@@ -7,6 +7,11 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
   </head>
   <body>
+    <div class="bg-blobs" aria-hidden="true">
+      <span class="bg-blob bg-blob--uk"></span>
+      <span class="bg-blob bg-blob--es"></span>
+      <span class="bg-blob bg-blob--mint"></span>
+    </div>
     <div id="gateOverlay" class="gate-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
       <div class="gate-card">
         <h2 id="gateTitle">クラスコード</h2>
@@ -193,7 +198,10 @@
       const API_DAILY_LIMIT = 20;
       const GATE_STORAGE_PREFIX = "vibespeak-gate-";
       const USAGE_STORAGE_PREFIX = "vibespeak-usage-";
+      const PASSWORD_BYPASS_KEY = "vibespeak-isPasswordBypassed";
       const FLAG_TAP_WINDOW_MS = 2500;
+      const FLAG_ADMIN_TAPS = 3;
+      const FLAG_BYPASS_TAPS = 5;
       let flagTapCount = 0;
       let flagTapTimer = null;
       let adminToastTimer = null;
@@ -544,39 +552,88 @@
         }
       }
 
+      function isPasswordBypassed() {
+        return localStorage.getItem(PASSWORD_BYPASS_KEY) === "true";
+      }
+
+      function setPasswordBypassed(enabled) {
+        localStorage.setItem(PASSWORD_BYPASS_KEY, enabled ? "true" : "false");
+      }
+
+      function showSecurityToast(message, durationMs = 3000) {
+        adminCodeToast.textContent = message;
+        adminCodeToast.classList.remove("hidden");
+        adminCodeToast.classList.add("is-visible");
+        if (adminToastTimer) window.clearTimeout(adminToastTimer);
+        adminToastTimer = window.setTimeout(() => {
+          adminCodeToast.classList.remove("is-visible");
+          window.setTimeout(() => adminCodeToast.classList.add("hidden"), 380);
+        }, durationMs);
+      }
+
+      async function autoUnlockGateIfNeeded() {
+        if (isGateUnlocked()) return true;
+        try {
+          const todayResponse = await fetch("/api/gate/today");
+          const todayData = await todayResponse.json();
+          const code = String(todayData.code || "").padStart(4, "0");
+          const verifyResponse = await fetch("/api/gate/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ code }),
+          });
+          const verifyData = await verifyResponse.json();
+          if (verifyResponse.ok && verifyData.ok && verifyData.token) {
+            saveGateToken(verifyData.token);
+            return true;
+          }
+        } catch (_) {
+          /* ignore */
+        }
+        return false;
+      }
+
+      async function enablePasswordBypassMode() {
+        setPasswordBypassed(true);
+        await autoUnlockGateIfNeeded();
+        hideGateOverlay();
+        showSecurityToast("パスワードなしモードを有効にしました");
+      }
+
       async function showAdminCodeToast() {
         try {
           const response = await fetch("/api/gate/today");
           const data = await response.json();
           const code = String(data.code || "").padStart(4, "0");
-          adminCodeToast.textContent = `本日のコードは ${code} です`;
-          adminCodeToast.classList.remove("hidden");
-          adminCodeToast.classList.add("is-visible");
-          if (adminToastTimer) window.clearTimeout(adminToastTimer);
-          adminToastTimer = window.setTimeout(() => {
-            adminCodeToast.classList.remove("is-visible");
-            window.setTimeout(() => adminCodeToast.classList.add("hidden"), 380);
-          }, 3000);
+          showSecurityToast(`本日のコードは ${code} です`);
         } catch (_) {
           setStatus("コードの取得に失敗しました。");
         }
       }
 
-      function registerFlagTripleTap() {
+      function registerFlagTap({ allowBypass = false } = {}) {
         flagTapCount += 1;
         if (flagTapTimer) window.clearTimeout(flagTapTimer);
-        if (flagTapCount >= 3) {
-          flagTapCount = 0;
+
+        if (flagTapCount === FLAG_ADMIN_TAPS) {
           showAdminCodeToast();
+        }
+        if (allowBypass && flagTapCount >= FLAG_BYPASS_TAPS) {
+          flagTapCount = 0;
+          enablePasswordBypassMode();
           return;
         }
+
         flagTapTimer = window.setTimeout(() => {
           flagTapCount = 0;
         }, FLAG_TAP_WINDOW_MS);
       }
 
-      function initSecurityGate() {
-        if (isGateUnlocked()) {
+      async function initSecurityGate() {
+        if (isPasswordBypassed()) {
+          await autoUnlockGateIfNeeded();
+          hideGateOverlay();
+        } else if (isGateUnlocked()) {
           hideGateOverlay();
         } else {
           showGateOverlay();
@@ -591,7 +648,7 @@
           gateError.textContent = "";
           if (gateCodeInput.value.length === 4) submitGateCode();
         });
-        document.getElementById("gateTitle").addEventListener("click", registerFlagTripleTap);
+        document.getElementById("gateTitle").addEventListener("click", () => registerFlagTap());
       }
 
       function getSampleBank() {
@@ -1452,7 +1509,7 @@
 
       studyLangTabButtons.forEach((btn) => {
         btn.addEventListener("click", () => {
-          registerFlagTripleTap();
+          registerFlagTap({ allowBypass: true });
           const nextLang = btn.dataset.lang;
           if (!nextLang || nextLang === studyLang) return;
           stopCurrentTtsPlayback();
