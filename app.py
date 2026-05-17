@@ -1,5 +1,7 @@
 import base64
+import datetime
 import hashlib
+import hmac
 import json
 import os
 import re
@@ -99,6 +101,32 @@ def get_openai_client() -> OpenAI | None:
     return OpenAI(api_key=api_key)
 
 
+def _today_date_key() -> str:
+    return datetime.date.today().strftime("%Y%m%d")
+
+
+def daily_class_code() -> str:
+    digest = hashlib.sha256(_today_date_key().encode("utf-8")).hexdigest()
+    return str(int(digest[:8], 16) % 10000).zfill(4)
+
+
+def gate_token_for_today() -> str:
+    secret = os.getenv("GATE_SECRET", "").strip() or os.getenv("OPENAI_API_KEY", "vibespeak-gate")
+    digest = hashlib.sha256(f"{secret}:{_today_date_key()}".encode("utf-8")).hexdigest()
+    return digest[:24]
+
+
+def is_valid_gate_token(token: str) -> bool:
+    value = (token or "").strip()
+    if not value:
+        return False
+    return hmac.compare_digest(value, gate_token_for_today())
+
+
+def gate_auth_error():
+    return jsonify({"error": "class code required", "code": "GATE_REQUIRED"}), 403
+
+
 def cache_key_for_text(text: str, lang: str = TTS_DEFAULT_LANG) -> str:
     digest = hashlib.sha256(f"{lang}\n{text}".encode("utf-8")).hexdigest()
     return digest[:32]
@@ -109,8 +137,25 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/api/gate/verify", methods=["POST"])
+def gate_verify():
+    payload = request.get_json(silent=True) or {}
+    code = str(payload.get("code", "")).strip()
+    if code == daily_class_code():
+        return jsonify({"ok": True, "token": gate_token_for_today()})
+    return jsonify({"ok": False, "error": "invalid code"}), 403
+
+
+@app.route("/api/gate/today", methods=["GET"])
+def gate_today():
+    return jsonify({"code": daily_class_code()})
+
+
 @app.route("/api/check-grammar", methods=["POST"])
 def check_grammar():
+    if not is_valid_gate_token(request.headers.get("X-Gate-Token", "")):
+        return gate_auth_error()
+
     payload = request.get_json(silent=True) or {}
     text = (payload.get("text") or "").strip()
     lang = normalize_study_lang(payload.get("lang") or "")
@@ -243,6 +288,9 @@ def ocr():
 
 @app.route("/api/tts", methods=["POST"])
 def tts():
+    if not is_valid_gate_token(request.headers.get("X-Gate-Token", "")):
+        return gate_auth_error()
+
     payload = request.get_json(silent=True) or {}
     text = (payload.get("text") or "").strip()
     lang = normalize_study_lang(payload.get("lang") or "")

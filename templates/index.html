@@ -7,6 +7,26 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
   </head>
   <body>
+    <div id="gateOverlay" class="gate-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
+      <div class="gate-card">
+        <h2 id="gateTitle">クラスコード</h2>
+        <p>先生から教わった4桁のコードを入力してください</p>
+        <input
+          id="gateCodeInput"
+          class="gate-code-input"
+          type="password"
+          inputmode="numeric"
+          maxlength="4"
+          pattern="[0-9]*"
+          autocomplete="off"
+          aria-label="4桁クラスコード"
+        />
+        <button id="gateSubmitBtn" class="gate-submit-btn" type="button">入室する</button>
+        <p id="gateError" class="gate-error" aria-live="polite"></p>
+      </div>
+    </div>
+    <div id="adminCodeToast" class="admin-code-toast hidden" aria-live="polite"></div>
+
     <main class="page">
       <section class="card app-shell">
         <div class="app-top">
@@ -164,6 +184,19 @@
       const headerLangCode = document.getElementById("headerLangCode");
       const grammarCorrectedMeta = document.getElementById("grammarCorrectedMeta");
       const studyLangTabButtons = document.querySelectorAll(".study-lang-tab");
+      const gateOverlay = document.getElementById("gateOverlay");
+      const gateCodeInput = document.getElementById("gateCodeInput");
+      const gateSubmitBtn = document.getElementById("gateSubmitBtn");
+      const gateError = document.getElementById("gateError");
+      const adminCodeToast = document.getElementById("adminCodeToast");
+
+      const API_DAILY_LIMIT = 20;
+      const GATE_STORAGE_PREFIX = "vibespeak-gate-";
+      const USAGE_STORAGE_PREFIX = "vibespeak-usage-";
+      const FLAG_TAP_WINDOW_MS = 2500;
+      let flagTapCount = 0;
+      let flagTapTimer = null;
+      let adminToastTimer = null;
 
       const SAMPLE_BANK = {
         en: {
@@ -374,6 +407,191 @@
 
       function getStudyLangConfig() {
         return STUDY_LANG[studyLang] || STUDY_LANG.en;
+      }
+
+      function todayKey() {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+      }
+
+      function gateStorageKey() {
+        return `${GATE_STORAGE_PREFIX}${todayKey().replace(/-/g, "")}`;
+      }
+
+      function usageStorageKey() {
+        return `${USAGE_STORAGE_PREFIX}${todayKey()}`;
+      }
+
+      function isGateUnlocked() {
+        try {
+          const saved = JSON.parse(sessionStorage.getItem(gateStorageKey()) || "null");
+          return Boolean(saved && saved.token && saved.date === todayKey());
+        } catch (_) {
+          return false;
+        }
+      }
+
+      function getGateToken() {
+        try {
+          const saved = JSON.parse(sessionStorage.getItem(gateStorageKey()) || "null");
+          if (saved && saved.date === todayKey()) return String(saved.token || "");
+        } catch (_) {
+          /* ignore */
+        }
+        return "";
+      }
+
+      function saveGateToken(token) {
+        sessionStorage.setItem(
+          gateStorageKey(),
+          JSON.stringify({ token: String(token || ""), date: todayKey() })
+        );
+      }
+
+      function gateFetchHeaders(json = true) {
+        const headers = {};
+        if (json) headers["Content-Type"] = "application/json";
+        const token = getGateToken();
+        if (token) headers["X-Gate-Token"] = token;
+        return headers;
+      }
+
+      function getApiUsageCount() {
+        try {
+          const saved = JSON.parse(localStorage.getItem(usageStorageKey()) || "{}");
+          if (saved.date !== todayKey()) return 0;
+          return Number(saved.count) || 0;
+        } catch (_) {
+          return 0;
+        }
+      }
+
+      function incrementApiUsageCount() {
+        const count = getApiUsageCount() + 1;
+        localStorage.setItem(usageStorageKey(), JSON.stringify({ date: todayKey(), count }));
+        return count;
+      }
+
+      function isApiLimitReached() {
+        return getApiUsageCount() >= API_DAILY_LIMIT;
+      }
+
+      function showApiLimitMessage() {
+        setStatus("本日の練習上限です。また明日！");
+      }
+
+      function canUseApiQuota() {
+        if (isApiLimitReached()) {
+          showApiLimitMessage();
+          return false;
+        }
+        return true;
+      }
+
+      function recordApiUsage() {
+        incrementApiUsageCount();
+      }
+
+      function showGateOverlay() {
+        gateOverlay.classList.remove("hidden");
+        document.body.classList.add("gate-locked");
+        gateCodeInput.value = "";
+        gateError.textContent = "";
+        window.setTimeout(() => gateCodeInput.focus(), 60);
+      }
+
+      function hideGateOverlay() {
+        gateOverlay.classList.add("hidden");
+        document.body.classList.remove("gate-locked");
+        gateError.textContent = "";
+      }
+
+      function handleGateAuthFailure() {
+        sessionStorage.removeItem(gateStorageKey());
+        showGateOverlay();
+        setStatus("クラスコードの確認が必要です。");
+      }
+
+      async function submitGateCode() {
+        const code = gateCodeInput.value.replace(/\D/g, "").slice(0, 4);
+        if (code.length !== 4) {
+          gateError.textContent = "4桁の数字を入力してください。";
+          return;
+        }
+        gateSubmitBtn.disabled = true;
+        gateError.textContent = "";
+        try {
+          const response = await fetch("/api/gate/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ code }),
+          });
+          const data = await response.json();
+          if (response.ok && data.ok && data.token) {
+            saveGateToken(data.token);
+            hideGateOverlay();
+            setStatus("ようこそ！練習を始めましょう。");
+            return;
+          }
+          gateError.textContent = "コードが正しくありません。";
+        } catch (_) {
+          gateError.textContent = "接続に失敗しました。もう一度お試しください。";
+        } finally {
+          gateSubmitBtn.disabled = false;
+        }
+      }
+
+      async function showAdminCodeToast() {
+        try {
+          const response = await fetch("/api/gate/today");
+          const data = await response.json();
+          const code = String(data.code || "").padStart(4, "0");
+          adminCodeToast.textContent = `本日のコードは ${code} です`;
+          adminCodeToast.classList.remove("hidden");
+          adminCodeToast.classList.add("is-visible");
+          if (adminToastTimer) window.clearTimeout(adminToastTimer);
+          adminToastTimer = window.setTimeout(() => {
+            adminCodeToast.classList.remove("is-visible");
+            window.setTimeout(() => adminCodeToast.classList.add("hidden"), 380);
+          }, 3000);
+        } catch (_) {
+          setStatus("コードの取得に失敗しました。");
+        }
+      }
+
+      function registerFlagTripleTap() {
+        flagTapCount += 1;
+        if (flagTapTimer) window.clearTimeout(flagTapTimer);
+        if (flagTapCount >= 3) {
+          flagTapCount = 0;
+          showAdminCodeToast();
+          return;
+        }
+        flagTapTimer = window.setTimeout(() => {
+          flagTapCount = 0;
+        }, FLAG_TAP_WINDOW_MS);
+      }
+
+      function initSecurityGate() {
+        if (isGateUnlocked()) {
+          hideGateOverlay();
+        } else {
+          showGateOverlay();
+        }
+
+        gateSubmitBtn.addEventListener("click", submitGateCode);
+        gateCodeInput.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") submitGateCode();
+        });
+        gateCodeInput.addEventListener("input", () => {
+          gateCodeInput.value = gateCodeInput.value.replace(/\D/g, "").slice(0, 4);
+          gateError.textContent = "";
+          if (gateCodeInput.value.length === 4) submitGateCode();
+        });
+        document.getElementById("gateTitle").addEventListener("click", registerFlagTripleTap);
       }
 
       function getSampleBank() {
@@ -971,13 +1189,18 @@
         }
         const response = await fetch("/api/tts", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: gateFetchHeaders(),
           body: JSON.stringify({ text, cache: true, lang: getStudyLangConfig().apiLang }),
         });
         const data = await response.json();
+        if (response.status === 403 && data.code === "GATE_REQUIRED") {
+          handleGateAuthFailure();
+          throw new Error("GATE_REQUIRED");
+        }
         if (!response.ok) {
           throw new Error(data.error || `TTS request failed: ${response.status}`);
         }
+        recordApiUsage();
         const audio = new Audio(data.url);
         currentTtsAudio = audio;
         audio.onplay = () => {
@@ -1011,11 +1234,13 @@
         }
 
         if (isUsingSampleText()) {
+          if (!canUseApiQuota()) return;
           setButtonLoading(listenModelBtn, true, "生成中...", LISTEN_BTN_LABEL);
           setStatus("高音質音声を生成中...");
           try {
             await speakWithOpenAITTS(text);
           } catch (error) {
+            if (String(error.message) === "GATE_REQUIRED") return;
             console.error("OpenAI TTS error:", error);
             setListenButtonPlaying(false);
             setStatus("高音質音声の取得に失敗しました。時間をおいて再試行してください。");
@@ -1031,10 +1256,14 @@
       async function checkGrammarWithAPI(text) {
         const response = await fetch("/api/check-grammar", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: gateFetchHeaders(),
           body: JSON.stringify({ text, lang: getStudyLangConfig().apiLang }),
         });
         const data = await response.json();
+        if (response.status === 403 && data.code === "GATE_REQUIRED") {
+          handleGateAuthFailure();
+          throw new Error("GATE_REQUIRED");
+        }
         if (!response.ok) {
           throw new Error(data.error || `Grammar check failed: ${response.status}`);
         }
@@ -1066,6 +1295,8 @@
           setStatus(getStudyLangConfig().needTextStatus);
           return;
         }
+        if (!canUseApiQuota()) return;
+
         stopCurrentTtsPlayback();
         setButtonLoading(grammarCheckBtn, true, "チェック中...", GRAMMAR_BTN_LABEL);
         grammarExplainList.innerHTML = "";
@@ -1073,6 +1304,7 @@
 
         try {
           const result = await checkGrammarWithAPI(sourceText);
+          recordApiUsage();
           const tips = Array.isArray(result.tips) ? result.tips : [];
           const corrected = String(result.corrected || sourceText).trim();
           const referenceUpdated = applyCorrectedReference(corrected, sourceText);
@@ -1094,6 +1326,7 @@
             setStatus("文法チェックが完了しました。");
           }
         } catch (error) {
+          if (String(error.message) === "GATE_REQUIRED") return;
           console.error("Grammar check error:", error);
           grammarCorrectedText.textContent = "チェックに失敗しました。時間をおいて再試行してください。";
           grammarExplainList.innerHTML =
@@ -1215,8 +1448,11 @@
       bindOcrPicker(ocrCameraInput, ocrCameraBtn, OCR_CAMERA_BTN_LABEL);
       bindOcrPicker(ocrFileInput, ocrFileBtn, OCR_FILE_BTN_LABEL);
 
+      initSecurityGate();
+
       studyLangTabButtons.forEach((btn) => {
         btn.addEventListener("click", () => {
+          registerFlagTripleTap();
           const nextLang = btn.dataset.lang;
           if (!nextLang || nextLang === studyLang) return;
           stopCurrentTtsPlayback();
