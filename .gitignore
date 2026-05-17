@@ -1,0 +1,34 @@
+# 秘密情報（本番は Render の Environment で設定）
+.env
+.env.local
+.env.*.local
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# TTS 音声キャッシュ（実行時に再生成される）
+static/audio/*.mp3
+static/audio/*.wav
+!static/audio/.gitkeep
+
+# ローカル開発時のアップロード音声
+uploads/
+*.wav
+
+# ログ
+*.log

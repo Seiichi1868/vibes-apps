@@ -1,0 +1,1317 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VibeSpeak</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="card app-shell">
+        <div class="app-top">
+          <header class="app-header" data-section="header">
+            <div class="header-compact-row">
+              <h1>VibeSpeak</h1>
+              <div class="study-lang-tabs" role="tablist" aria-label="学習言語">
+                <button type="button" class="study-lang-tab is-active" data-lang="en" aria-selected="true">
+                  🇬🇧 英語
+                </button>
+                <button type="button" class="study-lang-tab" data-lang="es" aria-selected="false">
+                  🇪🇸 スペイン語
+                </button>
+              </div>
+              <span class="header-sep" aria-hidden="true"></span>
+              <span id="headerSubtitle" class="subtitle">英語音読の流暢さチェッカー</span>
+              <span class="header-sep" aria-hidden="true"></span>
+              <span class="header-lang"
+                >認識: <code id="headerLangCode">en-US</code> — 話し終えると自動判定</span
+              >
+              <span id="statusText" class="header-status" data-section="recorder">待機中</span>
+            </div>
+          </header>
+          <div class="settings-wrap">
+            <button id="settingsBtn" class="settings-btn" type="button" aria-expanded="false" aria-controls="settingsPanel" title="表示設定">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+              </svg>
+            </button>
+            <div id="settingsPanel" class="settings-panel hidden" role="dialog" aria-label="表示設定">
+              <h3>表示するセクション</h3>
+              <label><input type="checkbox" data-toggle-section="sample" checked /> 練習用サンプル文</label>
+              <label><input type="checkbox" data-toggle-section="compose" checked /> 自由作文</label>
+              <label><input type="checkbox" data-toggle-section="grammar" checked /> 文法添削</label>
+              <label><input type="checkbox" data-toggle-section="recorder" checked /> ステータス表示</label>
+              <label><input type="checkbox" data-toggle-section="result" checked /> 判定結果</label>
+              <label><input type="checkbox" data-toggle-section="comparison" checked /> 発音一致率</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="dashboard">
+        <section class="input-block sample-block panel-block" data-section="sample">
+          <label for="sampleSelect">練習用サンプル文（CEFR）</label>
+          <div class="cefr-tabs" role="tablist" aria-label="CEFRレベル">
+            <button type="button" class="cefr-tab is-active" data-level="A1" aria-selected="true">A1（初級）</button>
+            <button type="button" class="cefr-tab" data-level="A2" aria-selected="false">A2（中級）</button>
+            <button type="button" class="cefr-tab" data-level="B1" aria-selected="false">B1（中上級）</button>
+          </div>
+          <div class="sample-row">
+            <select id="sampleSelect">
+              <option value="">-- 英文を選択 --</option>
+            </select>
+            <button id="sampleRandomBtn" class="btn ghost sample-random" type="button">ランダム</button>
+          </div>
+        </section>
+
+        <section class="input-block panel-block" data-section="compose">
+          <label for="referenceText">自由作文</label>
+          <textarea id="referenceText" rows="1" placeholder="英文を入力するか、上の練習用サンプル文を選んでください。"></textarea>
+          <div class="compose-ocr-row">
+            <input
+              id="ocrCameraInput"
+              type="file"
+              accept="image/*"
+              capture="environment"
+              hidden
+            />
+            <input id="ocrFileInput" type="file" accept="image/*" hidden />
+            <button id="ocrCameraBtn" class="btn ghost ocr-import-btn" type="button">
+              📸 カメラで撮影
+            </button>
+            <button id="ocrFileBtn" class="btn ghost ocr-import-btn" type="button">
+              🖼 写真・スクショを選択
+            </button>
+          </div>
+          <div class="compose-actions controls dense">
+            <button id="listenModelBtn" class="btn accent" type="button">音読例を聞く</button>
+            <button id="grammarCheckBtn" class="btn ghost" type="button">文法チェック</button>
+            <button id="startBtn" class="btn primary" type="button">録音開始</button>
+            <button id="stopBtn" class="btn ghost" type="button" disabled>停止</button>
+          </div>
+        </section>
+
+        <section id="grammarCard" class="result panel-block grammar-compact hidden" data-section="grammar">
+          <h2>文法添削</h2>
+          <p id="grammarCorrectedMeta" class="meta">修正案（英文）</p>
+          <p id="grammarCorrectedText" class="recognized">-</p>
+          <p class="meta">修正ポイント（日本語）</p>
+          <ul id="grammarExplainList"></ul>
+        </section>
+
+        <div class="dashboard-row cols-2 results-row">
+          <section class="result panel-block" data-section="result">
+            <h2>判定結果</h2>
+            <p id="recognizedText" class="recognized">-</p>
+          </section>
+
+          <section id="comparisonCard" class="result panel-block comparison-hero hidden" data-section="comparison">
+            <h2>発音一致率</h2>
+            <div id="accuracyBlock" class="accuracy-block hidden">
+              <div class="accuracy-head">
+                <span><span id="accuracyPercent">0</span>%</span>
+              </div>
+              <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="accuracyProgress">
+                <div id="accuracyBarFill" class="progress-fill"></div>
+              </div>
+            </div>
+            <div class="overlay-wrap">
+              <p id="baseReferenceLayer" class="base-layer"></p>
+              <p id="highlightLayer" class="highlight-layer"></p>
+            </div>
+            <div class="legend">
+              <span class="chip exact">一致（緑）</span>
+              <span class="chip near">不明瞭</span>
+              <span class="chip miss">不一致（赤）</span>
+            </div>
+          </section>
+        </div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const startBtn = document.getElementById("startBtn");
+      const stopBtn = document.getElementById("stopBtn");
+      const statusText = document.getElementById("statusText");
+      const sampleSelect = document.getElementById("sampleSelect");
+      const referenceText = document.getElementById("referenceText");
+      const recognizedText = document.getElementById("recognizedText");
+      const comparisonCard = document.getElementById("comparisonCard");
+      const accuracyBlock = document.getElementById("accuracyBlock");
+      const accuracyPercent = document.getElementById("accuracyPercent");
+      const accuracyBarFill = document.getElementById("accuracyBarFill");
+      const accuracyProgress = document.getElementById("accuracyProgress");
+      const settingsBtn = document.getElementById("settingsBtn");
+      const settingsPanel = document.getElementById("settingsPanel");
+      const sectionToggles = document.querySelectorAll("[data-toggle-section]");
+      const baseReferenceLayer = document.getElementById("baseReferenceLayer");
+      const highlightLayer = document.getElementById("highlightLayer");
+      const listenModelBtn = document.getElementById("listenModelBtn");
+      const grammarCheckBtn = document.getElementById("grammarCheckBtn");
+      const ocrCameraInput = document.getElementById("ocrCameraInput");
+      const ocrFileInput = document.getElementById("ocrFileInput");
+      const ocrCameraBtn = document.getElementById("ocrCameraBtn");
+      const ocrFileBtn = document.getElementById("ocrFileBtn");
+      const grammarCard = document.getElementById("grammarCard");
+      const grammarCorrectedText = document.getElementById("grammarCorrectedText");
+      const grammarExplainList = document.getElementById("grammarExplainList");
+      const sampleRandomBtn = document.getElementById("sampleRandomBtn");
+      const cefrTabButtons = document.querySelectorAll(".sample-block .cefr-tab");
+      const headerSubtitle = document.getElementById("headerSubtitle");
+      const headerLangCode = document.getElementById("headerLangCode");
+      const grammarCorrectedMeta = document.getElementById("grammarCorrectedMeta");
+      const studyLangTabButtons = document.querySelectorAll(".study-lang-tab");
+
+      const SAMPLE_BANK = {
+        en: {
+        A1: [
+          {
+            label: "A1① 朝の準備と通学",
+            text: "I woke up at six thirty on school days and ate toast for breakfast. I packed my lunch and met my friend at the bus stop. We talked about our homework during the short ride. I sat down and opened my English book before class started.",
+          },
+          {
+            label: "A1② 科目と時間割",
+            text: "At my high school, we studied math, English, science, and history on weekdays. Our homeroom teacher wrote the schedule on the board every morning. I liked art class because we drew landscapes with colored pencils. After sixth period, I went to the library and finished my worksheets quietly.",
+          },
+          {
+            label: "A1③ 家族の夕食",
+            text: "My family ate dinner together at seven o'clock in our small kitchen. My father talked about his day at the office while the rice cooked in the pot. My mother asked me about my school clubs and my upcoming tests. I washed the dishes and studied twenty English words before I went to bed.",
+          },
+          {
+            label: "A1④ 買い物",
+            text: "On Saturday morning, I walked to the supermarket near the station with my mother. We bought milk, eggs, apples, and bread for the weekend. I carried a cloth bag because the store charged extra money for plastic bags. At the register, I greeted the cashier and practiced saying thank you in English.",
+          },
+          {
+            label: "A1⑤ 部活（バスケ）",
+            text: "I joined the basketball club that year because I enjoyed running and jumping. Practice started at four o'clock, and we stretched for ten minutes first. The coach showed us simple passes, and we repeated them slowly. I felt tired after practice, but a hot shower and dinner helped me recover.",
+          },
+          {
+            label: "A1⑥ 天気と服装",
+            text: "That morning, the weather was cold, and the sky was gray over our quiet town. I wore a sweater, a scarf, and gloves on my walk to school. My classmates who had no umbrellas waited under the roof by the front gate. I hoped we could eat lunch on the grass again when spring came.",
+          },
+          {
+            label: "A1⑦ 友だちとカフェ",
+            text: "After school, my friend Rina invited me to a quiet cafe by the river. We ordered hot cocoa and shared a small cake with two forks. Rina showed me photos from her short trip, and I listened with interest. We promised to study together at the public library the following Sunday afternoon.",
+          },
+          {
+            label: "A1⑧ スマホと勉強",
+            text: "My smartphone showed train times and let me message my friends after class. My parents did not let me play games while I did my homework on school nights. I used a simple dictionary app when I read easy English news online. I turned off my alerts at night so that I could sleep well.",
+          },
+          {
+            label: "A1⑨ 運動会",
+            text: "Our sports day took place every October on the wide field behind the gym. I ran in the relay while my classmates cheered from the grass. We wore matching shirts and drank water between each race. Even when we lost, we laughed and took one team photo together.",
+          },
+          {
+            label: "A1⑩ 分別と環境",
+            text: "In our classroom, we sorted bottles and paper into bins beside the door. Our teacher said that small daily steps could protect the rivers near our town. I carried my own water bottle and avoided plastic cups when I bought juice. My friends and I hoped for a cleaner schoolyard where we could play sports.",
+          },
+        ],
+        A2: [
+          {
+            label: "A2① 日帰り旅行の計画",
+            text: "That Sunday, we took a train to a lakeside town two hours away. We packed sandwiches, fruit, and a small camera in a backpack. The forecast was sunny, so we brought hats and sunscreen for the pier. I planned to use polite English phrases when I bought our return tickets.",
+          },
+          {
+            label: "A2② エコ部とスピーチ",
+            text: "Last semester, our school eco-club collected signatures for a plastic-free cafeteria. I wrote a short speech and practiced in front of my mirror every evening. On presentation day, I spoke slowly and pointed to simple charts about daily waste. Our teachers said that clear examples helped students understand the message.",
+          },
+          {
+            label: "A2③ カフェのバイト",
+            text: "I worked at a cafe on Saturday afternoons to pay for keyboard lessons nearby. The manager taught me how to greet guests and carry trays without spilling drinks. On busy shifts, I wrote down orders and repeated them aloud once. The long hours still taught me patience with people.",
+          },
+          {
+            label: "A2④ オンライン勉強会",
+            text: "During exam week, I joined nightly video study sessions with my classmates on one shared app. We shared slides, marked key formulas, and typed questions in the chat window. When the Wi-Fi stopped working, we emailed short backup notes to one another. Ten-minute breaks kept us focused until ten o'clock.",
+          },
+          {
+            label: "A2⑤ 文化祭",
+            text: "Our cultural festival filled the school with food stalls, soft music, and crafts from every grade. Guests wore wristbands and followed bright arrows on the hallway floor. I sold curry rice, counted coins with a calculator, and thanked each visitor politely. After we closed up, we swept the halls and compared our simple profit totals.",
+          },
+          {
+            label: "A2⑥ ペンパル",
+            text: "My pen pal in Australia wrote about surf lessons and daily life at a coastal school. I mailed her pictures of red maple trees near our campus and photos from volleyball club after class. We traded slang, laughed at awkward translation mistakes, and asked each other about exam stress. Writing a letter every month kept new words alive in my notebook.",
+          },
+          {
+            label: "A2⑦ 終電を逃す",
+            text: "When I missed the last train, I stayed at a friend's house, and we cooked instant noodles together. We talked about clubs, big tests, and summer plans past midnight. The warm soup helped us relax before we went to sleep upstairs. We set two phone alarms so that we would not miss first period the next morning.",
+          },
+          {
+            label: "A2⑧ ボランティア清掃",
+            text: "Last Saturday at dawn, twenty of us cleaned the muddy riverbank in our town. We wore gloves, filled sacks with trash, and piled cans beside a city truck. Neighbors offered us tea and crackers at noon with friendly smiles. Our dirty knees felt worth it when we saw the clearer path for walkers.",
+          },
+          {
+            label: "A2⑨ けがと復帰",
+            text: "Last month, I twisted my ankle during basketball practice, and the nurse taped it tightly. The coach told me to rest for two weeks and swim laps instead of running sprints. At my desk, I studied old game videos about defense. Coming back slowly showed me why daily warm-ups mattered.",
+          },
+          {
+            label: "A2⑩ 図書館で自学",
+            text: "The city library had quiet desks, bright lamps, and study space until nine in the evening. Before finals, I reserved a seat online and brought headphones with me. Kind volunteers tutored younger children every Wednesday after school. That steady quiet was better than studying in my noisy apartment on most nights.",
+          },
+        ],
+        B1: [
+          {
+            label: "B1① 気候と身近な行動",
+            text: "Climate reports showed ice melting far away, yet many of my neighbors ignored its link to the smoky traffic on our streets each morning. Short bike rides to school cut fuel costs and reduced exhaust near the elementary school gates. Our city leaders could have asked students to survey crowded bus routes before printing more vague climate posters.",
+          },
+          {
+            label: "B1② AIと教育",
+            text: "Teachers debated whether chatbots supported honest learning or encouraged lazy, copied answers late at night. Clear class rules about citing AI drafts pushed students to revise carefully instead of hiding the tools. Small pilot lessons showed which tasks saved time without removing deep thinking.",
+          },
+          {
+            label: "B1③ いじめと沈黙",
+            text: "Bullying often started as jokes that classmates called playful teasing, but the targets sometimes withdrew for whole difficult terms. Counselors encouraged early reports, yet shame around complaining still silenced students who feared ridicule. Peer mediators trained in patient listening made it normal to ask for help before conflicts grew worse.",
+          },
+          {
+            label: "B1④ フェイクニュース",
+            text: "Students scrolled through feeds that mixed facts with half-true rumors, so quick source checks became as important as grammar drills. Our civics teacher assigned ten-minute reviews of official city websites whenever frightened posts trended overnight. Comparing authors, dates, and links in pairs usually reduced panic about fake school closures within one class period.",
+          },
+          {
+            label: "B1⑤ 受験ストレス",
+            text: "Competitive entrance exams pushed many students into late-night study marathons that replaced healthy sleep and quiet hobbies. Counselors warned that fifteen-minute meetings could not replace rest or honest family talks about realistic goals. Schools tracked student wellbeing through short, anonymous surveys before hanging another cram-school banner in the hallway.",
+          },
+          {
+            label: "B1⑥ 都市の大気汚染",
+            text: "Gray spring smog still made children cough beside idling trucks outside our junior high school gates. Parents asked for temporary bans on through traffic, but shipping companies defended tight curbside loading downtown. Student volunteers who recorded weekly particle counts gave city planners honest data for fair weekday limits.",
+          },
+          {
+            label: "B1⑦ 部活とジェンダー",
+            text: "Traditional labels still guided boys toward science labs and girls toward music rooms before anyone asked about their real interests. Teens who crossed those quiet borders heard jokes or worried questions at family dinners. Principal-led club fairs with mixed mentors opened wider choices before course forms locked in their schedules.",
+          },
+          {
+            label: "B1⑧ 留学機会の格差",
+            text: "Overseas study tours excited wealthier families, while classmates with smaller budgets watched slideshows from the back rows of the auditorium. Public travel grants existed, but complicated forms and early deadlines excluded teens who learned about the programs too late each year. Simpler translated guides slowly spread access beyond top honor students.",
+          },
+          {
+            label: "B1⑨ ファストファッション",
+            text: "Fast-fashion sales tempted teens, but the industry hid factory pollution and landfill waste far from our closets. Several of my friends traded jackets each month instead of buying new dresses for every formal event. Short repair workshops at school built lasting habits faster than dry classroom lectures alone.",
+          },
+          {
+            label: "B1⑩ データとアプリ",
+            text: "Study apps offered fun quiz streaks while quietly collecting GPS routes and entire contact lists inside routine updates. Busy commuters barely read dense legal screens on bright phones between train transfers. Required digital-health classes taught us to delete unused profiles before the next district-wide app requirement arrived.",
+          },
+        ],
+      },
+      es: {
+        A1: [
+          { label: "A1① 朝の準備", text: "Me desperté a las seis y media los días de instituto y desayuné tostadas. Preparé el almuerzo y quedé con mi amiga en la parada del autobús. Hablamos de los deberes durante el trayecto corto. Me senté y abrí el libro de inglés antes de que empezara la clase." },
+          { label: "A1② 科目と時間", text: "En mi instituto estudiamos matemáticas, inglés, ciencias e historia entre semana. Nuestra tutora escribía el horario en la pizarra cada mañana. Me gustaba plástica porque dibujábamos paisajes con lápices de colores. Después de la sexta hora fui a la biblioteca y terminé los ejercicios en silencio." },
+          { label: "A1③  cena familiar", text: "Mi familia cenaba junta a las siete en nuestra cocina pequeña. Mi padre contaba su día en la oficina mientras se cocía el arroz. Mi madre me preguntaba por los clubes del instituto y los exámenes. Lavé los platos y estudié veinte palabras en inglés antes de dormir." },
+          { label: "A1④  compras", text: "El sábado por la mañana fui al supermercado cerca de la estación con mi madre. Compramos leche, huevos, manzanas y pan para el fin de semana. Llevé una bolsa de tela porque la tienda cobraba extra por las bolsas de plástico. En la caja saludé al cajero y practiqué decir gracias en inglés." },
+          { label: "A1⑤  baloncesto", text: "Ese año me apunté al club de baloncesto porque me gustaba correr y saltar. El entrenamiento empezaba a las cuatro y primero estirábamos diez minutos. El entrenador nos enseñó pases sencillos y los repetimos despacio. Me cansé después, pero una ducha caliente y la cena me ayudaron." },
+          { label: "A1⑥  tiempo", text: "Esa mañana hacía frío y el cielo estaba gris sobre nuestro pueblo tranquilo. Llevé jersey, bufanda y guantes camino al instituto. Mis compañeros sin paraguas esperaban bajo el techo de la entrada. Esperaba poder comer en el patio cuando llegara la primavera." },
+          { label: "A1⑦  café", text: "Después de clase mi amiga Rina me invitó a un café tranquilo junto al río. Pedimos chocolate caliente y compartimos un pastel pequeño con dos tenedores. Rina me enseñó fotos de su viaje corto y yo escuché con interés. Prometimos estudiar juntas en la biblioteca pública el domingo siguiente." },
+          { label: "A1⑧  móvil", text: "Mi móvil mostraba horarios de tren y me dejaba escribir a mis amigas después de clase. Mis padres no me dejaban jugar mientras hacía los deberes entre semana. Usaba una aplicación sencilla de diccionario cuando leía noticias fáciles en inglés. Apagué las alertas por la noche para dormir bien." },
+          { label: "A1⑨  deporte escolar", text: "Nuestra fiesta del deporte era cada octubre en el campo amplio detrás del gimnasio. Corrí en el relevo mientras mis compañeros animaban desde la hierba. Llevábamos camisetas iguales y bebíamos agua entre carreras. Aunque perdimos, nos reímos y nos hicimos una foto juntos." },
+          { label: "A1⑩  reciclaje", text: "En nuestra clase separábamos botellas y papel en cubos junto a la puerta. La profesora decía que pequeños gestos diarios podían proteger los ríos cerca del pueblo. Llevaba mi botella de agua y evitaba vasos de plástico al comprar zumo. Mis amigas y yo queríamos un patio más limpio para jugar." },
+        ],
+        A2: [
+          { label: "A2①  excursión", text: "Ese domingo cogimos un tren a un pueblo junto al lago a dos horas. Metimos bocadillos, fruta y una cámara pequeña en la mochila. El tiempo era soleado, así que llevamos gorras y crema solar para el embarcadero. Planeé usar frases educadas en inglés al comprar los billetes de vuelta." },
+          { label: "A2②  club ecológico", text: "El semestre pasado nuestro club ecológico recogió firmas para una cafetería sin plástico. Escribí un discurso corto y practiqué delante del espejo cada tarde. El día de la presentación hablé despacio y señalé gráficos sencillos sobre residuos diarios. Los profesores dijeron que ejemplos claros ayudaban a entender el mensaje." },
+          { label: "A2③  trabajo en cafetería", text: "Trabajaba en una cafetería los sábados por la tarde para pagar clases de teclado. El encargado me enseñó a saludar a los clientes y a llevar bandejas sin derramar bebidas. En turnos ocupados apuntaba pedidos y los repetía en voz alta una vez. Las horas largas me enseñaron paciencia con la gente." },
+          { label: "A2④  estudio online", text: "Durante los exámenes me uní por la noche a videollamadas de estudio con mis compañeras en una aplicación. Compartíamos diapositivas, marcamos fórmulas clave y escribíamos dudas en el chat. Cuando falló el wifi, nos enviamos notas cortas por correo. Descansos de diez minutos nos mantenían concentradas hasta las diez." },
+          { label: "A2⑤  fiesta cultural", text: "Nuestra fiesta cultural llenó el instituto de puestos de comida, música suave y manualidades de cada curso. Los visitantes llevaban pulseras y seguían flechas brillantes en el pasillo. Vendí arroz con curry, conté monedas con calculadora y agradecí a cada persona. Al cerrar, barremos y comparámos beneficios sencillos." },
+          { label: "A2⑥  amiga por carta", text: "Mi amiga de Australia escribía sobre clases de surf y la vida en un instituto costero. Le envié fotos de arces rojos cerca del campus y del club de voleibol. Intercambiamos modismos, reímos de traducciones raras y hablamos del estrés de los exámenes. Escribir cada mes mantenía vivas palabras nuevas en mi cuaderno." },
+          { label: "A2⑦  último tren", text: "Cuando perdí el último tren, me quedé en casa de una amiga y cocinamos fideos instantáneos. Hablamos de clubes, exámenes importantes y planes de verano hasta muy tarde. La sopa caliente nos relajó antes de dormir arriba. Pusimos dos alarmas en el móvil para no llegar tarde al instituto." },
+          { label: "A2⑧  voluntariado", text: "El sábado al amanecer veinte de nosotros limpiamos la orilla embarrada del río. Llevábamos guantes, llenamos sacos de basura y apilamos latas junto al camión municipal. Vecinos nos ofrecieron té y galletas al mediodía. Valió la pena cuando vimos el sendero más claro para pasear." },
+          { label: "A2⑨  lesión", text: "El mes pasado me torcí el tobillo en el entrenamiento de baloncesto y la enfermera me vendó fuerte. El entrenador me dijo que descansara dos semanas y nadara en lugar de correr sprints. En casa estudié vídeos antiguos sobre defensa. Volver despacio me enseñó por qué importan los calentamientos." },
+          { label: "A2⑩  biblioteca", text: "La biblioteca municipal tenía mesas tranquilas, lámparas brillantes y estudio hasta las nueve de la noche. Antes de los finales reservé sitio online y llevé auriculares. Voluntarios amables daban clase a niños pequeños los miércoles. Ese silencio constante era mejor que estudiar en mi piso ruidoso." },
+        ],
+        B1: [
+          { label: "B1①  clima", text: "Los informes climáticos mostraban hielo derritiéndose lejos, pero muchos vecinos ignoraban su relación con el tráfico humeante de nuestras calles cada mañana. Trayectos cortos en bici al instituto reducían costes y el escape cerca de las puertas del colegio infantil. Los líderes locales podrían haber pedido encuestas sobre autobuses llenos antes de imprimir más carteles vagos." },
+          { label: "B1②  IA y educación", text: "Los profesores debatían si los chatbots apoyaban un aprendizaje honesto o fomentaban respuestas copiadas de madrugada. Reglas claras sobre citar borradores de IA empujaban a revisar con cuidado en lugar de esconder las herramientas. Lecciones piloto pequeñas mostraron qué tareas ahorraban tiempo sin quitar pensamiento profundo." },
+          { label: "B1③  acoso", text: "El acoso a menudo empezaba como bromas que los compañeros llamaban juegos, pero algunas víctimas se aislaban durante trimestres enteros. Los orientadores animaban denuncias tempranas, pero la vergüenza por quejarse silenciaba a quienes temían burlas. Mediadores entrenados en escucha paciente normalizaban pedir ayuda antes de que el conflicto creciera." },
+          { label: "B1④  noticias falsas", text: "Los estudiantes revisaban feeds que mezclaban hechos con rumores a medias, así que comprobar fuentes rápido era tan importante como ejercicios de gramática. Nuestra profesora de ciudadanía pedía diez minutos en webs oficiales cuando posts alarmantes se viralizaban de noche. Comparar autores, fechas y enlaces en parejas reducía el pánico por cierres falsos en una clase." },
+          { label: "B1⑤  estrés de exámenes", text: "Exámenes competitivos empujaban a muchos a maratones nocturnos que sustituían sueño saludable y hobbies tranquilos. Los orientadores advertían que reuniones de quince minutos no reemplazaban descanso ni charlas familiares honestas sobre metas realistas. Los centros medían bienestar con encuestas anónimas cortas antes de colgar otro cartel de academia." },
+          { label: "B1⑥  contaminación", text: "La niebla gris de primavera aún hacía toser a niños junto a camiones parados fuera de nuestro instituto. Padres pedían prohibiciones temporales de tráfico de paso, pero empresas de reparto defendían carga en aceras del centro. Voluntarios que registraban partículas semanales daban datos honestos a planificadores urbanos." },
+          { label: "B1⑦  clubes y género", text: "Etiquetas tradicionales aún guiaban a chicos hacia laboratorios y a chicas hacia salas de música antes de preguntar intereses reales. Adolescentes que cruzaban esas fronteras escuchaban bromas o preguntas preocupadas en casa. Ferias de clubes con mentores mixtos abrían opciones antes de cerrar formularios de materias." },
+          { label: "B1⑧  becas de viaje", text: "Viajes de estudio al extranjero emocionaban a familias con más recursos, mientras compañeros con presupuestos menores veían diapositivas desde el fondo del auditorio. Existían becas públicas, pero formularios complicados y plazos tempranos excluían a quienes se enteraban tarde cada año. Guías traducidas más simples ampliaban acceso más allá de alumnos de honor." },
+          { label: "B1⑨  moda rápida", text: "Rebajas de moda rápida tentaban a adolescentes, pero la industria escondía contaminación de fábricas y vertederos lejos de nuestros armarios. Varias amigas intercambiaban chaquetas cada mes en lugar de comprar vestidos nuevos para cada evento formal. Talleres cortos de reparación en el instituto creaban hábitos duraderos más rápido que clases secas." },
+          { label: "B1⑩  datos y apps", text: "Aplicaciones de estudio ofrecían rachas divertidas mientras recogían rutas GPS y listas de contactos en actualizaciones rutinarias. Viajeros ocupados apenas leían pantallas legales densas entre transbordos de tren. Clases obligatorias de salud digital nos enseñaron a borrar perfiles sin uso antes del próximo requisito del distrito." },
+        ],
+      },
+      };
+
+      const STUDY_LANG = {
+        en: {
+          id: "en",
+          speechLang: "en-US",
+          apiLang: "en-US",
+          subtitle: "英語音読の流暢さチェッカー",
+          samplePlaceholder: "-- 英文を選択 --",
+          composePlaceholder: "英文を入力するか、上の練習用サンプル文を選んでください。",
+          grammarMeta: "修正案（英文）",
+          needTextStatus: "先に自由入力欄へ英文を入力してください。",
+          recordNeedText: "先にお手本の英文を入力してください。",
+          recordPrompt: "認識中... 英文を読み上げてください。",
+        },
+        es: {
+          id: "es",
+          speechLang: "es-ES",
+          apiLang: "es-ES",
+          subtitle: "スペイン語（スペイン）音読チェッカー",
+          samplePlaceholder: "-- スペイン語文を選択 --",
+          composePlaceholder: "スペイン語文を入力するか、上の練習用サンプル文を選んでください。",
+          grammarMeta: "修正案（スペイン語）",
+          needTextStatus: "先に自由入力欄へスペイン語文を入力してください。",
+          recordNeedText: "先にお手本のスペイン語文を入力してください。",
+          recordPrompt: "認識中... スペイン語文を読み上げてください。",
+        },
+      };
+
+      let studyLang = "en";
+      let sampleLevel = "A1";
+      let referenceFromSample = false;
+      let currentTtsAudio = null;
+      let browserUtteranceActive = false;
+      const GRAMMAR_BTN_LABEL = "文法チェック";
+      const LISTEN_BTN_LABEL = "音読例を聞く";
+      const LISTEN_STOP_LABEL = "■ 音声停止";
+      const OCR_CAMERA_BTN_LABEL = "📸 カメラで撮影";
+      const OCR_FILE_BTN_LABEL = "🖼 写真・スクショを選択";
+
+      function getStudyLangConfig() {
+        return STUDY_LANG[studyLang] || STUDY_LANG.en;
+      }
+
+      function getSampleBank() {
+        return SAMPLE_BANK[studyLang] || SAMPLE_BANK.en;
+      }
+
+      function applyStudyLanguage(nextLang, { resetReference = false } = {}) {
+        if (!STUDY_LANG[nextLang]) return;
+        studyLang = nextLang;
+        const config = getStudyLangConfig();
+
+        studyLangTabButtons.forEach((btn) => {
+          const active = btn.dataset.lang === studyLang;
+          btn.classList.toggle("is-active", active);
+          btn.setAttribute("aria-selected", active ? "true" : "false");
+        });
+
+        headerSubtitle.textContent = config.subtitle;
+        headerLangCode.textContent = config.speechLang;
+        grammarCorrectedMeta.textContent = config.grammarMeta;
+        referenceText.placeholder = config.composePlaceholder;
+
+        if (recognition) recognition.lang = config.speechLang;
+
+        fillSampleSelect(sampleLevel);
+        hideGrammarPanel();
+
+        if (resetReference) {
+          referenceText.value = "";
+          referenceFromSample = false;
+          autoResizeReferenceText();
+          renderComparison();
+        }
+      }
+
+      function fillSampleSelect(level) {
+        const config = getStudyLangConfig();
+        const bank = getSampleBank();
+        sampleSelect.innerHTML = "";
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = config.samplePlaceholder;
+        sampleSelect.appendChild(placeholder);
+        bank[level].forEach((item) => {
+          const opt = document.createElement("option");
+          opt.value = item.text;
+          opt.textContent = item.label;
+          sampleSelect.appendChild(opt);
+        });
+        sampleSelect.selectedIndex = 0;
+      }
+
+      function pickRandomSampleForLevel(level) {
+        const items = getSampleBank()[level];
+        const idx = Math.floor(Math.random() * items.length);
+        sampleSelect.selectedIndex = idx + 1;
+        referenceText.value = items[idx].text;
+        referenceFromSample = true;
+        autoResizeReferenceText();
+        renderComparison();
+        grammarCard.classList.add("hidden");
+      }
+
+      function isUsingSampleText() {
+        return referenceFromSample && referenceText.value.trim().length > 0;
+      }
+
+      function setButtonLoading(btn, loading, loadingText, defaultText) {
+        btn.disabled = loading;
+        btn.textContent = loading ? loadingText : defaultText;
+      }
+
+      function isTtsPlaying() {
+        if (currentTtsAudio && !currentTtsAudio.paused && !currentTtsAudio.ended) return true;
+        if (browserUtteranceActive) return true;
+        if ("speechSynthesis" in window && window.speechSynthesis.speaking) return true;
+        return false;
+      }
+
+      function setListenButtonPlaying(playing) {
+        listenModelBtn.textContent = playing ? LISTEN_STOP_LABEL : LISTEN_BTN_LABEL;
+        listenModelBtn.classList.toggle("is-playing", playing);
+        listenModelBtn.setAttribute("aria-pressed", playing ? "true" : "false");
+      }
+
+      function stopCurrentTtsPlayback() {
+        if (currentTtsAudio) {
+          currentTtsAudio.pause();
+          currentTtsAudio.currentTime = 0;
+          currentTtsAudio = null;
+        }
+        browserUtteranceActive = false;
+        if ("speechSynthesis" in window) {
+          window.speechSynthesis.cancel();
+        }
+        setListenButtonPlaying(false);
+      }
+
+      function pauseCurrentTtsPlayback() {
+        if (currentTtsAudio && !currentTtsAudio.paused) {
+          currentTtsAudio.pause();
+          currentTtsAudio.currentTime = 0;
+          currentTtsAudio = null;
+        }
+        browserUtteranceActive = false;
+        if ("speechSynthesis" in window) {
+          window.speechSynthesis.cancel();
+        }
+        setListenButtonPlaying(false);
+      }
+
+      let recognition = null;
+      let finalTranscript = "";
+      let interimTranscript = "";
+
+      const NUMBER_ONES = [
+        "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+        "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen",
+        "seventeen", "eighteen", "nineteen",
+      ];
+      const NUMBER_TENS = [
+        "", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety",
+      ];
+      const ENGLISH_NUMBER_WORDS = new Set([
+        ...NUMBER_ONES,
+        ...NUMBER_TENS.filter(Boolean),
+        "hundred", "thousand", "million", "oh",
+      ]);
+
+      function intToEnglish(n) {
+        const num = Math.floor(Number(n));
+        if (!Number.isFinite(num) || num < 0) return "";
+        if (num < 20) return NUMBER_ONES[num];
+        if (num < 100) {
+          const tens = Math.floor(num / 10);
+          const ones = num % 10;
+          return ones ? `${NUMBER_TENS[tens]} ${NUMBER_ONES[ones]}` : NUMBER_TENS[tens];
+        }
+        if (num < 1000) {
+          const hundreds = Math.floor(num / 100);
+          const rest = num % 100;
+          if (!rest) return `${NUMBER_ONES[hundreds]} hundred`;
+          return `${NUMBER_ONES[hundreds]} hundred ${intToEnglish(rest)}`;
+        }
+        if (num < 1000000) {
+          const thousands = Math.floor(num / 1000);
+          const rest = num % 1000;
+          if (!rest) return `${intToEnglish(thousands)} thousand`;
+          return `${intToEnglish(thousands)} thousand ${intToEnglish(rest)}`;
+        }
+        return String(num);
+      }
+
+      function expandOrdinals(text) {
+        return String(text || "").replace(/\b(\d+)(st|nd|rd|th)\b/gi, (_, digits) =>
+          intToEnglish(parseInt(digits, 10))
+        );
+      }
+
+      function expandClockTimes(text) {
+        return String(text || "").replace(
+          /\b(\d{1,2}):(\d{2})\b/g,
+          (_, hour, minute) => {
+            const h = parseInt(hour, 10);
+            const m = parseInt(minute, 10);
+            if (h > 23 || m > 59) return `${hour} ${minute}`;
+            return `${intToEnglish(h)} ${intToEnglish(m)}`;
+          }
+        );
+      }
+
+      function expandSpacedClockTimes(text) {
+        return String(text || "").replace(/\b(\d{1,2})\s+(\d{2})\b/g, (match, hour, minute) => {
+          const h = parseInt(hour, 10);
+          const m = parseInt(minute, 10);
+          if (h > 23 || m > 59) return match;
+          return `${intToEnglish(h)} ${intToEnglish(m)}`;
+        });
+      }
+
+      function expandStandaloneNumbers(text) {
+        return String(text || "").replace(/\b\d+\b/g, (digits) => intToEnglish(parseInt(digits, 10)));
+      }
+
+      function normalizeTextForWords(text) {
+        let normalized = String(text || "")
+          .replace(/\r\n|\r|\n/g, " ")
+          .toLowerCase();
+        if (studyLang === "en") {
+          normalized = expandOrdinals(normalized);
+          normalized = expandClockTimes(normalized);
+          normalized = expandSpacedClockTimes(normalized);
+          normalized = expandStandaloneNumbers(normalized);
+        }
+        return normalized
+          .replace(/[,.!?;:()[\]{}"""''…—–-]/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+
+      function canonicalCompareToken(token) {
+        const word = String(token || "").trim().toLowerCase();
+        if (!word) return "";
+        if (/^\d{1,2}:\d{2}$/.test(word)) {
+          const [hour, minute] = word.split(":");
+          return `${intToEnglish(parseInt(hour, 10))} ${intToEnglish(parseInt(minute, 10))}`;
+        }
+        if (studyLang === "en") {
+          if (/^\d+$/.test(word)) return intToEnglish(parseInt(word, 10));
+          if (ENGLISH_NUMBER_WORDS.has(word)) return word;
+        }
+        return word;
+      }
+
+      function tokenMatchScore(refToken, spokenToken) {
+        const refNorm = canonicalCompareToken(refToken);
+        const spokenNorm = canonicalCompareToken(spokenToken);
+        if (!refNorm || !spokenNorm) return -2;
+        if (refNorm === spokenNorm) return 3;
+        if (levenshtein(refNorm, spokenNorm) <= 1) return 1;
+        const refParts = refNorm.split(" ").filter(Boolean);
+        const spokenParts = spokenNorm.split(" ").filter(Boolean);
+        if (refParts.length > 1 && refParts.join(" ") === spokenNorm) return 3;
+        if (spokenParts.length > 1 && spokenParts.join(" ") === refNorm) return 3;
+        return -2;
+      }
+
+      function extractWordTokens(text) {
+        const normalized = normalizeTextForWords(text);
+        if (!normalized) return [];
+        return normalized.split(" ").filter(Boolean);
+      }
+
+      const tokenize = (text) => extractWordTokens(text);
+
+      function hideGrammarPanel() {
+        grammarCard.classList.add("hidden");
+      }
+
+      function applyCorrectedReference(corrected, sourceText) {
+        const next = String(corrected || "").trim();
+        const prev = String(sourceText || "").trim();
+        if (!next || next === prev) return false;
+        referenceText.value = next;
+        referenceFromSample = false;
+        sampleSelect.selectedIndex = 0;
+        autoResizeReferenceText();
+        if (finalTranscript.trim()) renderComparison();
+        return true;
+      }
+
+      function levenshtein(a, b) {
+        const m = a.length;
+        const n = b.length;
+        const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+        for (let i = 0; i <= m; i += 1) dp[i][0] = i;
+        for (let j = 0; j <= n; j += 1) dp[0][j] = j;
+        for (let i = 1; i <= m; i += 1) {
+          for (let j = 1; j <= n; j += 1) {
+            const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+            dp[i][j] = Math.min(
+              dp[i - 1][j] + 1,
+              dp[i][j - 1] + 1,
+              dp[i - 1][j - 1] + cost
+            );
+          }
+        }
+        return dp[m][n];
+      }
+
+      function compareWords(referenceWords, spokenWords) {
+        const n = referenceWords.length;
+        const m = spokenWords.length;
+        if (n === 0) return [];
+        if (m === 0) {
+          return referenceWords.map((word) => ({ word, state: "miss" }));
+        }
+
+        const GAP = 1;
+        const dp = Array.from({ length: n + 1 }, () => Array(m + 1).fill(0));
+        const trace = Array.from({ length: n + 1 }, () => Array(m + 1).fill(null));
+
+        for (let i = 1; i <= n; i += 1) dp[i][0] = -i * GAP;
+        for (let j = 1; j <= m; j += 1) dp[0][j] = -j * GAP;
+
+        for (let i = 1; i <= n; i += 1) {
+          for (let j = 1; j <= m; j += 1) {
+            const match = dp[i - 1][j - 1] + tokenMatchScore(referenceWords[i - 1], spokenWords[j - 1]);
+            const skipSpoken = dp[i][j - 1] - GAP;
+            const skipRef = dp[i - 1][j] - GAP;
+
+            let best = match;
+            let dir = "diag";
+            if (skipSpoken > best) {
+              best = skipSpoken;
+              dir = "left";
+            }
+            if (skipRef > best) {
+              best = skipRef;
+              dir = "up";
+            }
+            dp[i][j] = best;
+            trace[i][j] = dir;
+          }
+        }
+
+        const refStates = Array(n).fill("miss");
+        let i = n;
+        let j = m;
+        while (i > 0 || j > 0) {
+          const dir = trace[i][j];
+          if (i > 0 && j > 0 && dir === "diag") {
+            const score = tokenMatchScore(referenceWords[i - 1], spokenWords[j - 1]);
+            refStates[i - 1] = score >= 3 ? "exact" : score >= 1 ? "near" : "miss";
+            i -= 1;
+            j -= 1;
+          } else if (i > 0 && (j === 0 || dir === "up")) {
+            refStates[i - 1] = "miss";
+            i -= 1;
+          } else {
+            j -= 1;
+          }
+        }
+
+        return referenceWords.map((word, idx) => ({ word, state: refStates[idx] }));
+      }
+
+      function computeAccuracyPercent(compared) {
+        if (!compared.length) return 0;
+        let score = 0;
+        compared.forEach((item) => {
+          if (item.state === "exact") score += 1;
+          else if (item.state === "near") score += 0.5;
+        });
+        return Math.round((score / compared.length) * 100);
+      }
+
+      function updateAccuracyBar(compared) {
+        const percent = computeAccuracyPercent(compared);
+        accuracyPercent.textContent = String(percent);
+        accuracyBarFill.style.width = `${percent}%`;
+        accuracyProgress.setAttribute("aria-valuenow", String(percent));
+        accuracyBlock.classList.remove("hidden");
+      }
+
+      function renderComparison() {
+        const referenceRaw = referenceText.value.trim();
+        if (!referenceRaw) {
+          comparisonCard.classList.add("hidden");
+          accuracyBlock.classList.add("hidden");
+          return;
+        }
+
+        const referenceWords = extractWordTokens(referenceRaw);
+        const spokenWords = extractWordTokens(finalTranscript);
+        const compared = compareWords(referenceWords, spokenWords);
+
+        baseReferenceLayer.innerHTML = "";
+        highlightLayer.innerHTML = "";
+
+        referenceWords.forEach((word, idx) => {
+          const baseSpan = document.createElement("span");
+          baseSpan.className = "token";
+          baseSpan.textContent = word;
+          baseReferenceLayer.appendChild(baseSpan);
+
+          const colorSpan = document.createElement("span");
+          colorSpan.className = `token ${compared[idx].state}`;
+          colorSpan.textContent = word;
+          highlightLayer.appendChild(colorSpan);
+        });
+
+        updateAccuracyBar(compared);
+        comparisonCard.classList.remove("hidden");
+      }
+
+      const SECTION_STORAGE_KEY = "vibespeak-section-visibility";
+
+      function applySectionVisibility() {
+        document.querySelectorAll("[data-section]").forEach((el) => {
+          const key = el.getAttribute("data-section");
+          const checkbox = document.querySelector(`[data-toggle-section="${key}"]`);
+          const visible = checkbox ? checkbox.checked : true;
+          el.classList.toggle("section-hidden", !visible);
+        });
+      }
+
+      function loadSectionSettings() {
+        try {
+          const saved = JSON.parse(localStorage.getItem(SECTION_STORAGE_KEY) || "{}");
+          sectionToggles.forEach((cb) => {
+            const key = cb.getAttribute("data-toggle-section");
+            if (Object.prototype.hasOwnProperty.call(saved, key)) cb.checked = saved[key];
+          });
+        } catch (_) {
+          /* use defaults */
+        }
+        applySectionVisibility();
+      }
+
+      function saveSectionSettings() {
+        const state = {};
+        sectionToggles.forEach((cb) => {
+          state[cb.getAttribute("data-toggle-section")] = cb.checked;
+        });
+        localStorage.setItem(SECTION_STORAGE_KEY, JSON.stringify(state));
+      }
+
+      settingsBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const isHidden = settingsPanel.classList.toggle("hidden");
+        settingsBtn.setAttribute("aria-expanded", isHidden ? "false" : "true");
+      });
+
+      document.addEventListener("click", (e) => {
+        if (
+          !settingsPanel.classList.contains("hidden") &&
+          !settingsPanel.contains(e.target) &&
+          e.target !== settingsBtn &&
+          !settingsBtn.contains(e.target)
+        ) {
+          settingsPanel.classList.add("hidden");
+          settingsBtn.setAttribute("aria-expanded", "false");
+        }
+      });
+
+      sectionToggles.forEach((cb) => {
+        cb.addEventListener("change", () => {
+          applySectionVisibility();
+          saveSectionSettings();
+        });
+      });
+
+      function setStatus(text) {
+        statusText.textContent = text;
+      }
+
+      function autoResizeReferenceText() {
+        referenceText.style.height = "auto";
+        referenceText.style.height = `${referenceText.scrollHeight}px`;
+      }
+
+      function escapeHTML(value) {
+        return value
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function normalizeWordForDiff(word) {
+        return String(word || "")
+          .replace(/^[^a-z0-9]+|[^a-z0-9]+$/gi, "")
+          .toLowerCase();
+      }
+
+      function splitWordsForDiff(text) {
+        return String(text || "")
+          .trim()
+          .split(/\s+/)
+          .filter(Boolean);
+      }
+
+      function alignTextsForDiff(sourceWords, correctedWords) {
+        const n = sourceWords.length;
+        const m = correctedWords.length;
+        const GAP = 1;
+        const dp = Array.from({ length: n + 1 }, () => Array(m + 1).fill(0));
+        const trace = Array.from({ length: n + 1 }, () => Array(m + 1).fill(null));
+
+        for (let i = 1; i <= n; i += 1) dp[i][0] = -i * GAP;
+        for (let j = 1; j <= m; j += 1) dp[0][j] = -j * GAP;
+
+        for (let i = 1; i <= n; i += 1) {
+          for (let j = 1; j <= m; j += 1) {
+            const src = normalizeWordForDiff(sourceWords[i - 1]);
+            const cor = normalizeWordForDiff(correctedWords[j - 1]);
+            const matchScore = src && cor && src === cor ? 2 : -1;
+            const diag = dp[i - 1][j - 1] + matchScore;
+            const left = dp[i][j - 1] - GAP;
+            const up = dp[i - 1][j] - GAP;
+
+            let best = diag;
+            let dir = "diag";
+            if (left > best) {
+              best = left;
+              dir = "left";
+            }
+            if (up > best) {
+              best = up;
+              dir = "up";
+            }
+            dp[i][j] = best;
+            trace[i][j] = dir;
+          }
+        }
+
+        const correctedFlags = Array(m).fill(true);
+        let i = n;
+        let j = m;
+        while (i > 0 || j > 0) {
+          const dir = trace[i][j];
+          if (i > 0 && j > 0 && dir === "diag") {
+            const src = normalizeWordForDiff(sourceWords[i - 1]);
+            const cor = normalizeWordForDiff(correctedWords[j - 1]);
+            correctedFlags[j - 1] = !(src && cor && src === cor);
+            i -= 1;
+            j -= 1;
+          } else if (j > 0 && (i === 0 || dir === "left")) {
+            correctedFlags[j - 1] = true;
+            j -= 1;
+          } else {
+            i -= 1;
+          }
+        }
+        return correctedFlags;
+      }
+
+      function buildGrammarCorrectedHtml(sourceText, correctedText, hasIssues) {
+        const sourceWords = splitWordsForDiff(sourceText);
+        const correctedWords = splitWordsForDiff(correctedText);
+        if (!hasIssues || !correctedWords.length) {
+          return escapeHTML(correctedText);
+        }
+        if (!sourceWords.length) {
+          return correctedWords
+            .map((word) => `<span class="grammar-change">${escapeHTML(word)}</span>`)
+            .join(" ");
+        }
+        const changedFlags = alignTextsForDiff(sourceWords, correctedWords);
+        return correctedWords
+          .map((word, idx) => {
+            const safe = escapeHTML(word);
+            return changedFlags[idx]
+              ? `<span class="grammar-change">${safe}</span>`
+              : safe;
+          })
+          .join(" ");
+      }
+
+      function pickSpeechVoice() {
+        const voices = window.speechSynthesis.getVoices();
+        if (!voices.length) return null;
+        const prefix = studyLang === "es" ? "es" : "en";
+        const localeHint = getStudyLangConfig().speechLang.toLowerCase();
+        const matched = voices.filter((voice) => voice.lang && voice.lang.toLowerCase().startsWith(prefix));
+        if (!matched.length) return null;
+        return (
+          matched.find((voice) => voice.lang.toLowerCase() === localeHint) ||
+          matched.find((voice) => voice.lang.toLowerCase().startsWith(`${prefix}-`)) ||
+          matched.find((voice) => /google|samantha|alex|microsoft|monica|paulina|jorge/i.test(voice.name)) ||
+          matched[0]
+        );
+      }
+
+      function speakWithBrowserTTS(text) {
+        if (!("speechSynthesis" in window)) {
+          setStatus("このブラウザは音声読み上げに未対応です。");
+          return;
+        }
+        if (currentTtsAudio) {
+          currentTtsAudio.pause();
+          currentTtsAudio = null;
+        }
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = getStudyLangConfig().speechLang;
+        utterance.rate = 0.95;
+        utterance.pitch = 1;
+        const selectedVoice = pickSpeechVoice();
+        if (selectedVoice) utterance.voice = selectedVoice;
+        utterance.onerror = () => {
+          browserUtteranceActive = false;
+          setListenButtonPlaying(false);
+          setStatus("お手本音声の再生に失敗しました。");
+        };
+        utterance.onstart = () => {
+          browserUtteranceActive = true;
+          setListenButtonPlaying(true);
+          setStatus("お手本音声を再生中です（ブラウザ標準音声）。");
+        };
+        utterance.onend = () => {
+          browserUtteranceActive = false;
+          setListenButtonPlaying(false);
+          setStatus("お手本音声の再生が完了しました。");
+        };
+        window.speechSynthesis.speak(utterance);
+      }
+
+      async function speakWithOpenAITTS(text) {
+        browserUtteranceActive = false;
+        if ("speechSynthesis" in window) {
+          window.speechSynthesis.cancel();
+        }
+        const response = await fetch("/api/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, cache: true, lang: getStudyLangConfig().apiLang }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || `TTS request failed: ${response.status}`);
+        }
+        const audio = new Audio(data.url);
+        currentTtsAudio = audio;
+        audio.onplay = () => {
+          setListenButtonPlaying(true);
+          setStatus(data.cached ? "お手本音声を再生中です（キャッシュ）。" : "お手本音声を再生中です。");
+        };
+        audio.onended = () => {
+          currentTtsAudio = null;
+          setListenButtonPlaying(false);
+          setStatus("お手本音声の再生が完了しました。");
+        };
+        audio.onerror = () => {
+          currentTtsAudio = null;
+          setListenButtonPlaying(false);
+          setStatus("お手本音声の再生に失敗しました。");
+        };
+        await audio.play();
+      }
+
+      async function speakReferenceText() {
+        const text = referenceText.value.trim();
+        if (!text) {
+          setStatus(getStudyLangConfig().needTextStatus);
+          return;
+        }
+
+        if (isTtsPlaying()) {
+          pauseCurrentTtsPlayback();
+          setStatus("お手本音声を停止しました。");
+          return;
+        }
+
+        if (isUsingSampleText()) {
+          setButtonLoading(listenModelBtn, true, "生成中...", LISTEN_BTN_LABEL);
+          setStatus("高音質音声を生成中...");
+          try {
+            await speakWithOpenAITTS(text);
+          } catch (error) {
+            console.error("OpenAI TTS error:", error);
+            setListenButtonPlaying(false);
+            setStatus("高音質音声の取得に失敗しました。時間をおいて再試行してください。");
+          } finally {
+            setButtonLoading(listenModelBtn, false, "生成中...", listenModelBtn.classList.contains("is-playing") ? LISTEN_STOP_LABEL : LISTEN_BTN_LABEL);
+          }
+          return;
+        }
+
+        speakWithBrowserTTS(text);
+      }
+
+      async function checkGrammarWithAPI(text) {
+        const response = await fetch("/api/check-grammar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, lang: getStudyLangConfig().apiLang }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || `Grammar check failed: ${response.status}`);
+        }
+        return data;
+      }
+
+      function clarifyJapaneseMessage(text) {
+        return String(text || "")
+          .replace(/可能性があります。/g, "です。")
+          .replace(/可能性があります/g, "です")
+          .replace(/の恐れがあります。/g, "です。")
+          .replace(/の恐れがあります/g, "です")
+          .replace(/かもしれません。/g, "です。")
+          .replace(/かもしれません/g, "です")
+          .replace(/が疑われます。/g, "です。")
+          .replace(/が疑われます/g, "です")
+          .replace(/とよいです。/g, "してください。")
+          .replace(/とよいです/g, "してください")
+          .replace(/を検討してください。/g, "にしてください。")
+          .replace(/が必要かもしれません。/g, "が必要です。")
+          .replace(/が必要かもしれません/g, "が必要です")
+          .replace(/できます可能性があります。/g, "できます。")
+          .replace(/（詳細は提案語とあわせて確認してください）/g, "");
+      }
+
+      async function runGrammarCheck() {
+        const sourceText = referenceText.value.trim();
+        if (!sourceText) {
+          setStatus(getStudyLangConfig().needTextStatus);
+          return;
+        }
+        stopCurrentTtsPlayback();
+        setButtonLoading(grammarCheckBtn, true, "チェック中...", GRAMMAR_BTN_LABEL);
+        grammarExplainList.innerHTML = "";
+        setStatus("文法チェック中...");
+
+        try {
+          const result = await checkGrammarWithAPI(sourceText);
+          const tips = Array.isArray(result.tips) ? result.tips : [];
+          const corrected = String(result.corrected || sourceText).trim();
+          const referenceUpdated = applyCorrectedReference(corrected, sourceText);
+
+          grammarCorrectedText.innerHTML = buildGrammarCorrectedHtml(
+            sourceText,
+            corrected || sourceText,
+            result.has_issues
+          );
+
+          grammarExplainList.innerHTML = tips
+            .slice(0, 5)
+            .map((line) => `<li>${escapeHTML(clarifyJapaneseMessage(line))}</li>`)
+            .join("");
+          grammarCard.classList.remove("hidden");
+          if (referenceUpdated) {
+            setStatus("修正文をお手本にセットしました。録音して音読練習できます。");
+          } else {
+            setStatus("文法チェックが完了しました。");
+          }
+        } catch (error) {
+          console.error("Grammar check error:", error);
+          grammarCorrectedText.textContent = "チェックに失敗しました。時間をおいて再試行してください。";
+          grammarExplainList.innerHTML =
+            "<li>サーバーまたは OpenAI API の接続に失敗しました。時間をおいて再試行してください。</li>";
+          grammarCard.classList.remove("hidden");
+          setStatus("文法チェックに失敗しました。");
+        } finally {
+          setButtonLoading(grammarCheckBtn, false, "チェック中...", GRAMMAR_BTN_LABEL);
+        }
+      }
+
+      sampleSelect.addEventListener("change", () => {
+        stopCurrentTtsPlayback();
+        if (sampleSelect.value) {
+          referenceText.value = sampleSelect.value;
+          referenceFromSample = true;
+          autoResizeReferenceText();
+          renderComparison();
+          grammarCard.classList.add("hidden");
+        } else {
+          referenceFromSample = false;
+        }
+      });
+
+      cefrTabButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          stopCurrentTtsPlayback();
+          const level = btn.dataset.level;
+          sampleLevel = level;
+          cefrTabButtons.forEach((b) => {
+            const on = b === btn;
+            b.classList.toggle("is-active", on);
+            b.setAttribute("aria-selected", on ? "true" : "false");
+          });
+          fillSampleSelect(level);
+          referenceText.value = "";
+          referenceFromSample = false;
+          comparisonCard.classList.add("hidden");
+          grammarCard.classList.add("hidden");
+        });
+      });
+
+      sampleRandomBtn.addEventListener("click", () => {
+        stopCurrentTtsPlayback();
+        pickRandomSampleForLevel(sampleLevel);
+      });
+
+      fillSampleSelect("A1");
+      loadSectionSettings();
+      autoResizeReferenceText();
+
+      referenceText.addEventListener("input", () => {
+        referenceFromSample = false;
+        autoResizeReferenceText();
+        renderComparison();
+        grammarCard.classList.add("hidden");
+      });
+      function setOcrControlsBusy(busy, activeBtn, activeLabel) {
+        ocrCameraBtn.disabled = busy;
+        ocrFileBtn.disabled = busy;
+        if (busy) {
+          setButtonLoading(activeBtn, true, "読み込み中...", activeLabel);
+        } else {
+          setButtonLoading(ocrCameraBtn, false, "読み込み中...", OCR_CAMERA_BTN_LABEL);
+          setButtonLoading(ocrFileBtn, false, "読み込み中...", OCR_FILE_BTN_LABEL);
+        }
+      }
+
+      async function runOcrImport(file, activeBtn, activeInput, activeLabel) {
+        stopCurrentTtsPlayback();
+        setOcrControlsBusy(true, activeBtn, activeLabel);
+        setStatus("画像から英文を読み込み中...");
+
+        const formData = new FormData();
+        formData.append("image", file);
+
+        try {
+          const response = await fetch("/api/ocr", {
+            method: "POST",
+            body: formData,
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || `OCR request failed: ${response.status}`);
+          }
+
+          const extracted = String(data.text || "").trim();
+          if (!extracted) {
+            throw new Error("No English text found in image");
+          }
+
+          referenceText.value = extracted;
+          referenceFromSample = false;
+          sampleSelect.selectedIndex = 0;
+          autoResizeReferenceText();
+          grammarCard.classList.add("hidden");
+          renderComparison();
+          setStatus("画像から英文を読み込みました。");
+        } catch (error) {
+          console.error("OCR import error:", error);
+          setStatus("画像の読み込みに失敗しました。別の写真をお試しください。");
+        } finally {
+          setOcrControlsBusy(false, activeBtn, activeLabel);
+          activeInput.value = "";
+        }
+      }
+
+      function bindOcrPicker(input, btn, label) {
+        btn.addEventListener("click", () => {
+          if (!btn.disabled) input.click();
+        });
+        input.addEventListener("change", () => {
+          const file = input.files && input.files[0];
+          if (!file) return;
+          runOcrImport(file, btn, input, label);
+        });
+      }
+
+      bindOcrPicker(ocrCameraInput, ocrCameraBtn, OCR_CAMERA_BTN_LABEL);
+      bindOcrPicker(ocrFileInput, ocrFileBtn, OCR_FILE_BTN_LABEL);
+
+      studyLangTabButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const nextLang = btn.dataset.lang;
+          if (!nextLang || nextLang === studyLang) return;
+          stopCurrentTtsPlayback();
+          applyStudyLanguage(nextLang);
+          setStatus(
+            nextLang === "es"
+              ? "学習言語をスペイン語（es-ES）に切り替えました。"
+              : "学習言語を英語（en-US）に切り替えました。"
+          );
+        });
+      });
+
+      listenModelBtn.addEventListener("click", speakReferenceText);
+      grammarCheckBtn.addEventListener("click", runGrammarCheck);
+
+      if (!SpeechRecognition) {
+        setStatus("このブラウザは SpeechRecognition に未対応です。Chrome を使用してください。");
+        startBtn.disabled = true;
+      } else {
+        recognition = new SpeechRecognition();
+        recognition.lang = getStudyLangConfig().speechLang;
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        recognition.onstart = () => {
+          stopCurrentTtsPlayback();
+          finalTranscript = "";
+          interimTranscript = "";
+          recognizedText.textContent = "-";
+          hideGrammarPanel();
+          comparisonCard.classList.add("hidden");
+          accuracyBlock.classList.add("hidden");
+          startBtn.disabled = true;
+          stopBtn.disabled = false;
+          setStatus(getStudyLangConfig().recordPrompt);
+        };
+
+        recognition.onresult = (event) => {
+          const finalParts = [];
+          const interimParts = [];
+
+          // Always rebuild from all recognition results to avoid
+          // keeping only the last recognized token.
+          for (let i = 0; i < event.results.length; i += 1) {
+            const text = event.results[i][0].transcript.trim();
+            if (!text) continue;
+            if (event.results[i].isFinal) {
+              finalParts.push(text);
+            } else {
+              interimParts.push(text);
+            }
+          }
+
+          finalTranscript = finalParts.join(" ").trim();
+          interimTranscript = interimParts.join(" ").trim();
+
+          const combinedTranscript = `${finalTranscript} ${interimTranscript}`.trim();
+          recognizedText.textContent = combinedTranscript || "-";
+        };
+
+        recognition.onerror = (event) => {
+          setStatus(`認識エラー: ${event.error}`);
+          startBtn.disabled = false;
+          stopBtn.disabled = true;
+        };
+
+        recognition.onend = () => {
+          startBtn.disabled = false;
+          stopBtn.disabled = true;
+          const fullTranscript = `${finalTranscript} ${interimTranscript}`.trim();
+          finalTranscript = fullTranscript;
+          recognizedText.textContent = fullTranscript || "認識結果なし";
+          if (fullTranscript) {
+            setStatus("認識完了。自動で比較結果を表示しました。");
+          } else {
+            setStatus("音声を認識できませんでした。もう一度お試しください。");
+          }
+          renderComparison();
+        };
+      }
+
+      startBtn.addEventListener("click", () => {
+        if (!referenceText.value.trim()) {
+          setStatus("先にお手本の英文を入力してください。");
+          return;
+        }
+        stopCurrentTtsPlayback();
+        hideGrammarPanel();
+        recognition.start();
+      });
+
+      stopBtn.addEventListener("click", () => {
+        stopCurrentTtsPlayback();
+        if (recognition) recognition.stop();
+      });
+    </script>
+  </body>
+</html>
