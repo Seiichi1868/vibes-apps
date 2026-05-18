@@ -1025,6 +1025,38 @@
         window.setTimeout(() => grammarCard.classList.remove("grammar-flash"), 650);
       }
 
+      function getPracticeTextFromHistoryEntry(entry) {
+        const sourceText = String(entry.sourceText || "").trim();
+        const corrected = String(entry.corrected || "").trim();
+        if (entry.hasIssues && corrected && corrected !== sourceText) {
+          return corrected;
+        }
+        return sourceText || corrected;
+      }
+
+      function applyHistoryToCompose(entry) {
+        const practiceText = getPracticeTextFromHistoryEntry(entry);
+        if (!practiceText) return;
+
+        stopCurrentTtsPlayback();
+
+        const historyLang = String(entry.lang || "").trim();
+        if (historyLang && STUDY_LANG[historyLang] && historyLang !== studyLang) {
+          applyStudyLanguage(historyLang);
+        }
+
+        referenceText.value = practiceText;
+        referenceFromSample = false;
+        sampleSelect.selectedIndex = 0;
+        autoResizeReferenceText();
+
+        finalTranscript = "";
+        interimTranscript = "";
+        recognizedText.textContent = "-";
+        comparisonCard.classList.add("hidden");
+        accuracyBlock.classList.add("hidden");
+      }
+
       function displayGrammarResult(entry) {
         const sourceText = String(entry.sourceText || "").trim();
         const corrected = String(entry.corrected || sourceText).trim();
@@ -1041,9 +1073,22 @@
 
       function restoreGrammarHistoryEntry(entry) {
         if (!entry) return;
+
+        const sourceText = String(entry.sourceText || "").trim();
+        const corrected = String(entry.corrected || sourceText).trim();
+        const tips = Array.isArray(entry.tips) ? entry.tips : [];
+
+        applyHistoryToCompose(entry);
         displayGrammarResult(entry);
-        setStatus("添削履歴を表示しました。");
-        grammarCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        setGrammarSaveReady({
+          sourceText,
+          corrected,
+          tips,
+          hasIssues: Boolean(entry.hasIssues),
+          lang: entry.lang || studyLang,
+        });
+        setStatus("履歴を復元し、自由作文に反映しました。録音して音読練習できます。");
+        referenceText.scrollIntoView({ behavior: "smooth", block: "nearest" });
       }
 
       function renderGrammarHistoryList() {
