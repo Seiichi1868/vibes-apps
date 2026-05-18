@@ -777,11 +777,21 @@ h2 {
 
 .grammar-compact #grammarExplainList {
   margin: 4px 0 0;
-  padding-left: 16px;
-  font-size: 11px;
-  max-height: 48px;
+  padding-left: 14px;
+  font-size: 10.5px;
+  line-height: 1.35;
+  max-height: min(28vh, 108px);
   overflow-y: auto;
   color: #465466;
+}
+
+.grammar-compact #grammarExplainList .grammar-tip-item {
+  margin: 0 0 4px;
+  padding-left: 2px;
+}
+
+.grammar-compact #grammarExplainList .grammar-tip-item:last-child {
+  margin-bottom: 0;
 }
 
 .grammar-save-btn {

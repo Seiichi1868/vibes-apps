@@ -1064,9 +1064,7 @@
         const hasIssues = Boolean(entry.hasIssues);
 
         grammarCorrectedText.innerHTML = buildGrammarCorrectedHtml(sourceText, corrected, hasIssues);
-        grammarExplainList.innerHTML = tips
-          .map((line) => `<li>${escapeHTML(String(line))}</li>`)
-          .join("");
+        renderGrammarTipsList(tips);
         grammarCard.classList.remove("hidden");
         flashGrammarCard();
       }
@@ -1622,6 +1620,40 @@
         return data;
       }
 
+      const GRAMMAR_TIPS_MAX = 8;
+
+      function normalizeGrammarTips(rawTips) {
+        const candidates = Array.isArray(rawTips) ? rawTips : [rawTips];
+        const items = [];
+
+        candidates.forEach((candidate) => {
+          const text = String(candidate || "").trim();
+          if (!text) return;
+          const parts = text.split(/\n+|(?:^|\s)[-•・]\s+/);
+          parts.forEach((part) => {
+            const cleaned = part.replace(/^\d+[\.\)、]\s*/, "").trim();
+            if (cleaned) items.push(cleaned);
+          });
+        });
+
+        const unique = [];
+        const seen = new Set();
+        items.forEach((tip) => {
+          if (seen.has(tip)) return;
+          seen.add(tip);
+          unique.push(tip);
+        });
+        return unique.slice(0, GRAMMAR_TIPS_MAX);
+      }
+
+      function renderGrammarTipsList(tips) {
+        const normalized = normalizeGrammarTips(tips).map((line) => clarifyJapaneseMessage(line));
+        grammarExplainList.innerHTML = normalized
+          .map((line) => `<li class="grammar-tip-item">${escapeHTML(line)}</li>`)
+          .join("");
+        return normalized;
+      }
+
       function clarifyJapaneseMessage(text) {
         return String(text || "")
           .replace(/可能性があります。/g, "です。")
@@ -1657,7 +1689,6 @@
         try {
           const result = await checkGrammarWithAPI(sourceText);
           recordApiUsage();
-          const tips = Array.isArray(result.tips) ? result.tips : [];
           const corrected = String(result.corrected || sourceText).trim();
           const referenceUpdated = applyCorrectedReference(corrected, sourceText);
 
@@ -1667,11 +1698,7 @@
             result.has_issues
           );
 
-          const clarifiedTips = tips.slice(0, 5).map((line) => clarifyJapaneseMessage(line));
-
-          grammarExplainList.innerHTML = clarifiedTips
-            .map((line) => `<li>${escapeHTML(line)}</li>`)
-            .join("");
+          const clarifiedTips = renderGrammarTipsList(result.tips);
           setGrammarSaveReady({
             sourceText,
             corrected,
