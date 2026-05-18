@@ -229,7 +229,9 @@
       const GATE_STORAGE_PREFIX = "vibespeak-gate-";
       const USAGE_STORAGE_PREFIX = "vibespeak-usage-";
       const PASSWORD_BYPASS_KEY = "vibespeak-isPasswordBypassed";
+      const ADMIN_MODE_KEY = "vibespeak-admin-mode";
       const FLAG_TAP_WINDOW_MS = 2500;
+      const FLAG_LONG_PRESS_MS = 3000;
       const FLAG_ADMIN_TAPS = 3;
       const FLAG_BYPASS_TAPS = 5;
       const GRAMMAR_HISTORY_KEY = "vibespeak-grammar-history";
@@ -237,6 +239,8 @@
       let flagTapCount = 0;
       let lastGrammarResult = null;
       let flagTapTimer = null;
+      let flagLongPressTimer = null;
+      let flagLongPressTriggered = false;
       let adminToastTimer = null;
 
       const SAMPLE_BANK = {
@@ -524,7 +528,16 @@
         setStatus("本日の練習上限です。また明日！");
       }
 
+      function isAdminMode() {
+        return localStorage.getItem(ADMIN_MODE_KEY) === "true";
+      }
+
+      function setAdminMode(enabled) {
+        localStorage.setItem(ADMIN_MODE_KEY, enabled ? "true" : "false");
+      }
+
       function canUseApiQuota() {
+        if (isAdminMode()) return true;
         if (isApiLimitReached()) {
           showApiLimitMessage();
           return false;
@@ -533,6 +546,7 @@
       }
 
       function recordApiUsage() {
+        if (isAdminMode()) return;
         incrementApiUsageCount();
       }
 
@@ -633,6 +647,53 @@
         showSecurityToast("パスワードなしモードを有効にしました");
       }
 
+      async function enableAdminMode() {
+        setAdminMode(true);
+        await autoUnlockGateIfNeeded();
+        hideGateOverlay();
+        showSecurityToast("管理者モードが有効になりました（制限解除）");
+      }
+
+      function clearFlagLongPressTimer() {
+        if (flagLongPressTimer) {
+          window.clearTimeout(flagLongPressTimer);
+          flagLongPressTimer = null;
+        }
+      }
+
+      function cancelFlagLongPress() {
+        clearFlagLongPressTimer();
+      }
+
+      function startFlagLongPress() {
+        clearFlagLongPressTimer();
+        flagLongPressTriggered = false;
+        flagLongPressTimer = window.setTimeout(() => {
+          flagLongPressTimer = null;
+          flagLongPressTriggered = true;
+          enableAdminMode();
+        }, FLAG_LONG_PRESS_MS);
+      }
+
+      function bindFlagLongPress(btn) {
+        const onPressStart = (event) => {
+          if (event.type === "mousedown" && event.button !== 0) return;
+          cancelFlagLongPress();
+          startFlagLongPress();
+        };
+        const onPressEnd = () => {
+          cancelFlagLongPress();
+        };
+
+        btn.addEventListener("mousedown", onPressStart);
+        btn.addEventListener("touchstart", onPressStart, { passive: true });
+        btn.addEventListener("mouseup", onPressEnd);
+        btn.addEventListener("mouseleave", onPressEnd);
+        btn.addEventListener("touchend", onPressEnd);
+        btn.addEventListener("touchcancel", onPressEnd);
+        btn.addEventListener("contextmenu", (event) => event.preventDefault());
+      }
+
       async function showAdminCodeToast() {
         try {
           const response = await fetch("/api/gate/today");
@@ -663,7 +724,7 @@
       }
 
       async function initSecurityGate() {
-        if (isPasswordBypassed()) {
+        if (isAdminMode() || isPasswordBypassed()) {
           await autoUnlockGateIfNeeded();
           hideGateOverlay();
         } else if (isGateUnlocked()) {
@@ -1707,7 +1768,12 @@
       initGrammarHistory();
 
       studyLangTabButtons.forEach((btn) => {
+        bindFlagLongPress(btn);
         btn.addEventListener("click", () => {
+          if (flagLongPressTriggered) {
+            flagLongPressTriggered = false;
+            return;
+          }
           registerFlagTap({ allowBypass: true });
           const nextLang = btn.dataset.lang;
           if (!nextLang || nextLang === studyLang) return;
