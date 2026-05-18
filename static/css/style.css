@@ -427,10 +427,26 @@ label {
   font-size: 0.78rem;
 }
 
+.compose-text-wrap {
+  position: relative;
+}
+
+.compose-word-count {
+  position: absolute;
+  right: 10px;
+  bottom: 7px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  pointer-events: none;
+  line-height: 1;
+  opacity: 0.88;
+}
+
 textarea,
 #referenceText {
   width: 100%;
-  padding: 5px 8px;
+  padding: 5px 52px 22px 8px;
   border-radius: 7px;
   border: 1px solid var(--line);
   background: #ffffff;

@@ -92,7 +92,10 @@
 
         <section class="input-block panel-block" data-section="compose">
           <label for="referenceText">自由作文</label>
-          <textarea id="referenceText" rows="1" placeholder="英文を入力するか、上の練習用サンプル文を選んでください。"></textarea>
+          <div class="compose-text-wrap">
+            <textarea id="referenceText" rows="1" placeholder="英文を入力するか、上の練習用サンプル文を選んでください。"></textarea>
+            <span id="wordCountDisplay" class="compose-word-count" aria-live="polite">0 語</span>
+          </div>
           <div class="compose-ocr-row">
             <input
               id="ocrCameraInput"
@@ -119,9 +122,9 @@
 
         <section id="grammarCard" class="result panel-block grammar-compact hidden" data-section="grammar">
           <h2>文法添削</h2>
-          <p id="grammarCorrectedMeta" class="meta">修正案（英文）</p>
+          <p id="grammarCorrectedMeta" class="meta">修正案</p>
           <p id="grammarCorrectedText" class="recognized">-</p>
-          <p class="meta">修正ポイント（日本語）</p>
+          <p class="meta">修正ポイント</p>
           <ul id="grammarExplainList"></ul>
         </section>
 
@@ -163,6 +166,7 @@
       const statusText = document.getElementById("statusText");
       const sampleSelect = document.getElementById("sampleSelect");
       const referenceText = document.getElementById("referenceText");
+      const wordCountDisplay = document.getElementById("wordCountDisplay");
       const recognizedText = document.getElementById("recognizedText");
       const comparisonCard = document.getElementById("comparisonCard");
       const accuracyBlock = document.getElementById("accuracyBlock");
@@ -383,7 +387,7 @@
           subtitle: "英語音読の流暢さチェッカー",
           samplePlaceholder: "-- 英文を選択 --",
           composePlaceholder: "英文を入力するか、上の練習用サンプル文を選んでください。",
-          grammarMeta: "修正案（英文）",
+          grammarMeta: "修正案",
           needTextStatus: "先に自由入力欄へ英文を入力してください。",
           recordNeedText: "先にお手本の英文を入力してください。",
           recordPrompt: "認識中... 英文を読み上げてください。",
@@ -395,7 +399,7 @@
           subtitle: "スペイン語（スペイン）音読チェッカー",
           samplePlaceholder: "-- スペイン語文を選択 --",
           composePlaceholder: "スペイン語文を入力するか、上の練習用サンプル文を選んでください。",
-          grammarMeta: "修正案（スペイン語）",
+          grammarMeta: "修正案",
           needTextStatus: "先に自由入力欄へスペイン語文を入力してください。",
           recordNeedText: "先にお手本のスペイン語文を入力してください。",
           recordPrompt: "認識中... スペイン語文を読み上げてください。",
@@ -1086,9 +1090,22 @@
         statusText.textContent = text;
       }
 
+      function countComposeWords(text) {
+        const normalized = String(text || "").trim();
+        if (!normalized) return 0;
+        return normalized.split(/\s+/).filter(Boolean).length;
+      }
+
+      function updateWordCountDisplay() {
+        if (!wordCountDisplay) return;
+        const count = countComposeWords(referenceText.value);
+        wordCountDisplay.textContent = `${count} 語`;
+      }
+
       function autoResizeReferenceText() {
         referenceText.style.height = "auto";
         referenceText.style.height = `${referenceText.scrollHeight}px`;
+        updateWordCountDisplay();
       }
 
       function escapeHTML(value) {
