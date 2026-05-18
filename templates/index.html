@@ -126,6 +126,9 @@
           <p id="grammarCorrectedText" class="recognized">-</p>
           <p class="meta">修正ポイント</p>
           <ul id="grammarExplainList"></ul>
+          <button id="saveGrammarHistoryBtn" class="btn ghost grammar-save-btn" type="button" disabled>
+            📌 添削履歴に保存
+          </button>
         </section>
 
         <div class="dashboard-row cols-2 results-row">
@@ -155,6 +158,23 @@
             </div>
           </section>
         </div>
+
+        <section class="grammar-history panel-block" data-section="history">
+          <button
+            id="grammarHistoryToggle"
+            class="grammar-history-toggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="grammarHistoryPanel"
+          >
+            <span>過去の添削履歴</span>
+            <span id="grammarHistoryCount" class="grammar-history-count">0</span>
+          </button>
+          <div id="grammarHistoryPanel" class="grammar-history-panel hidden">
+            <p id="grammarHistoryEmpty" class="grammar-history-empty">保存された履歴はありません。</p>
+            <ul id="grammarHistoryList" class="grammar-history-list"></ul>
+          </div>
+        </section>
         </div>
       </section>
     </main>
@@ -187,6 +207,12 @@
       const grammarCard = document.getElementById("grammarCard");
       const grammarCorrectedText = document.getElementById("grammarCorrectedText");
       const grammarExplainList = document.getElementById("grammarExplainList");
+      const saveGrammarHistoryBtn = document.getElementById("saveGrammarHistoryBtn");
+      const grammarHistoryToggle = document.getElementById("grammarHistoryToggle");
+      const grammarHistoryPanel = document.getElementById("grammarHistoryPanel");
+      const grammarHistoryList = document.getElementById("grammarHistoryList");
+      const grammarHistoryEmpty = document.getElementById("grammarHistoryEmpty");
+      const grammarHistoryCount = document.getElementById("grammarHistoryCount");
       const sampleRandomBtn = document.getElementById("sampleRandomBtn");
       const cefrTabButtons = document.querySelectorAll(".sample-block .cefr-tab");
       const headerSubtitle = document.getElementById("headerSubtitle");
@@ -206,7 +232,10 @@
       const FLAG_TAP_WINDOW_MS = 2500;
       const FLAG_ADMIN_TAPS = 3;
       const FLAG_BYPASS_TAPS = 5;
+      const GRAMMAR_HISTORY_KEY = "vibespeak-grammar-history";
+      const GRAMMAR_HISTORY_MAX = 40;
       let flagTapCount = 0;
+      let lastGrammarResult = null;
       let flagTapTimer = null;
       let adminToastTimer = null;
 
@@ -892,6 +921,149 @@
         grammarCard.classList.add("hidden");
       }
 
+      function loadGrammarHistory() {
+        try {
+          const raw = localStorage.getItem(GRAMMAR_HISTORY_KEY);
+          const parsed = JSON.parse(raw || "[]");
+          return Array.isArray(parsed) ? parsed : [];
+        } catch (_) {
+          return [];
+        }
+      }
+
+      function saveGrammarHistoryStore(entries) {
+        localStorage.setItem(GRAMMAR_HISTORY_KEY, JSON.stringify(entries));
+      }
+
+      function formatGrammarHistoryDate(iso) {
+        const date = new Date(iso);
+        if (Number.isNaN(date.getTime())) return "";
+        return date.toLocaleString("ja-JP", {
+          month: "numeric",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      }
+
+      function truncateHistoryText(text, maxLen = 42) {
+        const value = String(text || "").trim();
+        if (value.length <= maxLen) return value;
+        return `${value.slice(0, maxLen)}…`;
+      }
+
+      function setGrammarSaveReady(result) {
+        lastGrammarResult = result;
+        if (saveGrammarHistoryBtn) saveGrammarHistoryBtn.disabled = !result;
+      }
+
+      function flashGrammarCard() {
+        grammarCard.classList.remove("grammar-flash");
+        void grammarCard.offsetWidth;
+        grammarCard.classList.add("grammar-flash");
+        window.setTimeout(() => grammarCard.classList.remove("grammar-flash"), 650);
+      }
+
+      function displayGrammarResult(entry) {
+        const sourceText = String(entry.sourceText || "").trim();
+        const corrected = String(entry.corrected || sourceText).trim();
+        const tips = Array.isArray(entry.tips) ? entry.tips : [];
+        const hasIssues = Boolean(entry.hasIssues);
+
+        grammarCorrectedText.innerHTML = buildGrammarCorrectedHtml(sourceText, corrected, hasIssues);
+        grammarExplainList.innerHTML = tips
+          .map((line) => `<li>${escapeHTML(String(line))}</li>`)
+          .join("");
+        grammarCard.classList.remove("hidden");
+        flashGrammarCard();
+      }
+
+      function restoreGrammarHistoryEntry(entry) {
+        if (!entry) return;
+        displayGrammarResult(entry);
+        setStatus("添削履歴を表示しました。");
+        grammarCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+
+      function renderGrammarHistoryList() {
+        const entries = loadGrammarHistory();
+        grammarHistoryCount.textContent = String(entries.length);
+        grammarHistoryEmpty.classList.toggle("hidden", entries.length > 0);
+        grammarHistoryList.innerHTML = "";
+
+        entries.forEach((entry) => {
+          const item = document.createElement("li");
+          item.className = "grammar-history-item";
+
+          const restoreBtn = document.createElement("button");
+          restoreBtn.type = "button";
+          restoreBtn.className = "grammar-history-restore";
+          restoreBtn.innerHTML = `
+            <span class="grammar-history-date">${escapeHTML(formatGrammarHistoryDate(entry.savedAt))}</span>
+            <span class="grammar-history-preview">${escapeHTML(truncateHistoryText(entry.sourceText))}</span>
+          `;
+          restoreBtn.addEventListener("click", () => restoreGrammarHistoryEntry(entry));
+
+          const deleteBtn = document.createElement("button");
+          deleteBtn.type = "button";
+          deleteBtn.className = "grammar-history-delete";
+          deleteBtn.setAttribute("aria-label", "履歴を削除");
+          deleteBtn.textContent = "×";
+          deleteBtn.addEventListener("click", (event) => {
+            event.stopPropagation();
+            const next = loadGrammarHistory().filter((row) => row.id !== entry.id);
+            saveGrammarHistoryStore(next);
+            renderGrammarHistoryList();
+            setStatus("添削履歴を削除しました。");
+          });
+
+          item.appendChild(restoreBtn);
+          item.appendChild(deleteBtn);
+          grammarHistoryList.appendChild(item);
+        });
+      }
+
+      function saveCurrentGrammarToHistory() {
+        if (!lastGrammarResult) {
+          setStatus("先に文法チェックを実行してください。");
+          return;
+        }
+
+        const entry = {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          savedAt: new Date().toISOString(),
+          lang: lastGrammarResult.lang || studyLang,
+          sourceText: lastGrammarResult.sourceText,
+          corrected: lastGrammarResult.corrected,
+          tips: lastGrammarResult.tips.slice(),
+          hasIssues: lastGrammarResult.hasIssues,
+        };
+
+        const entries = loadGrammarHistory();
+        entries.unshift(entry);
+        saveGrammarHistoryStore(entries.slice(0, GRAMMAR_HISTORY_MAX));
+        renderGrammarHistoryList();
+
+        if (grammarHistoryPanel.classList.contains("hidden")) {
+          grammarHistoryPanel.classList.remove("hidden");
+          grammarHistoryToggle.setAttribute("aria-expanded", "true");
+        }
+
+        setStatus("添削履歴に保存しました。");
+      }
+
+      function initGrammarHistory() {
+        renderGrammarHistoryList();
+
+        grammarHistoryToggle.addEventListener("click", () => {
+          const willOpen = grammarHistoryPanel.classList.contains("hidden");
+          grammarHistoryPanel.classList.toggle("hidden", !willOpen);
+          grammarHistoryToggle.setAttribute("aria-expanded", willOpen ? "true" : "false");
+        });
+
+        saveGrammarHistoryBtn.addEventListener("click", saveCurrentGrammarToHistory);
+      }
+
       function applyCorrectedReference(corrected, sourceText) {
         const next = String(corrected || "").trim();
         const prev = String(sourceText || "").trim();
@@ -1389,10 +1561,18 @@
             result.has_issues
           );
 
-          grammarExplainList.innerHTML = tips
-            .slice(0, 5)
-            .map((line) => `<li>${escapeHTML(clarifyJapaneseMessage(line))}</li>`)
+          const clarifiedTips = tips.slice(0, 5).map((line) => clarifyJapaneseMessage(line));
+
+          grammarExplainList.innerHTML = clarifiedTips
+            .map((line) => `<li>${escapeHTML(line)}</li>`)
             .join("");
+          setGrammarSaveReady({
+            sourceText,
+            corrected,
+            tips: clarifiedTips,
+            hasIssues: Boolean(result.has_issues),
+            lang: studyLang,
+          });
           grammarCard.classList.remove("hidden");
           if (referenceUpdated) {
             setStatus("修正文をお手本にセットしました。録音して音読練習できます。");
@@ -1405,6 +1585,7 @@
           grammarCorrectedText.textContent = "チェックに失敗しました。時間をおいて再試行してください。";
           grammarExplainList.innerHTML =
             "<li>サーバーまたは OpenAI API の接続に失敗しました。時間をおいて再試行してください。</li>";
+          setGrammarSaveReady(null);
           grammarCard.classList.remove("hidden");
           setStatus("文法チェックに失敗しました。");
         } finally {
@@ -1523,6 +1704,7 @@
       bindOcrPicker(ocrFileInput, ocrFileBtn, OCR_FILE_BTN_LABEL);
 
       initSecurityGate();
+      initGrammarHistory();
 
       studyLangTabButtons.forEach((btn) => {
         btn.addEventListener("click", () => {

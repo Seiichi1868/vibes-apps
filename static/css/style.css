@@ -780,6 +780,160 @@ h2 {
   color: #465466;
 }
 
+.grammar-save-btn {
+  width: 100%;
+  margin-top: 6px;
+  font-size: 11px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.62);
+  border-color: rgba(148, 163, 184, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.grammar-save-btn:disabled {
+  opacity: 0.5;
+}
+
+.grammar-compact.grammar-flash {
+  animation: grammarFlash 0.65s ease;
+}
+
+@keyframes grammarFlash {
+  0% {
+    box-shadow: 0 0 0 0 rgba(124, 198, 255, 0.45);
+  }
+  100% {
+    box-shadow: 0 20px 44px rgba(15, 23, 42, 0.12), 0 4px 16px rgba(255, 255, 255, 0.3) inset;
+  }
+}
+
+.grammar-history {
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+
+.grammar-history-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 12px;
+  padding: 7px 10px;
+  background: rgba(255, 255, 255, 0.58);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #233244;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.grammar-history-count {
+  min-width: 1.4em;
+  text-align: center;
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 0.72rem;
+  background: rgba(124, 198, 255, 0.25);
+  color: #1e3a5f;
+}
+
+.grammar-history-panel {
+  margin-top: 4px;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 4px 6px;
+}
+
+.grammar-history-panel.hidden {
+  display: none;
+}
+
+.grammar-history-empty {
+  margin: 4px 2px 6px;
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.grammar-history-empty.hidden {
+  display: none;
+}
+
+.grammar-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 132px;
+  overflow-y: auto;
+}
+
+.grammar-history-item {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.grammar-history-item:last-child {
+  margin-bottom: 2px;
+}
+
+.grammar-history-restore {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 5px 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.grammar-history-restore:hover {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.grammar-history-date {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+
+.grammar-history-preview {
+  display: block;
+  font-size: 11px;
+  color: #1f2937;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.grammar-history-delete {
+  flex: 0 0 auto;
+  width: 28px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 9px;
+  background: rgba(254, 226, 226, 0.65);
+  color: #b91c1c;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.grammar-history-delete:hover {
+  background: rgba(254, 202, 202, 0.9);
+}
+
 #grammarCorrectedText .grammar-change {
   color: #b71c1c;
   font-weight: 700;
@@ -792,7 +946,8 @@ h2 {
 
 .panel-block.sample-block,
 .panel-block[data-section="compose"],
-.panel-block.grammar-compact {
+.panel-block.grammar-compact,
+.panel-block.grammar-history {
   flex-shrink: 0;
 }
 
