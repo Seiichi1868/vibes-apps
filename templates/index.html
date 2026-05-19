@@ -647,11 +647,22 @@
         showSecurityToast("パスワードなしモードを有効にしました");
       }
 
-      async function enableAdminMode() {
-        setAdminMode(true);
-        await autoUnlockGateIfNeeded();
-        hideGateOverlay();
-        showSecurityToast("管理者モードが有効になりました（制限解除）");
+      async function toggleAdminMode() {
+        const enabling = !isAdminMode();
+        setAdminMode(enabling);
+        if (enabling) {
+          await autoUnlockGateIfNeeded();
+          hideGateOverlay();
+          showSecurityToast("管理者モード：ON（制限解除）");
+          return;
+        }
+        showSecurityToast("管理者モード：OFF（生徒モード）");
+        if (!isPasswordBypassed() && !isGateUnlocked()) {
+          showGateOverlay();
+          setStatus("クラスコードの確認が必要です。");
+        } else if (isApiLimitReached()) {
+          showApiLimitMessage();
+        }
       }
 
       function clearFlagLongPressTimer() {
@@ -671,7 +682,7 @@
         flagLongPressTimer = window.setTimeout(() => {
           flagLongPressTimer = null;
           flagLongPressTriggered = true;
-          enableAdminMode();
+          toggleAdminMode();
         }, FLAG_LONG_PRESS_MS);
       }
 
