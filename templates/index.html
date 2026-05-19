@@ -37,7 +37,7 @@
         <div class="app-top">
           <header class="app-header" data-section="header">
             <div class="header-compact-row">
-              <h1>VibeSpeak</h1>
+              <h1 id="app-title">VibeSpeak</h1>
               <div class="study-lang-tabs" role="tablist" aria-label="学習言語">
                 <button type="button" class="study-lang-tab is-active" data-lang="en" aria-selected="true">
                   🇬🇧 英語
@@ -218,6 +218,7 @@
       const headerSubtitle = document.getElementById("headerSubtitle");
       const headerLangCode = document.getElementById("headerLangCode");
       const grammarCorrectedMeta = document.getElementById("grammarCorrectedMeta");
+      const appTitle = document.getElementById("app-title");
       const studyLangTabButtons = document.querySelectorAll(".study-lang-tab");
       const gateOverlay = document.getElementById("gateOverlay");
       const gateCodeInput = document.getElementById("gateCodeInput");
@@ -1850,14 +1851,19 @@
       initSecurityGate();
       initGrammarHistory();
 
-      studyLangTabButtons.forEach((btn) => {
-        bindFlagLongPress(btn);
-        btn.addEventListener("click", () => {
+      if (appTitle) {
+        bindFlagLongPress(appTitle);
+        appTitle.addEventListener("click", () => {
           if (flagLongPressTriggered) {
             flagLongPressTriggered = false;
             return;
           }
           registerFlagTap({ allowBypass: true });
+        });
+      }
+
+      studyLangTabButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
           const nextLang = btn.dataset.lang;
           if (!nextLang || nextLang === studyLang) return;
           stopCurrentTtsPlayback();
