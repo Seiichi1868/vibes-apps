@@ -1167,3 +1167,144 @@ body.gate-locked {
 .admin-code-toast.hidden {
   display: none;
 }
+
+/* Splash screen (startup motion) */
+.splash-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse 120% 80% at 50% 40%, #152033 0%, #070b12 52%, #030508 100%);
+  opacity: 1;
+  transition: opacity 0.5s ease;
+  pointer-events: auto;
+}
+
+.splash-screen.hidden {
+  display: none;
+}
+
+.splash-screen.is-hiding {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.splash-screen__stage {
+  position: relative;
+  width: min(92vw, 400px);
+  height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.splash-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.splash-line-enter,
+.splash-line-box {
+  fill: none;
+  stroke: url(#splashNeon);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: url(#splashGlow);
+}
+
+.splash-line-enter {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 1;
+  animation:
+    splashLineEnter 0.68s cubic-bezier(0.22, 1, 0.36, 1) forwards,
+    splashLineEnterFade 0.28s ease 0.52s forwards;
+}
+
+.splash-line-box {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  animation:
+    splashBoxReveal 0.2s ease 0.5s forwards,
+    splashBoxDraw 1.15s cubic-bezier(0.45, 0, 0.2, 1) 0.58s forwards;
+}
+
+.splash-brand {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  font-size: clamp(1.85rem, 7vw, 2.65rem);
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: #f0f9ff;
+  text-shadow:
+    0 0 18px rgba(124, 198, 255, 0.85),
+    0 0 36px rgba(56, 189, 248, 0.45);
+  opacity: 0;
+  transform: translateY(6px) scale(0.98);
+  animation:
+    splashBrandIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.42s forwards,
+    splashBrandOut 0.45s ease 2.05s forwards;
+}
+
+body.splash-active .page,
+body.splash-active .bg-blobs {
+  visibility: hidden;
+}
+
+@keyframes splashLineEnter {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes splashLineEnterFade {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes splashBoxReveal {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes splashBoxDraw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes splashBrandIn {
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes splashBrandOut {
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+    text-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash-screen {
+    display: none !important;
+  }
+
+  body.splash-active .page,
+  body.splash-active .bg-blobs {
+    visibility: visible;
+  }
+}

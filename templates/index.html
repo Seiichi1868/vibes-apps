@@ -6,7 +6,30 @@
     <title>VibeSpeak</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
   </head>
-  <body>
+  <body class="splash-active">
+    <div id="splashScreen" class="splash-screen" role="presentation" aria-label="起動中">
+      <div class="splash-screen__stage">
+        <svg class="splash-svg" viewBox="0 0 400 160" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <linearGradient id="splashNeon" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#38bdf8" />
+              <stop offset="55%" stop-color="#7cc6ff" />
+              <stop offset="100%" stop-color="#22d3ee" />
+            </linearGradient>
+            <filter id="splashGlow" x="-40%" y="-40%" width="180%" height="180%">
+              <feGaussianBlur stdDeviation="2.8" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+          <line class="splash-line-enter" x1="16" y1="80" x2="72" y2="80" pathLength="1" />
+          <rect class="splash-line-box" x="72" y="36" width="256" height="88" rx="12" ry="12" pathLength="1" />
+        </svg>
+        <p class="splash-brand">Vibe Speak</p>
+      </div>
+    </div>
     <div class="bg-blobs" aria-hidden="true">
       <span class="bg-blob bg-blob--uk"></span>
       <span class="bg-blob bg-blob--es"></span>
@@ -733,6 +756,45 @@
         flagTapTimer = window.setTimeout(() => {
           flagTapCount = 0;
         }, FLAG_TAP_WINDOW_MS);
+      }
+
+      const SPLASH_TOTAL_MS = 2600;
+      const SPLASH_FADE_MS = 500;
+
+      function initSplashScreen(onComplete) {
+        const splash = document.getElementById("splashScreen");
+        const done = typeof onComplete === "function" ? onComplete : () => {};
+
+        function finishSplash() {
+          if (!splash) {
+            document.body.classList.remove("splash-active");
+            done();
+            return;
+          }
+          splash.classList.add("is-hiding");
+          splash.setAttribute("aria-hidden", "true");
+          window.setTimeout(() => {
+            splash.classList.add("hidden");
+            document.body.classList.remove("splash-active");
+            done();
+          }, SPLASH_FADE_MS);
+        }
+
+        if (!splash) {
+          document.body.classList.remove("splash-active");
+          done();
+          return;
+        }
+
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          splash.classList.add("hidden");
+          splash.setAttribute("aria-hidden", "true");
+          document.body.classList.remove("splash-active");
+          done();
+          return;
+        }
+
+        window.setTimeout(finishSplash, SPLASH_TOTAL_MS - SPLASH_FADE_MS);
       }
 
       async function initSecurityGate() {
@@ -1848,7 +1910,9 @@
       bindOcrPicker(ocrCameraInput, ocrCameraBtn, OCR_CAMERA_BTN_LABEL);
       bindOcrPicker(ocrFileInput, ocrFileBtn, OCR_FILE_BTN_LABEL);
 
-      initSecurityGate();
+      initSplashScreen(() => {
+        initSecurityGate();
+      });
       initGrammarHistory();
 
       if (appTitle) {
