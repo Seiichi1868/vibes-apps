@@ -1238,18 +1238,14 @@ body.gate-locked {
   height: 55%;
   z-index: 0;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-top: 1px solid rgba(255, 255, 255, 0.72);
-  border-left: 1px solid rgba(255, 255, 255, 0.58);
-  border-right: 1px solid rgba(148, 163, 184, 0.2);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.26);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.62),
-    inset 1px 0 0 rgba(255, 255, 255, 0.35),
-    0 10px 36px rgba(56, 189, 248, 0.14),
-    0 2px 12px rgba(15, 23, 42, 0.06);
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.42);
+  border-left: 1px solid rgba(255, 255, 255, 0.32);
+  border-right: 1px solid rgba(56, 189, 248, 0.14);
+  border-bottom: 1px solid rgba(56, 189, 248, 0.18);
+  box-shadow: none;
   opacity: 0;
   transform: scale(0.98);
   animation: splashGlassIn var(--splash-box-phase) cubic-bezier(0.45, 0.05, 0.25, 1)
@@ -1263,14 +1259,14 @@ body.gate-locked {
   width: 100%;
   height: 100%;
   overflow: visible;
-  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.75)) drop-shadow(0 0 14px rgba(124, 198, 255, 0.45));
+  filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.5)) drop-shadow(0 0 9px rgba(124, 198, 255, 0.28));
 }
 
 .splash-line-enter,
 .splash-line-box {
   fill: none;
   stroke: url(#splashNeon);
-  stroke-width: 2.75;
+  stroke-width: 2.35;
   stroke-linecap: round;
   stroke-linejoin: round;
   filter: url(#splashGlow);
@@ -1299,8 +1295,6 @@ body.gate-locked {
   margin: 0;
   opacity: 0;
   transform: translateY(5px);
-  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.95))
-    drop-shadow(0 3px 10px rgba(14, 116, 178, 0.22));
   animation: splashBrandIn 0.95s cubic-bezier(0.4, 0, 0.2, 1) 0.35s forwards;
 }
 
@@ -1308,14 +1302,18 @@ body.gate-locked {
   display: inline-block;
   font-family: "Poppins", "Inter", "Helvetica Neue", Arial, sans-serif;
   font-size: clamp(1.75rem, 6.5vw, 2.5rem);
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.08em;
   line-height: 1.15;
-  background: linear-gradient(145deg, #0c4a6e 0%, #0369a1 38%, #0284c7 72%, #0ea5e9 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
+  color: #0369a1;
+  -webkit-text-fill-color: #0369a1;
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.98),
+    0 -1px 0 rgba(255, 255, 255, 0.45),
+    0 2px 3px rgba(2, 132, 199, 0.42),
+    0 4px 14px rgba(3, 105, 161, 0.28),
+    0 0 10px rgba(56, 189, 248, 0.38),
+    0 0 22px rgba(124, 198, 255, 0.22);
 }
 
 body.splash-active .page,
