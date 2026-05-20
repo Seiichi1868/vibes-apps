@@ -769,8 +769,9 @@
         }, FLAG_TAP_WINDOW_MS);
       }
 
+      const SPLASH_FADE_IN_MS = 800;
       const SPLASH_ANIM_MS = 4000;
-      const SPLASH_FADE_MS = 450;
+      const SPLASH_FADE_OUT_MS = 900;
 
       function initSplashScreen(onComplete) {
         const splash = document.getElementById("splashScreen");
@@ -788,7 +789,7 @@
             splash.classList.add("hidden");
             document.body.classList.remove("splash-active");
             done();
-          }, SPLASH_FADE_MS);
+          }, SPLASH_FADE_OUT_MS);
         }
 
         if (!splash) {
@@ -805,7 +806,7 @@
           return;
         }
 
-        window.setTimeout(finishSplash, SPLASH_ANIM_MS);
+        window.setTimeout(finishSplash, SPLASH_FADE_IN_MS + SPLASH_ANIM_MS);
       }
 
       async function initSecurityGate() {
