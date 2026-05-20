@@ -1174,6 +1174,7 @@ body.gate-locked {
   --splash-fade-in: 0.8s;
   --splash-fade-out: 0.9s;
   --splash-enter-delay: 0.8s;
+  --splash-brand-fade: 1s;
   --splash-line-phase: 1.36s;
   --splash-box-phase: 2.64s;
   position: fixed;
@@ -1298,21 +1299,21 @@ body.gate-locked {
   position: relative;
   z-index: 2;
   margin: 0;
-  opacity: 0;
-  transform: translateY(5px);
-  animation: splashBrandIn 0.95s cubic-bezier(0.4, 0, 0.2, 1)
-    calc(var(--splash-enter-delay) + 0.35s) forwards;
 }
 
 .splash-brand__text {
   display: inline-block;
-  font-family: "Poppins", "Inter", "Helvetica Neue", Arial, sans-serif;
-  font-size: clamp(1.75rem, 6.5vw, 2.5rem);
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  line-height: 1.15;
+  font-family: "Montserrat", "Inter", "Helvetica Neue", Arial, sans-serif;
+  font-size: clamp(1.65rem, 6.2vw, 2.45rem);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  text-transform: uppercase;
   color: #0284c7;
   -webkit-text-fill-color: #0284c7;
+  opacity: 0;
+  animation: splashBrandTextFadeIn var(--splash-brand-fade) ease
+    calc(var(--splash-enter-delay) + 0.2s) forwards;
   text-shadow:
     0 1px 0 rgba(255, 255, 255, 1),
     0 -1px 0 rgba(255, 255, 255, 0.55),
@@ -1368,10 +1369,12 @@ body.splash-active .bg-blobs {
   }
 }
 
-@keyframes splashBrandIn {
+@keyframes splashBrandTextFadeIn {
+  from {
+    opacity: 0;
+  }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
