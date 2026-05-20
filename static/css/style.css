@@ -1170,13 +1170,8 @@ body.gate-locked {
 
 /* Splash screen (startup motion) */
 .splash-screen {
-  --splash-motion: 4s;
-  --splash-fade-in: 0.8s;
-  --splash-fade-out: 0.9s;
-  --splash-enter-delay: 0.8s;
-  --splash-brand-fade: 1s;
-  --splash-line-phase: 1.36s;
-  --splash-box-phase: 2.64s;
+  --splash-fade-in: 1.8s;
+  --splash-fade-out: 1s;
   position: fixed;
   inset: 0;
   z-index: 3000;
@@ -1230,7 +1225,7 @@ body.gate-locked {
 .splash-screen__stage {
   position: relative;
   width: min(92vw, 400px);
-  height: 160px;
+  min-height: 140px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1238,69 +1233,26 @@ body.gate-locked {
 
 .splash-glass-panel {
   position: absolute;
-  left: 11%;
-  top: 22.5%;
-  width: 78%;
-  height: 55%;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(92vw, 380px);
+  min-height: 118px;
+  padding: 28px 40px;
   z-index: 0;
-  border-radius: 4px;
-  background: transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: none;
-  box-shadow: none;
-  opacity: 0;
-  transform: scale(0.98);
-  animation: splashGlassIn var(--splash-box-phase) cubic-bezier(0.45, 0.05, 0.25, 1)
-    calc(var(--splash-enter-delay) + var(--splash-line-phase)) forwards;
+  box-shadow: 0 10px 36px rgba(56, 189, 248, 0.1);
   pointer-events: none;
-}
-
-.splash-svg {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.5)) drop-shadow(0 0 9px rgba(124, 198, 255, 0.28));
-}
-
-.splash-line-enter,
-.splash-line-box {
-  fill: none;
-  stroke: url(#splashNeon);
-  stroke-width: 2.35;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  filter: url(#splashGlow);
-}
-
-.splash-line-enter {
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  opacity: 1;
-  animation:
-    splashLineEnter var(--splash-line-phase) cubic-bezier(0.45, 0.05, 0.25, 1)
-      var(--splash-enter-delay) forwards,
-    splashLineEnterFade 0.22s ease
-      calc(var(--splash-enter-delay) + var(--splash-line-phase) - 0.2s) forwards;
-}
-
-.splash-line-box {
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  opacity: 1;
-  animation: splashBoxDraw var(--splash-box-phase) cubic-bezier(0.45, 0.05, 0.25, 1)
-    calc(var(--splash-enter-delay) + var(--splash-line-phase)) forwards;
 }
 
 .splash-brand {
   position: relative;
-  z-index: 2;
+  z-index: 1;
   margin: 0;
-  opacity: 0;
-  animation: splashBrandTextFadeIn var(--splash-brand-fade) ease 0s both;
 }
 
 .splash-brand__text {
@@ -1332,47 +1284,6 @@ body.splash-active .bg-blobs {
     opacity: 0;
   }
   to {
-    opacity: 1;
-  }
-}
-
-@keyframes splashLineEnter {
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-@keyframes splashLineEnterFade {
-  to {
-    opacity: 0;
-  }
-}
-
-@keyframes splashGlassIn {
-  0% {
-    opacity: 0;
-    transform: scale(0.98);
-  }
-  18% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes splashBoxDraw {
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-@keyframes splashBrandTextFadeIn {
-  0% {
-    opacity: 0;
-  }
-  100% {
     opacity: 1;
   }
 }
