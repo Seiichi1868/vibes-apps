@@ -762,17 +762,44 @@
             done();
             return;
           }
+
+          const hideAfterFade = () => {
+            splash.classList.add("hidden");
+            splash.classList.remove("is-hiding");
+            splash.style.removeProperty("transition");
+            splash.style.removeProperty("opacity");
+            splash.style.removeProperty("animation");
+            document.body.classList.remove("splash-active");
+            done();
+          };
+
+          splash.classList.add("is-hiding");
+          splash.setAttribute("aria-hidden", "true");
           splash.style.animation = "none";
           splash.style.opacity = "1";
+          void splash.offsetWidth;
+          splash.style.transition = `opacity ${SPLASH_FADE_OUT_MS}ms ease`;
+
           requestAnimationFrame(() => {
-            splash.classList.add("is-hiding");
-            splash.setAttribute("aria-hidden", "true");
-            window.setTimeout(() => {
-              splash.classList.add("hidden");
-              document.body.classList.remove("splash-active");
-              done();
-            }, SPLASH_FADE_OUT_MS);
+            requestAnimationFrame(() => {
+              splash.style.opacity = "0";
+            });
           });
+
+          let finished = false;
+          const onFadeDone = (event) => {
+            if (finished || event.target !== splash || event.propertyName !== "opacity") return;
+            finished = true;
+            splash.removeEventListener("transitionend", onFadeDone);
+            hideAfterFade();
+          };
+          splash.addEventListener("transitionend", onFadeDone);
+          window.setTimeout(() => {
+            if (finished) return;
+            finished = true;
+            splash.removeEventListener("transitionend", onFadeDone);
+            hideAfterFade();
+          }, SPLASH_FADE_OUT_MS + 80);
         }
 
         if (!splash) {
