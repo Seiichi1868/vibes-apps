@@ -24,8 +24,8 @@
               </feMerge>
             </filter>
           </defs>
-          <line class="splash-line-enter" x1="16" y1="80" x2="72" y2="80" pathLength="1" />
-          <rect class="splash-line-box" x="72" y="36" width="256" height="88" rx="12" ry="12" pathLength="1" />
+          <line class="splash-line-enter" x1="-56" y1="80" x2="72" y2="80" pathLength="1" />
+          <rect class="splash-line-box" x="72" y="36" width="256" height="88" rx="4" ry="4" pathLength="1" />
         </svg>
         <p class="splash-brand">Vibe Speak</p>
       </div>
@@ -758,8 +758,8 @@
         }, FLAG_TAP_WINDOW_MS);
       }
 
-      const SPLASH_TOTAL_MS = 2600;
-      const SPLASH_FADE_MS = 500;
+      const SPLASH_ANIM_MS = 4000;
+      const SPLASH_FADE_MS = 450;
 
       function initSplashScreen(onComplete) {
         const splash = document.getElementById("splashScreen");
@@ -794,7 +794,7 @@
           return;
         }
 
-        window.setTimeout(finishSplash, SPLASH_TOTAL_MS - SPLASH_FADE_MS);
+        window.setTimeout(finishSplash, SPLASH_ANIM_MS);
       }
 
       async function initSecurityGate() {
