@@ -1171,7 +1171,7 @@ body.gate-locked {
 /* Splash screen (startup motion) */
 .splash-screen {
   --splash-fade-in: 1.8s;
-  --splash-fade-out: 1s;
+  --splash-fade-out: 0.65s;
   position: fixed;
   inset: 0;
   z-index: 3000;
@@ -1216,10 +1216,8 @@ body.gate-locked {
 }
 
 .splash-screen.is-hiding {
-  animation: none;
-  opacity: 0;
+  animation: splashScreenFadeOut var(--splash-fade-out) ease forwards;
   pointer-events: none;
-  transition: opacity var(--splash-fade-out) ease;
 }
 
 .splash-screen__stage {
@@ -1229,24 +1227,7 @@ body.gate-locked {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.splash-glass-panel {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: min(92vw, 380px);
-  min-height: 118px;
-  padding: 28px 40px;
-  z-index: 0;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: none;
-  box-shadow: 0 10px 36px rgba(56, 189, 248, 0.1);
-  pointer-events: none;
+  background: transparent;
 }
 
 .splash-brand {
@@ -1285,6 +1266,15 @@ body.splash-active .bg-blobs {
   }
   to {
     opacity: 1;
+  }
+}
+
+@keyframes splashScreenFadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
   }
 }
 

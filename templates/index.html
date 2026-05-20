@@ -15,7 +15,6 @@
   <body class="splash-active">
     <div id="splashScreen" class="splash-screen" role="presentation" aria-label="起動中">
       <div class="splash-screen__stage">
-        <div class="splash-glass-panel" aria-hidden="true"></div>
         <p class="splash-brand">
           <span class="splash-brand__text">Vibe Speak</span>
         </p>
@@ -751,7 +750,7 @@
 
       const SPLASH_FADE_IN_MS = 1800;
       const SPLASH_HOLD_MS = 1700;
-      const SPLASH_FADE_OUT_MS = 1000;
+      const SPLASH_FADE_OUT_MS = 650;
 
       function initSplashScreen(onComplete) {
         const splash = document.getElementById("splashScreen");
@@ -763,13 +762,17 @@
             done();
             return;
           }
-          splash.classList.add("is-hiding");
-          splash.setAttribute("aria-hidden", "true");
-          window.setTimeout(() => {
-            splash.classList.add("hidden");
-            document.body.classList.remove("splash-active");
-            done();
-          }, SPLASH_FADE_OUT_MS);
+          splash.style.animation = "none";
+          splash.style.opacity = "1";
+          requestAnimationFrame(() => {
+            splash.classList.add("is-hiding");
+            splash.setAttribute("aria-hidden", "true");
+            window.setTimeout(() => {
+              splash.classList.add("hidden");
+              document.body.classList.remove("splash-active");
+              done();
+            }, SPLASH_FADE_OUT_MS);
+          });
         }
 
         if (!splash) {
