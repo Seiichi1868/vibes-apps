@@ -1238,9 +1238,9 @@ body.gate-locked {
 
 .splash-glass-panel {
   position: absolute;
-  left: 18%;
+  left: 11%;
   top: 22.5%;
-  width: 64%;
+  width: 78%;
   height: 55%;
   z-index: 0;
   border-radius: 4px;
