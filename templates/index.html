@@ -4,22 +4,31 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>VibeSpeak</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
   </head>
   <body class="splash-active">
     <div id="splashScreen" class="splash-screen" role="presentation" aria-label="起動中">
       <div class="splash-screen__stage">
+        <div class="splash-glass-panel" aria-hidden="true"></div>
         <svg class="splash-svg" viewBox="0 0 400 160" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
           <defs>
-            <linearGradient id="splashNeon" x1="0%" y1="0%" x2="100%" y2="0%">
+            <linearGradient id="splashNeon" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stop-color="#38bdf8" />
-              <stop offset="55%" stop-color="#7cc6ff" />
+              <stop offset="45%" stop-color="#7cc6ff" />
               <stop offset="100%" stop-color="#22d3ee" />
             </linearGradient>
-            <filter id="splashGlow" x="-40%" y="-40%" width="180%" height="180%">
-              <feGaussianBlur stdDeviation="2.8" result="blur" />
+            <filter id="splashGlow" x="-80%" y="-80%" width="260%" height="260%">
+              <feGaussianBlur stdDeviation="4" result="blurSoft" />
+              <feGaussianBlur stdDeviation="1.6" result="blurCore" />
               <feMerge>
-                <feMergeNode in="blur" />
+                <feMergeNode in="blurSoft" />
+                <feMergeNode in="blurCore" />
                 <feMergeNode in="SourceGraphic" />
               </feMerge>
             </filter>
@@ -27,7 +36,9 @@
           <line class="splash-line-enter" x1="-56" y1="80" x2="72" y2="80" pathLength="1" />
           <rect class="splash-line-box" x="72" y="36" width="256" height="88" rx="4" ry="4" pathLength="1" />
         </svg>
-        <p class="splash-brand">Vibe Speak</p>
+        <p class="splash-brand">
+          <span class="splash-brand__text">Vibe Speak</span>
+        </p>
       </div>
     </div>
     <div class="bg-blobs" aria-hidden="true">
