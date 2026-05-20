@@ -1299,6 +1299,8 @@ body.gate-locked {
   position: relative;
   z-index: 2;
   margin: 0;
+  opacity: 0;
+  animation: splashBrandTextFadeIn var(--splash-brand-fade) ease 0s both;
 }
 
 .splash-brand__text {
@@ -1311,9 +1313,6 @@ body.gate-locked {
   text-transform: uppercase;
   color: #0284c7;
   -webkit-text-fill-color: #0284c7;
-  opacity: 0;
-  animation: splashBrandTextFadeIn var(--splash-brand-fade) ease
-    calc(var(--splash-enter-delay) + 0.2s) forwards;
   text-shadow:
     0 1px 0 rgba(255, 255, 255, 1),
     0 -1px 0 rgba(255, 255, 255, 0.55),
@@ -1370,10 +1369,10 @@ body.splash-active .bg-blobs {
 }
 
 @keyframes splashBrandTextFadeIn {
-  from {
+  0% {
     opacity: 0;
   }
-  to {
+  100% {
     opacity: 1;
   }
 }
