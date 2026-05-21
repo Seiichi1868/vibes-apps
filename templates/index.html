@@ -250,6 +250,7 @@
       const FLAG_BYPASS_TAPS = 5;
       const GRAMMAR_HISTORY_KEY = "vibespeak-grammar-history";
       const GRAMMAR_HISTORY_MAX = 40;
+      const GATE_LOCK_POLL_MS = 30000;
       let gateLockPollTimer = null;
       let serverGateLockEnabled = true;
 
@@ -728,7 +729,7 @@
 
       function startGateLockPolling() {
         if (gateLockPollTimer) window.clearInterval(gateLockPollTimer);
-        gateLockPollTimer = window.setInterval(syncGateLockFromServer, 3000);
+        gateLockPollTimer = window.setInterval(syncGateLockFromServer, GATE_LOCK_POLL_MS);
       }
 
       async function enablePasswordBypassMode() {
