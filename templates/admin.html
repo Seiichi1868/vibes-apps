@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VibeSpeak 管理者</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  </head>
+  <body class="admin-page">
+    <main class="admin-shell">
+      <section class="admin-card">
+        <p class="admin-eyebrow">VibeSpeak Admin</p>
+        <h1>クラスコードロック</h1>
+        <p class="admin-lead">
+          生徒全員にリアルタイムで反映されます。OFF にするとコード入力なしで利用できます。
+        </p>
+
+        <div class="admin-lock-panel">
+          <div class="admin-lock-status">
+            <span id="adminLockLabel" class="admin-lock-label">読み込み中...</span>
+            <span id="adminLockHint" class="admin-lock-hint">—</span>
+          </div>
+          <label class="admin-toggle" for="adminLockToggle">
+            <input id="adminLockToggle" type="checkbox" role="switch" aria-labelledby="adminLockLabel" />
+            <span class="admin-toggle-track" aria-hidden="true">
+              <span class="admin-toggle-thumb"></span>
+            </span>
+          </label>
+        </div>
+
+        <p class="admin-meta">本日のクラスコード（参考）: <strong id="adminTodayCode">----</strong></p>
+        <p id="adminStatus" class="admin-status" aria-live="polite"></p>
+        <a class="admin-back-link" href="{{ url_for('index') }}">← 生徒画面へ戻る</a>
+      </section>
+    </main>
+
+    <script>
+      const lockToggle = document.getElementById("adminLockToggle");
+      const lockLabel = document.getElementById("adminLockLabel");
+      const lockHint = document.getElementById("adminLockHint");
+      const todayCode = document.getElementById("adminTodayCode");
+      const statusText = document.getElementById("adminStatus");
+
+      function renderLockState(lockEnabled) {
+        lockToggle.checked = lockEnabled;
+        lockLabel.textContent = lockEnabled ? "ロック ON（コード必須）" : "ロック OFF（解放中）";
+        lockHint.textContent = lockEnabled
+          ? "生徒は4桁コードの入力が必要です"
+          : "生徒はコードなしでそのまま入室できます";
+      }
+
+      async function loadGateLockState() {
+        statusText.textContent = "状態を取得中...";
+        const [statusRes, codeRes] = await Promise.all([
+          fetch("/api/admin/gate-lock"),
+          fetch("/api/gate/today"),
+        ]);
+        const statusData = await statusRes.json();
+        const codeData = await codeRes.json();
+        if (!statusRes.ok) {
+          throw new Error(statusData.error || "状態の取得に失敗しました");
+        }
+        renderLockState(Boolean(statusData.lock_enabled));
+        todayCode.textContent = String(codeData.code || "----").padStart(4, "0");
+        statusText.textContent = "準備完了";
+      }
+
+      async function saveGateLockState(lockEnabled) {
+        lockToggle.disabled = true;
+        statusText.textContent = "保存中...";
+        try {
+          const response = await fetch("/api/admin/gate-lock", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ lock_enabled: lockEnabled }),
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || "保存に失敗しました");
+          }
+          renderLockState(Boolean(data.lock_enabled));
+          statusText.textContent = data.lock_enabled
+            ? "ロックを ON にしました（全生徒に即時反映）"
+            : "ロックを OFF にしました（全生徒がコードなしで利用可能）";
+        } catch (error) {
+          console.error(error);
+          statusText.textContent = "保存に失敗しました。もう一度お試しください。";
+          await loadGateLockState();
+        } finally {
+          lockToggle.disabled = false;
+        }
+      }
+
+      lockToggle.addEventListener("change", () => {
+        saveGateLockState(lockToggle.checked);
+      });
+
+      loadGateLockState().catch((error) => {
+        console.error(error);
+        statusText.textContent = "サーバーに接続できませんでした。";
+      });
+    </script>
+  </body>
+</html>

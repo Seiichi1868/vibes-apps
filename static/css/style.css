@@ -1168,6 +1168,160 @@ body.gate-locked {
   display: none;
 }
 
+/* Admin page */
+.admin-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.admin-shell {
+  width: min(420px, 100%);
+}
+
+.admin-card {
+  padding: 28px 24px 22px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.14), 0 2px 12px rgba(255, 255, 255, 0.45) inset;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.admin-eyebrow {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.admin-card h1 {
+  margin: 0 0 8px;
+  font-size: 1.45rem;
+  color: #19324a;
+}
+
+.admin-lead {
+  margin: 0 0 18px;
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.admin-lock-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.admin-lock-status {
+  min-width: 0;
+}
+
+.admin-lock-label {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #19324a;
+}
+
+.admin-lock-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.admin-toggle {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.admin-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.admin-toggle-track {
+  display: inline-flex;
+  align-items: center;
+  width: 52px;
+  height: 30px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.45);
+  transition: background 0.25s ease;
+  box-shadow: inset 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+.admin-toggle-thumb {
+  width: 24px;
+  height: 24px;
+  margin-left: 3px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.18);
+  transition: transform 0.25s ease, background 0.25s ease;
+}
+
+.admin-toggle input:checked + .admin-toggle-track {
+  background: linear-gradient(135deg, #7cc6ff, #75c98b);
+}
+
+.admin-toggle input:checked + .admin-toggle-track .admin-toggle-thumb {
+  transform: translateX(22px);
+}
+
+.admin-toggle input:focus-visible + .admin-toggle-track {
+  outline: 2px solid rgba(124, 198, 255, 0.65);
+  outline-offset: 2px;
+}
+
+.admin-meta {
+  margin: 0 0 8px;
+  font-size: 0.84rem;
+  color: #475569;
+}
+
+.admin-meta strong {
+  letter-spacing: 0.2em;
+  color: #19324a;
+}
+
+.admin-status {
+  margin: 0 0 14px;
+  min-height: 1.2em;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0369a1;
+}
+
+.admin-back-link {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #0369a1;
+  text-decoration: none;
+}
+
+.admin-back-link:hover {
+  text-decoration: underline;
+}
+
 /* Splash screen (startup motion) */
 .splash-screen {
   --splash-fade-in: 1.8s;

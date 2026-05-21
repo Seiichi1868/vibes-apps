@@ -140,6 +140,26 @@ def _today_date_key() -> str:
     return datetime.date.today().strftime("%Y%m%d")
 
 
+# True = クラスコード入力が必要 / False = 全員がコードなしで利用可能
+CLASS_CODE_LOCK_ENABLED = True
+
+
+def is_gate_lock_enabled() -> bool:
+    return CLASS_CODE_LOCK_ENABLED
+
+
+def set_gate_lock_enabled(enabled: bool) -> bool:
+    global CLASS_CODE_LOCK_ENABLED
+    CLASS_CODE_LOCK_ENABLED = bool(enabled)
+    return CLASS_CODE_LOCK_ENABLED
+
+
+def gate_access_allowed() -> bool:
+    if not is_gate_lock_enabled():
+        return True
+    return is_valid_gate_token(request.headers.get("X-Gate-Token", ""))
+
+
 def daily_class_code() -> str:
     digest = hashlib.sha256(_today_date_key().encode("utf-8")).hexdigest()
     return str(int(digest[:8], 16) % 10000).zfill(4)
@@ -172,23 +192,69 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/admin")
+def admin_page():
+    return render_template("admin.html")
+
+
+@app.route("/api/gate/status", methods=["GET"])
+def gate_status():
+    return jsonify(
+        {
+            "lock_enabled": is_gate_lock_enabled(),
+            "code": daily_class_code(),
+        }
+    )
+
+
+@app.route("/api/admin/gate-lock", methods=["GET", "POST"])
+def admin_gate_lock():
+    if request.method == "GET":
+        return jsonify({"lock_enabled": is_gate_lock_enabled(), "ok": True})
+
+    payload = request.get_json(silent=True) or {}
+    raw = payload.get("lock_enabled")
+    if isinstance(raw, bool):
+        enabled = raw
+    else:
+        value = str(raw or "").strip().lower()
+        if value in {"1", "true", "on", "yes"}:
+            enabled = True
+        elif value in {"0", "false", "off", "no"}:
+            enabled = False
+        else:
+            return jsonify({"error": "lock_enabled is required"}), 400
+
+    return jsonify({"ok": True, "lock_enabled": set_gate_lock_enabled(enabled)})
+
+
 @app.route("/api/gate/verify", methods=["POST"])
 def gate_verify():
+    if not is_gate_lock_enabled():
+        return jsonify(
+            {
+                "ok": True,
+                "token": gate_token_for_today(),
+                "lock_enabled": False,
+                "bypass": True,
+            }
+        )
+
     payload = request.get_json(silent=True) or {}
     code = str(payload.get("code", "")).strip()
     if code == daily_class_code():
-        return jsonify({"ok": True, "token": gate_token_for_today()})
+        return jsonify({"ok": True, "token": gate_token_for_today(), "lock_enabled": True})
     return jsonify({"ok": False, "error": "invalid code"}), 403
 
 
 @app.route("/api/gate/today", methods=["GET"])
 def gate_today():
-    return jsonify({"code": daily_class_code()})
+    return jsonify({"code": daily_class_code(), "lock_enabled": is_gate_lock_enabled()})
 
 
 @app.route("/api/check-grammar", methods=["POST"])
 def check_grammar():
-    if not is_valid_gate_token(request.headers.get("X-Gate-Token", "")):
+    if not gate_access_allowed():
         return gate_auth_error()
 
     payload = request.get_json(silent=True) or {}
@@ -267,6 +333,9 @@ def clean_ocr_text(raw: str) -> str:
 
 @app.route("/api/ocr", methods=["POST"])
 def ocr():
+    if not gate_access_allowed():
+        return gate_auth_error()
+
     file = request.files.get("image")
     if not file or not file.filename:
         return jsonify({"error": "image is required"}), 400
@@ -320,7 +389,7 @@ def ocr():
 
 @app.route("/api/tts", methods=["POST"])
 def tts():
-    if not is_valid_gate_token(request.headers.get("X-Gate-Token", "")):
+    if not gate_access_allowed():
         return gate_auth_error()
 
     payload = request.get_json(silent=True) or {}

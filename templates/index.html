@@ -250,6 +250,9 @@
       const FLAG_BYPASS_TAPS = 5;
       const GRAMMAR_HISTORY_KEY = "vibespeak-grammar-history";
       const GRAMMAR_HISTORY_MAX = 40;
+      let gateLockPollTimer = null;
+      let serverGateLockEnabled = true;
+
       let flagTapCount = 0;
       let lastGrammarResult = null;
       let flagTapTimer = null;
@@ -493,6 +496,15 @@
         }
       }
 
+      function isGateBypassUnlock() {
+        try {
+          const saved = JSON.parse(sessionStorage.getItem(gateStorageKey()) || "null");
+          return Boolean(saved && saved.bypass && saved.date === todayKey());
+        } catch (_) {
+          return false;
+        }
+      }
+
       function getGateToken() {
         try {
           const saved = JSON.parse(sessionStorage.getItem(gateStorageKey()) || "null");
@@ -503,10 +515,14 @@
         return "";
       }
 
-      function saveGateToken(token) {
+      function saveGateToken(token, { bypass = false } = {}) {
         sessionStorage.setItem(
           gateStorageKey(),
-          JSON.stringify({ token: String(token || ""), date: todayKey() })
+          JSON.stringify({
+            token: String(token || ""),
+            date: todayKey(),
+            bypass: Boolean(bypass),
+          })
         );
       }
 
@@ -632,9 +648,37 @@
         }, durationMs);
       }
 
+      async function fetchGateLockStatus() {
+        const response = await fetch("/api/gate/status");
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "gate status failed");
+        }
+        serverGateLockEnabled = Boolean(data.lock_enabled);
+        return serverGateLockEnabled;
+      }
+
+      async function unlockGateFromServerBypass() {
+        const response = await fetch("/api/gate/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: "" }),
+        });
+        const data = await response.json();
+        if (response.ok && data.ok && data.token) {
+          saveGateToken(data.token, { bypass: Boolean(data.bypass) });
+          return true;
+        }
+        return false;
+      }
+
       async function autoUnlockGateIfNeeded() {
         if (isGateUnlocked()) return true;
         try {
+          const lockEnabled = await fetchGateLockStatus();
+          if (!lockEnabled) {
+            return unlockGateFromServerBypass();
+          }
           const todayResponse = await fetch("/api/gate/today");
           const todayData = await todayResponse.json();
           const code = String(todayData.code || "").padStart(4, "0");
@@ -652,6 +696,39 @@
           /* ignore */
         }
         return false;
+      }
+
+      async function syncGateLockFromServer() {
+        try {
+          const lockEnabled = await fetchGateLockStatus();
+          if (!lockEnabled) {
+            if (!isGateUnlocked()) {
+              await unlockGateFromServerBypass();
+            }
+            hideGateOverlay();
+            return;
+          }
+          if (isAdminMode() || isPasswordBypassed()) {
+            hideGateOverlay();
+            return;
+          }
+          if (lockEnabled && isGateBypassUnlock()) {
+            sessionStorage.removeItem(gateStorageKey());
+            showGateOverlay();
+            setStatus("クラスコードの確認が必要です。");
+            return;
+          }
+          if (!isGateUnlocked()) {
+            showGateOverlay();
+          }
+        } catch (_) {
+          /* ignore polling errors */
+        }
+      }
+
+      function startGateLockPolling() {
+        if (gateLockPollTimer) window.clearInterval(gateLockPollTimer);
+        gateLockPollTimer = window.setInterval(syncGateLockFromServer, 3000);
       }
 
       async function enablePasswordBypassMode() {
@@ -820,7 +897,10 @@
       }
 
       async function initSecurityGate() {
-        if (isAdminMode() || isPasswordBypassed()) {
+        await syncGateLockFromServer();
+        if (!serverGateLockEnabled) {
+          hideGateOverlay();
+        } else if (isAdminMode() || isPasswordBypassed()) {
           await autoUnlockGateIfNeeded();
           hideGateOverlay();
         } else if (isGateUnlocked()) {
@@ -828,6 +908,7 @@
         } else {
           showGateOverlay();
         }
+        startGateLockPolling();
 
         gateSubmitBtn.addEventListener("click", submitGateCode);
         gateCodeInput.addEventListener("keydown", (event) => {
