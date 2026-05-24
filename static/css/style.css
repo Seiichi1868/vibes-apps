@@ -6,6 +6,8 @@
   --muted: #5b6878;
   --primary: #7cc6ff;
   --accent: #75c98b;
+  --app-subtitle-size: clamp(0.72rem, 1.5vw, 0.82rem);
+  --lang-toolbar-label-size: clamp(0.6rem, 1.22vw, 0.68rem);
 }
 
 * {
@@ -174,11 +176,11 @@ body {
 
 .lang-toolbar__label {
   margin: 0;
-  font-size: 0.64rem;
-  font-weight: 700;
+  font-size: var(--lang-toolbar-label-size);
+  font-weight: 600;
   color: #475569;
   white-space: nowrap;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.015em;
 }
 
 .lang-toolbar__divider {
@@ -274,7 +276,7 @@ body {
 
 .header-compact-row .subtitle {
   margin: 0;
-  font-size: clamp(0.72rem, 1.5vw, 0.82rem);
+  font-size: var(--app-subtitle-size);
   font-weight: 600;
   color: #3d5166;
   white-space: nowrap;
