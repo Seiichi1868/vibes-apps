@@ -204,21 +204,24 @@ def ocr_user_prompt(api_lang: str) -> str:
 def grammar_system_prompt(api_lang: str) -> str:
     lang_id = lang_id_from_api(api_lang)
     if lang_id == "ja":
-        return """あなたは日本在住のルーマニア語話者（奥様）向けの日本語教師です。日本語の作文（約50語）を優しく、かつ正確に添削してください。
+        return """あなたは日本語を学ぶ外国人向けの日本語教師です。日本語の作文（約50語）を優しく、かつ正確に添削してください。
 
 必ず守ること:
 - 助詞のミス、不自然な語順、敬語の誤り、漢字の誤用、ひらがな・カタカナ・漢字のバランスを見逃さない。
 - corrected は日本語全文で返す。
-- tips は各項目ごとに「ルーマニア語の解説 / 日本語の解説」を併記する（例: RO: ... / JP: ...）。
+- tips は各修正点ごとに1件、優しい日本語のみで書く（ルーマニア語は使わない）。
+- tips_english には、tips 全体の内容を英語に翻訳したテキストを1つだけ入れる（日本語 tips の下に表示する全体英訳）。
 - 「〜可能性があります」など曖昧な表現は禁止。断定調のみ。
 - 修正点ごとに tips を1件ずつ。最大8件。
 - 問題がなければ corrected は原文のまま、has_issues は false、tips は1件:
-  「RO: Nu este nevoie de corecții. Japoneza este perfectă! / JP: 修正の必要はありません。完璧な日本語です！」
+  「修正の必要はありません。完璧な日本語です！」
+  tips_english は "No corrections needed. Your Japanese is perfect!"
 
 出力は次のJSONオブジェクトのみ:
 {
   "corrected": "修正後の日本語全文",
-  "tips": ["RO: ... / JP: ..."],
+  "tips": ["優しい日本語の解説1", "優しい日本語の解説2"],
+  "tips_english": "All tips translated into English as one block",
   "has_issues": true または false,
   "detected_lang": "ja"
 }"""
@@ -301,7 +304,7 @@ def perfect_grammar_tip(lang: str) -> str:
     tips = {
         "en": "修正の必要はありません。完璧な英文です！",
         "es": "修正の必要はありません。完璧なスペイン語です！",
-        "ja": "RO: Nu este nevoie de corecții. Japoneza este perfectă! / JP: 修正の必要はありません。完璧な日本語です！",
+        "ja": "修正の必要はありません。完璧な日本語です！",
         "ro": "修正の必要はありません。完璧なルーマニア語です！",
     }
     return tips.get(lang_id, tips["en"])
@@ -312,7 +315,7 @@ def grammar_fallback_tip(lang: str) -> str:
     tips = {
         "en": "英文を見直し、上の修正案を参考にしてください。",
         "es": "スペイン語文を見直し、上の修正案を参考にしてください。",
-        "ja": "RO: Revizuiește textul japonez folosind propunerea de mai sus. / JP: 日本語文を見直し、上の修正案を参考にしてください。",
+        "ja": "日本語文を見直し、上の修正案を参考にしてください。",
         "ro": "ルーマニア語文を見直し、上の修正案を参考にしてください。",
     }
     return tips.get(lang_id, tips["en"])
@@ -483,7 +486,7 @@ def create_json_chat_completion(
     return parse_json_object(raw)
 
 
-def normalize_ai_mode(raw: str) -> str:
+def normalize_grammar_tips(raw_tips) -> list[str]:
     if isinstance(raw_tips, str):
         candidates = [raw_tips]
     elif isinstance(raw_tips, list):
@@ -746,7 +749,9 @@ def check_grammar():
 
     payload = request.get_json(silent=True) or {}
     text = (payload.get("text") or "").strip()
-    lang = normalize_study_lang(payload.get("lang") or "")
+    lang_raw = payload.get("lang") or payload.get("lang_id") or payload.get("language") or ""
+    lang = normalize_study_lang(lang_raw)
+    lang_id = lang_id_from_api(lang)
     if not text:
         return jsonify({"error": "text is required"}), 400
 
@@ -779,22 +784,31 @@ def check_grammar():
         else:
             tips = [perfect_grammar_tip(lang)]
 
+    tips_english = ""
+    if lang_id == "ja":
+        tips_english = str(data.get("tips_english") or "").strip()
+        if not tips_english and not has_issues:
+            tips_english = "No corrections needed. Your Japanese is perfect!"
+
     detected_lang = str(data.get("detected_lang") or "").strip().lower()
-    lang_id = lang_id_from_api(lang)
     allowed_detected = {"en", "es", "ja", "ro"}
     if detected_lang not in allowed_detected:
         detected_lang = lang_id
 
-    return jsonify(
-        {
-            "corrected": corrected,
-            "tips": tips,
-            "has_issues": has_issues,
-            "source": text,
-            "detected_lang": detected_lang,
-            "lang": lang,
-        }
-    )
+    response = {
+        "corrected": corrected,
+        "tips": tips,
+        "has_issues": has_issues,
+        "source": text,
+        "detected_lang": detected_lang,
+        "lang": lang,
+        "lang_id": lang_id,
+        "active_model": get_ai_chat_model(),
+        "ai_mode": get_ai_mode(),
+    }
+    if tips_english:
+        response["tips_english"] = tips_english
+    return jsonify(response)
 
 
 def resolve_image_mime(file_storage) -> str:

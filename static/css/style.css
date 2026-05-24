@@ -794,6 +794,23 @@ h2 {
   margin-bottom: 0;
 }
 
+.grammar-compact #grammarExplainList .grammar-tip-english {
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(148, 163, 184, 0.45);
+  color: #334155;
+  line-height: 1.55;
+}
+
+.grammar-tip-english-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #0369a1;
+}
+
 .grammar-save-btn {
   width: 100%;
   margin-top: 6px;

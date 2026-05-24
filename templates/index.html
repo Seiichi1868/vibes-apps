@@ -1996,10 +1996,15 @@
       }
 
       async function checkGrammarWithAPI(text) {
+        const config = getStudyLangConfig();
         const response = await fetch("/api/check-grammar", {
           method: "POST",
           headers: gateFetchHeaders(),
-          body: JSON.stringify({ text, lang: getStudyLangConfig().apiLang }),
+          body: JSON.stringify({
+            text,
+            lang: config.apiLang,
+            lang_id: config.id,
+          }),
         });
         const data = await response.json();
         if (response.status === 403 && data.code === "GATE_REQUIRED") {
@@ -2038,11 +2043,15 @@
         return unique.slice(0, GRAMMAR_TIPS_MAX);
       }
 
-      function renderGrammarTipsList(tips) {
+      function renderGrammarTipsList(tips, tipsEnglish = "") {
         const normalized = normalizeGrammarTips(tips).map((line) => clarifyJapaneseMessage(line));
-        grammarExplainList.innerHTML = normalized
-          .map((line) => `<li class="grammar-tip-item">${escapeHTML(line)}</li>`)
-          .join("");
+        const items = normalized.map((line) => `<li class="grammar-tip-item">${escapeHTML(line)}</li>`);
+        if (tipsEnglish) {
+          items.push(
+            `<li class="grammar-tip-item grammar-tip-english"><span class="grammar-tip-english-label">English Translation</span>${escapeHTML(String(tipsEnglish).trim())}</li>`
+          );
+        }
+        grammarExplainList.innerHTML = items.join("");
         return normalized;
       }
 
@@ -2090,7 +2099,7 @@
             result.has_issues
           );
 
-          const clarifiedTips = renderGrammarTipsList(result.tips);
+          const clarifiedTips = renderGrammarTipsList(result.tips, result.tips_english);
           setGrammarSaveReady({
             sourceText,
             corrected,
