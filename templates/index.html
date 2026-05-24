@@ -47,12 +47,29 @@
 
     <main class="page">
       <section class="card app-shell">
-        <div class="ui-lang-bar" role="region" aria-labelledby="uiLangBarLabel">
-          <span class="ui-lang-bar__icon" aria-hidden="true">🌐</span>
-          <span id="uiLangBarLabel" class="ui-lang-bar__label">App Language:</span>
-          <div class="ui-lang-toggle" role="group" id="uiLangToggle" aria-label="App display language">
-            <button type="button" class="ui-lang-btn is-active" data-ui-lang="ja">日本語</button>
-            <button type="button" class="ui-lang-btn" data-ui-lang="en">English</button>
+        <div class="lang-toolbar" role="region" aria-label="Language controls">
+          <div class="lang-toolbar__group lang-toolbar__group--ui">
+            <span class="lang-toolbar__icon" aria-hidden="true">🌐</span>
+            <span id="uiLangBarLabel" class="lang-toolbar__label">App Language:</span>
+            <div class="ui-lang-toggle" role="group" id="uiLangToggle" aria-label="App display language">
+              <button type="button" class="ui-lang-btn is-active" data-ui-lang="ja">日本語</button>
+              <button type="button" class="ui-lang-btn" data-ui-lang="en">English</button>
+            </div>
+          </div>
+          <span class="lang-toolbar__divider" aria-hidden="true"></span>
+          <div class="lang-toolbar__group lang-toolbar__group--study">
+            <span class="lang-toolbar__icon" aria-hidden="true">🎯</span>
+            <label id="studyLangBlockLabel" class="lang-toolbar__label" for="studyLangSelect"
+              >学習する言語を選択</label
+            >
+            <select
+              id="studyLangSelect"
+              class="study-lang-select study-lang-select--toolbar"
+              aria-labelledby="studyLangBlockLabel"
+            ></select>
+            <span id="studyLangBlockHint" class="sr-only"
+              >音読・添削の対象言語（Learning Language）です。🌐は画面の表示言語です。</span
+            >
           </div>
         </div>
         <div class="app-top">
@@ -90,18 +107,6 @@
         </div>
 
         <div class="dashboard">
-        <section class="study-lang-block panel-block" aria-labelledby="studyLangBlockLabel">
-          <label id="studyLangBlockLabel" class="study-lang-block__label" for="studyLangSelect"
-            >学習する言語を選択</label
-          >
-          <p id="studyLangBlockHint" class="study-lang-block__hint">
-            音読・添削の対象言語（Learning Language）を選びます。上の🌐は画面の表示言語です。
-          </p>
-          <div class="study-lang-select-wrap study-lang-select-wrap--main">
-            <select id="studyLangSelect" class="study-lang-select" aria-labelledby="studyLangBlockLabel"></select>
-          </div>
-        </section>
-
         <section class="input-block sample-block panel-block" data-section="sample">
           <label for="sampleSelect" id="sampleBlockLabel">練習用サンプル文（CEFR）</label>
           <div class="cefr-tabs" role="tablist" id="cefrTablist" aria-label="CEFRレベル">

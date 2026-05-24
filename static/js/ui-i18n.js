@@ -3,14 +3,14 @@
   const UI_STRINGS = {
     ja: {
       appSubtitle: "多言語音読・添削AIチェッカー",
-      uiLangBarLabel: "表示言語（App Language）",
+      uiLangBarLabel: "表示言語",
       uiLangJa: "日本語",
       uiLangEn: "English",
       headerLangPrefix: "認識:",
       headerLangSuffix: "— 話し終えると自動判定",
-      studyLangBlockLabel: "学習する言語を選択",
+      studyLangBlockLabel: "学習言語",
       studyLangBlockHint:
-        "音読・添削の対象言語（Learning Language）です。上の🌐は画面の表示言語（App Language）です。",
+        "音読・添削の対象言語です。🌐は画面の表示言語を切り替えます。",
       studyLangSelectAria: "学習言語",
       statusIdle: "待機中",
       gateTitle: "クラスコード",
@@ -155,9 +155,9 @@
       uiLangEn: "English",
       headerLangPrefix: "Recognition:",
       headerLangSuffix: "— auto-judges when you finish speaking",
-      studyLangBlockLabel: "Select target language",
+      studyLangBlockLabel: "Target Language",
       studyLangBlockHint:
-        "Choose the language you practice (Learning Language). The 🌐 control above changes app display language only.",
+        "Language you practice. 🌐 switches app display language only.",
       studyLangSelectAria: "Target language",
       statusIdle: "Idle",
       gateTitle: "Class code",
