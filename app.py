@@ -21,6 +21,8 @@ AUDIO_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 MODEL_ECONOMY = "gpt-4o-mini"
 MODEL_PREMIUM = "gpt-5-mini"
 OCR_MODEL = MODEL_ECONOMY
+PREMIUM_MAX_COMPLETION_TOKENS = 4096
+PREMIUM_REASONING_EFFORT = "low"
 
 # False = 節約モード（gpt-4o-mini） / True = 高精度モード（添削・解説・発音アドバイスのみ gpt-5-mini）
 USE_GPT5_MODE = False
@@ -103,6 +105,74 @@ def set_gpt5_mode_enabled(enabled: bool) -> bool:
 
 def get_ai_chat_model() -> str:
     return MODEL_PREMIUM if is_gpt5_mode_enabled() else MODEL_ECONOMY
+
+
+def is_reasoning_chat_model(model: str) -> bool:
+    name = (model or "").strip().lower()
+    if name.startswith("gpt-5") and "chat" not in name:
+        return True
+    return name.startswith(("o1", "o3", "o4"))
+
+
+def parse_json_object(raw: str) -> dict:
+    text = str(raw or "").strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```[a-zA-Z]*\n?", "", text)
+        text = re.sub(r"\n?```$", "", text)
+        text = text.strip()
+    data = json.loads(text)
+    if not isinstance(data, dict):
+        raise json.JSONDecodeError("Expected JSON object", text, 0)
+    return data
+
+
+def extract_completion_text(completion) -> str:
+    if not completion.choices:
+        return ""
+    message = completion.choices[0].message
+    content = getattr(message, "content", None)
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        parts: list[str] = []
+        for part in content:
+            if isinstance(part, dict):
+                if part.get("type") == "text":
+                    parts.append(str(part.get("text") or ""))
+            else:
+                text = getattr(part, "text", None)
+                if text:
+                    parts.append(str(text))
+        return "".join(parts).strip()
+    return str(content or "").strip()
+
+
+def create_json_chat_completion(
+    client: OpenAI,
+    model: str,
+    messages: list,
+    *,
+    temperature: float = 0.2,
+) -> dict:
+    kwargs: dict = {
+        "model": model,
+        "messages": messages,
+        "response_format": {"type": "json_object"},
+    }
+    if is_reasoning_chat_model(model):
+        kwargs["max_completion_tokens"] = PREMIUM_MAX_COMPLETION_TOKENS
+        kwargs["reasoning_effort"] = PREMIUM_REASONING_EFFORT
+    else:
+        kwargs["temperature"] = temperature
+
+    completion = client.chat.completions.create(**kwargs)
+    raw = extract_completion_text(completion)
+    if not raw:
+        finish_reason = ""
+        if completion.choices:
+            finish_reason = str(completion.choices[0].finish_reason or "")
+        raise ValueError(f"Empty model response (finish_reason={finish_reason or 'unknown'})")
+    return parse_json_object(raw)
 
 
 def normalize_study_lang(raw: str) -> str:
@@ -338,17 +408,15 @@ def check_grammar():
         return jsonify({"error": "OPENAI_API_KEY is not configured"}), 500
 
     try:
-        completion = client.chat.completions.create(
-            model=get_ai_chat_model(),
-            temperature=0.2,
-            response_format={"type": "json_object"},
-            messages=[
+        data = create_json_chat_completion(
+            client,
+            get_ai_chat_model(),
+            [
                 {"role": "system", "content": GRAMMAR_SYSTEM_PROMPT},
                 {"role": "user", "content": grammar_user_message(text, lang)},
             ],
+            temperature=0.2,
         )
-        raw = completion.choices[0].message.content or "{}"
-        data = json.loads(raw)
     except json.JSONDecodeError:
         return jsonify({"error": "Invalid JSON from grammar model"}), 502
     except Exception as exc:
@@ -554,17 +622,15 @@ def pronunciation_advice():
         user_message += f"発音一致率: {accuracy_percent}%\n"
 
     try:
-        completion = client.chat.completions.create(
-            model=get_ai_chat_model(),
-            temperature=0.3,
-            response_format={"type": "json_object"},
-            messages=[
+        data = create_json_chat_completion(
+            client,
+            get_ai_chat_model(),
+            [
                 {"role": "system", "content": PRONUNCIATION_SYSTEM_PROMPT},
                 {"role": "user", "content": user_message},
             ],
+            temperature=0.3,
         )
-        raw = completion.choices[0].message.content or "{}"
-        data = json.loads(raw)
     except json.JSONDecodeError:
         return jsonify({"error": "Invalid JSON from pronunciation model"}), 502
     except Exception as exc:
