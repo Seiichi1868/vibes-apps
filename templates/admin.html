@@ -78,7 +78,7 @@
       <section class="admin-card admin-card-spaced">
         <h1>利用可能な言語</h1>
         <p class="admin-lead">
-          チェックを入れた言語だけが、生徒画面の言語切り替えに表示されます。
+          チェックを入れた言語だけが、生徒画面の「学習する言語を選択」ドロップダウンに表示されます（アプリ表示言語の設定とは別です）。
         </p>
 
         <fieldset class="admin-mode-fieldset">
@@ -99,6 +99,33 @@
             <label class="admin-lang-option">
               <input type="checkbox" name="adminLang" value="ro" />
               <span>🇷🇴 ルーマニア語 (Romanian)</span>
+            </label>
+          </div>
+        </fieldset>
+      </section>
+
+      <section class="admin-card admin-card-spaced">
+        <h1>表示言語の初期設定</h1>
+        <p class="admin-lead">
+          生徒が初めてページを開いたときのアプリ表示言語（UI）のデフォルトです。学習する言語（英語・日本語など）とは別の設定です。
+        </p>
+
+        <fieldset class="admin-mode-fieldset">
+          <legend class="admin-mode-legend">Default UI Language</legend>
+          <div class="admin-mode-options" id="adminUiLangOptions">
+            <label class="admin-mode-option">
+              <input type="radio" name="uiLang" value="ja" />
+              <span class="admin-mode-option-body">
+                <span class="admin-mode-option-title">日本語</span>
+                <span class="admin-mode-option-desc">ボタン・説明文を日本語で表示</span>
+              </span>
+            </label>
+            <label class="admin-mode-option">
+              <input type="radio" name="uiLang" value="en" />
+              <span class="admin-mode-option-body">
+                <span class="admin-mode-option-title">English</span>
+                <span class="admin-mode-option-desc">Buttons and labels in English</span>
+              </span>
             </label>
           </div>
         </fieldset>
@@ -138,6 +165,7 @@
       const ttsLabel = document.getElementById("adminTtsLabel");
       const ttsHint = document.getElementById("adminTtsHint");
       const langInputs = Array.from(document.querySelectorAll('input[name="adminLang"]'));
+      const uiLangInputs = Array.from(document.querySelectorAll('input[name="uiLang"]'));
       const activeModel = document.getElementById("adminActiveModel");
       const todayCode = document.getElementById("adminTodayCode");
       const statusText = document.getElementById("adminStatus");
@@ -176,18 +204,28 @@
         });
       }
 
+      function renderUiLanguageState(uiLang) {
+        const lang = String(uiLang || "ja");
+        uiLangInputs.forEach((input) => {
+          input.checked = input.value === lang;
+          input.disabled = false;
+        });
+      }
+
       async function loadAdminState() {
         statusText.textContent = "状態を取得中...";
-        const [lockRes, aiRes, langRes, ttsRes, codeRes] = await Promise.all([
+        const [lockRes, aiRes, langRes, uiLangRes, ttsRes, codeRes] = await Promise.all([
           fetch("/api/admin/gate-lock"),
           fetch("/api/admin/ai-mode"),
           fetch("/api/admin/languages"),
+          fetch("/api/admin/ui-language"),
           fetch("/api/admin/tts"),
           fetch("/api/gate/today"),
         ]);
         const lockData = await lockRes.json();
         const aiData = await aiRes.json();
         const langData = await langRes.json();
+        const uiLangData = await uiLangRes.json();
         const ttsData = await ttsRes.json();
         const codeData = await codeRes.json();
         if (!lockRes.ok) {
@@ -199,12 +237,16 @@
         if (!langRes.ok) {
           throw new Error(langData.error || "言語設定の取得に失敗しました");
         }
+        if (!uiLangRes.ok) {
+          throw new Error(uiLangData.error || "表示言語設定の取得に失敗しました");
+        }
         if (!ttsRes.ok) {
           throw new Error(ttsData.error || "TTS状態の取得に失敗しました");
         }
         renderLockState(Boolean(lockData.lock_enabled));
         renderAiModeState(aiData);
         renderLanguageState(langData);
+        renderUiLanguageState(uiLangData.default_ui_language);
         renderTtsState(Boolean(ttsData.tts_enabled));
         todayCode.textContent = String(codeData.code || "----").padStart(4, "0");
         statusText.textContent = "準備完了";
@@ -290,6 +332,37 @@
         }
       }
 
+      async function saveUiLanguageState(uiLanguage) {
+        uiLangInputs.forEach((input) => {
+          input.disabled = true;
+        });
+        statusText.textContent = "表示言語の初期設定を保存中...";
+        try {
+          const response = await fetch("/api/admin/ui-language", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ default_ui_language: uiLanguage }),
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || "保存に失敗しました");
+          }
+          renderUiLanguageState(data.default_ui_language);
+          statusText.textContent =
+            data.default_ui_language === "en"
+              ? "初期表示言語を English に設定しました（新規アクセスに反映）"
+              : "初期表示言語を日本語に設定しました（新規アクセスに反映）";
+        } catch (error) {
+          console.error(error);
+          statusText.textContent = "表示言語設定の保存に失敗しました。";
+          await loadAdminState();
+        } finally {
+          uiLangInputs.forEach((input) => {
+            input.disabled = false;
+          });
+        }
+      }
+
       async function saveTtsState(ttsEnabled) {
         ttsToggle.disabled = true;
         statusText.textContent = "TTS設定を保存中...";
@@ -334,6 +407,13 @@
       langInputs.forEach((input) => {
         input.addEventListener("change", () => {
           saveLanguageState();
+        });
+      });
+
+      uiLangInputs.forEach((input) => {
+        input.addEventListener("change", () => {
+          if (!input.checked) return;
+          saveUiLanguageState(input.value);
         });
       });
 

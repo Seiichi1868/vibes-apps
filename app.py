@@ -100,6 +100,9 @@ ENABLED_STUDY_LANGUAGES: list[str] = list(DEFAULT_ENABLED_LANGUAGES)
 # False = 生徒画面はブラウザ標準TTS / True = 再生ボタン押下時のみ OpenAI TTS
 TTS_ENABLED = False
 
+# 生徒画面の表示言語（UI）の初期値（管理者が変更可能）
+DEFAULT_UI_LANGUAGE = "ja"
+
 
 def normalize_study_lang_id(raw: str) -> str:
     value = (raw or "").strip().lower().replace("_", "-")
@@ -591,6 +594,25 @@ def set_tts_enabled(enabled: bool) -> bool:
     return TTS_ENABLED
 
 
+def normalize_ui_language(raw) -> str:
+    value = str(raw or "").strip().lower()
+    if value in {"ja", "jp", "japanese", "日本語"}:
+        return "ja"
+    if value in {"en", "english", "英語"}:
+        return "en"
+    return "ja"
+
+
+def get_default_ui_language() -> str:
+    return DEFAULT_UI_LANGUAGE
+
+
+def set_default_ui_language(raw) -> str:
+    global DEFAULT_UI_LANGUAGE
+    DEFAULT_UI_LANGUAGE = normalize_ui_language(raw)
+    return DEFAULT_UI_LANGUAGE
+
+
 def synthesize_openai_tts(text: str, lang: str, voice: str) -> bytes:
     client = get_openai_client()
     if not client:
@@ -634,6 +656,7 @@ def gate_status():
             "tts_enabled": is_tts_enabled(),
             "enabled_languages": get_enabled_study_languages(),
             "languages": languages_response()["languages"],
+            "default_ui_language": get_default_ui_language(),
         }
     )
 
@@ -683,6 +706,22 @@ def admin_ai_mode():
         return jsonify({"error": str(exc)}), 400
 
     return jsonify(ai_mode_response())
+
+
+@app.route("/api/admin/ui-language", methods=["GET", "POST"])
+def admin_ui_language():
+    if request.method == "GET":
+        return jsonify({"ok": True, "default_ui_language": get_default_ui_language()})
+
+    payload = request.get_json(silent=True) or {}
+    raw = payload.get("default_ui_language")
+    if raw is None:
+        raw = payload.get("ui_language")
+    if raw is None:
+        return jsonify({"error": "default_ui_language is required"}), 400
+
+    lang = set_default_ui_language(raw)
+    return jsonify({"ok": True, "default_ui_language": lang})
 
 
 @app.route("/api/admin/tts", methods=["GET", "POST"])

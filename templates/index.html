@@ -28,7 +28,7 @@
     <div id="gateOverlay" class="gate-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
       <div class="gate-card">
         <h2 id="gateTitle">クラスコード</h2>
-        <p>先生から教わった4桁のコードを入力してください</p>
+        <p id="gateLead">先生から教わった4桁のコードを入力してください</p>
         <input
           id="gateCodeInput"
           class="gate-code-input"
@@ -47,6 +47,14 @@
 
     <main class="page">
       <section class="card app-shell">
+        <div class="ui-lang-bar" role="region" aria-labelledby="uiLangBarLabel">
+          <span class="ui-lang-bar__icon" aria-hidden="true">🌐</span>
+          <span id="uiLangBarLabel" class="ui-lang-bar__label">App Language:</span>
+          <div class="ui-lang-toggle" role="group" id="uiLangToggle" aria-label="App display language">
+            <button type="button" class="ui-lang-btn is-active" data-ui-lang="ja">日本語</button>
+            <button type="button" class="ui-lang-btn" data-ui-lang="en">English</button>
+          </div>
+        </div>
         <div class="app-top">
           <header class="app-header" data-section="header">
             <div class="header-compact-row">
@@ -54,14 +62,12 @@
               <span class="header-sep" aria-hidden="true"></span>
               <span id="headerSubtitle" class="subtitle">多言語音読・添削AIチェッカー</span>
               <span class="header-sep" aria-hidden="true"></span>
-              <span class="header-lang"
-                >認識: <code id="headerLangCode">en-US</code> — 話し終えると自動判定</span
-              >
+              <span class="header-lang">
+                <span id="headerLangPrefix">認識:</span>
+                <code id="headerLangCode">en-US</code>
+                <span id="headerLangSuffix">— 話し終えると自動判定</span>
+              </span>
               <span id="statusText" class="header-status" data-section="recorder">待機中</span>
-              <div class="study-lang-select-wrap">
-                <label class="sr-only" for="studyLangSelect">学習言語</label>
-                <select id="studyLangSelect" class="study-lang-select" aria-label="学習言語"></select>
-              </div>
             </div>
           </header>
           <div class="settings-wrap">
@@ -72,24 +78,36 @@
               </svg>
             </button>
             <div id="settingsPanel" class="settings-panel hidden" role="dialog" aria-label="表示設定">
-              <h3>表示するセクション</h3>
-              <label><input type="checkbox" data-toggle-section="sample" checked /> 練習用サンプル文</label>
-              <label><input type="checkbox" data-toggle-section="compose" checked /> 自由作文</label>
-              <label><input type="checkbox" data-toggle-section="grammar" checked /> 文法添削</label>
-              <label><input type="checkbox" data-toggle-section="recorder" checked /> ステータス表示</label>
-              <label><input type="checkbox" data-toggle-section="result" checked /> 判定結果</label>
-              <label><input type="checkbox" data-toggle-section="comparison" checked /> 発音一致率</label>
+              <h3 id="settingsPanelHeading">表示するセクション</h3>
+              <label id="settingsLabelSample"><input type="checkbox" data-toggle-section="sample" checked /> 練習用サンプル文</label>
+              <label id="settingsLabelCompose"><input type="checkbox" data-toggle-section="compose" checked /> 自由作文</label>
+              <label id="settingsLabelGrammar"><input type="checkbox" data-toggle-section="grammar" checked /> 文法添削</label>
+              <label id="settingsLabelRecorder"><input type="checkbox" data-toggle-section="recorder" checked /> ステータス表示</label>
+              <label id="settingsLabelResult"><input type="checkbox" data-toggle-section="result" checked /> 判定結果</label>
+              <label id="settingsLabelComparison"><input type="checkbox" data-toggle-section="comparison" checked /> 発音一致率</label>
             </div>
           </div>
         </div>
 
         <div class="dashboard">
+        <section class="study-lang-block panel-block" aria-labelledby="studyLangBlockLabel">
+          <label id="studyLangBlockLabel" class="study-lang-block__label" for="studyLangSelect"
+            >学習する言語を選択</label
+          >
+          <p id="studyLangBlockHint" class="study-lang-block__hint">
+            音読・添削の対象言語（Learning Language）を選びます。上の🌐は画面の表示言語です。
+          </p>
+          <div class="study-lang-select-wrap study-lang-select-wrap--main">
+            <select id="studyLangSelect" class="study-lang-select" aria-labelledby="studyLangBlockLabel"></select>
+          </div>
+        </section>
+
         <section class="input-block sample-block panel-block" data-section="sample">
-          <label for="sampleSelect">練習用サンプル文（CEFR）</label>
-          <div class="cefr-tabs" role="tablist" aria-label="CEFRレベル">
-            <button type="button" class="cefr-tab is-active" data-level="A1" aria-selected="true">A1（初級）</button>
-            <button type="button" class="cefr-tab" data-level="A2" aria-selected="false">A2（中級）</button>
-            <button type="button" class="cefr-tab" data-level="B1" aria-selected="false">B1（中上級）</button>
+          <label for="sampleSelect" id="sampleBlockLabel">練習用サンプル文（CEFR）</label>
+          <div class="cefr-tabs" role="tablist" id="cefrTablist" aria-label="CEFRレベル">
+            <button type="button" class="cefr-tab is-active" data-level="A1" aria-selected="true" id="cefrTabA1">A1（初級）</button>
+            <button type="button" class="cefr-tab" data-level="A2" aria-selected="false" id="cefrTabA2">A2（中級）</button>
+            <button type="button" class="cefr-tab" data-level="B1" aria-selected="false" id="cefrTabB1">B1（中上級）</button>
           </div>
           <div class="sample-row">
             <select id="sampleSelect">
@@ -100,7 +118,7 @@
         </section>
 
         <section class="input-block panel-block" data-section="compose">
-          <label for="referenceText">自由作文</label>
+          <label for="referenceText" id="composeBlockLabel">自由作文</label>
           <div class="compose-text-wrap">
             <textarea id="referenceText" rows="1" placeholder="英文を入力するか、上の練習用サンプル文を選んでください。"></textarea>
             <span id="wordCountDisplay" class="compose-word-count" aria-live="polite">0 語</span>
@@ -130,10 +148,10 @@
         </section>
 
         <section id="grammarCard" class="result panel-block grammar-compact hidden" data-section="grammar">
-          <h2>文法添削</h2>
+          <h2 id="grammarCardHeading">文法添削</h2>
           <p id="grammarCorrectedMeta" class="meta">修正案</p>
           <p id="grammarCorrectedText" class="recognized">-</p>
-          <p class="meta">修正ポイント</p>
+          <p class="meta" id="grammarTipsHeading">修正ポイント</p>
           <ul id="grammarExplainList"></ul>
           <button id="saveGrammarHistoryBtn" class="btn ghost grammar-save-btn" type="button" disabled>
             📌 添削履歴に保存
@@ -142,12 +160,12 @@
 
         <div class="dashboard-row cols-2 results-row">
           <section class="result panel-block" data-section="result">
-            <h2>判定結果</h2>
+            <h2 id="resultCardHeading">判定結果</h2>
             <p id="recognizedText" class="recognized">-</p>
           </section>
 
           <section id="comparisonCard" class="result panel-block comparison-hero hidden" data-section="comparison">
-            <h2>発音一致率</h2>
+            <h2 id="comparisonCardHeading">発音一致率</h2>
             <div id="accuracyBlock" class="accuracy-block hidden">
               <div class="accuracy-head">
                 <span><span id="accuracyPercent">0</span>%</span>
@@ -157,7 +175,7 @@
               </div>
             </div>
             <div id="pronunciationAdviceBlock" class="pronunciation-advice hidden" aria-live="polite">
-              <p class="pronunciation-advice-label">🎧 AI発音コーチからのアドバイス</p>
+              <p class="pronunciation-advice-label" id="pronunciationAdviceLabel">🎧 AI発音コーチからのアドバイス</p>
               <p id="pronunciationAdviceText" class="pronunciation-advice-text">—</p>
             </div>
             <div class="overlay-wrap">
@@ -165,9 +183,9 @@
               <p id="highlightLayer" class="highlight-layer"></p>
             </div>
             <div class="legend">
-              <span class="chip exact">一致</span>
-              <span class="chip near">不明瞭</span>
-              <span class="chip miss">不一致</span>
+              <span class="chip exact" id="legendChipExact">一致</span>
+              <span class="chip near" id="legendChipNear">不明瞭</span>
+              <span class="chip miss" id="legendChipMiss">不一致</span>
             </div>
           </section>
         </div>
@@ -180,7 +198,7 @@
             aria-expanded="false"
             aria-controls="grammarHistoryPanel"
           >
-            <span>過去の添削履歴</span>
+            <span id="grammarHistoryToggleLabel">過去の添削履歴</span>
             <span id="grammarHistoryCount" class="grammar-history-count">0</span>
           </button>
           <div id="grammarHistoryPanel" class="grammar-history-panel hidden">
@@ -192,6 +210,7 @@
       </section>
     </main>
 
+    <script src="{{ url_for('static', filename='js/ui-i18n.js') }}"></script>
     <script>
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const startBtn = document.getElementById("startBtn");
@@ -235,6 +254,37 @@
       const grammarCorrectedMeta = document.getElementById("grammarCorrectedMeta");
       const appTitle = document.getElementById("app-title");
       const studyLangSelect = document.getElementById("studyLangSelect");
+      const uiLangBarLabel = document.getElementById("uiLangBarLabel");
+      const uiLangToggle = document.getElementById("uiLangToggle");
+      const uiLangButtons = document.querySelectorAll(".ui-lang-btn");
+      const studyLangBlockLabel = document.getElementById("studyLangBlockLabel");
+      const studyLangBlockHint = document.getElementById("studyLangBlockHint");
+      const headerLangPrefix = document.getElementById("headerLangPrefix");
+      const headerLangSuffix = document.getElementById("headerLangSuffix");
+      const gateLead = document.getElementById("gateLead");
+      const gateTitle = document.getElementById("gateTitle");
+      const sampleBlockLabel = document.getElementById("sampleBlockLabel");
+      const cefrTablist = document.getElementById("cefrTablist");
+      const cefrTabA1 = document.getElementById("cefrTabA1");
+      const cefrTabA2 = document.getElementById("cefrTabA2");
+      const cefrTabB1 = document.getElementById("cefrTabB1");
+      const composeBlockLabel = document.getElementById("composeBlockLabel");
+      const grammarCardHeading = document.getElementById("grammarCardHeading");
+      const grammarTipsHeading = document.getElementById("grammarTipsHeading");
+      const resultCardHeading = document.getElementById("resultCardHeading");
+      const comparisonCardHeading = document.getElementById("comparisonCardHeading");
+      const pronunciationAdviceLabel = document.getElementById("pronunciationAdviceLabel");
+      const legendChipExact = document.getElementById("legendChipExact");
+      const legendChipNear = document.getElementById("legendChipNear");
+      const legendChipMiss = document.getElementById("legendChipMiss");
+      const grammarHistoryToggleLabel = document.getElementById("grammarHistoryToggleLabel");
+      const settingsPanelHeading = document.getElementById("settingsPanelHeading");
+      const settingsLabelSample = document.getElementById("settingsLabelSample");
+      const settingsLabelCompose = document.getElementById("settingsLabelCompose");
+      const settingsLabelGrammar = document.getElementById("settingsLabelGrammar");
+      const settingsLabelRecorder = document.getElementById("settingsLabelRecorder");
+      const settingsLabelResult = document.getElementById("settingsLabelResult");
+      const settingsLabelComparison = document.getElementById("settingsLabelComparison");
       const gateOverlay = document.getElementById("gateOverlay");
       const gateCodeInput = document.getElementById("gateCodeInput");
       const gateSubmitBtn = document.getElementById("gateSubmitBtn");
@@ -546,61 +596,16 @@
       },
       };
 
-      const APP_SUBTITLE = "多言語音読・添削AIチェッカー";
+      const UI_LANG_STORAGE_KEY = "vibespeak-ui-lang";
+      const { UI_STRINGS, formatTemplate } = window.VibeSpeakUiI18n;
+      let uiLang = "ja";
+      let serverDefaultUiLanguage = "ja";
 
       const STUDY_LANG = {
-        en: {
-          id: "en",
-          speechLang: "en-US",
-          apiLang: "en-US",
-          label: "🇬🇧 英語",
-          samplePlaceholder: "-- 英文を選択 --",
-          composePlaceholder: "英文を入力するか、上の練習用サンプル文を選んでください。",
-          grammarMeta: "修正案",
-          needTextStatus: "先に自由入力欄へ英文を入力してください。",
-          recordNeedText: "先にお手本のテキストを入力してください。",
-          recordPrompt: "認識中... 英文を読み上げてください。",
-          wordUnit: "語",
-        },
-        es: {
-          id: "es",
-          speechLang: "es-ES",
-          apiLang: "es-ES",
-          label: "🇪🇸 スペイン語",
-          samplePlaceholder: "-- スペイン語文を選択 --",
-          composePlaceholder: "スペイン語文を入力するか、上の練習用サンプル文を選んでください。",
-          grammarMeta: "修正案",
-          needTextStatus: "先に自由入力欄へスペイン語文を入力してください。",
-          recordNeedText: "先にお手本のテキストを入力してください。",
-          recordPrompt: "認識中... スペイン語文を読み上げてください。",
-          wordUnit: "語",
-        },
-        ja: {
-          id: "ja",
-          speechLang: "ja-JP",
-          apiLang: "ja-JP",
-          label: "🇯🇵 日本語",
-          samplePlaceholder: "-- 日本語文を選択 --",
-          composePlaceholder: "日本語文を入力するか、上の練習用サンプル文を選んでください。",
-          grammarMeta: "修正案",
-          needTextStatus: "先に自由入力欄へ日本語文を入力してください。",
-          recordNeedText: "先にお手本のテキストを入力してください。",
-          recordPrompt: "認識中... 日本語文を読み上げてください。",
-          wordUnit: "文字",
-        },
-        ro: {
-          id: "ro",
-          speechLang: "ro-RO",
-          apiLang: "ro-RO",
-          label: "🇷🇴 ルーマニア語",
-          samplePlaceholder: "-- ルーマニア語文を選択 --",
-          composePlaceholder: "ルーマニア語文を入力するか、上の練習用サンプル文を選んでください。",
-          grammarMeta: "修正案",
-          needTextStatus: "先に自由入力欄へルーマニア語文を入力してください。",
-          recordNeedText: "先にお手本のテキストを入力してください。",
-          recordPrompt: "認識中... ルーマニア語文を読み上げてください。",
-          wordUnit: "語",
-        },
+        en: { id: "en", speechLang: "en-US", apiLang: "en-US" },
+        es: { id: "es", speechLang: "es-ES", apiLang: "es-ES" },
+        ja: { id: "ja", speechLang: "ja-JP", apiLang: "ja-JP" },
+        ro: { id: "ro", speechLang: "ro-RO", apiLang: "ro-RO" },
       };
 
       let enabledStudyLanguages = ["en", "es", "ja", "ro"];
@@ -609,14 +614,135 @@
       let referenceFromSample = false;
       let currentTtsAudio = null;
       let browserUtteranceActive = false;
-      const GRAMMAR_BTN_LABEL = "文法チェック";
-      const LISTEN_BTN_LABEL = "見本を聴く";
-      const LISTEN_STOP_LABEL = "■ 音声停止";
-      const OCR_CAMERA_BTN_LABEL = "📸 カメラで撮影";
-      const OCR_FILE_BTN_LABEL = "🖼 写真・スクショを選択";
+
+      function t(key, vars) {
+        const pack = UI_STRINGS[uiLang] || UI_STRINGS.ja;
+        const value = pack[key];
+        if (typeof value === "string") return formatTemplate(value, vars || {});
+        return key;
+      }
+
+      function getStudyLangUiPack(langId) {
+        const pack = UI_STRINGS[uiLang] || UI_STRINGS.ja;
+        const id = STUDY_LANG[langId] ? langId : "en";
+        return pack.study[id] || pack.study.en;
+      }
 
       function getStudyLangConfig() {
-        return STUDY_LANG[studyLang] || STUDY_LANG.en;
+        const tech = STUDY_LANG[studyLang] || STUDY_LANG.en;
+        return { ...tech, ...getStudyLangUiPack(studyLang) };
+      }
+
+      function listenBtnLabel() {
+        return isTtsPlaying() ? t("listenStopBtn") : t("listenBtn");
+      }
+
+      function syncUiLanguageFromServer(defaultLang) {
+        serverDefaultUiLanguage = defaultLang === "en" ? "en" : "ja";
+        try {
+          const saved = localStorage.getItem(UI_LANG_STORAGE_KEY);
+          if (saved === "ja" || saved === "en") return;
+        } catch (_) {
+          /* ignore */
+        }
+        if (uiLang !== serverDefaultUiLanguage) {
+          setUiLanguage(serverDefaultUiLanguage, { persist: false, fromUser: false });
+        }
+      }
+
+      function setUiLanguage(next, { persist = true, fromUser = false } = {}) {
+        if (next !== "ja" && next !== "en") return;
+        uiLang = next;
+        if (persist && fromUser) {
+          try {
+            localStorage.setItem(UI_LANG_STORAGE_KEY, next);
+          } catch (_) {
+            /* ignore */
+          }
+        }
+        document.documentElement.lang = uiLang === "en" ? "en" : "ja";
+        applyUiLanguage({ resetStatus: fromUser });
+      }
+
+      function applyUiLanguage({ resetStatus = false } = {}) {
+        if (uiLangBarLabel) uiLangBarLabel.textContent = t("uiLangBarLabel");
+        uiLangButtons.forEach((btn) => {
+          const active = btn.dataset.uiLang === uiLang;
+          btn.classList.toggle("is-active", active);
+          btn.setAttribute("aria-pressed", active ? "true" : "false");
+          btn.textContent = btn.dataset.uiLang === "ja" ? t("uiLangJa") : t("uiLangEn");
+        });
+        if (uiLangToggle) uiLangToggle.setAttribute("aria-label", t("uiLangBarLabel"));
+
+        headerSubtitle.textContent = t("appSubtitle");
+        if (headerLangPrefix) headerLangPrefix.textContent = t("headerLangPrefix");
+        if (headerLangSuffix) headerLangSuffix.textContent = t("headerLangSuffix");
+        if (studyLangBlockLabel) studyLangBlockLabel.textContent = t("studyLangBlockLabel");
+        if (studyLangBlockHint) studyLangBlockHint.textContent = t("studyLangBlockHint");
+        if (studyLangSelect) studyLangSelect.setAttribute("aria-label", t("studyLangSelectAria"));
+
+        if (gateTitle) gateTitle.textContent = t("gateTitle");
+        if (gateLead) gateLead.textContent = t("gateLead");
+        if (gateCodeInput) gateCodeInput.setAttribute("aria-label", t("gateCodeAria"));
+        if (gateSubmitBtn) gateSubmitBtn.textContent = t("gateSubmit");
+
+        if (settingsBtn) settingsBtn.title = t("settingsTitle");
+        if (settingsPanel) settingsPanel.setAttribute("aria-label", t("settingsTitle"));
+        if (settingsPanelHeading) settingsPanelHeading.textContent = t("settingsHeading");
+        const settingsPairs = [
+          [settingsLabelSample, "settingsSample", "sample"],
+          [settingsLabelCompose, "settingsCompose", "compose"],
+          [settingsLabelGrammar, "settingsGrammar", "grammar"],
+          [settingsLabelRecorder, "settingsRecorder", "recorder"],
+          [settingsLabelResult, "settingsResult", "result"],
+          [settingsLabelComparison, "settingsComparison", "comparison"],
+        ];
+        settingsPairs.forEach(([labelEl, textKey, sectionKey]) => {
+          if (!labelEl) return;
+          const input = labelEl.querySelector("input");
+          labelEl.textContent = "";
+          if (input) {
+            labelEl.appendChild(input);
+            labelEl.append(` ${t(textKey)}`);
+          } else {
+            labelEl.textContent = t(textKey);
+          }
+          if (input) input.dataset.toggleSection = sectionKey;
+        });
+
+        if (sampleBlockLabel) sampleBlockLabel.textContent = t("sampleLabel");
+        if (cefrTablist) cefrTablist.setAttribute("aria-label", t("cefrAria"));
+        if (cefrTabA1) cefrTabA1.textContent = t("cefrA1");
+        if (cefrTabA2) cefrTabA2.textContent = t("cefrA2");
+        if (cefrTabB1) cefrTabB1.textContent = t("cefrB1");
+        if (sampleRandomBtn) sampleRandomBtn.textContent = t("sampleRandom");
+        if (composeBlockLabel) composeBlockLabel.textContent = t("composeLabel");
+        if (grammarCardHeading) grammarCardHeading.textContent = t("grammarHeading");
+        if (grammarTipsHeading) grammarTipsHeading.textContent = t("grammarTipsHeading");
+        if (resultCardHeading) resultCardHeading.textContent = t("resultHeading");
+        if (comparisonCardHeading) comparisonCardHeading.textContent = t("comparisonHeading");
+        if (pronunciationAdviceLabel) pronunciationAdviceLabel.textContent = t("adviceLabel");
+        if (legendChipExact) legendChipExact.textContent = t("chipExact");
+        if (legendChipNear) legendChipNear.textContent = t("chipNear");
+        if (legendChipMiss) legendChipMiss.textContent = t("chipMiss");
+        if (grammarHistoryToggleLabel) grammarHistoryToggleLabel.textContent = t("historyToggle");
+        if (grammarHistoryEmpty) grammarHistoryEmpty.textContent = t("historyEmpty");
+        if (saveGrammarHistoryBtn) saveGrammarHistoryBtn.textContent = t("saveHistory");
+
+        grammarCheckBtn.textContent = t("grammarBtn");
+        startBtn.textContent = t("recordStart");
+        stopBtn.textContent = t("recordStop");
+        ocrCameraBtn.textContent = t("ocrCamera");
+        ocrFileBtn.textContent = t("ocrFile");
+        listenModelBtn.textContent = listenBtnLabel();
+
+        const config = getStudyLangConfig();
+        grammarCorrectedMeta.textContent = config.grammarMeta;
+        referenceText.placeholder = config.composePlaceholder;
+        renderStudyLangSelect();
+        fillSampleSelect(sampleLevel);
+        updateWordCountDisplay();
+        if (resetStatus) setStatus(t("statusIdle"));
       }
 
       function todayKey() {
@@ -703,7 +829,7 @@
       }
 
       function showApiLimitMessage() {
-        setStatus("本日の練習上限です。また明日！");
+        setStatus(t("apiLimit"));
       }
 
       function isAdminMode() {
@@ -745,13 +871,13 @@
       function handleGateAuthFailure() {
         sessionStorage.removeItem(gateStorageKey());
         showGateOverlay();
-        setStatus("クラスコードの確認が必要です。");
+        setStatus(t("gateNeedCode"));
       }
 
       async function submitGateCode() {
         const code = gateCodeInput.value.replace(/\D/g, "").slice(0, 4);
         if (code.length !== 4) {
-          gateError.textContent = "4桁の数字を入力してください。";
+          gateError.textContent = t("gateCodeInvalid");
           return;
         }
         gateSubmitBtn.disabled = true;
@@ -766,12 +892,12 @@
           if (response.ok && data.ok && data.token) {
             saveGateToken(data.token);
             hideGateOverlay();
-            setStatus("ようこそ！練習を始めましょう。");
+            setStatus(t("gateWelcome"));
             return;
           }
-          gateError.textContent = "コードが正しくありません。";
+          gateError.textContent = t("gateCodeWrong");
         } catch (_) {
-          gateError.textContent = "接続に失敗しました。もう一度お試しください。";
+          gateError.textContent = t("gateConnectFail");
         } finally {
           gateSubmitBtn.disabled = false;
         }
@@ -804,6 +930,9 @@
         }
         serverGateLockEnabled = Boolean(data.lock_enabled);
         serverTtsEnabled = Boolean(data.tts_enabled);
+        if (data.default_ui_language) {
+          syncUiLanguageFromServer(data.default_ui_language);
+        }
         if (Array.isArray(data.enabled_languages) && data.enabled_languages.length) {
           enabledStudyLanguages = data.enabled_languages;
           renderStudyLangSelect();
@@ -868,7 +997,7 @@
           if (lockEnabled && isGateBypassUnlock()) {
             sessionStorage.removeItem(gateStorageKey());
             showGateOverlay();
-            setStatus("クラスコードの確認が必要です。");
+            setStatus(t("gateNeedCode"));
             return;
           }
           if (!isGateUnlocked()) {
@@ -888,7 +1017,7 @@
         setPasswordBypassed(true);
         await autoUnlockGateIfNeeded();
         hideGateOverlay();
-        showSecurityToast("パスワードなしモードを有効にしました");
+        showSecurityToast(t("toastBypass"));
       }
 
       async function toggleAdminMode() {
@@ -897,13 +1026,13 @@
         if (enabling) {
           await autoUnlockGateIfNeeded();
           hideGateOverlay();
-          showSecurityToast("管理者モード：ON（制限解除）");
+          showSecurityToast(t("toastAdminOn"));
           return;
         }
-        showSecurityToast("管理者モード：OFF（生徒モード）");
+        showSecurityToast(t("toastAdminOff"));
         if (!isPasswordBypassed() && !isGateUnlocked()) {
           showGateOverlay();
-          setStatus("クラスコードの確認が必要です。");
+          setStatus(t("gateNeedCode"));
         } else if (isApiLimitReached()) {
           showApiLimitMessage();
         }
@@ -954,9 +1083,9 @@
           const response = await fetch("/api/gate/today");
           const data = await response.json();
           const code = String(data.code || "").padStart(4, "0");
-          showSecurityToast(`本日のコードは ${code} です`);
+          showSecurityToast(t("toastTodayCode", { code }));
         } catch (_) {
-          setStatus("コードの取得に失敗しました。");
+          setStatus(t("gateCodeFetchFail"));
         }
       }
 
@@ -1084,11 +1213,10 @@
         const previous = studyLang;
         studyLangSelect.innerHTML = "";
         enabledStudyLanguages.forEach((langId) => {
-          const config = STUDY_LANG[langId];
-          if (!config) return;
+          if (!STUDY_LANG[langId]) return;
           const option = document.createElement("option");
           option.value = langId;
-          option.textContent = config.label;
+          option.textContent = getStudyLangUiPack(langId).label;
           studyLangSelect.appendChild(option);
         });
         const nextLang = enabledStudyLanguages.includes(previous)
@@ -1109,11 +1237,10 @@
         const config = getStudyLangConfig();
 
         if (studyLangSelect) studyLangSelect.value = studyLang;
-        headerSubtitle.textContent = APP_SUBTITLE;
         headerLangCode.textContent = config.speechLang;
         grammarCorrectedMeta.textContent = config.grammarMeta;
         referenceText.placeholder = config.composePlaceholder;
-        listenModelBtn.textContent = isTtsPlaying() ? LISTEN_STOP_LABEL : LISTEN_BTN_LABEL;
+        listenModelBtn.textContent = listenBtnLabel();
 
         if (recognition) recognition.lang = config.speechLang;
 
@@ -1174,7 +1301,7 @@
       }
 
       function setListenButtonPlaying(playing) {
-        listenModelBtn.textContent = playing ? LISTEN_STOP_LABEL : LISTEN_BTN_LABEL;
+        listenModelBtn.textContent = playing ? t("listenStopBtn") : t("listenBtn");
         listenModelBtn.classList.toggle("is-playing", playing);
         listenModelBtn.setAttribute("aria-pressed", playing ? "true" : "false");
       }
@@ -1363,7 +1490,7 @@
       function formatGrammarHistoryDate(iso) {
         const date = new Date(iso);
         if (Number.isNaN(date.getTime())) return "";
-        return date.toLocaleString("ja-JP", {
+        return date.toLocaleString(uiLang === "en" ? "en-US" : "ja-JP", {
           month: "numeric",
           day: "numeric",
           hour: "2-digit",
@@ -1449,7 +1576,7 @@
           hasIssues: Boolean(entry.hasIssues),
           lang: entry.lang || studyLang,
         });
-        setStatus("履歴を復元し、自由作文に反映しました。録音して音読練習できます。");
+        setStatus(t("historyRestored"));
         referenceText.scrollIntoView({ behavior: "smooth", block: "nearest" });
       }
 
@@ -1475,14 +1602,14 @@
           const deleteBtn = document.createElement("button");
           deleteBtn.type = "button";
           deleteBtn.className = "grammar-history-delete";
-          deleteBtn.setAttribute("aria-label", "履歴を削除");
+          deleteBtn.setAttribute("aria-label", t("historyDeleteAria"));
           deleteBtn.textContent = "×";
           deleteBtn.addEventListener("click", (event) => {
             event.stopPropagation();
             const next = loadGrammarHistory().filter((row) => row.id !== entry.id);
             saveGrammarHistoryStore(next);
             renderGrammarHistoryList();
-            setStatus("添削履歴を削除しました。");
+            setStatus(t("historyDeleted"));
           });
 
           item.appendChild(restoreBtn);
@@ -1493,7 +1620,7 @@
 
       function saveCurrentGrammarToHistory() {
         if (!lastGrammarResult) {
-          setStatus("先に文法チェックを実行してください。");
+          setStatus(t("historyNeedGrammar"));
           return;
         }
 
@@ -1517,7 +1644,7 @@
           grammarHistoryToggle.setAttribute("aria-expanded", "true");
         }
 
-        setStatus("添削履歴に保存しました。");
+        setStatus(t("historySaved"));
       }
 
       function initGrammarHistory() {
@@ -1647,7 +1774,7 @@
       function showPronunciationAdviceLoading() {
         pronunciationAdviceBlock.classList.remove("hidden");
         pronunciationAdviceBlock.classList.add("is-loading");
-        pronunciationAdviceText.textContent = "AIが発音を分析しています...";
+        pronunciationAdviceText.textContent = t("adviceLoading");
       }
 
       function renderPronunciationAdvice(advice, adviceEnglish = "") {
@@ -1657,7 +1784,7 @@
         if (enText) {
           pronunciationAdviceText.innerHTML = [
             `<span class="pronunciation-advice-ja">${escapeHTML(jaText)}</span>`,
-            `<span class="pronunciation-advice-en-label">English Translation</span>`,
+            `<span class="pronunciation-advice-en-label">${escapeHTML(t("englishTranslation"))}</span>`,
             `<span class="pronunciation-advice-en">${escapeHTML(enText)}</span>`,
           ].join("");
         } else {
@@ -1711,8 +1838,7 @@
           console.error("Pronunciation advice error:", error);
           pronunciationAdviceBlock.classList.remove("is-loading");
           pronunciationAdviceBlock.classList.remove("hidden");
-          pronunciationAdviceText.textContent =
-            "発音アドバイスの取得に失敗しました。時間をおいて再試行してください。";
+          pronunciationAdviceText.textContent = t("adviceFail");
         }
       }
 
@@ -1955,7 +2081,7 @@
 
       function speakWithBrowserTTS(text) {
         if (!("speechSynthesis" in window)) {
-          setStatus("このブラウザは音声読み上げに未対応です。");
+          setStatus(t("ttsUnsupported"));
           return;
         }
         if (currentTtsAudio) {
@@ -1972,17 +2098,17 @@
         utterance.onerror = () => {
           browserUtteranceActive = false;
           setListenButtonPlaying(false);
-          setStatus("お手本音声の再生に失敗しました。");
+          setStatus(t("ttsPlayFail"));
         };
         utterance.onstart = () => {
           browserUtteranceActive = true;
           setListenButtonPlaying(true);
-          setStatus("お手本音声を再生中です（ブラウザ標準音声）。");
+          setStatus(t("ttsPlayingBrowser"));
         };
         utterance.onend = () => {
           browserUtteranceActive = false;
           setListenButtonPlaying(false);
-          setStatus("お手本音声の再生が完了しました。");
+          setStatus(t("ttsDone"));
         };
         window.speechSynthesis.speak(utterance);
       }
@@ -2000,21 +2126,17 @@
         currentTtsAudio = audio;
         audio.onplay = () => {
           setListenButtonPlaying(true);
-          setStatus(
-            cached
-              ? "お手本音声を再生中です（キャッシュ）。"
-              : "お手本音声を再生中です（OpenAI）。"
-          );
+          setStatus(cached ? t("ttsPlayingCached") : t("ttsPlayingOpenai"));
         };
         audio.onended = () => {
           currentTtsAudio = null;
           setListenButtonPlaying(false);
-          setStatus("お手本音声の再生が完了しました。");
+          setStatus(t("ttsDone"));
         };
         audio.onerror = () => {
           currentTtsAudio = null;
           setListenButtonPlaying(false);
-          setStatus("お手本音声の再生に失敗しました。");
+          setStatus(t("ttsPlayFail"));
           throw new Error("AUDIO_PLAYBACK_FAILED");
         };
         await audio.play();
@@ -2057,7 +2179,7 @@
 
         if (isTtsPlaying()) {
           pauseCurrentTtsPlayback();
-          setStatus("お手本音声を停止しました。");
+          setStatus(t("ttsStopped"));
           return;
         }
 
@@ -2066,8 +2188,8 @@
           return;
         }
 
-        setButtonLoading(listenModelBtn, true, "生成中...", LISTEN_BTN_LABEL);
-        setStatus("高音質音声を生成中...");
+        setButtonLoading(listenModelBtn, true, t("generating"), t("listenBtn"));
+        setStatus(t("ttsGenerating"));
         try {
           await speakWithOpenAITTS(text);
         } catch (error) {
@@ -2079,8 +2201,8 @@
           setButtonLoading(
             listenModelBtn,
             false,
-            "生成中...",
-            listenModelBtn.classList.contains("is-playing") ? LISTEN_STOP_LABEL : LISTEN_BTN_LABEL
+            t("generating"),
+            listenModelBtn.classList.contains("is-playing") ? t("listenStopBtn") : t("listenBtn")
           );
         }
       }
@@ -2138,7 +2260,7 @@
         const items = normalized.map((line) => `<li class="grammar-tip-item">${escapeHTML(line)}</li>`);
         if (tipsEnglish) {
           items.push(
-            `<li class="grammar-tip-item grammar-tip-english"><span class="grammar-tip-english-label">English Translation</span>${escapeHTML(String(tipsEnglish).trim())}</li>`
+            `<li class="grammar-tip-item grammar-tip-english"><span class="grammar-tip-english-label">${escapeHTML(t("englishTranslation"))}</span>${escapeHTML(String(tipsEnglish).trim())}</li>`
           );
         }
         grammarExplainList.innerHTML = items.join("");
@@ -2173,9 +2295,8 @@
         if (!canUseApiQuota()) return;
 
         stopCurrentTtsPlayback();
-        setButtonLoading(grammarCheckBtn, true, "チェック中...", GRAMMAR_BTN_LABEL);
-        grammarExplainList.innerHTML = "";
-        setStatus("文法チェック中...");
+        setButtonLoading(grammarCheckBtn, true, t("checking"), t("grammarBtn"));
+        setStatus(t("grammarChecking"));
 
         try {
           const result = await checkGrammarWithAPI(sourceText);
@@ -2199,21 +2320,20 @@
           });
           grammarCard.classList.remove("hidden");
           if (referenceUpdated) {
-            setStatus("修正文をお手本にセットしました。録音して音読練習できます。");
+            setStatus(t("grammarApplied"));
           } else {
-            setStatus("文法チェックが完了しました。");
+            setStatus(t("grammarDone"));
           }
         } catch (error) {
           if (String(error.message) === "GATE_REQUIRED") return;
           console.error("Grammar check error:", error);
-          grammarCorrectedText.textContent = "チェックに失敗しました。時間をおいて再試行してください。";
-          grammarExplainList.innerHTML =
-            "<li>サーバーまたは OpenAI API の接続に失敗しました。時間をおいて再試行してください。</li>";
+          grammarCorrectedText.textContent = t("grammarFailBody");
+          grammarExplainList.innerHTML = `<li>${escapeHTML(t("grammarFailList"))}</li>`;
           setGrammarSaveReady(null);
           grammarCard.classList.remove("hidden");
-          setStatus("文法チェックに失敗しました。");
+          setStatus(t("grammarFail"));
         } finally {
-          setButtonLoading(grammarCheckBtn, false, "チェック中...", GRAMMAR_BTN_LABEL);
+          setButtonLoading(grammarCheckBtn, false, t("checking"), t("grammarBtn"));
         }
       }
 
@@ -2263,21 +2383,22 @@
         renderComparison();
         grammarCard.classList.add("hidden");
       });
-      function setOcrControlsBusy(busy, activeBtn, activeLabel) {
+      function setOcrControlsBusy(busy, activeBtn) {
         ocrCameraBtn.disabled = busy;
         ocrFileBtn.disabled = busy;
         if (busy) {
-          setButtonLoading(activeBtn, true, "読み込み中...", activeLabel);
+          setButtonLoading(activeBtn, true, t("ocrLoading"), activeBtn === ocrCameraBtn ? t("ocrCamera") : t("ocrFile"));
         } else {
-          setButtonLoading(ocrCameraBtn, false, "読み込み中...", OCR_CAMERA_BTN_LABEL);
-          setButtonLoading(ocrFileBtn, false, "読み込み中...", OCR_FILE_BTN_LABEL);
+          setButtonLoading(ocrCameraBtn, false, t("ocrLoading"), t("ocrCamera"));
+          setButtonLoading(ocrFileBtn, false, t("ocrLoading"), t("ocrFile"));
         }
       }
 
-      async function runOcrImport(file, activeBtn, activeInput, activeLabel) {
+      async function runOcrImport(file, activeBtn, activeInput) {
         stopCurrentTtsPlayback();
-        setOcrControlsBusy(true, activeBtn, activeLabel);
-        setStatus("画像から英文を読み込み中...");
+        setOcrControlsBusy(true, activeBtn);
+        const config = getStudyLangConfig();
+        setStatus(config.ocrLoadingStatus || t("ocrLoadingStatus"));
 
         const formData = new FormData();
         formData.append("image", file);
@@ -2304,29 +2425,45 @@
           autoResizeReferenceText();
           grammarCard.classList.add("hidden");
           renderComparison();
-          setStatus("画像から英文を読み込みました。");
+          setStatus(config.ocrDone || t("ocrDone"));
         } catch (error) {
           console.error("OCR import error:", error);
-          setStatus("画像の読み込みに失敗しました。別の写真をお試しください。");
+          setStatus(t("ocrFail"));
         } finally {
-          setOcrControlsBusy(false, activeBtn, activeLabel);
+          setOcrControlsBusy(false, activeBtn);
           activeInput.value = "";
         }
       }
 
-      function bindOcrPicker(input, btn, label) {
+      function bindOcrPicker(input, btn) {
         btn.addEventListener("click", () => {
           if (!btn.disabled) input.click();
         });
         input.addEventListener("change", () => {
           const file = input.files && input.files[0];
           if (!file) return;
-          runOcrImport(file, btn, input, label);
+          runOcrImport(file, btn, input);
         });
       }
 
-      bindOcrPicker(ocrCameraInput, ocrCameraBtn, OCR_CAMERA_BTN_LABEL);
-      bindOcrPicker(ocrFileInput, ocrFileBtn, OCR_FILE_BTN_LABEL);
+      bindOcrPicker(ocrCameraInput, ocrCameraBtn);
+      bindOcrPicker(ocrFileInput, ocrFileBtn);
+
+      try {
+        const savedUi = localStorage.getItem(UI_LANG_STORAGE_KEY);
+        if (savedUi === "ja" || savedUi === "en") uiLang = savedUi;
+      } catch (_) {
+        /* ignore */
+      }
+      applyUiLanguage({ resetStatus: true });
+
+      uiLangButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const next = btn.dataset.uiLang;
+          if (!next || next === uiLang) return;
+          setUiLanguage(next, { persist: true, fromUser: true });
+        });
+      });
 
       initSplashScreen(() => {
         initSecurityGate();
@@ -2344,15 +2481,13 @@
         });
       }
 
-      renderStudyLangSelect();
-
       if (studyLangSelect) {
         studyLangSelect.addEventListener("change", () => {
           const nextLang = studyLangSelect.value;
           if (!nextLang || nextLang === studyLang) return;
           stopCurrentTtsPlayback();
           applyStudyLanguage(nextLang, { resetReference: true });
-          setStatus(`${getStudyLangConfig().label}に切り替えました。`);
+          setStatus(t("studyLangSwitched", { label: getStudyLangConfig().label }));
         });
       }
 
@@ -2360,7 +2495,7 @@
       grammarCheckBtn.addEventListener("click", runGrammarCheck);
 
       if (!SpeechRecognition) {
-        setStatus("このブラウザは SpeechRecognition に未対応です。Chrome を使用してください。");
+        setStatus(t("speechUnsupported"));
         startBtn.disabled = true;
       } else {
         recognition = new SpeechRecognition();
@@ -2406,7 +2541,7 @@
         };
 
         recognition.onerror = (event) => {
-          setStatus(`認識エラー: ${event.error}`);
+          setStatus(t("recogError", { error: event.error }));
           startBtn.disabled = false;
           stopBtn.disabled = true;
         };
@@ -2416,11 +2551,11 @@
           stopBtn.disabled = true;
           const fullTranscript = `${finalTranscript} ${interimTranscript}`.trim();
           finalTranscript = fullTranscript;
-          recognizedText.textContent = fullTranscript || "認識結果なし";
+          recognizedText.textContent = fullTranscript || t("recogNoResult");
           if (fullTranscript) {
-            setStatus("認識完了。自動で比較結果を表示しました。");
+            setStatus(t("recogDone"));
           } else {
-            setStatus("音声を認識できませんでした。もう一度お試しください。");
+            setStatus(t("recogNone"));
           }
           renderComparison();
         };
