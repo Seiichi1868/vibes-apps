@@ -19,13 +19,36 @@ AUDIO_CACHE_DIR = BASE_DIR / "static" / "audio"
 AUDIO_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 MODEL_ECONOMY = "gpt-4o-mini"
-MODEL_PREMIUM = "gpt-5-mini"
 OCR_MODEL = MODEL_ECONOMY
+DEFAULT_AI_MODE = "4o-mini"
 PREMIUM_MAX_COMPLETION_TOKENS = 4096
 PREMIUM_REASONING_EFFORT = "low"
 
-# False = 節約モード（gpt-4o-mini） / True = 高精度モード（添削・解説・発音アドバイスのみ gpt-5-mini）
-USE_GPT5_MODE = False
+AI_MODE_OPTIONS: dict[str, dict[str, str]] = {
+    "4o-mini": {
+        "label": "節約モード",
+        "hint": "全機能で gpt-4o-mini を使用",
+        "model": MODEL_ECONOMY,
+    },
+    "5-mini": {
+        "label": "前世代miniモード",
+        "hint": "添削・解説・発音に gpt-5-mini",
+        "model": "gpt-5-mini",
+    },
+    "5.4-mini": {
+        "label": "最新高精度モード",
+        "hint": "添削・解説・発音に gpt-5.4-mini",
+        "model": "gpt-5.4-mini",
+    },
+    "5.4-nano": {
+        "label": "最安実験モード",
+        "hint": "添削・解説・発音に gpt-5.4-nano",
+        "model": "gpt-5.4-nano",
+    },
+}
+
+# 添削・解説・発音アドバイス用の現在モード（OCR は常に gpt-4o-mini）
+AI_MODE = DEFAULT_AI_MODE
 TTS_MODEL = "tts-1"
 TTS_VOICE_BY_LANG = {
     "en-US": "nova",
@@ -93,18 +116,68 @@ PRONUNCIATION_SYSTEM_PROMPT = """あなたは日本人の中高生向け英語�
 {"advice": "日本語のアドバイス2〜3行"}"""
 
 
-def is_gpt5_mode_enabled() -> bool:
-    return USE_GPT5_MODE
+def normalize_ai_mode(raw: str) -> str:
+    value = (raw or "").strip().lower().replace("_", "-")
+    aliases = {
+        "gpt-4o-mini": "4o-mini",
+        "4omini": "4o-mini",
+        "economy": "4o-mini",
+        "gpt-5-mini": "5-mini",
+        "5mini": "5-mini",
+        "premium": "5-mini",
+        "gpt-5.4-mini": "5.4-mini",
+        "gpt-54-mini": "5.4-mini",
+        "5.4mini": "5.4-mini",
+        "gpt-5.4-nano": "5.4-nano",
+        "gpt-54-nano": "5.4-nano",
+        "5.4nano": "5.4-nano",
+    }
+    value = aliases.get(value, value)
+    if value in AI_MODE_OPTIONS:
+        return value
+    raise ValueError(f"unsupported ai_mode: {raw}")
 
 
-def set_gpt5_mode_enabled(enabled: bool) -> bool:
-    global USE_GPT5_MODE
-    USE_GPT5_MODE = bool(enabled)
-    return USE_GPT5_MODE
+def get_ai_mode() -> str:
+    return AI_MODE
+
+
+def set_ai_mode(mode: str) -> str:
+    global AI_MODE
+    AI_MODE = normalize_ai_mode(mode)
+    return AI_MODE
 
 
 def get_ai_chat_model() -> str:
-    return MODEL_PREMIUM if is_gpt5_mode_enabled() else MODEL_ECONOMY
+    return AI_MODE_OPTIONS[get_ai_mode()]["model"]
+
+
+def ai_mode_response() -> dict:
+    mode = get_ai_mode()
+    option = AI_MODE_OPTIONS[mode]
+    return {
+        "ok": True,
+        "ai_mode": mode,
+        "active_model": option["model"],
+        "label": option["label"],
+        "hint": option["hint"],
+        "ocr_model": OCR_MODEL,
+        "modes": [
+            {"id": key, **AI_MODE_OPTIONS[key]}
+            for key in AI_MODE_OPTIONS
+        ],
+        # 旧トグルUIとの互換
+        "use_gpt5_mode": mode != DEFAULT_AI_MODE,
+    }
+
+
+def reasoning_effort_for_model(model: str) -> str | None:
+    name = (model or "").strip().lower()
+    if not is_reasoning_chat_model(model):
+        return None
+    if name.startswith("gpt-5.4") or name.startswith("gpt-5.1"):
+        return "none"
+    return PREMIUM_REASONING_EFFORT
 
 
 def is_reasoning_chat_model(model: str) -> bool:
@@ -161,7 +234,9 @@ def create_json_chat_completion(
     }
     if is_reasoning_chat_model(model):
         kwargs["max_completion_tokens"] = PREMIUM_MAX_COMPLETION_TOKENS
-        kwargs["reasoning_effort"] = PREMIUM_REASONING_EFFORT
+        effort = reasoning_effort_for_model(model)
+        if effort:
+            kwargs["reasoning_effort"] = effort
     else:
         kwargs["temperature"] = temperature
 
@@ -332,40 +407,27 @@ def admin_gate_lock():
 @app.route("/api/admin/ai-mode", methods=["GET", "POST"])
 def admin_ai_mode():
     if request.method == "GET":
-        return jsonify(
-            {
-                "ok": True,
-                "use_gpt5_mode": is_gpt5_mode_enabled(),
-                "economy_model": MODEL_ECONOMY,
-                "premium_model": MODEL_PREMIUM,
-                "active_model": get_ai_chat_model(),
-            }
-        )
+        return jsonify(ai_mode_response())
 
     payload = request.get_json(silent=True) or {}
-    raw = payload.get("use_gpt5_mode")
-    if raw is None:
-        raw = payload.get("enabled")
-    if isinstance(raw, bool):
-        enabled = raw
-    else:
-        value = str(raw or "").strip().lower()
-        if value in {"1", "true", "on", "yes"}:
-            enabled = True
-        elif value in {"0", "false", "off", "no"}:
-            enabled = False
+    raw_mode = payload.get("ai_mode")
+    if raw_mode is None and payload.get("use_gpt5_mode") is not None:
+        raw = payload.get("use_gpt5_mode")
+        if isinstance(raw, bool):
+            raw_mode = "5-mini" if raw else DEFAULT_AI_MODE
         else:
-            return jsonify({"error": "use_gpt5_mode is required"}), 400
+            value = str(raw or "").strip().lower()
+            raw_mode = "5-mini" if value in {"1", "true", "on", "yes"} else DEFAULT_AI_MODE
 
-    return jsonify(
-        {
-            "ok": True,
-            "use_gpt5_mode": set_gpt5_mode_enabled(enabled),
-            "active_model": get_ai_chat_model(),
-            "economy_model": MODEL_ECONOMY,
-            "premium_model": MODEL_PREMIUM,
-        }
-    )
+    if raw_mode is None:
+        return jsonify({"error": "ai_mode is required"}), 400
+
+    try:
+        set_ai_mode(str(raw_mode))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    return jsonify(ai_mode_response())
 
 
 @app.route("/api/gate/verify", methods=["POST"])

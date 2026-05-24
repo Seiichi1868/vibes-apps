@@ -1178,7 +1178,7 @@ body.gate-locked {
 }
 
 .admin-shell {
-  width: min(420px, 100%);
+  width: min(480px, 100%);
 }
 
 .admin-card {
@@ -1328,6 +1328,81 @@ body.gate-locked {
 
 .admin-shell .admin-status {
   margin-top: 14px;
+}
+
+.admin-mode-fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.admin-mode-legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.admin-mode-options {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.admin-mode-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.admin-mode-option:hover {
+  border-color: rgba(14, 165, 233, 0.45);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.admin-mode-option input {
+  margin-top: 3px;
+  accent-color: #0284c7;
+  flex-shrink: 0;
+}
+
+.admin-mode-option:has(input:checked) {
+  border-color: rgba(2, 132, 199, 0.55);
+  box-shadow: 0 0 0 1px rgba(2, 132, 199, 0.18), 0 10px 24px rgba(14, 165, 233, 0.12);
+  background: rgba(240, 249, 255, 0.82);
+}
+
+.admin-mode-option-body {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.admin-mode-option-title {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #19324a;
+}
+
+.admin-mode-option-desc {
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.admin-ai-hint {
+  margin: 6px 0 0;
 }
 
 .pronunciation-advice {
