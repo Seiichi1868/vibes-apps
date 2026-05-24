@@ -54,7 +54,14 @@ TTS_VOICE_BY_LANG = {
     "en-US": "nova",
     "es-ES": "shimmer",
 }
+TTS_GENERATE_VOICE_BY_LANG = {
+    "en-US": "alloy",
+    "es-ES": "shimmer",
+}
 TTS_DEFAULT_LANG = "en-US"
+
+# False = 生徒画面はブラウザ標準TTS / True = 再生ボタン押下時のみ OpenAI TTS
+TTS_ENABLED = False
 
 OCR_SYSTEM_PROMPT = (
     "画像内の英語の文章だけを正確に抜き出してください。"
@@ -358,9 +365,44 @@ def gate_auth_error():
     return jsonify({"error": "class code required", "code": "GATE_REQUIRED"}), 403
 
 
-def cache_key_for_text(text: str, lang: str = TTS_DEFAULT_LANG) -> str:
-    digest = hashlib.sha256(f"{lang}\n{text}".encode("utf-8")).hexdigest()
+def cache_key_for_text(text: str, lang: str = TTS_DEFAULT_LANG, voice: str | None = None) -> str:
+    voice_part = voice or TTS_VOICE_BY_LANG.get(lang, TTS_VOICE_BY_LANG[TTS_DEFAULT_LANG])
+    digest = hashlib.sha256(f"{lang}\n{voice_part}\n{text}".encode("utf-8")).hexdigest()
     return digest[:32]
+
+
+def is_tts_enabled() -> bool:
+    return TTS_ENABLED
+
+
+def set_tts_enabled(enabled: bool) -> bool:
+    global TTS_ENABLED
+    TTS_ENABLED = bool(enabled)
+    return TTS_ENABLED
+
+
+def synthesize_openai_tts(text: str, lang: str, voice: str) -> bytes:
+    client = get_openai_client()
+    if not client:
+        raise RuntimeError("OPENAI_API_KEY is not configured")
+    speech = client.audio.speech.create(
+        model=TTS_MODEL,
+        voice=voice,
+        input=text,
+        response_format="mp3",
+    )
+    return speech.read()
+
+
+def resolve_tts_audio(text: str, lang: str, voice: str) -> tuple[str, bool]:
+    cache_name = f"{cache_key_for_text(text, lang, voice)}.mp3"
+    cache_path = AUDIO_CACHE_DIR / cache_name
+    if cache_path.is_file():
+        return f"/static/audio/{cache_name}", True
+
+    audio_bytes = synthesize_openai_tts(text, lang, voice)
+    cache_path.write_bytes(audio_bytes)
+    return f"/static/audio/{cache_name}", False
 
 
 @app.route("/")
@@ -379,6 +421,7 @@ def gate_status():
         {
             "lock_enabled": is_gate_lock_enabled(),
             "code": daily_class_code(),
+            "tts_enabled": is_tts_enabled(),
         }
     )
 
@@ -428,6 +471,29 @@ def admin_ai_mode():
         return jsonify({"error": str(exc)}), 400
 
     return jsonify(ai_mode_response())
+
+
+@app.route("/api/admin/tts", methods=["GET", "POST"])
+def admin_tts():
+    if request.method == "GET":
+        return jsonify({"ok": True, "tts_enabled": is_tts_enabled()})
+
+    payload = request.get_json(silent=True) or {}
+    raw = payload.get("tts_enabled")
+    if raw is None:
+        raw = payload.get("enabled")
+    if isinstance(raw, bool):
+        enabled = raw
+    else:
+        value = str(raw or "").strip().lower()
+        if value in {"1", "true", "on", "yes"}:
+            enabled = True
+        elif value in {"0", "false", "off", "no"}:
+            enabled = False
+        else:
+            return jsonify({"error": "tts_enabled is required"}), 400
+
+    return jsonify({"ok": True, "tts_enabled": set_tts_enabled(enabled)})
 
 
 @app.route("/api/gate/verify", methods=["POST"])
@@ -587,6 +653,38 @@ def ocr():
     return jsonify({"text": extracted})
 
 
+@app.route("/api/generate-tts", methods=["POST"])
+def generate_tts():
+    if not gate_access_allowed():
+        return gate_auth_error()
+    if not is_tts_enabled():
+        return jsonify({"error": "TTS is disabled", "code": "TTS_DISABLED"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    text = (payload.get("text") or "").strip()
+    lang = normalize_study_lang(payload.get("lang") or "")
+    voice = TTS_GENERATE_VOICE_BY_LANG.get(lang, TTS_GENERATE_VOICE_BY_LANG[TTS_DEFAULT_LANG])
+
+    if not text:
+        return jsonify({"error": "text is required"}), 400
+    if len(text) > 4000:
+        return jsonify({"error": "text is too long"}), 400
+
+    try:
+        url, cached = resolve_tts_audio(text, lang, voice)
+    except Exception as exc:
+        return jsonify({"error": f"TTS generation failed: {exc}"}), 502
+
+    return jsonify(
+        {
+            "url": url,
+            "cached": cached,
+            "lang": lang,
+            "voice": voice,
+        }
+    )
+
+
 @app.route("/api/tts", methods=["POST"])
 def tts():
     if not gate_access_allowed():
@@ -603,7 +701,7 @@ def tts():
     if len(text) > 4000:
         return jsonify({"error": "text is too long"}), 400
 
-    cache_name = f"{cache_key_for_text(text, lang)}.mp3"
+    cache_name = f"{cache_key_for_text(text, lang, voice)}.mp3"
     cache_path = AUDIO_CACHE_DIR / cache_name
 
     if use_cache and cache_path.is_file():
@@ -616,31 +714,21 @@ def tts():
             }
         )
 
-    client = get_openai_client()
-    if not client:
-        return jsonify({"error": "OPENAI_API_KEY is not configured"}), 500
-
     try:
-        speech = client.audio.speech.create(
-            model=TTS_MODEL,
-            voice=voice,
-            input=text,
-            response_format="mp3",
-        )
-        audio_bytes = speech.read()
+        if use_cache:
+            url, cached = resolve_tts_audio(text, lang, voice)
+            return jsonify(
+                {
+                    "url": url,
+                    "cached": cached,
+                    "lang": lang,
+                    "voice": voice,
+                }
+            )
+
+        audio_bytes = synthesize_openai_tts(text, lang, voice)
     except Exception as exc:
         return jsonify({"error": f"TTS generation failed: {exc}"}), 502
-
-    if use_cache:
-        cache_path.write_bytes(audio_bytes)
-        return jsonify(
-            {
-                "url": f"/static/audio/{cache_name}",
-                "cached": False,
-                "lang": lang,
-                "voice": voice,
-            }
-        )
 
     return Response(
         audio_bytes,

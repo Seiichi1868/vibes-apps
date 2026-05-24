@@ -75,6 +75,26 @@
         <p id="adminAiHint" class="admin-lock-hint admin-ai-hint">—</p>
       </section>
 
+      <section class="admin-card admin-card-spaced">
+        <h1>TTS音声（OpenAI）</h1>
+        <p class="admin-lead">
+          ON にすると、生徒が「音読例を聞く」を押した時だけ OpenAI のネイティブ音声を生成します。OFF 時はブラウザ標準音声です。
+        </p>
+
+        <div class="admin-lock-panel">
+          <div class="admin-lock-status">
+            <span id="adminTtsLabel" class="admin-lock-label">読み込み中...</span>
+            <span id="adminTtsHint" class="admin-lock-hint">—</span>
+          </div>
+          <label class="admin-toggle" for="adminTtsToggle">
+            <input id="adminTtsToggle" type="checkbox" role="switch" aria-labelledby="adminTtsLabel" />
+            <span class="admin-toggle-track" aria-hidden="true">
+              <span class="admin-toggle-thumb"></span>
+            </span>
+          </label>
+        </div>
+      </section>
+
       <p id="adminStatus" class="admin-status" aria-live="polite"></p>
       <a class="admin-back-link" href="{{ url_for('index') }}">← 生徒画面へ戻る</a>
     </main>
@@ -85,6 +105,9 @@
       const lockHint = document.getElementById("adminLockHint");
       const aiModeInputs = Array.from(document.querySelectorAll('input[name="aiMode"]'));
       const aiHint = document.getElementById("adminAiHint");
+      const ttsToggle = document.getElementById("adminTtsToggle");
+      const ttsLabel = document.getElementById("adminTtsLabel");
+      const ttsHint = document.getElementById("adminTtsHint");
       const activeModel = document.getElementById("adminActiveModel");
       const todayCode = document.getElementById("adminTodayCode");
       const statusText = document.getElementById("adminStatus");
@@ -107,15 +130,25 @@
         aiHint.textContent = aiData.hint || aiData.label || "—";
       }
 
+      function renderTtsState(ttsEnabled) {
+        ttsToggle.checked = ttsEnabled;
+        ttsLabel.textContent = ttsEnabled ? "TTS音声 ON（OpenAI）" : "TTS音声 OFF（ブラウザ標準）";
+        ttsHint.textContent = ttsEnabled
+          ? "再生ボタン押下時のみ tts-1 で音声を生成します"
+          : "生徒は無料のブラウザ標準音声で聞けます";
+      }
+
       async function loadAdminState() {
         statusText.textContent = "状態を取得中...";
-        const [lockRes, aiRes, codeRes] = await Promise.all([
+        const [lockRes, aiRes, ttsRes, codeRes] = await Promise.all([
           fetch("/api/admin/gate-lock"),
           fetch("/api/admin/ai-mode"),
+          fetch("/api/admin/tts"),
           fetch("/api/gate/today"),
         ]);
         const lockData = await lockRes.json();
         const aiData = await aiRes.json();
+        const ttsData = await ttsRes.json();
         const codeData = await codeRes.json();
         if (!lockRes.ok) {
           throw new Error(lockData.error || "ロック状態の取得に失敗しました");
@@ -123,8 +156,12 @@
         if (!aiRes.ok) {
           throw new Error(aiData.error || "AIモードの取得に失敗しました");
         }
+        if (!ttsRes.ok) {
+          throw new Error(ttsData.error || "TTS状態の取得に失敗しました");
+        }
         renderLockState(Boolean(lockData.lock_enabled));
         renderAiModeState(aiData);
+        renderTtsState(Boolean(ttsData.tts_enabled));
         todayCode.textContent = String(codeData.code || "----").padStart(4, "0");
         statusText.textContent = "準備完了";
       }
@@ -179,6 +216,32 @@
         }
       }
 
+      async function saveTtsState(ttsEnabled) {
+        ttsToggle.disabled = true;
+        statusText.textContent = "TTS設定を保存中...";
+        try {
+          const response = await fetch("/api/admin/tts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tts_enabled: ttsEnabled }),
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || "保存に失敗しました");
+          }
+          renderTtsState(Boolean(data.tts_enabled));
+          statusText.textContent = data.tts_enabled
+            ? "OpenAI TTS を ON にしました"
+            : "OpenAI TTS を OFF にしました（ブラウザ標準音声）";
+        } catch (error) {
+          console.error(error);
+          statusText.textContent = "TTS設定の保存に失敗しました。";
+          await loadAdminState();
+        } finally {
+          ttsToggle.disabled = false;
+        }
+      }
+
       lockToggle.addEventListener("change", () => {
         saveGateLockState(lockToggle.checked);
       });
@@ -188,6 +251,10 @@
           if (!input.checked) return;
           saveAiModeState(input.value);
         });
+      });
+
+      ttsToggle.addEventListener("change", () => {
+        saveTtsState(ttsToggle.checked);
       });
 
       loadAdminState().catch((error) => {
