@@ -51,16 +51,12 @@
           <header class="app-header" data-section="header">
             <div class="header-compact-row">
               <h1 id="app-title">VibeSpeak</h1>
-              <div class="study-lang-tabs" role="tablist" aria-label="学習言語">
-                <button type="button" class="study-lang-tab is-active" data-lang="en" aria-selected="true">
-                  🇬🇧 英語
-                </button>
-                <button type="button" class="study-lang-tab" data-lang="es" aria-selected="false">
-                  🇪🇸 スペイン語
-                </button>
+              <div class="study-lang-select-wrap">
+                <label class="sr-only" for="studyLangSelect">学習言語</label>
+                <select id="studyLangSelect" class="study-lang-select" aria-label="学習言語"></select>
               </div>
               <span class="header-sep" aria-hidden="true"></span>
-              <span id="headerSubtitle" class="subtitle">英語音読の流暢さチェッカー</span>
+              <span id="headerSubtitle" class="subtitle">多言語音読・添削AIチェッカー</span>
               <span class="header-sep" aria-hidden="true"></span>
               <span class="header-lang"
                 >認識: <code id="headerLangCode">en-US</code> — 話し終えると自動判定</span
@@ -126,7 +122,7 @@
             </button>
           </div>
           <div class="compose-actions controls dense">
-            <button id="listenModelBtn" class="btn accent" type="button">音読例を聞く</button>
+            <button id="listenModelBtn" class="btn accent" type="button">見本を聴く</button>
             <button id="grammarCheckBtn" class="btn ghost" type="button">文法チェック</button>
             <button id="startBtn" class="btn primary" type="button">録音開始</button>
             <button id="stopBtn" class="btn ghost" type="button" disabled>停止</button>
@@ -238,7 +234,7 @@
       const headerLangCode = document.getElementById("headerLangCode");
       const grammarCorrectedMeta = document.getElementById("grammarCorrectedMeta");
       const appTitle = document.getElementById("app-title");
-      const studyLangTabButtons = document.querySelectorAll(".study-lang-tab");
+      const studyLangSelect = document.getElementById("studyLangSelect");
       const gateOverlay = document.getElementById("gateOverlay");
       const gateCodeInput = document.getElementById("gateCodeInput");
       const gateSubmitBtn = document.getElementById("gateSubmitBtn");
@@ -437,42 +433,107 @@
           { label: "B1⑩  datos y apps", text: "Aplicaciones de estudio ofrecían rachas divertidas mientras recogían rutas GPS y listas de contactos en actualizaciones rutinarias. Viajeros ocupados apenas leían pantallas legales densas entre transbordos de tren. Clases obligatorias de salud digital nos enseñaron a borrar perfiles sin uso antes del próximo requisito del distrito." },
         ],
       },
+      ja: {
+        A1: [
+          { label: "A1① 天気", text: "今日は良い天気です。公園で友達とサッカーをしました。" },
+          { label: "A1② 買い物", text: "午後にスーパーへ行き、りんごとパンを買いました。" },
+          { label: "A1③ 学校", text: "私は毎朝七時に起きて、学校へ行きます。" },
+        ],
+        A2: [
+          { label: "A2① 週末", text: "週末は図書館で本を読み、夜は家族と映画を見ました。" },
+          { label: "A2② 旅行", text: "来月、京都へ旅行に行く予定です。お寺とお茶を楽しみたいです。" },
+          { label: "A2③ 趣味", text: "私の趣味は料理です。新しいレシピを試すのが好きです。" },
+        ],
+        B1: [
+          { label: "B1① 環境", text: "町のリサイクル活動が広がり、住民は分別をより丁寧に行うようになりました。" },
+          { label: "B1② 留学", text: "留学の経験は、語学力だけでなく異文化理解も深めてくれました。" },
+          { label: "B1③ 健康", text: "十分な睡眠と規則正しい食事は、試験期間の集中力を保つのに役立ちます。" },
+        ],
+      },
+      ro: {
+        A1: [
+          { label: "A1① vreme", text: "Astăzi este o zi frumoasă. Am jucat fotbal cu prietenii mei." },
+          { label: "A1② magazin", text: "După-amiaza am mers la magazin și am cumpărat mere și pâine." },
+          { label: "A1③ școală", text: "Mă trezesc la ora șapte în fiecare dimineață și merg la școală." },
+        ],
+        A2: [
+          { label: "A2① weekend", text: "În weekend am citit la bibliotecă și seara am văzut un film cu familia." },
+          { label: "A2② călătorie", text: "Luna viitoare voi călători în București. Vreau să văd muzeele orașului." },
+          { label: "A2③ hobby", text: "Hobby-ul meu este gătitul. Îmi place să încerc rețete noi." },
+        ],
+        B1: [
+          { label: "B1① mediu", text: "Proiectele locale de reciclare au făcut locuitorii mai atenți la sortarea deșeurilor." },
+          { label: "B1② studii", text: "Experiența de a studia în străinătate mi-a îmbunătățit limba și deschiderea culturală." },
+          { label: "B1③ sănătate", text: "Somnul suficient și mesele regulate ajută la concentrare în perioada examenelor." },
+        ],
+      },
       };
+
+      const APP_SUBTITLE = "多言語音読・添削AIチェッカー";
 
       const STUDY_LANG = {
         en: {
           id: "en",
           speechLang: "en-US",
           apiLang: "en-US",
-          subtitle: "英語音読の流暢さチェッカー",
+          label: "🇬🇧 英語",
           samplePlaceholder: "-- 英文を選択 --",
           composePlaceholder: "英文を入力するか、上の練習用サンプル文を選んでください。",
           grammarMeta: "修正案",
           needTextStatus: "先に自由入力欄へ英文を入力してください。",
-          recordNeedText: "先にお手本の英文を入力してください。",
+          recordNeedText: "先にお手本のテキストを入力してください。",
           recordPrompt: "認識中... 英文を読み上げてください。",
+          wordUnit: "語",
         },
         es: {
           id: "es",
           speechLang: "es-ES",
           apiLang: "es-ES",
-          subtitle: "スペイン語（スペイン）音読チェッカー",
+          label: "🇪🇸 スペイン語",
           samplePlaceholder: "-- スペイン語文を選択 --",
           composePlaceholder: "スペイン語文を入力するか、上の練習用サンプル文を選んでください。",
           grammarMeta: "修正案",
           needTextStatus: "先に自由入力欄へスペイン語文を入力してください。",
-          recordNeedText: "先にお手本のスペイン語文を入力してください。",
+          recordNeedText: "先にお手本のテキストを入力してください。",
           recordPrompt: "認識中... スペイン語文を読み上げてください。",
+          wordUnit: "語",
+        },
+        ja: {
+          id: "ja",
+          speechLang: "ja-JP",
+          apiLang: "ja-JP",
+          label: "🇯🇵 日本語",
+          samplePlaceholder: "-- 日本語文を選択 --",
+          composePlaceholder: "日本語文を入力するか、上の練習用サンプル文を選んでください。",
+          grammarMeta: "修正案",
+          needTextStatus: "先に自由入力欄へ日本語文を入力してください。",
+          recordNeedText: "先にお手本のテキストを入力してください。",
+          recordPrompt: "認識中... 日本語文を読み上げてください。",
+          wordUnit: "文字",
+        },
+        ro: {
+          id: "ro",
+          speechLang: "ro-RO",
+          apiLang: "ro-RO",
+          label: "🇷🇴 ルーマニア語",
+          samplePlaceholder: "-- ルーマニア語文を選択 --",
+          composePlaceholder: "ルーマニア語文を入力するか、上の練習用サンプル文を選んでください。",
+          grammarMeta: "修正案",
+          needTextStatus: "先に自由入力欄へルーマニア語文を入力してください。",
+          recordNeedText: "先にお手本のテキストを入力してください。",
+          recordPrompt: "認識中... ルーマニア語文を読み上げてください。",
+          wordUnit: "語",
         },
       };
 
+      let enabledStudyLanguages = ["en", "es", "ja", "ro"];
       let studyLang = "en";
       let sampleLevel = "A1";
       let referenceFromSample = false;
       let currentTtsAudio = null;
       let browserUtteranceActive = false;
       const GRAMMAR_BTN_LABEL = "文法チェック";
-      const LISTEN_BTN_LABEL = "音読例を聞く";
+      const LISTEN_BTN_LABEL = "見本を聴く";
       const LISTEN_STOP_LABEL = "■ 音声停止";
       const OCR_CAMERA_BTN_LABEL = "📸 カメラで撮影";
       const OCR_FILE_BTN_LABEL = "🖼 写真・スクショを選択";
@@ -666,6 +727,10 @@
         }
         serverGateLockEnabled = Boolean(data.lock_enabled);
         serverTtsEnabled = Boolean(data.tts_enabled);
+        if (Array.isArray(data.enabled_languages) && data.enabled_languages.length) {
+          enabledStudyLanguages = data.enabled_languages;
+          renderStudyLangSelect();
+        }
         return serverGateLockEnabled;
       }
 
@@ -937,26 +1002,47 @@
         return SAMPLE_BANK[studyLang] || SAMPLE_BANK.en;
       }
 
+      function renderStudyLangSelect() {
+        if (!studyLangSelect) return;
+        const previous = studyLang;
+        studyLangSelect.innerHTML = "";
+        enabledStudyLanguages.forEach((langId) => {
+          const config = STUDY_LANG[langId];
+          if (!config) return;
+          const option = document.createElement("option");
+          option.value = langId;
+          option.textContent = config.label;
+          studyLangSelect.appendChild(option);
+        });
+        const nextLang = enabledStudyLanguages.includes(previous)
+          ? previous
+          : enabledStudyLanguages[0] || "en";
+        studyLangSelect.value = nextLang;
+        if (nextLang !== studyLang) {
+          applyStudyLanguage(nextLang);
+        } else {
+          studyLangSelect.value = studyLang;
+        }
+      }
+
       function applyStudyLanguage(nextLang, { resetReference = false } = {}) {
         if (!STUDY_LANG[nextLang]) return;
+        if (!enabledStudyLanguages.includes(nextLang)) return;
         studyLang = nextLang;
         const config = getStudyLangConfig();
 
-        studyLangTabButtons.forEach((btn) => {
-          const active = btn.dataset.lang === studyLang;
-          btn.classList.toggle("is-active", active);
-          btn.setAttribute("aria-selected", active ? "true" : "false");
-        });
-
-        headerSubtitle.textContent = config.subtitle;
+        if (studyLangSelect) studyLangSelect.value = studyLang;
+        headerSubtitle.textContent = APP_SUBTITLE;
         headerLangCode.textContent = config.speechLang;
         grammarCorrectedMeta.textContent = config.grammarMeta;
         referenceText.placeholder = config.composePlaceholder;
+        listenModelBtn.textContent = isTtsPlaying() ? LISTEN_STOP_LABEL : LISTEN_BTN_LABEL;
 
         if (recognition) recognition.lang = config.speechLang;
 
         fillSampleSelect(sampleLevel);
         hideGrammarPanel();
+        updateWordCountDisplay();
 
         if (resetReference) {
           referenceText.value = "";
@@ -1116,19 +1202,22 @@
       }
 
       function normalizeTextForWords(text) {
-        let normalized = String(text || "")
-          .replace(/\r\n|\r|\n/g, " ")
-          .toLowerCase();
+        let normalized = String(text || "").replace(/\r\n|\r|\n/g, " ");
+        if (studyLang !== "ja") {
+          normalized = normalized.toLowerCase();
+        }
         if (studyLang === "en") {
           normalized = expandOrdinals(normalized);
           normalized = expandClockTimes(normalized);
           normalized = expandSpacedClockTimes(normalized);
           normalized = expandStandaloneNumbers(normalized);
         }
-        return normalized
-          .replace(/[,.!?;:()[\]{}"""''…—–-]/g, " ")
-          .replace(/\s+/g, " ")
-          .trim();
+        const punct =
+          studyLang === "ja"
+            ? /[,.!?;:()[\]{}"""''…—–-、。！？「」『』・]/g
+            : /[,.!?;:()[\]{}"""''…—–-]/g;
+        normalized = normalized.replace(punct, studyLang === "ja" ? "" : " ");
+        return normalized.replace(/\s+/g, studyLang === "ja" ? "" : " ").trim();
       }
 
       function canonicalCompareToken(token) {
@@ -1161,6 +1250,16 @@
       function extractWordTokens(text) {
         const normalized = normalizeTextForWords(text);
         if (!normalized) return [];
+        if (studyLang === "ja") {
+          if (typeof Intl !== "undefined" && Intl.Segmenter) {
+            const segmenter = new Intl.Segmenter("ja-JP", { granularity: "word" });
+            return [...segmenter.segment(normalized)]
+              .filter((part) => part.isWordLike)
+              .map((part) => part.segment.trim())
+              .filter(Boolean);
+          }
+          return [...normalized].filter((ch) => /\S/.test(ch));
+        }
         return normalized.split(" ").filter(Boolean);
       }
 
@@ -1480,10 +1579,6 @@
       }
 
       async function fetchPronunciationAdvice(referenceRaw, spokenRaw, accuracyPercent) {
-        if (studyLang !== "en") {
-          hidePronunciationAdvice();
-          return;
-        }
         const reference = String(referenceRaw || "").trim();
         const spoken = String(spokenRaw || "").trim();
         if (!reference || !spoken) {
@@ -1634,13 +1729,17 @@
       function countComposeWords(text) {
         const normalized = String(text || "").trim();
         if (!normalized) return 0;
+        if (studyLang === "ja") {
+          return [...normalized.replace(/\s+/g, "")].length;
+        }
         return normalized.split(/\s+/).filter(Boolean).length;
       }
 
       function updateWordCountDisplay() {
         if (!wordCountDisplay) return;
         const count = countComposeWords(referenceText.value);
-        wordCountDisplay.textContent = `${count} 語`;
+        const unit = getStudyLangConfig().wordUnit || "語";
+        wordCountDisplay.textContent = `${count} ${unit}`;
       }
 
       function autoResizeReferenceText() {
@@ -1751,14 +1850,15 @@
       function pickSpeechVoice() {
         const voices = window.speechSynthesis.getVoices();
         if (!voices.length) return null;
-        const prefix = studyLang === "es" ? "es" : "en";
-        const localeHint = getStudyLangConfig().speechLang.toLowerCase();
+        const config = getStudyLangConfig();
+        const localeHint = config.speechLang.toLowerCase();
+        const prefix = localeHint.split("-")[0];
         const matched = voices.filter((voice) => voice.lang && voice.lang.toLowerCase().startsWith(prefix));
         if (!matched.length) return null;
         return (
           matched.find((voice) => voice.lang.toLowerCase() === localeHint) ||
           matched.find((voice) => voice.lang.toLowerCase().startsWith(`${prefix}-`)) ||
-          matched.find((voice) => /google|samantha|alex|microsoft|monica|paulina|jorge/i.test(voice.name)) ||
+          matched.find((voice) => /google|samantha|alex|microsoft|monica|paulina|jorge|kyoko|oana|mihaela/i.test(voice.name)) ||
           matched[0]
         );
       }
@@ -2082,6 +2182,7 @@
 
         const formData = new FormData();
         formData.append("image", file);
+        formData.append("lang", getStudyLangConfig().apiLang);
 
         try {
           const response = await fetch("/api/ocr", {
@@ -2144,19 +2245,17 @@
         });
       }
 
-      studyLangTabButtons.forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const nextLang = btn.dataset.lang;
+      renderStudyLangSelect();
+
+      if (studyLangSelect) {
+        studyLangSelect.addEventListener("change", () => {
+          const nextLang = studyLangSelect.value;
           if (!nextLang || nextLang === studyLang) return;
           stopCurrentTtsPlayback();
-          applyStudyLanguage(nextLang);
-          setStatus(
-            nextLang === "es"
-              ? "学習言語をスペイン語（es-ES）に切り替えました。"
-              : "学習言語を英語（en-US）に切り替えました。"
-          );
+          applyStudyLanguage(nextLang, { resetReference: true });
+          setStatus(`${getStudyLangConfig().label}に切り替えました。`);
         });
-      });
+      }
 
       listenModelBtn.addEventListener("click", speakReferenceText);
       grammarCheckBtn.addEventListener("click", runGrammarCheck);
@@ -2230,7 +2329,7 @@
 
       startBtn.addEventListener("click", () => {
         if (!referenceText.value.trim()) {
-          setStatus("先にお手本の英文を入力してください。");
+          setStatus(getStudyLangConfig().recordNeedText);
           return;
         }
         stopCurrentTtsPlayback();

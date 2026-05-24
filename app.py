@@ -53,21 +53,281 @@ TTS_MODEL = "tts-1"
 TTS_VOICE_BY_LANG = {
     "en-US": "nova",
     "es-ES": "shimmer",
+    "ja-JP": "nova",
+    "ro-RO": "onyx",
 }
 TTS_GENERATE_VOICE_BY_LANG = {
     "en-US": "alloy",
     "es-ES": "shimmer",
+    "ja-JP": "nova",
+    "ro-RO": "onyx",
 }
 TTS_DEFAULT_LANG = "en-US"
+
+STUDY_LANGUAGE_CATALOG: dict[str, dict[str, str]] = {
+    "en": {
+        "id": "en",
+        "api_lang": "en-US",
+        "label": "English",
+        "label_ja": "英語",
+        "flag": "🇬🇧",
+    },
+    "es": {
+        "id": "es",
+        "api_lang": "es-ES",
+        "label": "Spanish",
+        "label_ja": "スペイン語",
+        "flag": "🇪🇸",
+    },
+    "ja": {
+        "id": "ja",
+        "api_lang": "ja-JP",
+        "label": "Japanese",
+        "label_ja": "日本語",
+        "flag": "🇯🇵",
+    },
+    "ro": {
+        "id": "ro",
+        "api_lang": "ro-RO",
+        "label": "Romanian",
+        "label_ja": "ルーマニア語",
+        "flag": "🇷🇴",
+    },
+}
+DEFAULT_ENABLED_LANGUAGES = ["en", "es", "ja", "ro"]
+ENABLED_STUDY_LANGUAGES: list[str] = list(DEFAULT_ENABLED_LANGUAGES)
 
 # False = 生徒画面はブラウザ標準TTS / True = 再生ボタン押下時のみ OpenAI TTS
 TTS_ENABLED = False
 
-OCR_SYSTEM_PROMPT = (
-    "画像内の英語の文章だけを正確に抜き出してください。"
-    "挨拶や解説などの余計な日本語の返答は一切不要です。"
-    "英語のテキストのみを返してください。"
-)
+
+def normalize_study_lang_id(raw: str) -> str:
+    value = (raw or "").strip().lower().replace("_", "-")
+    aliases = {
+        "en-us": "en",
+        "english": "en",
+        "es-es": "es",
+        "spanish": "es",
+        "ja-jp": "ja",
+        "japanese": "ja",
+        "ro-ro": "ro",
+        "romanian": "ro",
+    }
+    if value in STUDY_LANGUAGE_CATALOG:
+        return value
+    return aliases.get(value, "en")
+
+
+def normalize_study_lang(raw: str) -> str:
+    lang_id = normalize_study_lang_id(raw)
+    return STUDY_LANGUAGE_CATALOG.get(lang_id, STUDY_LANGUAGE_CATALOG["en"])["api_lang"]
+
+
+def lang_id_from_api(api_lang: str) -> str:
+    for lang_id, meta in STUDY_LANGUAGE_CATALOG.items():
+        if meta["api_lang"] == api_lang:
+            return lang_id
+    return "en"
+
+
+def get_enabled_study_languages() -> list[str]:
+    return list(ENABLED_STUDY_LANGUAGES)
+
+
+def normalize_enabled_languages(raw) -> list[str]:
+    if raw is None:
+        return list(DEFAULT_ENABLED_LANGUAGES)
+    if isinstance(raw, str):
+        items = [part.strip() for part in raw.split(",") if part.strip()]
+    elif isinstance(raw, list):
+        items = [str(part).strip() for part in raw if str(part).strip()]
+    else:
+        raise ValueError("enabled_languages must be a list")
+
+    normalized: list[str] = []
+    for item in items:
+        lang_id = normalize_study_lang_id(item)
+        if lang_id not in STUDY_LANGUAGE_CATALOG:
+            raise ValueError(f"unsupported language: {item}")
+        if lang_id not in normalized:
+            normalized.append(lang_id)
+    if not normalized:
+        raise ValueError("at least one language must be enabled")
+    return normalized
+
+
+def set_enabled_study_languages(languages: list[str]) -> list[str]:
+    global ENABLED_STUDY_LANGUAGES
+    ENABLED_STUDY_LANGUAGES = normalize_enabled_languages(languages)
+    return get_enabled_study_languages()
+
+
+def languages_response() -> dict:
+    enabled = get_enabled_study_languages()
+    return {
+        "ok": True,
+        "enabled_languages": enabled,
+        "languages": [
+            {**STUDY_LANGUAGE_CATALOG[lang_id], "enabled": lang_id in enabled}
+            for lang_id in STUDY_LANGUAGE_CATALOG
+        ],
+    }
+
+
+def ocr_system_prompt(api_lang: str) -> str:
+    lang_id = lang_id_from_api(api_lang)
+    specs = {
+        "en": "画像内の英語の文章だけを正確に抜き出してください。",
+        "es": "画像内のスペイン語（スペイン）の文章だけを正確に抜き出してください。",
+        "ja": "画像内の日本語（ひらがな・カタカナ・漢字）の文章だけを正確に抜き出してください。",
+        "ro": "画像内のルーマニア語（ă â î ș ț などの文字を含む）の文章だけを正確に抜き出してください。",
+    }
+    target = specs.get(lang_id, specs["en"])
+    return (
+        f"{target}"
+        "挨拶や解説などの余計な日本語の返答は一切不要です。"
+        "対象言語のテキストのみを返してください。"
+    )
+
+
+def ocr_user_prompt(api_lang: str) -> str:
+    lang_id = lang_id_from_api(api_lang)
+    labels = {
+        "en": "Extract all English text from this image.",
+        "es": "Extract all Spanish text from this image.",
+        "ja": "Extract all Japanese text from this image.",
+        "ro": "Extract all Romanian text from this image.",
+    }
+    return labels.get(lang_id, labels["en"])
+
+
+def grammar_system_prompt(api_lang: str) -> str:
+    lang_id = lang_id_from_api(api_lang)
+    if lang_id == "ja":
+        return """あなたは日本在住のルーマニア語話者（奥様）向けの日本語教師です。日本語の作文（約50語）を優しく、かつ正確に添削してください。
+
+必ず守ること:
+- 助詞のミス、不自然な語順、敬語の誤り、漢字の誤用、ひらがな・カタカナ・漢字のバランスを見逃さない。
+- corrected は日本語全文で返す。
+- tips は各項目ごとに「ルーマニア語の解説 / 日本語の解説」を併記する（例: RO: ... / JP: ...）。
+- 「〜可能性があります」など曖昧な表現は禁止。断定調のみ。
+- 修正点ごとに tips を1件ずつ。最大8件。
+- 問題がなければ corrected は原文のまま、has_issues は false、tips は1件:
+  「RO: Nu este nevoie de corecții. Japoneza este perfectă! / JP: 修正の必要はありません。完璧な日本語です！」
+
+出力は次のJSONオブジェクトのみ:
+{
+  "corrected": "修正後の日本語全文",
+  "tips": ["RO: ... / JP: ..."],
+  "has_issues": true または false,
+  "detected_lang": "ja"
+}"""
+
+    lang_names = {
+        "en": "英語",
+        "es": "スペイン語（スペイン）",
+        "ro": "ルーマニア語",
+    }
+    perfect = {
+        "en": "修正の必要はありません。完璧な英文です！",
+        "es": "修正の必要はありません。完璧なスペイン語です！",
+        "ro": "修正の必要はありません。完璧なルーマニア語です！",
+    }
+    target = lang_names.get(lang_id, "英語")
+    perfect_tip = perfect.get(lang_id, perfect["en"])
+    detected = lang_id if lang_id in {"en", "es", "ro"} else "en"
+
+    return f"""あなたは高校生向けの{target}教師です。生徒の作文（約50語）を優しく、かつ正確に添削してください。
+
+必ず守ること:
+- {target}で文法チェックする。フロントから lang ヒントが付く場合はその言語を優先する。
+- 時制、冠詞、性数一致、スペル・綴りミスを見逃さない。
+- corrected は入力と同じ言語の全文で返す。tips は常に日本語のみ。
+- 「〜可能性があります」など曖昧な表現は禁止。「〜です」「〜してください」の断定調のみ。
+- 修正点ごとに tips を1件ずつ（最大8件）。
+- 問題がなければ corrected は原文のまま、has_issues は false、tips は1件のみ:
+  「{perfect_tip}」
+
+出力は次のJSONオブジェクトのみ:
+{{
+  "corrected": "修正後の全文（入力と同じ言語）",
+  "tips": ["誤り → 正しい形: 日本語の解説"],
+  "has_issues": true または false,
+  "detected_lang": "{detected}"
+}}"""
+
+
+def pronunciation_system_prompt(api_lang: str) -> str:
+    lang_id = lang_id_from_api(api_lang)
+    if lang_id == "en":
+        focus = "日本人の英語学習者が間違いやすい発音（L/R、th、V/B、語尾の母音など）"
+        advice_lang = "日本語"
+    elif lang_id == "ja":
+        focus = "日本語学習者が間違いやすい音（長短母音、促音、濁音・半濁音、イントネーションなど）"
+        advice_lang = "ルーマニア語と日本語の併記（RO: ... / JP: ...）"
+    elif lang_id == "es":
+        focus = "日本人のスペイン語学習者が間違いやすい発音（r/rr、ñ、母音、強勢など）"
+        advice_lang = "日本語"
+    else:
+        focus = "日本人のルーマニア語学習者が間違いやすい発音（特殊文字 ă â î ș ț、強勢、母音など）"
+        advice_lang = "日本語"
+
+    return f"""あなたは音読コーチです。お手本テキストと生徒の音読（STT）テキストを比較し、発音アドバイスを書いてください。
+
+必ず守ること:
+- {focus}に注目する。
+- STT上でずれ・置き換え・欠落が見える部分を中心に解説する。
+- 次から意識すべきコツを{advice_lang}で2〜3行（短文）にまとめる。
+- 一致率の復唱や長い講義は不要。励ましを1文含めてもよい。
+
+出力は次のJSONオブジェクトのみ:
+{{"advice": "アドバイス2〜3行"}}"""
+
+
+def grammar_user_message(text: str, lang: str) -> str:
+    lang_id = lang_id_from_api(lang)
+    labels = {
+        "en": "英語（en-US）",
+        "es": "スペイン語（スペイン / es-ES）",
+        "ja": "日本語（ja-JP）",
+        "ro": "ルーマニア語（ro-RO）",
+    }
+    label = labels.get(lang_id, labels["en"])
+    return f"[学習言語ヒント: {label}]\n\n{text}"
+
+
+def perfect_grammar_tip(lang: str) -> str:
+    lang_id = lang_id_from_api(lang)
+    tips = {
+        "en": "修正の必要はありません。完璧な英文です！",
+        "es": "修正の必要はありません。完璧なスペイン語です！",
+        "ja": "RO: Nu este nevoie de corecții. Japoneza este perfectă! / JP: 修正の必要はありません。完璧な日本語です！",
+        "ro": "修正の必要はありません。完璧なルーマニア語です！",
+    }
+    return tips.get(lang_id, tips["en"])
+
+
+def grammar_fallback_tip(lang: str) -> str:
+    lang_id = lang_id_from_api(lang)
+    tips = {
+        "en": "英文を見直し、上の修正案を参考にしてください。",
+        "es": "スペイン語文を見直し、上の修正案を参考にしてください。",
+        "ja": "RO: Revizuiește textul japonez folosind propunerea de mai sus. / JP: 日本語文を見直し、上の修正案を参考にしてください。",
+        "ro": "ルーマニア語文を見直し、上の修正案を参考にしてください。",
+    }
+    return tips.get(lang_id, tips["en"])
+
+
+def pronunciation_reference_label(lang: str) -> str:
+    lang_id = lang_id_from_api(lang)
+    labels = {
+        "en": "お手本の英文",
+        "es": "お手本のスペイン語文",
+        "ja": "お手本の日本語文",
+        "ro": "お手本のルーマニア語文",
+    }
+    return labels.get(lang_id, labels["en"])
+
 
 OCR_ALLOWED_MIME = {
     "image/jpeg",
@@ -86,41 +346,7 @@ OCR_MIME_BY_EXT = {
 
 OCR_MAX_BYTES = 10 * 1024 * 1024
 
-GRAMMAR_SYSTEM_PROMPT = """あなたは高校生向けの英語・スペイン語（スペイン）教師です。生徒の作文（約50語）を優しく、かつ正確に添削してください。
-
-必ず守ること:
-- 入力テキストが英語かスペイン語（スペイン）かを自動判別し、その言語で文法チェックする。フロントから lang ヒント（en-US または es-ES）が付く場合は、その言語を優先して判定する。
-- 時制のミス、文脈のミス、スペル・綴りミス（タイプミス）、冠詞・性数一致（スペイン語）を見逃さない。
-- corrected は入力と同じ言語の全文（英語なら英語、スペイン語ならスペイン語）で返す。解説（tips）は常に日本語のみ。
-- 「〜可能性があります」「〜かもしれません」など曖昧な表現は禁止。「〜です」「〜してください」の断定調のみ。
-- 修正が複数ある場合、tips は必ず「修正点ごとに1件」の配列にすること（1つの長文にまとめない）。
-- 各 tip は「誤り → 正しい形: 理由（1〜2行、断定調）」の形式を推奨（例: went → go: yesterday があるため過去形にします。）
-- 修正点が3つあれば tips は最低3件入れる。見落とし禁止。最大8件まで。
-- 修正候補語だけのリストや、提案語リストだけを先に出す形式は禁止。
-- 問題がなければ corrected は原文のまま、has_issues は false、tips は1件のみ:
-  - 英語のとき「修正の必要はありません。完璧な英文です！」
-  - スペイン語のとき「修正の必要はありません。完璧なスペイン語です！」
-
-出力は次のJSONオブジェクトのみ（前後に説明文を付けない）:
-{
-  "corrected": "修正後の全文（入力と同じ言語）",
-  "tips": ["誤り → 正しい形: 日本語の解説1", "誤り → 正しい形: 日本語の解説2"],
-  "has_issues": true または false,
-  "detected_lang": "en" または "es"
-}"""
-
-PRONUNCIATION_SYSTEM_PROMPT = """あなたは日本人の中高生向け英語発音コーチです。
-お手本の英文と、生徒の音読を音声認識（STT）したテキストを比較し、発音のワンポイントアドバイスを日本語で書いてください。
-
-必ず守ること:
-- 日本人の英語学習者が間違いやすい発音のクセ（LとRの混同、thがsやdになる、VがBになる、単語の末尾に余計な母音が付く など）に注目する
-- STT 上でずれ・置き換え・欠落が見える部分を中心に解説する
-- 次から意識すべき発音のコツを、親しみやすい日本語で2〜3行（短文）にまとめる
-- 一致率の数値の復唱や長い講義は不要。励ましを1文含めてもよい
-- 問題がほとんどなければ、うまくできた点を短く褒める
-
-出力は次のJSONオブジェクトのみ（前後に説明文を付けない）:
-{"advice": "日本語のアドバイス2〜3行"}"""
+GRAMMAR_TIPS_MAX = 8
 
 
 def normalize_ai_mode(raw: str) -> str:
@@ -257,33 +483,7 @@ def create_json_chat_completion(
     return parse_json_object(raw)
 
 
-def normalize_study_lang(raw: str) -> str:
-    value = (raw or "").strip().lower()
-    if value in {"es", "es-es", "es_es", "spanish"}:
-        return "es-ES"
-    if value in {"en", "en-us", "en_us", "english"}:
-        return "en-US"
-    return TTS_DEFAULT_LANG
-
-
-def grammar_user_message(text: str, lang: str) -> str:
-    if lang == "es-ES":
-        return f"[学習言語ヒント: スペイン語（スペイン / es-ES）]\n\n{text}"
-    if lang == "en-US":
-        return f"[学習言語ヒント: 英語（en-US）]\n\n{text}"
-    return text
-
-
-def perfect_grammar_tip(lang: str) -> str:
-    if lang == "es-ES":
-        return "修正の必要はありません。完璧なスペイン語です！"
-    return "修正の必要はありません。完璧な英文です！"
-
-
-GRAMMAR_TIPS_MAX = 8
-
-
-def normalize_grammar_tips(raw_tips) -> list[str]:
+def normalize_ai_mode(raw: str) -> str:
     if isinstance(raw_tips, str):
         candidates = [raw_tips]
     elif isinstance(raw_tips, list):
@@ -422,6 +622,8 @@ def gate_status():
             "lock_enabled": is_gate_lock_enabled(),
             "code": daily_class_code(),
             "tts_enabled": is_tts_enabled(),
+            "enabled_languages": get_enabled_study_languages(),
+            "languages": languages_response()["languages"],
         }
     )
 
@@ -496,6 +698,23 @@ def admin_tts():
     return jsonify({"ok": True, "tts_enabled": set_tts_enabled(enabled)})
 
 
+@app.route("/api/admin/languages", methods=["GET", "POST"])
+def admin_languages():
+    if request.method == "GET":
+        return jsonify(languages_response())
+
+    payload = request.get_json(silent=True) or {}
+    raw = payload.get("enabled_languages")
+    if raw is None:
+        raw = payload.get("languages")
+    try:
+        enabled = set_enabled_study_languages(raw if raw is not None else get_enabled_study_languages())
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    return jsonify(languages_response() | {"enabled_languages": enabled})
+
+
 @app.route("/api/gate/verify", methods=["POST"])
 def gate_verify():
     if not is_gate_lock_enabled():
@@ -540,7 +759,7 @@ def check_grammar():
             client,
             get_ai_chat_model(),
             [
-                {"role": "system", "content": GRAMMAR_SYSTEM_PROMPT},
+                {"role": "system", "content": grammar_system_prompt(lang)},
                 {"role": "user", "content": grammar_user_message(text, lang)},
             ],
             temperature=0.2,
@@ -556,18 +775,15 @@ def check_grammar():
 
     if not tips:
         if has_issues:
-            fallback = (
-                "スペイン語文を見直し、上の修正案を参考にしてください。"
-                if lang == "es-ES"
-                else "英文を見直し、上の修正案を参考にしてください。"
-            )
-            tips = [fallback]
+            tips = [grammar_fallback_tip(lang)]
         else:
             tips = [perfect_grammar_tip(lang)]
 
     detected_lang = str(data.get("detected_lang") or "").strip().lower()
-    if detected_lang not in {"en", "es"}:
-        detected_lang = "es" if lang == "es-ES" else "en"
+    lang_id = lang_id_from_api(lang)
+    allowed_detected = {"en", "es", "ja", "ro"}
+    if detected_lang not in allowed_detected:
+        detected_lang = lang_id
 
     return jsonify(
         {
@@ -616,6 +832,8 @@ def ocr():
     if mime not in OCR_ALLOWED_MIME:
         return jsonify({"error": "unsupported image type"}), 400
 
+    lang = normalize_study_lang(request.form.get("lang") or request.args.get("lang") or "")
+
     client = get_openai_client()
     if not client:
         return jsonify({"error": "OPENAI_API_KEY is not configured"}), 500
@@ -627,13 +845,13 @@ def ocr():
             model=OCR_MODEL,
             temperature=0,
             messages=[
-                {"role": "system", "content": OCR_SYSTEM_PROMPT},
+                {"role": "system", "content": ocr_system_prompt(lang)},
                 {
                     "role": "user",
                     "content": [
                         {
                             "type": "text",
-                            "text": "Extract all English text from this image.",
+                            "text": ocr_user_prompt(lang),
                         },
                         {
                             "type": "image_url",
@@ -648,9 +866,9 @@ def ocr():
         return jsonify({"error": f"OCR failed: {exc}"}), 502
 
     if not extracted:
-        return jsonify({"error": "No English text found in image"}), 422
+        return jsonify({"error": "No text found in image"}), 422
 
-    return jsonify({"text": extracted})
+    return jsonify({"text": extracted, "lang": lang})
 
 
 @app.route("/api/generate-tts", methods=["POST"])
@@ -751,8 +969,6 @@ def pronunciation_advice():
         return jsonify({"error": "reference is required"}), 400
     if not spoken:
         return jsonify({"error": "spoken is required"}), 400
-    if lang != "en-US":
-        return jsonify({"error": "pronunciation advice is available for English only"}), 400
 
     accuracy_raw = payload.get("accuracy_percent")
     try:
@@ -765,7 +981,7 @@ def pronunciation_advice():
         return jsonify({"error": "OPENAI_API_KEY is not configured"}), 500
 
     user_message = (
-        f"お手本の英文:\n{reference}\n\n"
+        f"{pronunciation_reference_label(lang)}:\n{reference}\n\n"
         f"生徒の音読（STT）:\n{spoken}\n\n"
     )
     if accuracy_percent is not None:
@@ -776,7 +992,7 @@ def pronunciation_advice():
             client,
             get_ai_chat_model(),
             [
-                {"role": "system", "content": PRONUNCIATION_SYSTEM_PROMPT},
+                {"role": "system", "content": pronunciation_system_prompt(lang)},
                 {"role": "user", "content": user_message},
             ],
             temperature=0.3,

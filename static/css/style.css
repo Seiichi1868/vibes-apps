@@ -1405,6 +1405,71 @@ body.gate-locked {
   margin: 6px 0 0;
 }
 
+.admin-lang-options {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.admin-lang-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #19324a;
+}
+
+.admin-lang-option input {
+  accent-color: #0284c7;
+}
+
+.admin-lang-option:has(input:checked) {
+  border-color: rgba(2, 132, 199, 0.55);
+  background: rgba(240, 249, 255, 0.82);
+}
+
+.study-lang-select-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+
+.study-lang-select {
+  min-width: 9.5rem;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(255, 255, 255, 0.72);
+  color: #19324a;
+  font-size: 0.78rem;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.study-lang-select:focus-visible {
+  outline: 2px solid rgba(2, 132, 199, 0.45);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .pronunciation-advice {
   margin: 10px 0 12px;
   padding: 12px 14px;

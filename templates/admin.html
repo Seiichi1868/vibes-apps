@@ -76,9 +76,38 @@
       </section>
 
       <section class="admin-card admin-card-spaced">
+        <h1>利用可能な言語</h1>
+        <p class="admin-lead">
+          チェックを入れた言語だけが、生徒画面の言語切り替えに表示されます。
+        </p>
+
+        <fieldset class="admin-mode-fieldset">
+          <legend class="admin-mode-legend">言語の有効化</legend>
+          <div class="admin-lang-options" id="adminLangOptions">
+            <label class="admin-lang-option">
+              <input type="checkbox" name="adminLang" value="en" />
+              <span>🇬🇧 英語 (English)</span>
+            </label>
+            <label class="admin-lang-option">
+              <input type="checkbox" name="adminLang" value="es" />
+              <span>🇪🇸 スペイン語 (Spanish)</span>
+            </label>
+            <label class="admin-lang-option">
+              <input type="checkbox" name="adminLang" value="ja" />
+              <span>🇯🇵 日本語 (Japanese)</span>
+            </label>
+            <label class="admin-lang-option">
+              <input type="checkbox" name="adminLang" value="ro" />
+              <span>🇷🇴 ルーマニア語 (Romanian)</span>
+            </label>
+          </div>
+        </fieldset>
+      </section>
+
+      <section class="admin-card admin-card-spaced">
         <h1>TTS音声（OpenAI）</h1>
         <p class="admin-lead">
-          ON にすると、生徒が「音読例を聞く」を押した時だけ OpenAI のネイティブ音声を生成します。OFF 時はブラウザ標準音声です。
+          ON にすると、生徒が「見本を聴く」を押した時だけ OpenAI のネイティブ音声を生成します。OFF 時はブラウザ標準音声です。
         </p>
 
         <div class="admin-lock-panel">
@@ -108,6 +137,7 @@
       const ttsToggle = document.getElementById("adminTtsToggle");
       const ttsLabel = document.getElementById("adminTtsLabel");
       const ttsHint = document.getElementById("adminTtsHint");
+      const langInputs = Array.from(document.querySelectorAll('input[name="adminLang"]'));
       const activeModel = document.getElementById("adminActiveModel");
       const todayCode = document.getElementById("adminTodayCode");
       const statusText = document.getElementById("adminStatus");
@@ -138,16 +168,26 @@
           : "生徒は無料のブラウザ標準音声で聞けます";
       }
 
+      function renderLanguageState(langData) {
+        const enabled = new Set(Array.isArray(langData.enabled_languages) ? langData.enabled_languages : []);
+        langInputs.forEach((input) => {
+          input.checked = enabled.has(input.value);
+          input.disabled = false;
+        });
+      }
+
       async function loadAdminState() {
         statusText.textContent = "状態を取得中...";
-        const [lockRes, aiRes, ttsRes, codeRes] = await Promise.all([
+        const [lockRes, aiRes, langRes, ttsRes, codeRes] = await Promise.all([
           fetch("/api/admin/gate-lock"),
           fetch("/api/admin/ai-mode"),
+          fetch("/api/admin/languages"),
           fetch("/api/admin/tts"),
           fetch("/api/gate/today"),
         ]);
         const lockData = await lockRes.json();
         const aiData = await aiRes.json();
+        const langData = await langRes.json();
         const ttsData = await ttsRes.json();
         const codeData = await codeRes.json();
         if (!lockRes.ok) {
@@ -156,11 +196,15 @@
         if (!aiRes.ok) {
           throw new Error(aiData.error || "AIモードの取得に失敗しました");
         }
+        if (!langRes.ok) {
+          throw new Error(langData.error || "言語設定の取得に失敗しました");
+        }
         if (!ttsRes.ok) {
           throw new Error(ttsData.error || "TTS状態の取得に失敗しました");
         }
         renderLockState(Boolean(lockData.lock_enabled));
         renderAiModeState(aiData);
+        renderLanguageState(langData);
         renderTtsState(Boolean(ttsData.tts_enabled));
         todayCode.textContent = String(codeData.code || "----").padStart(4, "0");
         statusText.textContent = "準備完了";
@@ -216,6 +260,36 @@
         }
       }
 
+      async function saveLanguageState() {
+        const enabled = langInputs.filter((input) => input.checked).map((input) => input.value);
+        if (!enabled.length) {
+          statusText.textContent = "少なくとも1つの言語を有効にしてください。";
+          await loadAdminState();
+          return;
+        }
+        langInputs.forEach((input) => {
+          input.disabled = true;
+        });
+        statusText.textContent = "言語設定を保存中...";
+        try {
+          const response = await fetch("/api/admin/languages", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ enabled_languages: enabled }),
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || "保存に失敗しました");
+          }
+          renderLanguageState(data);
+          statusText.textContent = "利用可能な言語を更新しました（生徒画面に即時反映）";
+        } catch (error) {
+          console.error(error);
+          statusText.textContent = "言語設定の保存に失敗しました。";
+          await loadAdminState();
+        }
+      }
+
       async function saveTtsState(ttsEnabled) {
         ttsToggle.disabled = true;
         statusText.textContent = "TTS設定を保存中...";
@@ -255,6 +329,12 @@
 
       ttsToggle.addEventListener("change", () => {
         saveTtsState(ttsToggle.checked);
+      });
+
+      langInputs.forEach((input) => {
+        input.addEventListener("change", () => {
+          saveLanguageState();
+        });
       });
 
       loadAdminState().catch((error) => {
