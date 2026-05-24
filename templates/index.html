@@ -1573,9 +1573,19 @@
         pronunciationAdviceText.textContent = "AIが発音を分析しています...";
       }
 
-      function renderPronunciationAdvice(advice) {
+      function renderPronunciationAdvice(advice, adviceEnglish = "") {
         pronunciationAdviceBlock.classList.remove("hidden", "is-loading");
-        pronunciationAdviceText.textContent = advice;
+        const jaText = String(advice || "").trim();
+        const enText = String(adviceEnglish || "").trim();
+        if (enText) {
+          pronunciationAdviceText.innerHTML = [
+            `<span class="pronunciation-advice-ja">${escapeHTML(jaText)}</span>`,
+            `<span class="pronunciation-advice-en-label">English Translation</span>`,
+            `<span class="pronunciation-advice-en">${escapeHTML(enText)}</span>`,
+          ].join("");
+        } else {
+          pronunciationAdviceText.textContent = jaText;
+        }
       }
 
       async function fetchPronunciationAdvice(referenceRaw, spokenRaw, accuracyPercent) {
@@ -1615,7 +1625,10 @@
             throw new Error(data.error || `Pronunciation advice failed: ${response.status}`);
           }
           recordApiUsage();
-          renderPronunciationAdvice(clarifyJapaneseMessage(String(data.advice || "").trim()));
+          renderPronunciationAdvice(
+            clarifyJapaneseMessage(String(data.advice || "").trim()),
+            data.advice_english ? clarifyJapaneseMessage(String(data.advice_english).trim()) : ""
+          );
         } catch (error) {
           if (requestId !== pronunciationAdviceRequestId) return;
           console.error("Pronunciation advice error:", error);

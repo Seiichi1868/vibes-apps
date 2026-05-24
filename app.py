@@ -262,29 +262,36 @@ def grammar_system_prompt(api_lang: str) -> str:
 
 def pronunciation_system_prompt(api_lang: str) -> str:
     lang_id = lang_id_from_api(api_lang)
+    if lang_id == "ja":
+        return """あなたは日本語音読コーチです。お手本テキストと生徒の音読（STT）テキストを比較し、発音アドバイスを書いてください。
+
+必ず守ること:
+- 日本語学習者が間違いやすい音（長短母音、促音、濁音・半濁音、イントネーションなど）に注目する。
+- STT上でずれ・置き換え・欠落が見える部分を中心に解説する。
+- advice は優しい日本語のみで2〜3行（短文）にまとめる。ルーマニア語は一切使わない。
+- advice_english には advice と同じ内容の完全な英訳を1つ入れる。
+- 一致率の復唱や長い講義は不要。励ましを1文含めてもよい。
+
+出力は次のJSONオブジェクトのみ:
+{"advice": "優しい日本語のアドバイス2〜3行", "advice_english": "Complete English translation of the advice"}"""
+
     if lang_id == "en":
         focus = "日本人の英語学習者が間違いやすい発音（L/R、th、V/B、語尾の母音など）"
-        advice_lang = "日本語"
-    elif lang_id == "ja":
-        focus = "日本語学習者が間違いやすい音（長短母音、促音、濁音・半濁音、イントネーションなど）"
-        advice_lang = "ルーマニア語と日本語の併記（RO: ... / JP: ...）"
     elif lang_id == "es":
         focus = "日本人のスペイン語学習者が間違いやすい発音（r/rr、ñ、母音、強勢など）"
-        advice_lang = "日本語"
     else:
         focus = "日本人のルーマニア語学習者が間違いやすい発音（特殊文字 ă â î ș ț、強勢、母音など）"
-        advice_lang = "日本語"
 
     return f"""あなたは音読コーチです。お手本テキストと生徒の音読（STT）テキストを比較し、発音アドバイスを書いてください。
 
 必ず守ること:
 - {focus}に注目する。
 - STT上でずれ・置き換え・欠落が見える部分を中心に解説する。
-- 次から意識すべきコツを{advice_lang}で2〜3行（短文）にまとめる。
+- 次から意識すべきコツを優しい日本語で2〜3行（短文）にまとめる。
 - 一致率の復唱や長い講義は不要。励ましを1文含めてもよい。
 
 出力は次のJSONオブジェクトのみ:
-{{"advice": "アドバイス2〜3行"}}"""
+{{"advice": "優しい日本語のアドバイス2〜3行"}}"""
 
 
 def grammar_user_message(text: str, lang: str) -> str:
@@ -1020,13 +1027,18 @@ def pronunciation_advice():
     if not advice:
         return jsonify({"error": "Empty advice from pronunciation model"}), 502
 
-    return jsonify(
-        {
-            "advice": advice,
-            "model": get_ai_chat_model(),
-            "lang": lang,
-        }
-    )
+    lang_id = lang_id_from_api(lang)
+    response = {
+        "advice": advice,
+        "model": get_ai_chat_model(),
+        "lang": lang,
+        "lang_id": lang_id,
+    }
+    if lang_id == "ja":
+        advice_english = str(data.get("advice_english") or "").strip()
+        if advice_english:
+            response["advice_english"] = advice_english
+    return jsonify(response)
 
 
 @app.route("/static/audio/<path:filename>")

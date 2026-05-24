@@ -1514,6 +1514,23 @@ body.gate-locked {
   white-space: pre-wrap;
 }
 
+.pronunciation-advice-en-label {
+  display: block;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(148, 163, 184, 0.45);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #0369a1;
+}
+
+.pronunciation-advice-en {
+  display: block;
+  margin-top: 4px;
+  color: #334155;
+}
+
 .pronunciation-advice.is-loading .pronunciation-advice-text {
   color: var(--muted);
   font-style: italic;
