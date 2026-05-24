@@ -160,6 +160,10 @@
                 <div id="accuracyBarFill" class="progress-fill"></div>
               </div>
             </div>
+            <div id="pronunciationAdviceBlock" class="pronunciation-advice hidden" aria-live="polite">
+              <p class="pronunciation-advice-label">🎧 AI発音コーチからのアドバイス</p>
+              <p id="pronunciationAdviceText" class="pronunciation-advice-text">—</p>
+            </div>
             <div class="overlay-wrap">
               <p id="baseReferenceLayer" class="base-layer"></p>
               <p id="highlightLayer" class="highlight-layer"></p>
@@ -206,6 +210,8 @@
       const accuracyPercent = document.getElementById("accuracyPercent");
       const accuracyBarFill = document.getElementById("accuracyBarFill");
       const accuracyProgress = document.getElementById("accuracyProgress");
+      const pronunciationAdviceBlock = document.getElementById("pronunciationAdviceBlock");
+      const pronunciationAdviceText = document.getElementById("pronunciationAdviceText");
       const settingsBtn = document.getElementById("settingsBtn");
       const settingsPanel = document.getElementById("settingsPanel");
       const sectionToggles = document.querySelectorAll("[data-toggle-section]");
@@ -253,6 +259,7 @@
       const GATE_LOCK_POLL_MS = 30000;
       let gateLockPollTimer = null;
       let serverGateLockEnabled = true;
+      let pronunciationAdviceRequestId = 0;
 
       let flagTapCount = 0;
       let lastGrammarResult = null;
@@ -1452,11 +1459,81 @@
         accuracyBlock.classList.remove("hidden");
       }
 
+      function hidePronunciationAdvice() {
+        pronunciationAdviceBlock.classList.add("hidden");
+        pronunciationAdviceBlock.classList.remove("is-loading");
+        pronunciationAdviceText.textContent = "—";
+      }
+
+      function showPronunciationAdviceLoading() {
+        pronunciationAdviceBlock.classList.remove("hidden");
+        pronunciationAdviceBlock.classList.add("is-loading");
+        pronunciationAdviceText.textContent = "AIが発音を分析しています...";
+      }
+
+      function renderPronunciationAdvice(advice) {
+        pronunciationAdviceBlock.classList.remove("hidden", "is-loading");
+        pronunciationAdviceText.textContent = advice;
+      }
+
+      async function fetchPronunciationAdvice(referenceRaw, spokenRaw, accuracyPercent) {
+        if (studyLang !== "en") {
+          hidePronunciationAdvice();
+          return;
+        }
+        const reference = String(referenceRaw || "").trim();
+        const spoken = String(spokenRaw || "").trim();
+        if (!reference || !spoken) {
+          hidePronunciationAdvice();
+          return;
+        }
+        if (!isAdminMode() && isApiLimitReached()) {
+          hidePronunciationAdvice();
+          return;
+        }
+
+        const requestId = ++pronunciationAdviceRequestId;
+        showPronunciationAdviceLoading();
+
+        try {
+          const response = await fetch("/api/pronunciation-advice", {
+            method: "POST",
+            headers: gateFetchHeaders(),
+            body: JSON.stringify({
+              reference,
+              spoken,
+              accuracy_percent: accuracyPercent,
+              lang: getStudyLangConfig().apiLang,
+            }),
+          });
+          const data = await response.json();
+          if (requestId !== pronunciationAdviceRequestId) return;
+          if (response.status === 403 && data.code === "GATE_REQUIRED") {
+            handleGateAuthFailure();
+            hidePronunciationAdvice();
+            return;
+          }
+          if (!response.ok) {
+            throw new Error(data.error || `Pronunciation advice failed: ${response.status}`);
+          }
+          recordApiUsage();
+          renderPronunciationAdvice(clarifyJapaneseMessage(String(data.advice || "").trim()));
+        } catch (error) {
+          if (requestId !== pronunciationAdviceRequestId) return;
+          console.error("Pronunciation advice error:", error);
+          pronunciationAdviceBlock.classList.remove("is-loading");
+          pronunciationAdviceBlock.classList.remove("hidden");
+          pronunciationAdviceText.textContent =
+            "発音アドバイスの取得に失敗しました。時間をおいて再試行してください。";
+        }
+      }
+
       function renderComparison() {
         const referenceRaw = referenceText.value.trim();
         if (!referenceRaw) {
           comparisonCard.classList.add("hidden");
           accuracyBlock.classList.add("hidden");
+          hidePronunciationAdvice();
           return;
         }
 
@@ -1481,6 +1558,13 @@
 
         updateAccuracyBar(compared);
         comparisonCard.classList.remove("hidden");
+
+        const spokenForAdvice = finalTranscript.trim();
+        if (spokenForAdvice) {
+          fetchPronunciationAdvice(referenceRaw, spokenForAdvice, computeAccuracyPercent(compared));
+        } else {
+          hidePronunciationAdvice();
+        }
       }
 
       const SECTION_STORAGE_KEY = "vibespeak-section-visibility";
@@ -2064,6 +2148,7 @@
           hideGrammarPanel();
           comparisonCard.classList.add("hidden");
           accuracyBlock.classList.add("hidden");
+          hidePronunciationAdvice();
           startBtn.disabled = true;
           stopBtn.disabled = false;
           setStatus(getStudyLangConfig().recordPrompt);

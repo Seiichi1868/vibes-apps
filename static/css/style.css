@@ -1322,6 +1322,50 @@ body.gate-locked {
   text-decoration: underline;
 }
 
+.admin-card-spaced {
+  margin-top: 16px;
+}
+
+.admin-shell .admin-status {
+  margin-top: 14px;
+}
+
+.pronunciation-advice {
+  margin: 10px 0 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(14, 165, 233, 0.28);
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06), 0 1px 0 rgba(255, 255, 255, 0.7) inset;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.pronunciation-advice-label {
+  margin: 0 0 6px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #0369a1;
+}
+
+.pronunciation-advice-text {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: #19324a;
+  white-space: pre-wrap;
+}
+
+.pronunciation-advice.is-loading .pronunciation-advice-text {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.dashboard-row.results-row #comparisonCard .pronunciation-advice {
+  flex-shrink: 0;
+}
+
 /* Splash screen (startup motion) */
 .splash-screen {
   --splash-fade-in: 1.8s;

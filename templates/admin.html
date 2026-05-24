@@ -29,15 +29,42 @@
         </div>
 
         <p class="admin-meta">本日のクラスコード（参考）: <strong id="adminTodayCode">----</strong></p>
-        <p id="adminStatus" class="admin-status" aria-live="polite"></p>
-        <a class="admin-back-link" href="{{ url_for('index') }}">← 生徒画面へ戻る</a>
       </section>
+
+      <section class="admin-card admin-card-spaced">
+        <h1>AIモデル選択</h1>
+        <p class="admin-lead">
+          添削・解説・発音アドバイスのみ切り替わります。OCR など基本処理は常に gpt-4o-mini です。
+        </p>
+
+        <div class="admin-lock-panel">
+          <div class="admin-lock-status">
+            <span id="adminAiLabel" class="admin-lock-label">読み込み中...</span>
+            <span id="adminAiHint" class="admin-lock-hint">—</span>
+          </div>
+          <label class="admin-toggle" for="adminAiToggle">
+            <input id="adminAiToggle" type="checkbox" role="switch" aria-labelledby="adminAiLabel" />
+            <span class="admin-toggle-track" aria-hidden="true">
+              <span class="admin-toggle-thumb"></span>
+            </span>
+          </label>
+        </div>
+
+        <p class="admin-meta">現在のAIモデル: <strong id="adminActiveModel">—</strong></p>
+      </section>
+
+      <p id="adminStatus" class="admin-status" aria-live="polite"></p>
+      <a class="admin-back-link" href="{{ url_for('index') }}">← 生徒画面へ戻る</a>
     </main>
 
     <script>
       const lockToggle = document.getElementById("adminLockToggle");
       const lockLabel = document.getElementById("adminLockLabel");
       const lockHint = document.getElementById("adminLockHint");
+      const aiToggle = document.getElementById("adminAiToggle");
+      const aiLabel = document.getElementById("adminAiLabel");
+      const aiHint = document.getElementById("adminAiHint");
+      const activeModel = document.getElementById("adminActiveModel");
       const todayCode = document.getElementById("adminTodayCode");
       const statusText = document.getElementById("adminStatus");
 
@@ -49,25 +76,40 @@
           : "生徒はコードなしでそのまま入室できます";
       }
 
-      async function loadGateLockState() {
+      function renderAiModeState(useGpt5Mode, activeModelName) {
+        aiToggle.checked = useGpt5Mode;
+        aiLabel.textContent = useGpt5Mode ? "高精度モード（gpt-5-mini）" : "節約モード（gpt-4o-mini）";
+        aiHint.textContent = useGpt5Mode
+          ? "添削・解説・発音アドバイスが gpt-5-mini になります"
+          : "すべての AI 心臓部が gpt-4o-mini で動作します";
+        activeModel.textContent = activeModelName || "—";
+      }
+
+      async function loadAdminState() {
         statusText.textContent = "状態を取得中...";
-        const [statusRes, codeRes] = await Promise.all([
+        const [lockRes, aiRes, codeRes] = await Promise.all([
           fetch("/api/admin/gate-lock"),
+          fetch("/api/admin/ai-mode"),
           fetch("/api/gate/today"),
         ]);
-        const statusData = await statusRes.json();
+        const lockData = await lockRes.json();
+        const aiData = await aiRes.json();
         const codeData = await codeRes.json();
-        if (!statusRes.ok) {
-          throw new Error(statusData.error || "状態の取得に失敗しました");
+        if (!lockRes.ok) {
+          throw new Error(lockData.error || "ロック状態の取得に失敗しました");
         }
-        renderLockState(Boolean(statusData.lock_enabled));
+        if (!aiRes.ok) {
+          throw new Error(aiData.error || "AIモードの取得に失敗しました");
+        }
+        renderLockState(Boolean(lockData.lock_enabled));
+        renderAiModeState(Boolean(aiData.use_gpt5_mode), aiData.active_model);
         todayCode.textContent = String(codeData.code || "----").padStart(4, "0");
         statusText.textContent = "準備完了";
       }
 
       async function saveGateLockState(lockEnabled) {
         lockToggle.disabled = true;
-        statusText.textContent = "保存中...";
+        statusText.textContent = "ロック設定を保存中...";
         try {
           const response = await fetch("/api/admin/gate-lock", {
             method: "POST",
@@ -84,10 +126,36 @@
             : "ロックを OFF にしました（全生徒がコードなしで利用可能）";
         } catch (error) {
           console.error(error);
-          statusText.textContent = "保存に失敗しました。もう一度お試しください。";
-          await loadGateLockState();
+          statusText.textContent = "ロック設定の保存に失敗しました。";
+          await loadAdminState();
         } finally {
           lockToggle.disabled = false;
+        }
+      }
+
+      async function saveAiModeState(useGpt5Mode) {
+        aiToggle.disabled = true;
+        statusText.textContent = "AIモデル設定を保存中...";
+        try {
+          const response = await fetch("/api/admin/ai-mode", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ use_gpt5_mode: useGpt5Mode }),
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || "保存に失敗しました");
+          }
+          renderAiModeState(Boolean(data.use_gpt5_mode), data.active_model);
+          statusText.textContent = data.use_gpt5_mode
+            ? "高精度モード（gpt-5-mini）に切り替えました"
+            : "節約モード（gpt-4o-mini）に切り替えました";
+        } catch (error) {
+          console.error(error);
+          statusText.textContent = "AIモデル設定の保存に失敗しました。";
+          await loadAdminState();
+        } finally {
+          aiToggle.disabled = false;
         }
       }
 
@@ -95,7 +163,11 @@
         saveGateLockState(lockToggle.checked);
       });
 
-      loadGateLockState().catch((error) => {
+      aiToggle.addEventListener("change", () => {
+        saveAiModeState(aiToggle.checked);
+      });
+
+      loadAdminState().catch((error) => {
         console.error(error);
         statusText.textContent = "サーバーに接続できませんでした。";
       });
