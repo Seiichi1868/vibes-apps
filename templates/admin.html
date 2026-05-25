@@ -8,9 +8,20 @@
   </head>
   <body class="admin-page">
     <main class="admin-shell">
+      <header class="admin-top-bar">
+        <div class="admin-top-bar__brand">
+          <p class="admin-eyebrow">VibeSpeak Admin</p>
+          <h1 class="admin-page-title">管理ダッシュボード</h1>
+        </div>
+        <div class="admin-top-bar__actions">
+          <p id="adminStatus" class="admin-status" aria-live="polite"></p>
+          <a class="admin-back-link" href="{{ url_for('index') }}">← 生徒画面へ戻る</a>
+        </div>
+      </header>
+
+      <div class="admin-dashboard">
       <section class="admin-card">
-        <p class="admin-eyebrow">VibeSpeak Admin</p>
-        <h1>クラスコードロック</h1>
+        <h2 class="admin-card__title">クラスコードロック</h2>
         <p class="admin-lead">
           生徒全員にリアルタイムで反映されます。OFF にするとコード入力なしで利用できます。
         </p>
@@ -31,15 +42,91 @@
         <p class="admin-meta">本日のクラスコード（参考）: <strong id="adminTodayCode">----</strong></p>
       </section>
 
-      <section class="admin-card admin-card-spaced">
-        <h1>AIモデル選択</h1>
+      <section class="admin-card">
+        <h2 class="admin-card__title">TTS音声（OpenAI）</h2>
+        <p class="admin-lead">
+          ON にすると、生徒が「見本を聴く」を押した時だけ OpenAI のネイティブ音声を生成します。OFF 時はブラウザ標準音声です。
+        </p>
+
+        <div class="admin-lock-panel">
+          <div class="admin-lock-status">
+            <span id="adminTtsLabel" class="admin-lock-label">読み込み中...</span>
+            <span id="adminTtsHint" class="admin-lock-hint">—</span>
+          </div>
+          <label class="admin-toggle" for="adminTtsToggle">
+            <input id="adminTtsToggle" type="checkbox" role="switch" aria-labelledby="adminTtsLabel" />
+            <span class="admin-toggle-track" aria-hidden="true">
+              <span class="admin-toggle-thumb"></span>
+            </span>
+          </label>
+        </div>
+      </section>
+
+      <section class="admin-card">
+        <h2 class="admin-card__title">利用可能な言語</h2>
+        <p class="admin-lead">
+          チェックを入れた言語だけが、生徒画面の「学習する言語を選択」に表示されます。
+        </p>
+
+        <fieldset class="admin-mode-fieldset">
+          <legend class="admin-mode-legend">言語の有効化</legend>
+          <div class="admin-lang-options admin-lang-options--grid" id="adminLangOptions">
+            <label class="admin-lang-option">
+              <input type="checkbox" name="adminLang" value="en" />
+              <span>🇬🇧 英語</span>
+            </label>
+            <label class="admin-lang-option">
+              <input type="checkbox" name="adminLang" value="es" />
+              <span>🇪🇸 スペイン語</span>
+            </label>
+            <label class="admin-lang-option">
+              <input type="checkbox" name="adminLang" value="ja" />
+              <span>🇯🇵 日本語</span>
+            </label>
+            <label class="admin-lang-option">
+              <input type="checkbox" name="adminLang" value="ro" />
+              <span>🇷🇴 ルーマニア語</span>
+            </label>
+          </div>
+        </fieldset>
+      </section>
+
+      <section class="admin-card">
+        <h2 class="admin-card__title">表示言語の初期設定</h2>
+        <p class="admin-lead">
+          初回アクセス時の UI 表示言語（学習言語とは別）です。
+        </p>
+
+        <fieldset class="admin-mode-fieldset">
+          <legend class="admin-mode-legend">Default UI Language</legend>
+          <div class="admin-mode-options admin-mode-options--compact" id="adminUiLangOptions">
+            <label class="admin-mode-option">
+              <input type="radio" name="uiLang" value="ja" />
+              <span class="admin-mode-option-body">
+                <span class="admin-mode-option-title">日本語</span>
+                <span class="admin-mode-option-desc">UI を日本語で表示</span>
+              </span>
+            </label>
+            <label class="admin-mode-option">
+              <input type="radio" name="uiLang" value="en" />
+              <span class="admin-mode-option-body">
+                <span class="admin-mode-option-title">English</span>
+                <span class="admin-mode-option-desc">UI in English</span>
+              </span>
+            </label>
+          </div>
+        </fieldset>
+      </section>
+
+      <section class="admin-card admin-card--span-2">
+        <h2 class="admin-card__title">AIモデル選択</h2>
         <p class="admin-lead">
           添削・解説・発音アドバイスのみ切り替わります。OCR など基本処理は常に gpt-4o-mini です。
         </p>
 
         <fieldset class="admin-mode-fieldset">
           <legend class="admin-mode-legend">4つのAIモード</legend>
-          <div class="admin-mode-options" id="adminAiModeOptions">
+          <div class="admin-mode-options admin-mode-options--grid" id="adminAiModeOptions">
             <label class="admin-mode-option">
               <input type="radio" name="aiMode" value="4o-mini" />
               <span class="admin-mode-option-body">
@@ -75,69 +162,14 @@
         <p id="adminAiHint" class="admin-lock-hint admin-ai-hint">—</p>
       </section>
 
-      <section class="admin-card admin-card-spaced">
-        <h1>利用可能な言語</h1>
-        <p class="admin-lead">
-          チェックを入れた言語だけが、生徒画面の「学習する言語を選択」ドロップダウンに表示されます（アプリ表示言語の設定とは別です）。
-        </p>
-
-        <fieldset class="admin-mode-fieldset">
-          <legend class="admin-mode-legend">言語の有効化</legend>
-          <div class="admin-lang-options" id="adminLangOptions">
-            <label class="admin-lang-option">
-              <input type="checkbox" name="adminLang" value="en" />
-              <span>🇬🇧 英語 (English)</span>
-            </label>
-            <label class="admin-lang-option">
-              <input type="checkbox" name="adminLang" value="es" />
-              <span>🇪🇸 スペイン語 (Spanish)</span>
-            </label>
-            <label class="admin-lang-option">
-              <input type="checkbox" name="adminLang" value="ja" />
-              <span>🇯🇵 日本語 (Japanese)</span>
-            </label>
-            <label class="admin-lang-option">
-              <input type="checkbox" name="adminLang" value="ro" />
-              <span>🇷🇴 ルーマニア語 (Romanian)</span>
-            </label>
-          </div>
-        </fieldset>
-      </section>
-
-      <section class="admin-card admin-card-spaced">
-        <h1>表示言語の初期設定</h1>
-        <p class="admin-lead">
-          生徒が初めてページを開いたときのアプリ表示言語（UI）のデフォルトです。学習する言語（英語・日本語など）とは別の設定です。
-        </p>
-
-        <fieldset class="admin-mode-fieldset">
-          <legend class="admin-mode-legend">Default UI Language</legend>
-          <div class="admin-mode-options" id="adminUiLangOptions">
-            <label class="admin-mode-option">
-              <input type="radio" name="uiLang" value="ja" />
-              <span class="admin-mode-option-body">
-                <span class="admin-mode-option-title">日本語</span>
-                <span class="admin-mode-option-desc">ボタン・説明文を日本語で表示</span>
-              </span>
-            </label>
-            <label class="admin-mode-option">
-              <input type="radio" name="uiLang" value="en" />
-              <span class="admin-mode-option-body">
-                <span class="admin-mode-option-title">English</span>
-                <span class="admin-mode-option-desc">Buttons and labels in English</span>
-              </span>
-            </label>
-          </div>
-        </fieldset>
-      </section>
-
-      <section class="admin-card admin-card-spaced admin-card--link-gen">
-        <h1>🔗 共有用リンク生成（Link Generator）</h1>
+      <section class="admin-card admin-card--span-full admin-card--link-gen">
+        <h2 class="admin-card__title">🔗 共有用リンク生成（Link Generator）</h2>
         <p class="admin-lead">
           表示言語と学習言語を選ぶと、生徒が開いた瞬間にその設定が反映されるURLを自動作成します。クエリは
           <code>?ui=xx&amp;target=xx</code> 形式です。
         </p>
 
+        <div class="admin-link-gen-row">
         <div class="admin-link-gen-form">
           <label class="admin-link-gen-field" for="shareLinkUiSelect">
             <span class="admin-link-gen-field-label">アプリの表示言語 (UI Language)</span>
@@ -163,33 +195,13 @@
             URLをコピー（Copy URL）
           </button>
         </div>
+        </div>
         <p id="shareLinkCopyToast" class="admin-link-gen-toast hidden" role="status" aria-live="polite">
           コピーしました！
         </p>
       </section>
 
-      <section class="admin-card admin-card-spaced">
-        <h1>TTS音声（OpenAI）</h1>
-        <p class="admin-lead">
-          ON にすると、生徒が「見本を聴く」を押した時だけ OpenAI のネイティブ音声を生成します。OFF 時はブラウザ標準音声です。
-        </p>
-
-        <div class="admin-lock-panel">
-          <div class="admin-lock-status">
-            <span id="adminTtsLabel" class="admin-lock-label">読み込み中...</span>
-            <span id="adminTtsHint" class="admin-lock-hint">—</span>
-          </div>
-          <label class="admin-toggle" for="adminTtsToggle">
-            <input id="adminTtsToggle" type="checkbox" role="switch" aria-labelledby="adminTtsLabel" />
-            <span class="admin-toggle-track" aria-hidden="true">
-              <span class="admin-toggle-thumb"></span>
-            </span>
-          </label>
-        </div>
-      </section>
-
-      <p id="adminStatus" class="admin-status" aria-live="polite"></p>
-      <a class="admin-back-link" href="{{ url_for('index') }}">← 生徒画面へ戻る</a>
+      </div>
     </main>
 
     <script>
