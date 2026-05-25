@@ -9,5 +9,9 @@ services:
     envVars:
       - key: OPENAI_API_KEY
         sync: false
+      - key: FLASK_SECRET_KEY
+        generateValue: true
+      - key: GATE_LOCK_ENABLED
+        value: "false"
       - key: PYTHON_VERSION
         value: "3.11.9"

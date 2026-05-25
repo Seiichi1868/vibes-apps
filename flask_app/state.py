@@ -1,6 +1,23 @@
 """ランタイムで変更可能なアプリケーション状態"""
 
+import os
+
 from flask_app.config import Config
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    value = str(raw).strip().lower()
+    if value in {"1", "true", "on", "yes"}:
+        return True
+    if value in {"0", "false", "off", "no"}:
+        return False
+    return default
+
+
+_on_render = os.environ.get("RENDER", "").strip().lower() == "true"
 
 AI_MODE_OPTIONS: dict[str, dict[str, str]] = {
     "4o-mini": {
@@ -74,5 +91,9 @@ DEFAULT_ENABLED_LANGUAGES = ["en", "es", "ja", "ro"]
 ENABLED_STUDY_LANGUAGES: list[str] = list(DEFAULT_ENABLED_LANGUAGES)
 AI_MODE = Config.DEFAULT_AI_MODE
 TTS_ENABLED = False
-CLASS_CODE_LOCK_ENABLED = True
+# Render 本番はデフォルト OFF（管理画面から ON 可能）。ローカルはデフォルト ON。
+CLASS_CODE_LOCK_ENABLED = _env_bool(
+    "GATE_LOCK_ENABLED",
+    default=not _on_render,
+)
 DEFAULT_UI_LANGUAGE = "ja"
