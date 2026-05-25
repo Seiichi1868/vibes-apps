@@ -1,7 +1,6 @@
-# 音読判定アプリ（Flask）
+# VibeSpeak（音読判定アプリ）
 
-英語の音読をブラウザで録音し、流暢さスコアを返す Web アプリの土台です。  
-現時点の評価ロジックはダミー実装で、後から Whisper や LLM 評価に置き換えやすい構成にしています。
+多言語音読・添削をブラウザで行う Flask Web アプリです。音読認識は Web Speech API、添削・OCR・発音アドバイスは OpenAI API を利用します。
 
 ## セットアップ
 
@@ -9,25 +8,51 @@
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+cp .env.example .env   # OPENAI_API_KEY などを設定
 ```
 
 ## 起動
 
 ```bash
-python app.py
+python run.py
 ```
 
-ブラウザで `http://127.0.0.1:5000` を開いてください。
+ブラウザで `http://127.0.0.1:5001` を開いてください。
 
-## 現在の機能
+本番（Render 等）では `gunicorn run:app` を使用します。
 
-- テキスト入力（読み上げる英文）
-- ブラウザ録音（MediaRecorder）
-- Flask API への音声アップロード
-- 流暢さスコアの返却と表示（ダミーAI）
+## プロジェクト構成
 
-## 次の拡張ポイント
+```
+音読判定アプリ/
+├── app/                 # Flask アプリケーション
+│   ├── api/             # API Blueprint
+│   ├── services/        # ビジネスロジック
+│   ├── utils/           # ユーティリティ
+│   └── views/           # ページルート
+├── static/
+├── templates/
+├── uploads/
+├── learning_history/
+├── run.py               # 起動スクリプト
+└── requirements.txt
+```
 
-- Whisper で音声認識し、原文との一致率を算出
-- GPT 系モデルで発音/リズム/自然さのコメント生成
-- ユーザー別の履歴保存（SQLite + SQLAlchemy）
+## 環境変数（.env）
+
+- `OPENAI_API_KEY` — 必須（添削・OCR・TTS・発音アドバイス）
+- `FLASK_SECRET_KEY` — セッション用（任意）
+- `GATE_SECRET` — クラスコード認証用（任意）
+- `GOOGLE_APPLICATION_CREDENTIALS` — サーバー側 STT 利用時のみ
+
+## 主な API
+
+| エンドポイント | 説明 |
+|----------------|------|
+| `GET /api/gate/status` | ゲート・言語・TTS 設定 |
+| `POST /api/check-grammar` | 作文添削 |
+| `POST /api/ocr` | 画像からテキスト抽出 |
+| `POST /api/pronunciation-advice` | 発音アドバイス |
+| `POST /api/generate-tts` | お手本音声生成 |
+
+管理者画面: `/admin`
