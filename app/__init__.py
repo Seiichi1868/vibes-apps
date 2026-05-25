@@ -63,3 +63,7 @@ def create_app(config_class=Config):
         return ("Internal Server Error", 500)
 
     return app
+
+
+# Render ダッシュボード等で ``gunicorn app:app`` が指定されている場合の互換
+app = create_app()
