@@ -131,6 +131,43 @@
         </fieldset>
       </section>
 
+      <section class="admin-card admin-card-spaced admin-card--link-gen">
+        <h1>🔗 共有用リンク生成（Link Generator）</h1>
+        <p class="admin-lead">
+          表示言語と学習言語を選ぶと、生徒が開いた瞬間にその設定が反映されるURLを自動作成します。クエリは
+          <code>?ui=xx&amp;target=xx</code> 形式です。
+        </p>
+
+        <div class="admin-link-gen-form">
+          <label class="admin-link-gen-field" for="shareLinkUiSelect">
+            <span class="admin-link-gen-field-label">アプリの表示言語 (UI Language)</span>
+            <select id="shareLinkUiSelect" class="admin-link-gen-select">
+              <option value="ja">日本語</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+          <label class="admin-link-gen-field" for="shareLinkTargetSelect">
+            <span class="admin-link-gen-field-label">学習対象の言語 (Target Language)</span>
+            <select id="shareLinkTargetSelect" class="admin-link-gen-select"></select>
+          </label>
+        </div>
+
+        <div class="admin-link-gen-preview-wrap">
+          <p class="admin-link-gen-preview-label">生成URL（プレビュー）</p>
+          <output
+            id="shareLinkPreview"
+            class="admin-link-gen-preview"
+            for="shareLinkUiSelect shareLinkTargetSelect"
+          ></output>
+          <button id="shareLinkCopyBtn" type="button" class="admin-link-gen-copy-btn">
+            URLをコピー（Copy URL）
+          </button>
+        </div>
+        <p id="shareLinkCopyToast" class="admin-link-gen-toast hidden" role="status" aria-live="polite">
+          コピーしました！
+        </p>
+      </section>
+
       <section class="admin-card admin-card-spaced">
         <h1>TTS音声（OpenAI）</h1>
         <p class="admin-lead">
@@ -169,6 +206,21 @@
       const activeModel = document.getElementById("adminActiveModel");
       const todayCode = document.getElementById("adminTodayCode");
       const statusText = document.getElementById("adminStatus");
+      const shareLinkUiSelect = document.getElementById("shareLinkUiSelect");
+      const shareLinkTargetSelect = document.getElementById("shareLinkTargetSelect");
+      const shareLinkPreview = document.getElementById("shareLinkPreview");
+      const shareLinkCopyBtn = document.getElementById("shareLinkCopyBtn");
+      const shareLinkCopyToast = document.getElementById("shareLinkCopyToast");
+
+      const ALL_SHARE_TARGET_LANGS = ["en", "es", "ja", "ro"];
+      const SHARE_TARGET_LABELS = {
+        en: "🇬🇧 英語 (English)",
+        es: "🇪🇸 スペイン語 (Spanish)",
+        ja: "🇯🇵 日本語 (Japanese)",
+        ro: "🇷🇴 ルーマニア語 (Romanian)",
+      };
+      let shareLinkEnabledLangs = [...ALL_SHARE_TARGET_LANGS];
+      let shareLinkCopyToastTimer = null;
 
       function renderLockState(lockEnabled) {
         lockToggle.checked = lockEnabled;
@@ -202,6 +254,83 @@
           input.checked = enabled.has(input.value);
           input.disabled = false;
         });
+        const enabledList = ALL_SHARE_TARGET_LANGS.filter((id) => enabled.has(id));
+        shareLinkEnabledLangs = enabledList.length ? enabledList : [...ALL_SHARE_TARGET_LANGS];
+        renderShareLinkTargetOptions();
+        updateShareLinkPreview();
+      }
+
+      function renderShareLinkTargetOptions() {
+        if (!shareLinkTargetSelect) return;
+        const previous = shareLinkTargetSelect.value;
+        shareLinkTargetSelect.innerHTML = "";
+        shareLinkEnabledLangs.forEach((langId) => {
+          const option = document.createElement("option");
+          option.value = langId;
+          option.textContent = SHARE_TARGET_LABELS[langId] || langId;
+          shareLinkTargetSelect.appendChild(option);
+        });
+        const next =
+          shareLinkEnabledLangs.includes(previous) ? previous : shareLinkEnabledLangs[0] || "en";
+        shareLinkTargetSelect.value = next;
+      }
+
+      function buildShareLinkUrl() {
+        const ui = shareLinkUiSelect?.value === "en" ? "en" : "ja";
+        const target = shareLinkTargetSelect?.value || shareLinkEnabledLangs[0] || "en";
+        const url = new URL("/", window.location.origin);
+        url.searchParams.set("ui", ui);
+        url.searchParams.set("target", target);
+        return url.toString();
+      }
+
+      function updateShareLinkPreview() {
+        if (!shareLinkPreview) return;
+        shareLinkPreview.textContent = buildShareLinkUrl();
+      }
+
+      function showShareLinkCopyToast() {
+        if (!shareLinkCopyToast) return;
+        shareLinkCopyToast.classList.remove("hidden");
+        shareLinkCopyToast.classList.add("is-visible");
+        if (shareLinkCopyToastTimer) window.clearTimeout(shareLinkCopyToastTimer);
+        shareLinkCopyToastTimer = window.setTimeout(() => {
+          shareLinkCopyToast.classList.remove("is-visible");
+          window.setTimeout(() => shareLinkCopyToast.classList.add("hidden"), 320);
+        }, 2200);
+      }
+
+      async function copyShareLinkUrl() {
+        const url = buildShareLinkUrl();
+        updateShareLinkPreview();
+        try {
+          await navigator.clipboard.writeText(url);
+          showShareLinkCopyToast();
+          statusText.textContent = "共有リンクをクリップボードにコピーしました";
+          return;
+        } catch (_) {
+          /* fallback below */
+        }
+        const helper = document.createElement("textarea");
+        helper.value = url;
+        helper.setAttribute("readonly", "");
+        helper.style.position = "fixed";
+        helper.style.left = "-9999px";
+        document.body.appendChild(helper);
+        helper.select();
+        let copied = false;
+        try {
+          copied = document.execCommand("copy");
+        } catch (_) {
+          copied = false;
+        }
+        document.body.removeChild(helper);
+        if (copied) {
+          showShareLinkCopyToast();
+          statusText.textContent = "共有リンクをクリップボードにコピーしました";
+        } else {
+          statusText.textContent = "コピーに失敗しました。URLを手動で選択してください。";
+        }
       }
 
       function renderUiLanguageState(uiLang) {
@@ -247,8 +376,13 @@
         renderAiModeState(aiData);
         renderLanguageState(langData);
         renderUiLanguageState(uiLangData.default_ui_language);
+        if (shareLinkUiSelect) {
+          const uiDefault = uiLangData.default_ui_language === "en" ? "en" : "ja";
+          if (!shareLinkUiSelect.value) shareLinkUiSelect.value = uiDefault;
+        }
         renderTtsState(Boolean(ttsData.tts_enabled));
         todayCode.textContent = String(codeData.code || "----").padStart(4, "0");
+        updateShareLinkPreview();
         statusText.textContent = "準備完了";
       }
 
@@ -416,6 +550,19 @@
           saveUiLanguageState(input.value);
         });
       });
+
+      if (shareLinkUiSelect) {
+        shareLinkUiSelect.addEventListener("change", updateShareLinkPreview);
+      }
+      if (shareLinkTargetSelect) {
+        shareLinkTargetSelect.addEventListener("change", updateShareLinkPreview);
+      }
+      if (shareLinkCopyBtn) {
+        shareLinkCopyBtn.addEventListener("click", copyShareLinkUrl);
+      }
+
+      renderShareLinkTargetOptions();
+      updateShareLinkPreview();
 
       loadAdminState().catch((error) => {
         console.error(error);

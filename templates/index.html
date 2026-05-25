@@ -603,8 +603,20 @@
 
       const UI_LANG_STORAGE_KEY = "vibespeak-ui-lang";
       const { UI_STRINGS, formatTemplate } = window.VibeSpeakUiI18n;
+
+      const URL_LANG_PARAMS = (() => {
+        const params = new URLSearchParams(window.location.search);
+        const ui = (params.get("ui") || "").trim().toLowerCase();
+        const target = (params.get("target") || "").trim().toLowerCase();
+        return {
+          ui: ui === "ja" || ui === "en" ? ui : null,
+          target: ["en", "es", "ja", "ro"].includes(target) ? target : null,
+        };
+      })();
+
       let uiLang = "ja";
       let serverDefaultUiLanguage = "ja";
+      let urlInitTargetLang = URL_LANG_PARAMS.target;
 
       const STUDY_LANG = {
         en: { id: "en", speechLang: "en-US", apiLang: "en-US" },
@@ -644,6 +656,7 @@
 
       function syncUiLanguageFromServer(defaultLang) {
         serverDefaultUiLanguage = defaultLang === "en" ? "en" : "ja";
+        if (URL_LANG_PARAMS.ui) return;
         try {
           const saved = localStorage.getItem(UI_LANG_STORAGE_KEY);
           if (saved === "ja" || saved === "en") return;
@@ -653,6 +666,13 @@
         if (uiLang !== serverDefaultUiLanguage) {
           setUiLanguage(serverDefaultUiLanguage, { persist: false, fromUser: false });
         }
+      }
+
+      function applyUrlInitTargetLanguage() {
+        if (!urlInitTargetLang) return;
+        if (!enabledStudyLanguages.includes(urlInitTargetLang)) return;
+        applyStudyLanguage(urlInitTargetLang, { resetReference: true });
+        urlInitTargetLang = null;
       }
 
       function setUiLanguage(next, { persist = true, fromUser = false } = {}) {
@@ -941,6 +961,7 @@
         if (Array.isArray(data.enabled_languages) && data.enabled_languages.length) {
           enabledStudyLanguages = data.enabled_languages;
           renderStudyLangSelect();
+          applyUrlInitTargetLanguage();
         }
         return serverGateLockEnabled;
       }
@@ -1224,14 +1245,20 @@
           option.textContent = getStudyLangUiPack(langId).label;
           studyLangSelect.appendChild(option);
         });
-        const nextLang = enabledStudyLanguages.includes(previous)
+        let nextLang = enabledStudyLanguages.includes(previous)
           ? previous
           : enabledStudyLanguages[0] || "en";
+        if (urlInitTargetLang && enabledStudyLanguages.includes(urlInitTargetLang)) {
+          nextLang = urlInitTargetLang;
+        }
         studyLangSelect.value = nextLang;
         if (nextLang !== studyLang) {
           applyStudyLanguage(nextLang);
         } else {
           studyLangSelect.value = studyLang;
+        }
+        if (urlInitTargetLang && studyLang === urlInitTargetLang) {
+          urlInitTargetLang = null;
         }
       }
 
@@ -2454,13 +2481,17 @@
       bindOcrPicker(ocrCameraInput, ocrCameraBtn);
       bindOcrPicker(ocrFileInput, ocrFileBtn);
 
-      try {
-        const savedUi = localStorage.getItem(UI_LANG_STORAGE_KEY);
-        if (savedUi === "ja" || savedUi === "en") uiLang = savedUi;
-      } catch (_) {
-        /* ignore */
+      if (URL_LANG_PARAMS.ui) {
+        setUiLanguage(URL_LANG_PARAMS.ui, { persist: true, fromUser: false });
+      } else {
+        try {
+          const savedUi = localStorage.getItem(UI_LANG_STORAGE_KEY);
+          if (savedUi === "ja" || savedUi === "en") uiLang = savedUi;
+        } catch (_) {
+          /* ignore */
+        }
+        applyUiLanguage({ resetStatus: true });
       }
-      applyUiLanguage({ resetStatus: true });
 
       uiLangButtons.forEach((btn) => {
         btn.addEventListener("click", () => {

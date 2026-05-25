@@ -1312,7 +1312,7 @@ body.gate-locked {
 }
 
 .admin-shell {
-  width: min(480px, 100%);
+  width: min(520px, 100%);
 }
 
 .admin-card {
@@ -1566,6 +1566,119 @@ body.gate-locked {
 .admin-lang-option:has(input:checked) {
   border-color: rgba(2, 132, 199, 0.55);
   background: rgba(240, 249, 255, 0.82);
+}
+
+.admin-link-gen-form {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.admin-link-gen-field {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-link-gen-field-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.admin-link-gen-select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(255, 255, 255, 0.88);
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #19324a;
+  cursor: pointer;
+}
+
+.admin-link-gen-select:focus-visible {
+  outline: 2px solid rgba(124, 198, 255, 0.65);
+  outline-offset: 2px;
+}
+
+.admin-link-gen-preview-wrap {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.admin-link-gen-preview-label {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.admin-link-gen-preview {
+  display: block;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px dashed rgba(148, 163, 184, 0.55);
+  background: rgba(248, 250, 252, 0.9);
+  font-size: 0.76rem;
+  line-height: 1.45;
+  word-break: break-all;
+  color: #0f4c75;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.admin-link-gen-copy-btn {
+  justify-self: start;
+  margin: 0;
+  padding: 9px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #7cc6ff, #75c98b);
+  color: #0f2f46;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(76, 172, 255, 0.22);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.admin-link-gen-copy-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(76, 172, 255, 0.28);
+}
+
+.admin-link-gen-copy-btn:focus-visible {
+  outline: 2px solid rgba(124, 198, 255, 0.75);
+  outline-offset: 2px;
+}
+
+.admin-link-gen-toast {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(34, 197, 94, 0.16);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  color: #166534;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.admin-link-gen-toast.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.admin-link-gen-toast.hidden {
+  display: none;
 }
 
 .study-lang-select-wrap {
