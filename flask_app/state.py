@@ -1,6 +1,6 @@
 """ランタイムで変更可能なアプリケーション状態"""
 
-from app.config import Config
+from flask_app.config import Config
 
 AI_MODE_OPTIONS: dict[str, dict[str, str]] = {
     "4o-mini": {

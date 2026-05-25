@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from app.config import Config
+from flask_app.config import Config
 
 
 def allowed_file(filename: str, allowed_extensions: set[str] | None = None) -> bool:

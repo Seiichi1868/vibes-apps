@@ -3,8 +3,8 @@ import logging
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 
-from app.config import Config
-from app.extensions import cors
+from flask_app.config import Config
+from flask_app.extensions import cors
 
 load_dotenv(Config.BASE_DIR / ".env")
 
@@ -26,7 +26,7 @@ def create_app(config_class=Config):
 
     cors.init_app(app)
 
-    from app.api import (
+    from flask_app.api import (
         admin_bp,
         gate_bp,
         grammar_bp,
@@ -37,7 +37,7 @@ def create_app(config_class=Config):
         transcription_bp,
         tts_bp,
     )
-    from app.views import main_bp
+    from flask_app.views import main_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(gate_bp, url_prefix="/api")
@@ -63,7 +63,3 @@ def create_app(config_class=Config):
         return ("Internal Server Error", 500)
 
     return app
-
-
-# Render ダッシュボード等で ``gunicorn app:app`` が指定されている場合の互換
-app = create_app()

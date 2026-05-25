@@ -1,8 +1,8 @@
 import re
 
-from app.config import Config
-import app.state as state
-from app.state import AI_MODE_OPTIONS, DEFAULT_ENABLED_LANGUAGES, STUDY_LANGUAGE_CATALOG
+from flask_app.config import Config
+import flask_app.state as state
+from flask_app.state import AI_MODE_OPTIONS, DEFAULT_ENABLED_LANGUAGES, STUDY_LANGUAGE_CATALOG
 
 
 def normalize_study_lang_id(raw: str) -> str:

@@ -1,2 +1,4 @@
 """Gunicorn / Render 用 WSGI エントリポイント。"""
-from app import app as application
+from flask_app import create_app
+
+application = create_app()

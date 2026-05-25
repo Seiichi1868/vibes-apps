@@ -2,11 +2,11 @@ import logging
 
 from flask import Blueprint, jsonify, request
 
-from app.config import Config
-from app.services.ai_service import AIService
-from app.services.gate_service import gate_access_allowed, gate_auth_error
-from app.utils.language_utils import normalize_study_lang
-from app.utils.validators import resolve_image_mime
+from flask_app.config import Config
+from flask_app.services.ai_service import AIService
+from flask_app.services.gate_service import gate_access_allowed, gate_auth_error
+from flask_app.utils.language_utils import normalize_study_lang
+from flask_app.utils.validators import resolve_image_mime
 
 logger = logging.getLogger(__name__)
 

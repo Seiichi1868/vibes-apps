@@ -4,8 +4,8 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    # app.py / routes 互換あり。推奨は wsgi:application
-    startCommand: gunicorn wsgi:application --bind 0.0.0.0:$PORT
+    startCommand: gunicorn wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 120
+    healthCheckPath: /health
     envVars:
       - key: OPENAI_API_KEY
         sync: false

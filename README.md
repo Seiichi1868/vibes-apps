@@ -25,7 +25,7 @@ python run.py
 
 ```
 音読判定アプリ/
-├── app/                 # Flask アプリケーション
+├── flask_app/           # Flask アプリケーション本体
 │   ├── api/             # API Blueprint
 │   ├── services/        # ビジネスロジック
 │   ├── utils/           # ユーティリティ

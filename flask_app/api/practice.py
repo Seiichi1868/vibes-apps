@@ -2,7 +2,7 @@ import logging
 
 from flask import Blueprint, jsonify, request
 
-from app.services.ai_service import AIService
+from flask_app.services.ai_service import AIService
 
 logger = logging.getLogger(__name__)
 

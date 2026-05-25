@@ -1,8 +1,8 @@
 from flask import Blueprint, jsonify, request
 
-from app.config import Config
-from app.services.gate_service import set_gate_lock_enabled
-from app.utils.language_utils import (
+from flask_app.config import Config
+from flask_app.services.gate_service import set_gate_lock_enabled
+from flask_app.utils.language_utils import (
     ai_mode_response,
     get_default_ui_language,
     get_enabled_study_languages,
@@ -20,7 +20,7 @@ admin_bp = Blueprint("admin", __name__)
 
 @admin_bp.route("/admin/gate-lock", methods=["GET", "POST"])
 def admin_gate_lock():
-    from app.services.gate_service import is_gate_lock_enabled
+    from flask_app.services.gate_service import is_gate_lock_enabled
 
     if request.method == "GET":
         return jsonify({"lock_enabled": is_gate_lock_enabled(), "ok": True})

@@ -1,4 +1,4 @@
-from app.utils.text_utils import calculate_similarity
+from flask_app.utils.text_utils import calculate_similarity
 
 
 class AnalysisService:

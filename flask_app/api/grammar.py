@@ -3,8 +3,8 @@ import logging
 
 from flask import Blueprint, jsonify, request
 
-from app.services.ai_service import AIService
-from app.services.gate_service import gate_access_allowed, gate_auth_error
+from flask_app.services.ai_service import AIService
+from flask_app.services.gate_service import gate_access_allowed, gate_auth_error
 
 logger = logging.getLogger(__name__)
 

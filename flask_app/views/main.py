@@ -3,9 +3,9 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify, render_template, send_from_directory, session
 
-from app.config import Config
-from app.services.ai_service import AIService
-from app.services.tts_service import TTSService
+from flask_app.config import Config
+from flask_app.services.ai_service import AIService
+from flask_app.services.tts_service import TTSService
 
 main_bp = Blueprint("main", __name__)
 

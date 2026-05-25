@@ -5,9 +5,9 @@ import os
 
 from flask import jsonify, request
 
-import app.state as state
-from app.config import Config
-from app.utils.language_utils import (
+import flask_app.state as state
+from flask_app.config import Config
+from flask_app.utils.language_utils import (
     get_default_ui_language,
     get_enabled_study_languages,
     is_tts_enabled,

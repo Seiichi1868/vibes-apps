@@ -1,8 +1,7 @@
-"""Render 互換エントリポイント。
+"""Render 互換エントリポイント（``python app.py`` / ``gunicorn app:app``）。
 
-``python app.py`` や旧デプロイ設定から起動された場合に、
-``routes`` パッケージと ``app`` パッケージ（Flask 本体）の両方を解決する。
-本番の Gunicorn 推奨コマンドは ``gunicorn wsgi:application``。
+Flask 本体は ``flask_app`` パッケージにあり、このファイル名 ``app`` との衝突を避ける。
+本番推奨: ``gunicorn wsgi:application``
 """
 import os
 from pathlib import Path
@@ -12,11 +11,10 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
-from app import create_app
+from flask_app import create_app
 
 app = create_app()
 
-# 旧 app.py が期待する import（Blueprint は create_app 内で登録済み）
 from routes.student import student_bp  # noqa: F401
 from routes.admin import admin_bp  # noqa: F401
 

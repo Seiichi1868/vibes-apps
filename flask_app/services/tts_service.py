@@ -3,9 +3,9 @@ import os
 
 from openai import OpenAI
 
-from app.config import Config
-from app.state import TTS_GENERATE_VOICE_BY_LANG, TTS_VOICE_BY_LANG
-from app.utils.audio_utils import cache_key_for_text
+from flask_app.config import Config
+from flask_app.state import TTS_GENERATE_VOICE_BY_LANG, TTS_VOICE_BY_LANG
+from flask_app.utils.audio_utils import cache_key_for_text
 
 logger = logging.getLogger(__name__)
 

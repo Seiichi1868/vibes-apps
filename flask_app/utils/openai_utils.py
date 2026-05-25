@@ -3,9 +3,9 @@ import re
 
 from openai import OpenAI
 
-from app.config import Config
-import app.state as state
-from app.state import AI_MODE_OPTIONS
+from flask_app.config import Config
+import flask_app.state as state
+from flask_app.state import AI_MODE_OPTIONS
 
 
 def parse_json_object(raw: str) -> dict:

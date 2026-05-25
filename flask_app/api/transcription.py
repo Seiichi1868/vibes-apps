@@ -6,13 +6,13 @@ from datetime import datetime
 from flask import Blueprint, current_app, jsonify, request, session
 from werkzeug.utils import secure_filename
 
-from app.config import Config
-from app.services.ai_service import AIService
-from app.services.analysis_service import AnalysisService
-from app.services.gate_service import gate_access_allowed, gate_auth_error
-from app.services.history_service import HistoryService
-from app.services.speech_service import SpeechService
-from app.utils.audio_utils import allowed_file, convert_to_wav
+from flask_app.config import Config
+from flask_app.services.ai_service import AIService
+from flask_app.services.analysis_service import AnalysisService
+from flask_app.services.gate_service import gate_access_allowed, gate_auth_error
+from flask_app.services.history_service import HistoryService
+from flask_app.services.speech_service import SpeechService
+from flask_app.utils.audio_utils import allowed_file, convert_to_wav
 
 logger = logging.getLogger(__name__)
 

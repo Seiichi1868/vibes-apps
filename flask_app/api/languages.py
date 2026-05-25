@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify
 
-from app.utils.language_utils import languages_response
+from flask_app.utils.language_utils import languages_response
 
 languages_bp = Blueprint("languages", __name__)
 

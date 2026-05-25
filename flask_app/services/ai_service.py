@@ -5,8 +5,8 @@ import os
 
 from openai import OpenAI
 
-from app.config import Config
-from app.utils.language_utils import (
+from flask_app.config import Config
+from flask_app.utils.language_utils import (
     grammar_fallback_tip,
     grammar_system_prompt,
     grammar_user_message,
@@ -19,8 +19,8 @@ from app.utils.language_utils import (
     pronunciation_reference_label,
     pronunciation_system_prompt,
 )
-from app.utils.openai_utils import create_json_chat_completion, get_ai_chat_model
-from app.utils.text_utils import clean_ocr_text
+from flask_app.utils.openai_utils import create_json_chat_completion, get_ai_chat_model
+from flask_app.utils.text_utils import clean_ocr_text
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ class AIService:
         if detected_lang not in {"en", "es", "ja", "ro"}:
             detected_lang = lang_id
 
-        from app.utils.language_utils import get_ai_mode
+        from flask_app.utils.language_utils import get_ai_mode
 
         response = {
             "corrected": corrected,

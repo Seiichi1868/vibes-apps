@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 
-from app.services.gate_service import (
+from flask_app.services.gate_service import (
     daily_class_code,
     gate_access_allowed,
     gate_status_payload,

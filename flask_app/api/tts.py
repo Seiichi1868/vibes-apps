@@ -2,9 +2,9 @@ import logging
 
 from flask import Blueprint, Response, jsonify, request
 
-from app.services.gate_service import gate_access_allowed, gate_auth_error
-from app.services.tts_service import TTSService
-from app.utils.language_utils import is_tts_enabled, normalize_study_lang
+from flask_app.services.gate_service import gate_access_allowed, gate_auth_error
+from flask_app.services.tts_service import TTSService
+from flask_app.utils.language_utils import is_tts_enabled, normalize_study_lang
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ def tts():
     if len(text) > 4000:
         return jsonify({"error": "text is too long"}), 400
 
-    from app.utils.audio_utils import cache_key_for_text
+    from flask_app.utils.audio_utils import cache_key_for_text
 
     cache_file = f"{cache_key_for_text(text, lang, voice)}.mp3"
     cache_path = tts_service.cache_dir / cache_file

@@ -1,8 +1,6 @@
 import hashlib
 import logging
 
-from pydub import AudioSegment
-
 logger = logging.getLogger(__name__)
 
 
@@ -13,6 +11,8 @@ def allowed_file(filename: str, allowed_extensions: set[str]) -> bool:
 def convert_to_wav(input_path: str, output_path: str) -> bool:
     """音声ファイルをWAV形式に変換"""
     try:
+        from pydub import AudioSegment
+
         audio = AudioSegment.from_file(input_path)
         audio = audio.set_channels(1)
         audio = audio.set_frame_rate(16000)

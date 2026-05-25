@@ -2,8 +2,8 @@ import logging
 
 from flask import Blueprint, jsonify, session
 
-from app.config import Config
-from app.services.history_service import HistoryService
+from flask_app.config import Config
+from flask_app.services.history_service import HistoryService
 
 logger = logging.getLogger(__name__)
 
