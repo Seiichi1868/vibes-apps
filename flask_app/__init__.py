@@ -38,8 +38,13 @@ def create_app(config_class=Config):
         tts_bp,
     )
     from flask_app.views import main_bp
+    from news_app import create_news_blueprints
 
     app.register_blueprint(main_bp)
+
+    news_bps = create_news_blueprints()
+    app.register_blueprint(news_bps["main"], url_prefix="/news")
+    app.register_blueprint(news_bps["admin"], url_prefix="/news/admin")
     app.register_blueprint(gate_bp, url_prefix="/api")
     app.register_blueprint(grammar_bp, url_prefix="/api")
     app.register_blueprint(ocr_bp, url_prefix="/api")
