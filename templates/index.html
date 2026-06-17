@@ -1385,6 +1385,7 @@
       }
 
       function stopCurrentTtsPlayback() {
+        _clearChromeTtsKeepalive();
         if (currentTtsAudio) {
           currentTtsAudio.pause();
           currentTtsAudio.currentTime = 0;
@@ -1398,6 +1399,7 @@
       }
 
       function pauseCurrentTtsPlayback() {
+        _clearChromeTtsKeepalive();
         if (currentTtsAudio && !currentTtsAudio.paused) {
           currentTtsAudio.pause();
           currentTtsAudio.currentTime = 0;
@@ -2179,6 +2181,19 @@
         return exact || enhanced || preferred || local || regional || matched[0];
       }
 
+      // Chrome desktop has a bug where calling speak() immediately after cancel()
+      // causes the utterance to silently fail. A short delay + resume() workaround
+      // is required. We also keep a keep-alive interval because Chrome pauses
+      // synthesis after ~15 s when the utterance is still running.
+      let _chromeTtsKeepaliveId = null;
+
+      function _clearChromeTtsKeepalive() {
+        if (_chromeTtsKeepaliveId !== null) {
+          clearInterval(_chromeTtsKeepaliveId);
+          _chromeTtsKeepaliveId = null;
+        }
+      }
+
       function startBrowserUtterance(text, voices) {
         const prepared = prepareTextForSpeech(text);
         if (!prepared) return;
@@ -2194,6 +2209,7 @@
           if (selectedVoice.lang) utterance.lang = selectedVoice.lang;
         }
         utterance.onerror = () => {
+          _clearChromeTtsKeepalive();
           browserUtteranceActive = false;
           setListenButtonPlaying(false);
           setStatus(t("ttsPlayFail"));
@@ -2202,18 +2218,33 @@
           browserUtteranceActive = true;
           setListenButtonPlaying(true);
           setStatus(t("ttsPlayingBrowser"));
+          // Chrome desktop freezes long utterances; pause/resume every 10 s keeps it alive.
+          _clearChromeTtsKeepalive();
+          _chromeTtsKeepaliveId = setInterval(() => {
+            if (window.speechSynthesis.speaking) {
+              window.speechSynthesis.pause();
+              window.speechSynthesis.resume();
+            } else {
+              _clearChromeTtsKeepalive();
+            }
+          }, 10000);
         };
         utterance.onend = () => {
+          _clearChromeTtsKeepalive();
           browserUtteranceActive = false;
           setListenButtonPlaying(false);
           setStatus(t("ttsDone"));
         };
 
+        // Chrome: cancel() then immediate speak() silently drops the utterance.
+        // Wrapping speak() in setTimeout(0) lets the cancel flush first.
         window.speechSynthesis.cancel();
-        if (window.speechSynthesis.paused) {
-          window.speechSynthesis.resume();
-        }
-        window.speechSynthesis.speak(utterance);
+        setTimeout(() => {
+          if (window.speechSynthesis.paused) {
+            window.speechSynthesis.resume();
+          }
+          window.speechSynthesis.speak(utterance);
+        }, 50);
       }
 
       function speakWithBrowserTTS(text) {
@@ -2221,6 +2252,7 @@
           setStatus(t("ttsUnsupported"));
           return;
         }
+        _clearChromeTtsKeepalive();
         if (currentTtsAudio) {
           currentTtsAudio.pause();
           currentTtsAudio = null;
