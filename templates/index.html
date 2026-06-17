@@ -631,6 +631,52 @@
       let referenceFromSample = false;
       let currentTtsAudio = null;
       let browserUtteranceActive = false;
+      let speechVoicesCache = [];
+
+      const PREFERRED_SPEECH_VOICE_NAMES = {
+        ja: /kyoko|otoya|hattori|haruka|microsoft.*haruka/i,
+        en: /samantha|alex|google.*english|microsoft.*zira|microsoft.*david/i,
+        es: /monica|paulina|jorge|google.*spanish/i,
+        ro: /oana|mihaela|microsoft.*andrei/i,
+      };
+
+      function refreshSpeechVoices() {
+        if (!("speechSynthesis" in window)) {
+          speechVoicesCache = [];
+          return speechVoicesCache;
+        }
+        speechVoicesCache = window.speechSynthesis.getVoices();
+        return speechVoicesCache;
+      }
+
+      function ensureSpeechVoicesReady() {
+        if (!("speechSynthesis" in window)) return Promise.resolve([]);
+        refreshSpeechVoices();
+        if (speechVoicesCache.length) return Promise.resolve(speechVoicesCache);
+
+        return new Promise((resolve) => {
+          let settled = false;
+          const finish = () => {
+            if (settled) return;
+            settled = true;
+            window.speechSynthesis.removeEventListener("voiceschanged", onVoicesChanged);
+            clearInterval(pollId);
+            clearTimeout(timeoutId);
+            resolve(refreshSpeechVoices());
+          };
+          const onVoicesChanged = () => finish();
+          window.speechSynthesis.addEventListener("voiceschanged", onVoicesChanged);
+          const pollId = window.setInterval(() => {
+            if (refreshSpeechVoices().length) finish();
+          }, 100);
+          const timeoutId = window.setTimeout(finish, 2000);
+        });
+      }
+
+      if ("speechSynthesis" in window) {
+        refreshSpeechVoices();
+        window.speechSynthesis.addEventListener("voiceschanged", refreshSpeechVoices);
+      }
 
       function t(key, vars) {
         const pack = UI_STRINGS[uiLang] || UI_STRINGS.ja;
@@ -2095,23 +2141,37 @@
           .join(" ");
       }
 
-      function pickSpeechVoice() {
-        const voices = window.speechSynthesis.getVoices();
+      function isLowQualitySpeechVoice(voice) {
+        const name = String(voice.name || "").toLowerCase();
+        return /compact|low quality|espeak|festival|android|basic/.test(name);
+      }
+
+      function pickSpeechVoice(voices = speechVoicesCache) {
         if (!voices.length) return null;
         const config = getStudyLangConfig();
         const localeHint = config.speechLang.toLowerCase();
         const prefix = localeHint.split("-")[0];
-        const matched = voices.filter((voice) => voice.lang && voice.lang.toLowerCase().startsWith(prefix));
-        if (!matched.length) return null;
-        return (
-          matched.find((voice) => voice.lang.toLowerCase() === localeHint) ||
-          matched.find((voice) => voice.lang.toLowerCase().startsWith(`${prefix}-`)) ||
-          matched.find((voice) => /google|samantha|alex|microsoft|monica|paulina|jorge|kyoko|oana|mihaela/i.test(voice.name)) ||
-          matched[0]
+        const matched = voices.filter(
+          (voice) =>
+            voice.lang &&
+            voice.lang.toLowerCase().startsWith(prefix) &&
+            !isLowQualitySpeechVoice(voice)
         );
+        if (!matched.length) return null;
+
+        const preferredPattern = PREFERRED_SPEECH_VOICE_NAMES[config.id];
+        const exact = matched.find((voice) => voice.lang.toLowerCase() === localeHint);
+        const enhanced = matched.find((voice) => /enhanced|premium|neural|natural/i.test(voice.name));
+        const preferred = preferredPattern
+          ? matched.find((voice) => preferredPattern.test(voice.name))
+          : null;
+        const regional = matched.find((voice) => voice.lang.toLowerCase().startsWith(`${prefix}-`));
+        const local = matched.find((voice) => voice.localService);
+
+        return exact || enhanced || preferred || regional || local || matched[0];
       }
 
-      function speakWithBrowserTTS(text) {
+      async function speakWithBrowserTTS(text) {
         if (!("speechSynthesis" in window)) {
           setStatus(t("ttsUnsupported"));
           return;
@@ -2121,12 +2181,19 @@
           currentTtsAudio = null;
         }
         window.speechSynthesis.cancel();
+        await new Promise((resolve) => window.setTimeout(resolve, 50));
+
+        const voices = await ensureSpeechVoicesReady();
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = getStudyLangConfig().speechLang;
+        const config = getStudyLangConfig();
+        utterance.lang = config.speechLang;
         utterance.rate = 0.95;
         utterance.pitch = 1;
-        const selectedVoice = pickSpeechVoice();
-        if (selectedVoice) utterance.voice = selectedVoice;
+        const selectedVoice = pickSpeechVoice(voices);
+        if (selectedVoice) {
+          utterance.voice = selectedVoice;
+          utterance.lang = selectedVoice.lang || utterance.lang;
+        }
         utterance.onerror = () => {
           browserUtteranceActive = false;
           setListenButtonPlaying(false);
