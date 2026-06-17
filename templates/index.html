@@ -2146,18 +2146,24 @@
         return /compact|low quality|espeak|festival|android|basic/.test(name);
       }
 
+      function prepareTextForSpeech(text) {
+        return String(text || "").replace(/[\u200b-\u200d\ufeff]/g, "").trim();
+      }
+
+      function filterSpeechVoicesForLang(voices, prefix) {
+        return voices.filter((voice) => voice.lang && voice.lang.toLowerCase().startsWith(prefix));
+      }
+
       function pickSpeechVoice(voices = speechVoicesCache) {
         if (!voices.length) return null;
         const config = getStudyLangConfig();
         const localeHint = config.speechLang.toLowerCase();
         const prefix = localeHint.split("-")[0];
-        const matched = voices.filter(
-          (voice) =>
-            voice.lang &&
-            voice.lang.toLowerCase().startsWith(prefix) &&
-            !isLowQualitySpeechVoice(voice)
-        );
-        if (!matched.length) return null;
+        const allMatched = filterSpeechVoicesForLang(voices, prefix);
+        if (!allMatched.length) return null;
+
+        let matched = allMatched.filter((voice) => !isLowQualitySpeechVoice(voice));
+        if (!matched.length) matched = allMatched;
 
         const preferredPattern = PREFERRED_SPEECH_VOICE_NAMES[config.id];
         const exact = matched.find((voice) => voice.lang.toLowerCase() === localeHint);
@@ -2165,34 +2171,25 @@
         const preferred = preferredPattern
           ? matched.find((voice) => preferredPattern.test(voice.name))
           : null;
-        const regional = matched.find((voice) => voice.lang.toLowerCase().startsWith(`${prefix}-`));
         const local = matched.find((voice) => voice.localService);
+        const regional = matched.find((voice) => voice.lang.toLowerCase().startsWith(`${prefix}-`));
 
-        return exact || enhanced || preferred || regional || local || matched[0];
+        return exact || enhanced || preferred || local || regional || matched[0];
       }
 
-      async function speakWithBrowserTTS(text) {
-        if (!("speechSynthesis" in window)) {
-          setStatus(t("ttsUnsupported"));
-          return;
-        }
-        if (currentTtsAudio) {
-          currentTtsAudio.pause();
-          currentTtsAudio = null;
-        }
-        window.speechSynthesis.cancel();
-        await new Promise((resolve) => window.setTimeout(resolve, 50));
+      function startBrowserUtterance(text, voices) {
+        const prepared = prepareTextForSpeech(text);
+        if (!prepared) return;
 
-        const voices = await ensureSpeechVoicesReady();
-        const utterance = new SpeechSynthesisUtterance(text);
+        const utterance = new SpeechSynthesisUtterance(prepared);
         const config = getStudyLangConfig();
         utterance.lang = config.speechLang;
-        utterance.rate = 0.95;
+        utterance.rate = 1;
         utterance.pitch = 1;
         const selectedVoice = pickSpeechVoice(voices);
         if (selectedVoice) {
           utterance.voice = selectedVoice;
-          utterance.lang = selectedVoice.lang || utterance.lang;
+          if (selectedVoice.lang) utterance.lang = selectedVoice.lang;
         }
         utterance.onerror = () => {
           browserUtteranceActive = false;
@@ -2209,7 +2206,34 @@
           setListenButtonPlaying(false);
           setStatus(t("ttsDone"));
         };
+
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.resume();
         window.speechSynthesis.speak(utterance);
+      }
+
+      function speakWithBrowserTTS(text) {
+        if (!("speechSynthesis" in window)) {
+          setStatus(t("ttsUnsupported"));
+          return;
+        }
+        if (currentTtsAudio) {
+          currentTtsAudio.pause();
+          currentTtsAudio = null;
+        }
+        window.speechSynthesis.cancel();
+
+        const voices = speechVoicesCache.length
+          ? speechVoicesCache
+          : window.speechSynthesis.getVoices();
+        if (voices.length) {
+          startBrowserUtterance(text, voices);
+          return;
+        }
+
+        void ensureSpeechVoicesReady().then((loadedVoices) => {
+          startBrowserUtterance(text, loadedVoices);
+        });
       }
 
       function buildOpenAiTtsCacheKey(text) {
@@ -2282,6 +2306,12 @@
           return;
         }
 
+        try {
+          await fetchGateLockStatus();
+        } catch (_) {
+          /* keep cached server setting */
+        }
+
         if (!serverTtsEnabled) {
           speakWithBrowserTTS(text);
           return;
@@ -2295,6 +2325,10 @@
           if (String(error.message) === "GATE_REQUIRED") return;
           console.error("OpenAI TTS error:", error);
           setListenButtonPlaying(false);
+          if (String(error.message) === "TTS_DISABLED") {
+            serverTtsEnabled = false;
+          }
+          setStatus(t("ttsOpenAiFallback"));
           speakWithBrowserTTS(text);
         } finally {
           setButtonLoading(

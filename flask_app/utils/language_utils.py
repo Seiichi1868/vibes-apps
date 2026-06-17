@@ -61,7 +61,10 @@ def normalize_enabled_languages(raw) -> list[str]:
 
 
 def set_enabled_study_languages(languages: list[str]) -> list[str]:
-    state.ENABLED_STUDY_LANGUAGES = normalize_enabled_languages(languages)
+    from flask_app.services.runtime_settings import update_runtime_settings
+
+    normalized = normalize_enabled_languages(languages)
+    update_runtime_settings(enabled_study_languages=normalized)
     return get_enabled_study_languages()
 
 
@@ -104,7 +107,10 @@ def get_ai_mode() -> str:
 
 
 def set_ai_mode(mode: str) -> str:
-    state.AI_MODE = normalize_ai_mode(mode)
+    from flask_app.services.runtime_settings import update_runtime_settings
+
+    normalized = normalize_ai_mode(mode)
+    update_runtime_settings(ai_mode=normalized)
     return state.AI_MODE
 
 
@@ -137,7 +143,10 @@ def get_default_ui_language() -> str:
 
 
 def set_default_ui_language(raw) -> str:
-    state.DEFAULT_UI_LANGUAGE = normalize_ui_language(raw)
+    from flask_app.services.runtime_settings import update_runtime_settings
+
+    normalized = normalize_ui_language(raw)
+    update_runtime_settings(default_ui_language=normalized)
     return state.DEFAULT_UI_LANGUAGE
 
 
@@ -146,8 +155,10 @@ def is_tts_enabled() -> bool:
 
 
 def set_tts_enabled(enabled: bool) -> bool:
-    state.TTS_ENABLED = bool(enabled)
-    return state.TTS_ENABLED
+    from flask_app.services.runtime_settings import update_runtime_settings
+
+    saved = update_runtime_settings(tts_enabled=bool(enabled))
+    return bool(saved["tts_enabled"])
 
 
 def ocr_system_prompt(api_lang: str) -> str:

@@ -24,8 +24,10 @@ def is_gate_lock_enabled() -> bool:
 
 
 def set_gate_lock_enabled(enabled: bool) -> bool:
-    state.CLASS_CODE_LOCK_ENABLED = bool(enabled)
-    return state.CLASS_CODE_LOCK_ENABLED
+    from flask_app.services.runtime_settings import update_runtime_settings
+
+    saved = update_runtime_settings(gate_lock_enabled=bool(enabled))
+    return bool(saved["gate_lock_enabled"])
 
 
 def daily_class_code() -> str:

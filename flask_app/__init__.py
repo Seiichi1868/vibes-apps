@@ -26,6 +26,10 @@ def create_app(config_class=Config):
 
     cors.init_app(app)
 
+    from flask_app.services.runtime_settings import load_and_apply_runtime_settings
+
+    load_and_apply_runtime_settings()
+
     from flask_app.api import (
         admin_bp,
         gate_bp,
