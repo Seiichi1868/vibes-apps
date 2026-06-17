@@ -1878,7 +1878,9 @@
           return;
         }
         if (!isAdminMode() && isApiLimitReached()) {
-          hidePronunciationAdvice();
+          pronunciationAdviceBlock.classList.remove("hidden");
+          pronunciationAdviceBlock.classList.remove("is-loading");
+          pronunciationAdviceText.textContent = t("apiLimit");
           return;
         }
 
@@ -2208,7 +2210,9 @@
         };
 
         window.speechSynthesis.cancel();
-        window.speechSynthesis.resume();
+        if (window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+        }
         window.speechSynthesis.speak(utterance);
       }
 
