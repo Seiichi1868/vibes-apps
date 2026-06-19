@@ -356,6 +356,11 @@
           <span>生徒画面でタイマーを表示する</span>
         </label>
         <label class="flex shrink-0 items-center gap-2 cursor-pointer text-xs text-slate-700">
+          <input type="checkbox" id="require-student-info" class="h-4 w-4 rounded border-teal-200 text-teal-600"
+            {% if active_class and active_class.require_student_info %}checked{% endif %}>
+          <span>生徒画面で生徒情報の入力を求める</span>
+        </label>
+        <label class="flex shrink-0 items-center gap-2 cursor-pointer text-xs text-slate-700">
           <input type="checkbox" id="subtitles-enabled" class="h-4 w-4 rounded border-teal-200 text-teal-600"
             {% if current.subtitles_enabled %}checked{% endif %}>
           <span>YouTube字幕を表示する（動画側に字幕がある場合）</span>

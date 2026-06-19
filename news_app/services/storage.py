@@ -169,6 +169,7 @@ def _normalize_class(class_id: str, raw: dict) -> dict:
         "id": class_id,
         "name": str(raw.get("name") or class_id).strip() or class_id,
         "created_at": str(raw.get("created_at") or _now_iso()),
+        "require_student_info": bool(raw.get("require_student_info", False)),
         "current": _normalize_current(raw.get("current")),
         "archive": normalized_archive,
     }
@@ -345,13 +346,15 @@ def create_class(name: str) -> dict:
     return state["classes"][class_id]
 
 
-def update_class_current(class_id: str, current_data: dict) -> dict:
+def update_class_current(class_id: str, current_data: dict, *, require_student_info: bool | None = None) -> dict:
     state = load_state()
     if class_id not in state.get("classes", {}):
         raise ValueError("指定されたクラスが見つかりません。")
     state["classes"][class_id]["current"] = _normalize_current(
         {**state["classes"][class_id]["current"], **current_data}
     )
+    if require_student_info is not None:
+        state["classes"][class_id]["require_student_info"] = bool(require_student_info)
     save_state(state)
     return state["classes"][class_id]
 

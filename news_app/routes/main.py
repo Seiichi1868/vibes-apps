@@ -45,6 +45,7 @@ def _class_public_payload(class_id: str, origin: str) -> dict | None:
     return {
         "id": cls["id"],
         "name": cls["name"],
+        "require_student_info": bool(cls.get("require_student_info", False)),
         "video": {
             "video_id": video_id,
             "start_seconds": start_sec,

@@ -380,6 +380,9 @@
     pendingClassId = classId;
     pendingLessonClassName = "";
     studentHrClass = "";
+    studentNumber = "";
+    studentName = "";
+    if (studentDisplayName) studentDisplayName.textContent = "";
     if (studentInfoError) studentInfoError.classList.add("hidden");
     if (studentClassInput) studentClassInput.value = "";
     if (studentNumberInput) studentNumberInput.value = "";
@@ -387,22 +390,26 @@
     if (rosterSelectWrap) rosterSelectWrap.classList.add("hidden");
     if (rosterSelect) rosterSelect.innerHTML = '<option value="">— 名前を選択 —</option>';
 
+    let requireStudentInfo = false;
     try {
       const configRes = await fetch(`/news/api/config?class_id=${encodeURIComponent(classId)}`);
       const configData = await configRes.json();
       if (configData.ok && configData.class) {
         pendingLessonClassName = configData.class.name || "";
+        requireStudentInfo = configData.class.require_student_info === true;
         if (lessonClassDisplay) lessonClassDisplay.textContent = pendingLessonClassName;
       }
     } catch (_) {
       /* ignore */
     }
 
+    let hasRoster = false;
     try {
       const res = await fetch(`/news/admin/api/roster/${encodeURIComponent(classId)}`);
       const data = await res.json();
       const roster = data.students || [];
-      if (roster.length && rosterSelect && rosterSelectWrap) {
+      hasRoster = roster.length > 0;
+      if (hasRoster && rosterSelect && rosterSelectWrap) {
         roster.forEach((student) => {
           const opt = document.createElement("option");
           opt.value = JSON.stringify(student);
@@ -415,7 +422,17 @@
       if (rosterSelectWrap) rosterSelectWrap.classList.add("hidden");
     }
 
-    showStudentInfoOverlay();
+    if (requireStudentInfo || hasRoster) {
+      showStudentInfoOverlay();
+      return;
+    }
+
+    try {
+      await loadClassSession(classId);
+    } catch (err) {
+      appMain.classList.remove("hidden");
+      feedbackArea.textContent = err.message || "クラス設定の読み込みに失敗しました。";
+    }
   }
 
   async function loadClassSession(classId) {

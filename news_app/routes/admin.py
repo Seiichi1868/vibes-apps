@@ -216,6 +216,7 @@ def api_save_lesson():
         record_sec = max(0, int(data.get("record_timer_seconds") or 60))
         timers_visible = bool(data.get("timers_visible", True))
         subtitles_enabled = bool(data.get("subtitles_enabled", False))
+        require_student_info = bool(data.get("require_student_info", False))
 
         cls = update_class_current(
             class_id,
@@ -231,6 +232,7 @@ def api_save_lesson():
                 "timers_visible": timers_visible,
                 "subtitles_enabled": subtitles_enabled,
             },
+            require_student_info=require_student_info,
         )
         return jsonify(
             {

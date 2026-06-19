@@ -641,6 +641,8 @@
     document.getElementById("record-timer-seconds").value = c.record_timer_seconds ?? 60;
     document.getElementById("timers-visible").checked = c.timers_visible !== false;
     document.getElementById("subtitles-enabled").checked = c.subtitles_enabled === true;
+    const requireStudentInfoEl = document.getElementById("require-student-info");
+    if (requireStudentInfoEl) requireStudentInfoEl.checked = cls.require_student_info === true;
     scriptAutoManaged = false;
     suppressAutoScriptFill = false;
     if (lessonClassId) lessonClassId.value = cls.id;
@@ -906,6 +908,7 @@
         record_timer_seconds: parseTimerValue(document.getElementById("record-timer-seconds"), 60),
         timers_visible: document.getElementById("timers-visible").checked,
         subtitles_enabled: document.getElementById("subtitles-enabled").checked,
+        require_student_info: document.getElementById("require-student-info")?.checked ?? false,
       };
 
       try {
