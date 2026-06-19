@@ -1,0 +1,31 @@
+---
+description: vibes-apps プラットフォームの開発境界
+alwaysApply: true
+---
+
+# vibes-apps 開発ルール
+
+本リポジトリは複数アプリを1 Render サービスに統合したプラットフォーム。
+
+## アプリと編集範囲
+
+| アプリ | 触ってよいパス |
+|--------|----------------|
+| 音読 VibeSpeak | `flask_app/`, `templates/`（`news/` 除く）, `static/`（`news/` 除く） |
+| Vibe Speak News | `news_app/`, `templates/news/`, `static/news/` |
+
+## 禁止
+
+- `flask_app/` ↔ `news_app/` の相互 import
+- `shared/` フォルダの新設（完全独立方針）
+- 本番データ（`.env`, `data/` 内の実データ）のコミット
+
+## 横展開
+
+UI を全アプリに揃える場合は、ユーザーが明示したときのみ。各アプリの既存構造に合わせて当てはめる。
+
+## 本番
+
+- リポジトリ: `Seiichi1868/vibes-apps`
+- URL: https://vibes-app-auz1.onrender.com
+- N2 Quest は未完成のため統合しない（別フォルダで開発中）

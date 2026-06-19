@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: vibes-app
+    name: vibes-apps
     runtime: python
     plan: starter
     buildCommand: pip install -r requirements.txt
