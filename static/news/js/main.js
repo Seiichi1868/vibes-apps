@@ -188,7 +188,7 @@
       html += '<ol class="space-y-1 list-none">';
       visibleQuestions.forEach(function (q, i) {
         html += '<li class="flex items-start gap-1.5 text-[11px] text-slate-700">' +
-          '<span class="shrink-0 text-[10px] font-bold text-sky-600">Q' + (q.id || (i + 1)) + '.</span>' +
+          '<span class="shrink-0 text-[10px] font-bold text-sky-600">Q' + (i + 1) + '.</span>' +
           '<span class="leading-snug">' + escHtml(q.text) + '</span>' +
           '</li>';
       });

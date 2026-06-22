@@ -54,9 +54,12 @@ def _class_public_payload(class_id: str, origin: str) -> dict | None:
     raw_warmup_questions = current.get("warmup_questions") if isinstance(current.get("warmup_questions"), list) else []
     if warmup_scaffolding_enabled:
         warmup_questions = [
-            {"id": q["id"], "text": q["text"]}
-            for q in raw_warmup_questions
-            if isinstance(q, dict) and q.get("selected", True) and str(q.get("text") or "").strip()
+            {"id": i + 1, "text": str(q.get("text") or "").strip()}
+            for i, q in enumerate(
+                q
+                for q in raw_warmup_questions
+                if isinstance(q, dict) and q.get("selected", True) and str(q.get("text") or "").strip()
+            )
         ]
     else:
         warmup_questions = []
