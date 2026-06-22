@@ -1,7 +1,11 @@
 import json
 import re
+from typing import TypeVar
 
 from openai import OpenAI
+from pydantic import BaseModel
+
+T = TypeVar("T", bound=BaseModel)
 
 PREMIUM_MAX_COMPLETION_TOKENS = 4096
 PREMIUM_REASONING_EFFORT = "low"
@@ -83,3 +87,41 @@ def create_json_chat_completion(
             finish_reason = str(completion.choices[0].finish_reason or "")
         raise ValueError(f"AI からの応答が空でした (finish_reason={finish_reason or 'unknown'})")
     return parse_json_object(raw)
+
+
+def create_parsed_chat_completion(
+    client: OpenAI,
+    model: str,
+    messages: list,
+    response_model: type[T],
+    *,
+    temperature: float = 0.3,
+) -> T:
+    """Pydantic モデル指定の Structured Outputs（chat.completions.parse）。"""
+    kwargs: dict = {
+        "model": model,
+        "messages": messages,
+        "response_format": response_model,
+    }
+    if is_reasoning_chat_model(model):
+        kwargs["max_completion_tokens"] = PREMIUM_MAX_COMPLETION_TOKENS
+        effort = reasoning_effort_for_model(model)
+        if effort:
+            kwargs["reasoning_effort"] = effort
+    else:
+        kwargs["temperature"] = temperature
+
+    completion = client.chat.completions.parse(**kwargs)
+    if not completion.choices:
+        raise ValueError("AI からの応答がありませんでした。")
+
+    message = completion.choices[0].message
+    parsed = getattr(message, "parsed", None)
+    if parsed is None:
+        finish_reason = str(completion.choices[0].finish_reason or "unknown")
+        refusal = getattr(message, "refusal", None)
+        detail = f"finish_reason={finish_reason}"
+        if refusal:
+            detail = f"{detail}, refusal={refusal}"
+        raise ValueError(f"AI の構造化出力を解析できませんでした ({detail})")
+    return parsed

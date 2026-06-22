@@ -26,6 +26,8 @@ load_environment()
 DEFAULT_AI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 
 CEFR_LEVELS = ("A1", "A2", "B1", "B2")
+VOCAB_CEFR_LEVELS = ("C2", "C1", "B2", "B1")
+VOCABULARY_EXTRACTION_MODEL = "gpt-5.4-mini"
 DISPLAY_LANGUAGES = ("ja", "en")
 AI_MODELS = (
     "gpt-4o-mini",

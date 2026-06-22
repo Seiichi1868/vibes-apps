@@ -212,6 +212,8 @@
   window.INITIAL_CLASS_ID = "{{ initial_class_id }}";
   window.HAS_CLASSES = {{ 'true' if classes else 'false' }};
   window.CEFR_LEVELS = {{ cefr_levels|list|tojson }};
+  window.VOCABULARY_SCAFFOLDING_ENABLED = {{ 'true' if vocabulary_scaffolding_enabled else 'false' }};
+  window.INITIAL_VOCABULARY_DATA = {{ vocabulary_data|tojson }};
 </script>
 <script src="{{ url_for('static', filename='news/js/main.js') }}"></script>
 {% endblock %}

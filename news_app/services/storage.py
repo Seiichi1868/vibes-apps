@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 import openpyxl
 
-from news_app.config import CEFR_LEVELS, DATA_DIR, STATE_FILE
+from news_app.config import CEFR_LEVELS, DATA_DIR, STATE_FILE, VOCAB_CEFR_LEVELS
 
 _lock = threading.Lock()
 ROSTER_FILE = DATA_DIR / "roster.json"
@@ -45,6 +45,8 @@ DEFAULT_CLASS_CURRENT = {
     "record_timer_seconds": 60,
     "timers_visible": True,
     "subtitles_enabled": False,
+    "vocabulary_data": [],
+    "vocabulary_scaffolding_enabled": False,
 }
 
 DEFAULT_STATE = {
@@ -122,6 +124,34 @@ def _normalize_criteria(raw: dict | None) -> dict:
     return merged
 
 
+def _normalize_vocabulary_item(raw) -> dict | None:
+    if not isinstance(raw, dict):
+        return None
+    word = str(raw.get("word") or "").strip()
+    cefr = str(raw.get("cefr") or "").strip().upper()
+    part_of_speech = str(raw.get("part_of_speech") or "").strip()
+    meaning = str(raw.get("meaning") or "").strip()
+    if not word or not meaning or cefr not in VOCAB_CEFR_LEVELS:
+        return None
+    return {
+        "word": word,
+        "cefr": cefr,
+        "part_of_speech": part_of_speech,
+        "meaning": meaning,
+    }
+
+
+def _normalize_vocabulary_data(raw) -> list[dict]:
+    if not isinstance(raw, list):
+        return []
+    items: list[dict] = []
+    for entry in raw:
+        normalized = _normalize_vocabulary_item(entry)
+        if normalized:
+            items.append(normalized)
+    return items[:20]
+
+
 def _normalize_current(raw: dict | None) -> dict:
     current = deepcopy(DEFAULT_CLASS_CURRENT)
     if not isinstance(raw, dict):
@@ -138,6 +168,8 @@ def _normalize_current(raw: dict | None) -> dict:
             "record_timer_seconds": _coerce_nonnegative_int(raw.get("record_timer_seconds"), 60),
             "timers_visible": bool(raw.get("timers_visible", True)),
             "subtitles_enabled": bool(raw.get("subtitles_enabled", False)),
+            "vocabulary_data": _normalize_vocabulary_data(raw.get("vocabulary_data")),
+            "vocabulary_scaffolding_enabled": bool(raw.get("vocabulary_scaffolding_enabled", False)),
         }
     )
     return current
@@ -163,6 +195,8 @@ def _normalize_class(class_id: str, raw: dict) -> dict:
                 "record_timer_seconds": _coerce_nonnegative_int(item.get("record_timer_seconds"), 60),
                 "timers_visible": bool(item.get("timers_visible", True)),
                 "subtitles_enabled": bool(item.get("subtitles_enabled", False)),
+                "vocabulary_data": _normalize_vocabulary_data(item.get("vocabulary_data")),
+                "vocabulary_scaffolding_enabled": bool(item.get("vocabulary_scaffolding_enabled", False)),
             }
         )
     return {

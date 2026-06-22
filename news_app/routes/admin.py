@@ -7,6 +7,7 @@ from news_app.config import AI_MODELS, CEFR_LEVELS, DISPLAY_LANGUAGES, get_opena
 from news_app.services.cnn10 import fetch_cnn10_episodes
 from news_app.services.cnn10_highlight import find_title_segment_in_transcript
 from news_app.services.network import get_public_base_url
+from news_app.services.openai_vocab import extract_vocabulary_from_script
 from news_app.services.storage import (
     DEFAULT_EVALUATION_CRITERIA,
     archive_class_current,
@@ -217,21 +218,29 @@ def api_save_lesson():
         timers_visible = bool(data.get("timers_visible", True))
         subtitles_enabled = bool(data.get("subtitles_enabled", False))
         require_student_info = bool(data.get("require_student_info", False))
+        vocabulary_scaffolding_enabled = bool(data.get("vocabulary_scaffolding_enabled", False))
+
+        existing = (get_class(class_id) or {}).get("current") or {}
+        existing_script = str(existing.get("script") or "").strip()
+        lesson_payload: dict = {
+            "source_url": url,
+            "video_id": video_id,
+            "start_seconds": start_sec,
+            "end_seconds": end_sec,
+            "script": script,
+            "evaluation_criteria": criteria,
+            "prep_timer_seconds": prep_sec,
+            "record_timer_seconds": record_sec,
+            "timers_visible": timers_visible,
+            "subtitles_enabled": subtitles_enabled,
+            "vocabulary_scaffolding_enabled": vocabulary_scaffolding_enabled,
+        }
+        if existing_script and existing_script != script:
+            lesson_payload["vocabulary_data"] = []
 
         cls = update_class_current(
             class_id,
-            {
-                "source_url": url,
-                "video_id": video_id,
-                "start_seconds": start_sec,
-                "end_seconds": end_sec,
-                "script": script,
-                "evaluation_criteria": criteria,
-                "prep_timer_seconds": prep_sec,
-                "record_timer_seconds": record_sec,
-                "timers_visible": timers_visible,
-                "subtitles_enabled": subtitles_enabled,
-            },
+            lesson_payload,
             require_student_info=require_student_info,
         )
         return jsonify(
@@ -245,6 +254,83 @@ def api_save_lesson():
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:
         return jsonify({"ok": False, "error": f"保存に失敗しました: {exc}"}), 500
+
+
+@admin_bp.route("/api/class/lesson/vocabulary", methods=["POST"])
+def api_extract_lesson_vocabulary():
+    """英語スクリプトから語彙を AI 抽出し、授業レコードに保存する。"""
+    data = request.get_json(silent=True) or {}
+    class_id = str(data.get("class_id") or get_active_class_id()).strip()
+    if not class_id:
+        return jsonify({"ok": False, "error": "クラスを選択または作成してください。"}), 400
+
+    cls = get_class(class_id)
+    if not cls:
+        return jsonify({"ok": False, "error": "クラスが見つかりません。"}), 404
+
+    current = cls.get("current") or {}
+    script = str(data.get("script") or current.get("script") or "").strip()
+    if not script:
+        return jsonify({"ok": False, "error": "文字起こし（スクリプト）を入力してください。"}), 400
+
+    api_key = get_openai_api_key()
+    if not api_key:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "OpenAI API キーが未設定です。管理画面の設定からキーを保存してください。",
+            }
+        ), 400
+
+    try:
+        vocabulary_data = extract_vocabulary_from_script(script, api_key=api_key)
+        cls = update_class_current(
+            class_id,
+            {
+                "script": script,
+                "vocabulary_data": vocabulary_data,
+            },
+        )
+        return jsonify(
+            {
+                "ok": True,
+                "class": cls,
+                "vocabulary_data": vocabulary_data,
+                "message": f"語彙 {len(vocabulary_data)} 件を抽出して保存しました。",
+            }
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"語彙抽出に失敗しました: {exc}"}), 500
+
+
+@admin_bp.route("/api/class/lesson/vocabulary/toggle", methods=["POST"])
+def api_toggle_vocabulary_scaffolding():
+    """生徒画面への語彙補助表示の on/off を切り替える。"""
+    data = request.get_json(silent=True) or {}
+    class_id = str(data.get("class_id") or get_active_class_id()).strip()
+    if not class_id:
+        return jsonify({"ok": False, "error": "クラスを選択または作成してください。"}), 400
+
+    enabled = bool(data.get("vocabulary_scaffolding_enabled", False))
+    try:
+        cls = update_class_current(
+            class_id,
+            {"vocabulary_scaffolding_enabled": enabled},
+        )
+        return jsonify(
+            {
+                "ok": True,
+                "class": cls,
+                "vocabulary_scaffolding_enabled": enabled,
+                "message": "語彙補助を有効にしました。" if enabled else "語彙補助を無効にしました。",
+            }
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"設定の保存に失敗しました: {exc}"}), 500
 
 
 @admin_bp.route("/api/class/archive", methods=["POST"])

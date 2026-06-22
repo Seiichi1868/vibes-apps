@@ -30,6 +30,8 @@ def _class_public_payload(class_id: str, origin: str) -> dict | None:
     start_sec = int(current.get("start_seconds") or 0)
     end_sec = int(current.get("end_seconds") or 0)
     subtitles_enabled = bool(current.get("subtitles_enabled", False))
+    vocabulary_scaffolding_enabled = bool(current.get("vocabulary_scaffolding_enabled", False))
+    vocabulary_data = current.get("vocabulary_data") if isinstance(current.get("vocabulary_data"), list) else []
     embed_url = (
         build_youtube_embed_url(
             video_id,
@@ -60,6 +62,8 @@ def _class_public_payload(class_id: str, origin: str) -> dict | None:
             "record_seconds": int(current.get("record_timer_seconds") or 60),
             "visible": bool(current.get("timers_visible", True)),
         },
+        "vocabulary_scaffolding_enabled": vocabulary_scaffolding_enabled,
+        "vocabulary_data": vocabulary_data if vocabulary_scaffolding_enabled else [],
     }
 
 
@@ -71,6 +75,12 @@ def index():
         level = "B1"
     class_id = (request.args.get("class") or get_active_class_id()).strip()
     classes = list_classes()
+    cls = get_class(class_id) if class_id else None
+    current = (cls or {}).get("current") or {}
+    vocabulary_scaffolding_enabled = bool(current.get("vocabulary_scaffolding_enabled", False))
+    vocabulary_data = current.get("vocabulary_data") if isinstance(current.get("vocabulary_data"), list) else []
+    if not vocabulary_scaffolding_enabled:
+        vocabulary_data = []
 
     return render_template(
         "news/index.html",
@@ -80,6 +90,8 @@ def index():
         initial_class_id=class_id,
         classes=classes,
         page_origin=request.host_url.rstrip("/"),
+        vocabulary_scaffolding_enabled=vocabulary_scaffolding_enabled,
+        vocabulary_data=vocabulary_data,
     )
 
 
