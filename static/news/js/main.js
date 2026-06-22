@@ -44,7 +44,14 @@
   const vocabTableWrap = document.getElementById("vocab-table-wrap");
   const vocabAccordionLabel = document.getElementById("vocab-accordion-label");
 
+  const warmupAccordion = document.getElementById("warmup-accordion");
+  const warmupToggleBtn = document.getElementById("warmup-toggle-btn");
+  const warmupToggleLabel = document.getElementById("warmup-toggle-label");
+  const warmupBody = document.getElementById("warmup-body");
+  const warmupContentWrap = document.getElementById("warmup-content-wrap");
+
   let vocabOpen = false;
+  let warmupOpen = false;
 
   let selectedClassId = "";
   let prepSeconds = 60;
@@ -155,6 +162,57 @@
         vocabBody.style.maxHeight = "0";
         vocabBody.style.overflowY = "hidden";
         if (vocabToggleLabel) vocabToggleLabel.textContent = "開く ▼";
+      }
+    });
+  }
+
+  // ── 導入補助（Warmup Scaffolding） ───────────────────────────────
+
+  function renderWarmup(imageUrl, questions, enabled) {
+    if (!warmupAccordion) return;
+    var visibleQuestions = (questions || []).filter(function (q) {
+      return q && q.text;
+    });
+    if (!enabled || (!imageUrl && !visibleQuestions.length)) {
+      warmupAccordion.classList.add("hidden");
+      return;
+    }
+    if (!warmupContentWrap) return;
+    var html = "";
+    if (imageUrl) {
+      html += '<div class="mb-2"><img src="' + escHtml(imageUrl) + '" alt="Warmup illustration"' +
+        ' class="w-full max-h-40 rounded-lg object-contain border border-sky-100 bg-slate-50"></div>';
+    }
+    if (visibleQuestions.length) {
+      html += '<p class="mb-1 text-[10px] font-semibold text-sky-800">動画を見る前に考えてみよう：</p>';
+      html += '<ol class="space-y-1 list-none">';
+      visibleQuestions.forEach(function (q, i) {
+        html += '<li class="flex items-start gap-1.5 text-[11px] text-slate-700">' +
+          '<span class="shrink-0 text-[10px] font-bold text-sky-600">Q' + (q.id || (i + 1)) + '.</span>' +
+          '<span class="leading-snug">' + escHtml(q.text) + '</span>' +
+          '</li>';
+      });
+      html += '</ol>';
+    }
+    warmupContentWrap.innerHTML = html;
+    warmupAccordion.classList.remove("hidden");
+    warmupOpen = false;
+    if (warmupBody) warmupBody.style.maxHeight = "0";
+    if (warmupToggleLabel) warmupToggleLabel.textContent = "開く ▼";
+  }
+
+  if (warmupToggleBtn) {
+    warmupToggleBtn.addEventListener("click", function () {
+      warmupOpen = !warmupOpen;
+      if (warmupOpen) {
+        var h = Math.min(warmupBody.scrollHeight, 320);
+        warmupBody.style.maxHeight = h + "px";
+        warmupBody.style.overflowY = warmupBody.scrollHeight > 320 ? "auto" : "hidden";
+        if (warmupToggleLabel) warmupToggleLabel.textContent = "閉じる ▲";
+      } else {
+        warmupBody.style.maxHeight = "0";
+        warmupBody.style.overflowY = "hidden";
+        if (warmupToggleLabel) warmupToggleLabel.textContent = "開く ▼";
       }
     });
   }
@@ -531,6 +589,11 @@
     renderVocabulary(
       cls.vocabulary_data || [],
       cls.vocabulary_scaffolding_enabled === true
+    );
+    renderWarmup(
+      cls.warmup_image_url || "",
+      cls.warmup_questions || [],
+      cls.warmup_scaffolding_enabled === true
     );
     setVideoPlayer(cls.video);
 

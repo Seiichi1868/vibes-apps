@@ -47,6 +47,9 @@ DEFAULT_CLASS_CURRENT = {
     "subtitles_enabled": False,
     "vocabulary_data": [],
     "vocabulary_scaffolding_enabled": False,
+    "warmup_image_url": "",
+    "warmup_questions": [],
+    "warmup_scaffolding_enabled": False,
 }
 
 DEFAULT_STATE = {
@@ -124,6 +127,30 @@ def _normalize_criteria(raw: dict | None) -> dict:
     return merged
 
 
+def _normalize_warmup_questions(raw) -> list[dict]:
+    if not isinstance(raw, list):
+        return []
+    items: list[dict] = []
+    for i, entry in enumerate(raw):
+        if not isinstance(entry, dict):
+            continue
+        text = str(entry.get("text") or "").strip()
+        if not text:
+            continue
+        q_id = entry.get("id")
+        try:
+            q_id = int(q_id) if q_id is not None else i + 1
+        except (TypeError, ValueError):
+            q_id = i + 1
+        selected_raw = entry.get("selected", True)
+        if isinstance(selected_raw, str):
+            selected = selected_raw.strip().lower() not in {"false", "0", "no", "off"}
+        else:
+            selected = bool(selected_raw)
+        items.append({"id": q_id, "text": text, "selected": selected})
+    return items
+
+
 def _normalize_vocabulary_item(raw) -> dict | None:
     if not isinstance(raw, dict):
         return None
@@ -195,6 +222,9 @@ def _normalize_current(raw: dict | None) -> dict:
             "subtitles_enabled": bool(raw.get("subtitles_enabled", False)),
             "vocabulary_data": _normalize_vocabulary_data(raw.get("vocabulary_data")),
             "vocabulary_scaffolding_enabled": bool(raw.get("vocabulary_scaffolding_enabled", False)),
+            "warmup_image_url": str(raw.get("warmup_image_url") or "").strip(),
+            "warmup_questions": _normalize_warmup_questions(raw.get("warmup_questions")),
+            "warmup_scaffolding_enabled": bool(raw.get("warmup_scaffolding_enabled", False)),
         }
     )
     return current
@@ -222,6 +252,9 @@ def _normalize_class(class_id: str, raw: dict) -> dict:
                 "subtitles_enabled": bool(item.get("subtitles_enabled", False)),
                 "vocabulary_data": _normalize_vocabulary_data(item.get("vocabulary_data")),
                 "vocabulary_scaffolding_enabled": bool(item.get("vocabulary_scaffolding_enabled", False)),
+                "warmup_image_url": str(item.get("warmup_image_url") or "").strip(),
+                "warmup_questions": _normalize_warmup_questions(item.get("warmup_questions")),
+                "warmup_scaffolding_enabled": bool(item.get("warmup_scaffolding_enabled", False)),
             }
         )
     return {

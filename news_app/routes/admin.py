@@ -8,6 +8,7 @@ from news_app.services.cnn10 import fetch_cnn10_episodes
 from news_app.services.cnn10_highlight import find_title_segment_in_transcript
 from news_app.services.network import get_public_base_url
 from news_app.services.openai_vocab import extract_vocabulary_from_script
+from news_app.services.openai_warmup import extract_warmup_from_script
 from news_app.services.storage import (
     DEFAULT_EVALUATION_CRITERIA,
     archive_class_current,
@@ -33,6 +34,7 @@ from news_app.services.storage import (
     update_class_current,
     update_settings,
     _normalize_vocabulary_data,
+    _normalize_warmup_questions,
 )
 from news_app.services.youtube import extract_video_id, fetch_youtube_title, parse_time_to_seconds, seconds_to_display
 
@@ -359,6 +361,117 @@ def api_toggle_vocabulary_scaffolding():
                 "class": cls,
                 "vocabulary_scaffolding_enabled": enabled,
                 "message": "語彙補助を有効にしました。" if enabled else "語彙補助を無効にしました。",
+            }
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"設定の保存に失敗しました: {exc}"}), 500
+
+
+@admin_bp.route("/api/class/lesson/warmup", methods=["POST"])
+def api_generate_warmup():
+    """スクリプトからウォームアップ画像と質問5問を生成してレコードに保存する。"""
+    data = request.get_json(silent=True) or {}
+    class_id = str(data.get("class_id") or get_active_class_id()).strip()
+    if not class_id:
+        return jsonify({"ok": False, "error": "クラスを選択または作成してください。"}), 400
+
+    cls = get_class(class_id)
+    if not cls:
+        return jsonify({"ok": False, "error": "クラスが見つかりません。"}), 404
+
+    current = cls.get("current") or {}
+    script = str(data.get("script") or current.get("script") or "").strip()
+    if not script:
+        return jsonify({"ok": False, "error": "文字起こし（スクリプト）を入力してください。"}), 400
+
+    api_key = get_openai_api_key()
+    if not api_key:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "OpenAI API キーが未設定です。管理画面の設定からキーを保存してください。",
+            }
+        ), 400
+
+    try:
+        result = extract_warmup_from_script(script, api_key=api_key)
+        cls = update_class_current(
+            class_id,
+            {
+                "warmup_image_url": result["image_url"],
+                "warmup_questions": result["questions"],
+            },
+        )
+        return jsonify(
+            {
+                "ok": True,
+                "class": cls,
+                "warmup_image_url": result["image_url"],
+                "warmup_questions": result["questions"],
+                "message": f"ウォームアップ画像と質問 {len(result['questions'])} 問を生成しました。",
+            }
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"ウォームアップの生成に失敗しました: {exc}"}), 500
+
+
+@admin_bp.route("/api/class/lesson/warmup/selection", methods=["POST"])
+def api_update_warmup_selection():
+    """ウォームアップ質問の表示/非表示（選択状態）を保存する。"""
+    data = request.get_json(silent=True) or {}
+    class_id = str(data.get("class_id") or get_active_class_id()).strip()
+    if not class_id:
+        return jsonify({"ok": False, "error": "クラスを選択または作成してください。"}), 400
+
+    raw_questions = data.get("warmup_questions")
+    if not isinstance(raw_questions, list):
+        return jsonify({"ok": False, "error": "質問データが不正です。"}), 400
+
+    if not get_class(class_id):
+        return jsonify({"ok": False, "error": "クラスが見つかりません。"}), 404
+
+    warmup_questions = _normalize_warmup_questions(raw_questions)
+    try:
+        cls = update_class_current(class_id, {"warmup_questions": warmup_questions})
+        selected_count = sum(1 for q in warmup_questions if q.get("selected", True))
+        return jsonify(
+            {
+                "ok": True,
+                "class": cls,
+                "warmup_questions": warmup_questions,
+                "message": f"質問の表示設定を保存しました（表示 {selected_count} / {len(warmup_questions)} 問）。",
+            }
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"保存に失敗しました: {exc}"}), 500
+
+
+@admin_bp.route("/api/class/lesson/warmup/toggle", methods=["POST"])
+def api_toggle_warmup_scaffolding():
+    """生徒画面へのウォームアップ表示の on/off を切り替える。"""
+    data = request.get_json(silent=True) or {}
+    class_id = str(data.get("class_id") or get_active_class_id()).strip()
+    if not class_id:
+        return jsonify({"ok": False, "error": "クラスを選択または作成してください。"}), 400
+
+    enabled = bool(data.get("warmup_scaffolding_enabled", False))
+    try:
+        cls = update_class_current(
+            class_id,
+            {"warmup_scaffolding_enabled": enabled},
+        )
+        return jsonify(
+            {
+                "ok": True,
+                "class": cls,
+                "warmup_scaffolding_enabled": enabled,
+                "message": "導入補助を有効にしました。" if enabled else "導入補助を無効にしました。",
             }
         )
     except ValueError as exc:

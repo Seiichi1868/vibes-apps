@@ -147,6 +147,27 @@
         <h2 class="text-xs font-semibold uppercase tracking-wider text-teal-700/80">News Clip</h2>
       </div>
 
+      <!-- 導入補助アコーディオン（warmup_scaffolding_enabled が true のとき表示） -->
+      <div id="warmup-accordion" class="mb-1 shrink-0 hidden">
+        <button type="button" id="warmup-toggle-btn"
+          class="flex w-full items-center justify-between rounded-lg border border-sky-200/70 bg-sky-50/80 px-2.5 py-1.5 text-left transition-colors hover:bg-sky-50">
+          <span class="text-[11px] font-semibold text-sky-900">
+            🎨 動画を見る前に考えよう
+          </span>
+          <span id="warmup-toggle-label"
+            class="ml-2 shrink-0 text-[10px] font-semibold text-sky-700 transition-transform duration-200">
+            開く ▼
+          </span>
+        </button>
+        <div id="warmup-body"
+          class="overflow-hidden transition-[max-height] duration-300 ease-in-out"
+          style="max-height:0;overflow:hidden;">
+          <div class="overflow-x-auto rounded-b-lg border-x border-b border-sky-100/80 bg-white/70 p-2">
+            <div id="warmup-content-wrap"></div>
+          </div>
+        </div>
+      </div>
+
       <!-- 語彙補助アコーディオン（vocabulary_scaffolding_enabled が true のとき表示） -->
       <div id="vocab-accordion" class="mb-1 shrink-0 hidden">
         <button type="button" id="vocab-toggle-btn"
@@ -237,6 +258,9 @@
   window.CEFR_LEVELS = {{ cefr_levels|list|tojson }};
   window.VOCABULARY_SCAFFOLDING_ENABLED = {{ 'true' if vocabulary_scaffolding_enabled else 'false' }};
   window.INITIAL_VOCABULARY_DATA = {{ vocabulary_data|tojson }};
+  window.WARMUP_SCAFFOLDING_ENABLED = false;
+  window.INITIAL_WARMUP_IMAGE_URL = "";
+  window.INITIAL_WARMUP_QUESTIONS = [];
 </script>
 <script src="{{ url_for('static', filename='news/js/main.js') }}"></script>
 {% endblock %}

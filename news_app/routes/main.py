@@ -49,6 +49,19 @@ def _class_public_payload(class_id: str, origin: str) -> dict | None:
         else ""
     )
 
+    warmup_scaffolding_enabled = bool(current.get("warmup_scaffolding_enabled", False))
+    warmup_image_url = str(current.get("warmup_image_url") or "").strip()
+    raw_warmup_questions = current.get("warmup_questions") if isinstance(current.get("warmup_questions"), list) else []
+    if warmup_scaffolding_enabled:
+        warmup_questions = [
+            {"id": q["id"], "text": q["text"]}
+            for q in raw_warmup_questions
+            if isinstance(q, dict) and q.get("selected", True) and str(q.get("text") or "").strip()
+        ]
+    else:
+        warmup_questions = []
+        warmup_image_url = ""
+
     return {
         "id": cls["id"],
         "name": cls["name"],
@@ -69,6 +82,9 @@ def _class_public_payload(class_id: str, origin: str) -> dict | None:
         },
         "vocabulary_scaffolding_enabled": vocabulary_scaffolding_enabled,
         "vocabulary_data": vocabulary_data,
+        "warmup_scaffolding_enabled": warmup_scaffolding_enabled,
+        "warmup_image_url": warmup_image_url,
+        "warmup_questions": warmup_questions,
     }
 
 
