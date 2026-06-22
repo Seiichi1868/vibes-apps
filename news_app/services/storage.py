@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 import openpyxl
 
-from news_app.config import CEFR_LEVELS, DATA_DIR, STATE_FILE, VOCAB_CEFR_LEVELS
+from news_app.config import CEFR_LEVELS, DATA_DIR, STATE_FILE, VOCAB_CEFR_LEVELS, VOCAB_EXTRACTION_MAX
 
 _lock = threading.Lock()
 ROSTER_FILE = DATA_DIR / "roster.json"
@@ -133,11 +133,17 @@ def _normalize_vocabulary_item(raw) -> dict | None:
     meaning = str(raw.get("meaning") or "").strip()
     if not word or not meaning or cefr not in VOCAB_CEFR_LEVELS:
         return None
+    selected_raw = raw.get("selected", True)
+    if isinstance(selected_raw, str):
+        selected = selected_raw.strip().lower() not in {"false", "0", "no", "off"}
+    else:
+        selected = bool(selected_raw)
     return {
         "word": word,
         "cefr": cefr,
         "part_of_speech": part_of_speech,
         "meaning": meaning,
+        "selected": selected,
     }
 
 
@@ -149,7 +155,26 @@ def _normalize_vocabulary_data(raw) -> list[dict]:
         normalized = _normalize_vocabulary_item(entry)
         if normalized:
             items.append(normalized)
-    return items[:20]
+    return items[:VOCAB_EXTRACTION_MAX]
+
+
+def vocabulary_for_student(items: list[dict] | None) -> list[dict]:
+    """生徒画面向けに、選択済み語彙のみを返す。"""
+    if not isinstance(items, list):
+        return []
+    visible: list[dict] = []
+    for item in items:
+        if not isinstance(item, dict) or not item.get("selected", True):
+            continue
+        visible.append(
+            {
+                "word": str(item.get("word") or "").strip(),
+                "cefr": str(item.get("cefr") or "").strip(),
+                "part_of_speech": str(item.get("part_of_speech") or "").strip(),
+                "meaning": str(item.get("meaning") or "").strip(),
+            }
+        )
+    return [entry for entry in visible if entry["word"] and entry["meaning"]]
 
 
 def _normalize_current(raw: dict | None) -> dict:

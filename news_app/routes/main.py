@@ -10,6 +10,7 @@ from news_app.services.storage import (
     list_classes,
     load_state,
     save_submission,
+    vocabulary_for_student,
 )
 from news_app.services.youtube import build_youtube_embed_url
 
@@ -32,6 +33,10 @@ def _class_public_payload(class_id: str, origin: str) -> dict | None:
     subtitles_enabled = bool(current.get("subtitles_enabled", False))
     vocabulary_scaffolding_enabled = bool(current.get("vocabulary_scaffolding_enabled", False))
     vocabulary_data = current.get("vocabulary_data") if isinstance(current.get("vocabulary_data"), list) else []
+    if vocabulary_scaffolding_enabled:
+        vocabulary_data = vocabulary_for_student(vocabulary_data)
+    else:
+        vocabulary_data = []
     embed_url = (
         build_youtube_embed_url(
             video_id,
@@ -63,7 +68,7 @@ def _class_public_payload(class_id: str, origin: str) -> dict | None:
             "visible": bool(current.get("timers_visible", True)),
         },
         "vocabulary_scaffolding_enabled": vocabulary_scaffolding_enabled,
-        "vocabulary_data": vocabulary_data if vocabulary_scaffolding_enabled else [],
+        "vocabulary_data": vocabulary_data,
     }
 
 
@@ -81,6 +86,8 @@ def index():
     vocabulary_data = current.get("vocabulary_data") if isinstance(current.get("vocabulary_data"), list) else []
     if not vocabulary_scaffolding_enabled:
         vocabulary_data = []
+    else:
+        vocabulary_data = vocabulary_for_student(vocabulary_data)
 
     return render_template(
         "news/index.html",

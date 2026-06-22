@@ -32,6 +32,7 @@ from news_app.services.storage import (
     set_active_class,
     update_class_current,
     update_settings,
+    _normalize_vocabulary_data,
 )
 from news_app.services.youtube import extract_video_id, fetch_youtube_title, parse_time_to_seconds, seconds_to_display
 
@@ -303,6 +304,39 @@ def api_extract_lesson_vocabulary():
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:
         return jsonify({"ok": False, "error": f"語彙抽出に失敗しました: {exc}"}), 500
+
+
+@admin_bp.route("/api/class/lesson/vocabulary/selection", methods=["POST"])
+def api_update_lesson_vocabulary_selection():
+    """抽出語彙の表示/非表示（チェック状態）を保存する。"""
+    data = request.get_json(silent=True) or {}
+    class_id = str(data.get("class_id") or get_active_class_id()).strip()
+    if not class_id:
+        return jsonify({"ok": False, "error": "クラスを選択または作成してください。"}), 400
+
+    raw_items = data.get("vocabulary_data")
+    if not isinstance(raw_items, list):
+        return jsonify({"ok": False, "error": "語彙データが不正です。"}), 400
+
+    if not get_class(class_id):
+        return jsonify({"ok": False, "error": "クラスが見つかりません。"}), 404
+
+    vocabulary_data = _normalize_vocabulary_data(raw_items)
+    try:
+        cls = update_class_current(class_id, {"vocabulary_data": vocabulary_data})
+        selected_count = sum(1 for item in vocabulary_data if item.get("selected", True))
+        return jsonify(
+            {
+                "ok": True,
+                "class": cls,
+                "vocabulary_data": vocabulary_data,
+                "message": f"語彙の表示設定を保存しました（表示 {selected_count} / {len(vocabulary_data)} 語）。",
+            }
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"保存に失敗しました: {exc}"}), 500
 
 
 @admin_bp.route("/api/class/lesson/vocabulary/toggle", methods=["POST"])

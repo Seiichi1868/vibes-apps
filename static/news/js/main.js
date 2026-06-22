@@ -93,7 +93,10 @@
 
   function renderVocabTable(items) {
     if (!vocabTableWrap) return;
-    if (!items || !items.length) {
+    items = (items || []).filter(function (item) {
+      return item && item.selected !== false;
+    });
+    if (!items.length) {
       vocabTableWrap.innerHTML =
         '<p class="py-1 text-[10px] text-slate-400">語彙データがありません。</p>';
       return;
@@ -121,14 +124,17 @@
 
   function renderVocabulary(items, enabled) {
     if (!vocabAccordion) return;
-    if (!enabled || !items || !items.length) {
+    const visibleItems = (items || []).filter(function (item) {
+      return item && item.selected !== false;
+    });
+    if (!enabled || !visibleItems.length) {
       vocabAccordion.classList.add("hidden");
       return;
     }
-    renderVocabTable(items);
+    renderVocabTable(visibleItems);
     if (vocabAccordionLabel) {
       vocabAccordionLabel.textContent =
-        "動画を見る前に：重要ボキャブラリーをチェック（" + items.length + "語）";
+        "動画を見る前に：重要ボキャブラリーをチェック（" + visibleItems.length + "語）";
     }
     vocabAccordion.classList.remove("hidden");
     // 毎回クラス切り替え時は折りたたんだ状態にリセット

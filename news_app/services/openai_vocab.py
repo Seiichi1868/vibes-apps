@@ -7,7 +7,7 @@ from typing import Literal
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
-from news_app.config import VOCABULARY_EXTRACTION_MODEL, VOCAB_CEFR_LEVELS
+from news_app.config import VOCABULARY_EXTRACTION_MODEL, VOCAB_CEFR_LEVELS, VOCAB_EXTRACTION_MAX
 from news_app.services.openai_utils import create_parsed_chat_completion
 
 VOCAB_CEFR_ORDER = {level: index for index, level in enumerate(VOCAB_CEFR_LEVELS)}
@@ -22,9 +22,9 @@ class VocabularyItem(BaseModel):
 
 class VocabularyExtractionResult(BaseModel):
     vocabulary: list[VocabularyItem] = Field(
-        description="難しい順（C2→C1→B2→B1）に並べた重要語彙（最大20語）",
+        description=f"難しい順（C2→C1→B2→B1）に並べた重要語彙（最大{VOCAB_EXTRACTION_MAX}語）",
         min_length=1,
-        max_length=20,
+        max_length=VOCAB_EXTRACTION_MAX,
     )
 
 
@@ -40,7 +40,7 @@ _SYSTEM_PROMPT = """\
 あなたは、日本の高校生（主に英検準2級〜2級程度、CEFR A2〜B1レベル）を指導する \
 優秀な英語教師であり、言語学のエキスパートです。
 与えられた英語のニューススクリプトから、生徒が動画を視聴する前の足場かけ \
-（Scaffolding）として最適な、難易度の高い重要語句（単語・熟語）を【最大20語】 \
+（Scaffolding）として最適な、難易度の高い重要語句（単語・熟語）を【最大30語】 \
 厳選し、CEFRレベルの高い順（C2 → C1 → B2 → B1）にソートしてJSON形式で出力してください。
 
 ==== RULE 1 — 厳格な抽出・除外ルール（最重要） ====
@@ -138,7 +138,7 @@ opposition parties in Brussels."
 """
 
 _USER_PROMPT_TEMPLATE = """\
-以下の英語ニューススクリプトから、最大20語の重要語彙を抽出してください。
+以下の英語ニューススクリプトから、最大30語の重要語彙を抽出してください。
 
 抽出対象は B1, B2, C1, C2 レベルのみ。A1/A2 レベルの語は含めないこと。
 固有名詞・現代略語・基本語の単純派生形はシステムプロンプトのルールに従い除外すること。
@@ -178,6 +178,7 @@ def _items_to_dicts(items: list[VocabularyItem]) -> list[dict]:
             "cefr": item.cefr,
             "part_of_speech": item.part_of_speech.strip(),
             "meaning": item.meaning.strip(),
+            "selected": True,
         }
         for item in items
         if item.word.strip() and item.meaning.strip()
@@ -190,7 +191,7 @@ def extract_vocabulary_from_script(
     api_key: str,
     model: str = VOCABULARY_EXTRACTION_MODEL,
 ) -> list[dict]:
-    """英語スクリプトから語彙リスト（最大20件）を抽出する。"""
+    """英語スクリプトから語彙リスト（最大30件）を抽出する。"""
     script = str(script or "").strip()
     if not script:
         raise ValueError("スクリプトが空です。語彙を抽出するには英語スクリプトが必要です。")
@@ -216,4 +217,4 @@ def extract_vocabulary_from_script(
     items = _items_to_dicts(sorted_items)
     if not items:
         raise ValueError("AI が有効な語彙を返しませんでした。スクリプトを確認して再試行してください。")
-    return items[:20]
+    return items[:VOCAB_EXTRACTION_MAX]

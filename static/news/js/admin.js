@@ -52,6 +52,8 @@
   const vocabExtractBtn = document.getElementById("vocab-extract-btn");
   const vocabExtractStatus = document.getElementById("vocab-extract-status");
   const vocabPreview = document.getElementById("vocab-preview");
+  let adminVocabItems = [];
+  let vocabSelectionSaving = false;
   let adminClasses = window.ADMIN_CLASSES || [];
   let adminSettingsPasswordValue = "";
   let latestSubmissions = [];
@@ -1446,25 +1448,99 @@
 
   // ── 語彙補助（Scaffolding）──────────────────────────────────────
 
+  function countSelectedVocab(items) {
+    return (items || []).filter((item) => item.selected !== false).length;
+  }
+
   function renderAdminVocabPreview(items) {
     if (!vocabPreview) return;
-    if (!items || !items.length) {
+    adminVocabItems = (items || []).map((item) => ({
+      word: item.word || "",
+      cefr: item.cefr || "",
+      part_of_speech: item.part_of_speech || "",
+      meaning: item.meaning || "",
+      selected: item.selected !== false,
+    }));
+    if (!adminVocabItems.length) {
       vocabPreview.classList.add("hidden");
       return;
     }
-    let html = `<p class="mb-1.5 font-semibold text-slate-600">抽出語彙プレビュー（${items.length}語）</p>`;
+    const selectedCount = countSelectedVocab(adminVocabItems);
+    let html = `<p class="mb-1.5 font-semibold text-slate-600">抽出語彙プレビュー（表示 ${selectedCount} / ${adminVocabItems.length} 語）</p>`;
+    html += `<p class="mb-1 text-[9px] text-slate-500">チェックを外した語は生徒画面に表示されません。</p>`;
     html += `<div class="space-y-px">`;
-    items.forEach((item, i) => {
+    adminVocabItems.forEach((item, i) => {
       const rowBg = i % 2 === 0 ? "bg-white/70" : "";
-      html += `<div class="flex items-start gap-2 rounded px-1.5 py-1 ${rowBg}">
+      const dimClass = item.selected ? "" : " opacity-50";
+      html += `<label class="flex items-start gap-2 rounded px-1.5 py-1 ${rowBg}${dimClass} cursor-pointer">
+        <input type="checkbox" class="vocab-select-cb shrink-0 mt-0.5 h-3.5 w-3.5 rounded border-violet-200 text-violet-600"
+          data-index="${i}" ${item.selected ? "checked" : ""}>
         <span class="shrink-0 w-28 font-semibold text-slate-800 leading-snug">${esc(item.word)}</span>
         <span class="shrink-0 w-12 text-slate-400 leading-snug">${esc(item.part_of_speech)}</span>
         <span class="text-slate-600 leading-snug">${esc(item.meaning)}</span>
-      </div>`;
+      </label>`;
     });
     html += `</div>`;
     vocabPreview.innerHTML = html;
     vocabPreview.classList.remove("hidden");
+
+    vocabPreview.querySelectorAll(".vocab-select-cb").forEach((cb) => {
+      cb.addEventListener("change", onVocabSelectionChange);
+    });
+  }
+
+  async function saveVocabSelection(options) {
+    const silent = options && options.silent;
+    const classId = getSelectedClassId() || (lessonClassId && lessonClassId.value);
+    if (!classId || !adminVocabItems.length) return true;
+
+    vocabSelectionSaving = true;
+    try {
+      const res = await fetch("/news/admin/api/class/lesson/vocabulary/selection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ class_id: classId, vocabulary_data: adminVocabItems }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "保存に失敗しました");
+      adminVocabItems = (data.vocabulary_data || adminVocabItems).map((item) => ({
+        word: item.word || "",
+        cefr: item.cefr || "",
+        part_of_speech: item.part_of_speech || "",
+        meaning: item.meaning || "",
+        selected: item.selected !== false,
+      }));
+      renderAdminVocabPreview(adminVocabItems);
+      if (!silent) {
+        showMessage(lessonMessage, data.message || "語彙の表示設定を保存しました。", false);
+      }
+      return true;
+    } catch (err) {
+      if (!silent) showMessage(lessonMessage, err.message, true);
+      return false;
+    } finally {
+      vocabSelectionSaving = false;
+    }
+  }
+
+  async function onVocabSelectionChange(event) {
+    if (vocabSelectionSaving) {
+      event.target.checked = !event.target.checked;
+      return;
+    }
+    const index = Number(event.target.dataset.index);
+    if (!Number.isInteger(index) || !adminVocabItems[index]) return;
+
+    const previous = adminVocabItems[index].selected;
+    adminVocabItems[index].selected = event.target.checked;
+    renderAdminVocabPreview(adminVocabItems);
+
+    const ok = await saveVocabSelection({ silent: true });
+    if (!ok) {
+      adminVocabItems[index].selected = previous;
+      renderAdminVocabPreview(adminVocabItems);
+      showMessage(lessonMessage, "語彙の表示設定の保存に失敗しました。", true);
+    }
   }
 
   if (vocabScaffoldingEnabledEl) {
