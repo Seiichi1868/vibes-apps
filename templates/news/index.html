@@ -200,22 +200,27 @@
     </section>
 
     <section class="glass flex min-h-0 flex-col gap-1 rounded-xl p-1.5 shadow-lg sm:col-start-1 sm:row-start-2">
-      <div id="timers-row" class="grid shrink-0 grid-cols-2 gap-1 sm:grid-cols-4">
-        <div id="prep-timer-wrap" class="glass-inset rounded-lg px-1 py-0.5 text-center">
-          <p class="text-[9px] font-medium uppercase tracking-wide text-slate-500 leading-none">準備</p>
-          <p id="prep-timer" class="text-base font-bold tabular-nums leading-none text-sky-600">01:00</p>
-          <button type="button" id="prep-start-btn" class="text-[9px] font-medium leading-none text-teal-600 hover:text-teal-800">開始</button>
+      <div id="timers-row" class="flex shrink-0 flex-wrap items-stretch gap-1 sm:flex-nowrap">
+        <div id="prep-timer-wrap" class="glass-inset flex min-w-[calc(50%-2px)] flex-1 items-center gap-1 rounded-lg px-1 py-0.5 sm:min-w-0">
+          <div class="min-w-0 flex-1 text-center leading-none">
+            <p class="text-[9px] font-medium uppercase tracking-wide text-slate-500">準備</p>
+            <p id="prep-timer" class="text-base font-bold tabular-nums leading-none text-sky-600">01:00</p>
+          </div>
+          <button type="button" id="prep-start-btn"
+            class="shrink-0 rounded-lg bg-gradient-to-r from-sky-600 to-teal-600 px-2 py-1 text-[11px] font-semibold text-white shadow-sm transition hover:from-sky-500 hover:to-teal-500 disabled:cursor-not-allowed disabled:opacity-40">
+            準備開始
+          </button>
         </div>
-        <div id="record-timer-wrap" class="glass-inset rounded-lg px-1 py-0.5 text-center">
-          <p class="text-[9px] font-medium uppercase tracking-wide text-slate-500 leading-none">録音</p>
+        <div id="record-timer-wrap" class="glass-inset min-w-[calc(50%-2px)] flex-1 rounded-lg px-1 py-0.5 text-center leading-none sm:min-w-0">
+          <p class="text-[9px] font-medium uppercase tracking-wide text-slate-500">録音</p>
           <p id="record-timer" class="text-base font-bold tabular-nums leading-none text-emerald-600">01:00</p>
         </div>
-        <div class="glass-inset flex flex-col items-center justify-center rounded-lg px-1 py-0 text-center leading-none">
+        <div class="glass-inset flex min-w-[calc(50%-2px)] flex-col items-center justify-center rounded-lg px-2 py-0 text-center leading-none sm:min-w-0 sm:flex-none">
           <p class="text-[9px] font-medium text-slate-500">レベル</p>
           <p id="level-display" class="text-xs font-semibold text-slate-800">{{ initial_level }}</p>
           <input type="hidden" id="level-select" value="{{ initial_level }}">
         </div>
-        <div class="flex flex-col justify-center gap-0">
+        <div class="flex min-w-[calc(50%-2px)] flex-1 flex-col justify-center gap-0 sm:min-w-0">
           <button type="button" id="record-btn"
             class="w-full rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 px-2 py-1 text-[11px] font-semibold text-white shadow-sm hover:from-teal-500 hover:to-emerald-500 transition">
             録音開始

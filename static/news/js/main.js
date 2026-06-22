@@ -24,7 +24,6 @@
   const recordTimerEl = document.getElementById("record-timer");
   const prepTimerWrap = document.getElementById("prep-timer-wrap");
   const recordTimerWrap = document.getElementById("record-timer-wrap");
-  const timersRow = document.getElementById("timers-row");
   const prepStartBtn = document.getElementById("prep-start-btn");
   const recordBtn = document.getElementById("record-btn");
   const recordStatus = document.getElementById("record-status");
@@ -255,17 +254,12 @@
     recordRemaining = recordSeconds;
     updatePrepDisplay();
     updateRecordDisplay();
-    if (prepStartBtn) prepStartBtn.textContent = prepSeconds > 0 ? "開始" : "準備なし";
+    if (prepStartBtn) prepStartBtn.textContent = prepSeconds > 0 ? "準備開始" : "準備なし";
 
     const visible = timers.visible !== false;
     const showPrepTimer = visible && prepSeconds > 0;
     if (prepTimerWrap) prepTimerWrap.classList.toggle("hidden", !showPrepTimer);
     if (recordTimerWrap) recordTimerWrap.classList.toggle("hidden", !visible);
-    if (prepStartBtn) prepStartBtn.classList.toggle("hidden", !showPrepTimer);
-    if (timersRow) {
-      timersRow.classList.toggle("sm:grid-cols-4", visible);
-      timersRow.classList.toggle("sm:grid-cols-2", !visible);
-    }
   }
 
   function buildPlayerVars(start, end, subtitlesEnabled) {
@@ -689,7 +683,7 @@
     clearInterval(prepInterval);
     if (prepStartBtn) {
       prepStartBtn.disabled = false;
-      prepStartBtn.textContent = prepSeconds > 0 ? "開始" : "準備なし";
+      prepStartBtn.textContent = prepSeconds > 0 ? "準備開始" : "準備なし";
     }
     if (!recognition) recognition = initSpeechRecognition();
     if (!recognition) return;
