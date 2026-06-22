@@ -1446,13 +1446,6 @@
 
   // ── 語彙補助（Scaffolding）──────────────────────────────────────
 
-  const VOCAB_ADMIN_COLORS = {
-    C2: "bg-purple-50 text-purple-800",
-    C1: "bg-red-50 text-red-700",
-    B2: "bg-orange-50 text-orange-700",
-    B1: "bg-sky-50 text-sky-700",
-  };
-
   function renderAdminVocabPreview(items) {
     if (!vocabPreview) return;
     if (!items || !items.length) {
@@ -1462,11 +1455,9 @@
     let html = `<p class="mb-1.5 font-semibold text-slate-600">抽出語彙プレビュー（${items.length}語）</p>`;
     html += `<div class="space-y-px">`;
     items.forEach((item, i) => {
-      const colorClass = VOCAB_ADMIN_COLORS[item.cefr] || "bg-slate-50 text-slate-700";
       const rowBg = i % 2 === 0 ? "bg-white/70" : "";
       html += `<div class="flex items-start gap-2 rounded px-1.5 py-1 ${rowBg}">
         <span class="shrink-0 w-28 font-semibold text-slate-800 leading-snug">${esc(item.word)}</span>
-        <span class="shrink-0 rounded px-1 py-0.5 text-[9px] font-bold leading-none ${colorClass}">${esc(item.cefr)}</span>
         <span class="shrink-0 w-12 text-slate-400 leading-snug">${esc(item.part_of_speech)}</span>
         <span class="text-slate-600 leading-snug">${esc(item.meaning)}</span>
       </div>`;

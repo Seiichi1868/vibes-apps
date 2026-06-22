@@ -102,19 +102,14 @@
       '<table class="w-full border-collapse text-[10px]">' +
       '<thead><tr class="border-b border-teal-100 text-[9px] uppercase tracking-wide text-slate-400">' +
       '<th class="pb-1 pr-3 text-left font-medium">単語・熟語</th>' +
-      '<th class="pb-1 pr-2 text-left font-medium w-10">CEFR</th>' +
       '<th class="pb-1 pr-3 text-left font-medium hidden sm:table-cell">品詞</th>' +
       '<th class="pb-1 text-left font-medium">意味（文脈）</th>' +
       '</tr></thead><tbody>';
     items.forEach(function (item) {
-      var badgeCls = "vocab-badge-" + (item.cefr || "B1");
       html +=
         '<tr class="border-b border-slate-50 hover:bg-amber-50/40 transition-colors">' +
         '<td class="py-1 pr-3 font-semibold text-slate-800 whitespace-nowrap leading-snug">' +
         escHtml(item.word) + "</td>" +
-        '<td class="py-1 pr-2">' +
-        '<span class="inline-flex items-center rounded px-1 py-0.5 text-[9px] font-bold leading-none ' +
-        badgeCls + '">' + escHtml(item.cefr) + "</span></td>" +
         '<td class="py-1 pr-3 text-slate-400 leading-snug hidden sm:table-cell">' +
         escHtml(item.part_of_speech) + "</td>" +
         '<td class="py-1 text-slate-700 leading-relaxed">' + escHtml(item.meaning) + "</td>" +
