@@ -1,4 +1,4 @@
-"""英語スクリプトから CEFR A2〜C2 の重要語彙を抽出する。"""
+"""英語スクリプトから CEFR B1〜C2 の重要語彙を抽出する。"""
 
 from __future__ import annotations
 
@@ -15,14 +15,14 @@ VOCAB_CEFR_ORDER = {level: index for index, level in enumerate(VOCAB_CEFR_LEVELS
 
 class VocabularyItem(BaseModel):
     word: str = Field(description="単語または熟語")
-    cefr: Literal["A2", "B1", "B2", "C1", "C2"] = Field(description="CEFR 難易度レベル")
+    cefr: Literal["B1", "B2", "C1", "C2"] = Field(description="CEFR 難易度レベル")
     part_of_speech: str = Field(description="品詞（名詞、動詞、形容詞、副詞、熟語 など）")
     meaning: str = Field(description="スクリプト内の文脈に合致した日本語の意味")
 
 
 class VocabularyExtractionResult(BaseModel):
     vocabulary: list[VocabularyItem] = Field(
-        description="難しい順（C2→C1→B2→B1→A2）に並べた重要語彙（最大20語）",
+        description="難しい順（C2→C1→B2→B1）に並べた重要語彙（最大20語）",
         min_length=1,
         max_length=20,
     )
@@ -31,7 +31,7 @@ class VocabularyExtractionResult(BaseModel):
 # ────────────────────────────────────────────────────────────────
 # プロンプト設計のポイント:
 #   - 各 CEFR レベルに具体的な代表語例を示し、モデルの誤分類を抑制する
-#   - A1 相当の極めて基本的な語は除外し、A2 は B1 以上が 20 語に満たない場合のみ補完
+#   - A1/A2 相当の語は除外し、B1〜C2 のみを抽出する
 # ────────────────────────────────────────────────────────────────
 
 _SYSTEM_PROMPT = """\
@@ -39,29 +39,30 @@ You are a precise English vocabulary classifier. Your job: extract important \
 vocabulary from a news script and assign ACCURATE CEFR levels based on the \
 calibrated benchmarks below.
 
-==== STEP 1 — EXCLUDE these A1 words (most frequent ~1,000 words) ====
-Never assign B1+ to any of these or similarly common words:
-wear, get, go, come, make, say, know, see, think, look, want, give, use, find, \
-tell, feel, try, leave, call, work, need, ask, show, keep, turn, start, play, \
-move, live, hold, bring, happen, write, sit, stand, lose, pay, meet, continue, \
-set, learn, change, lead, understand, watch, follow, stop, speak, read, spend, \
-grow, open, walk, win, offer, remember, love, consider, appear, buy, wait, \
-build, stay, fall, cut, reach, remain, raise, pass, sell, decide, pull, break, \
-eat, face, run, take, have, be, do, put, talk, help, big, small, new, old, \
-good, bad, long, short, first, last, right, high, low, early, next, free, \
-full, young, large, great, little, few, other, same, such, own, even, back, \
-also, just, well, still, only, now, then, here, way, year, time, day, week, \
-man, woman, child, thing, world, government, country, company, school, group, \
-number, people, place, problem, part, side, case, point, area, end, fact, \
-question, example, home, water, family, name, hand, head, line, state, story
+==== STEP 1 — EXCLUDE A1 and A2 words (do NOT include these) ====
+Never include words at A1 or A2 level. Do NOT assign B1+ to common basic words.
 
-==== STEP 2 — CALIBRATED CEFR benchmarks (use as reference) ====
+A1 examples (exclude): wear, get, go, come, make, say, know, see, think, look, \
+want, give, use, find, tell, feel, try, leave, call, work, need, ask, show, keep, \
+turn, start, play, move, live, hold, bring, happen, write, sit, stand, lose, pay, \
+meet, continue, set, learn, change, lead, understand, watch, follow, stop, speak, \
+read, spend, grow, open, walk, win, offer, remember, love, consider, appear, buy, \
+wait, build, stay, fall, cut, reach, remain, raise, pass, sell, decide, pull, \
+break, eat, face, run, take, have, be, do, put, talk, help, big, small, new, old, \
+good, bad, long, short, first, last, right, high, low, early, next, free, full, \
+young, large, great, little, few, other, same, such, own, even, back, also, just, \
+well, still, only, now, then, here, way, year, time, day, week, man, woman, child, \
+thing, world, government, country, company, school, group, number, people, place, \
+problem, part, side, case, point, area, end, fact, question, example, home, water, \
+family, name, hand, head, line, state, story
 
-A2 — slightly above beginner; include ONLY to reach 20 words when B1+ words are scarce:
-  prepare, describe, compare, develop, achieve, improve, various, recent, local, \
-  similar, serious, major, announce, attack, protect, release, affect, reduce, \
-  increase, support, suggest, require, provide, report, national, international, \
-  political, official, military, available, public, entire, further, central
+A2 examples (also exclude — too easy for this list): prepare, describe, compare, \
+develop, achieve, improve, various, recent, local, similar, serious, major, \
+announce, attack, protect, release, affect, reduce, increase, support, suggest, \
+require, provide, report, national, international, political, official, military, \
+available, public, entire, further, central, important, different, special, common
+
+==== STEP 2 — CALIBRATED CEFR benchmarks (B1 through C2 ONLY) ====
 
 B1 — intermediate; challenging for Japanese Eiken Pre-2 students:
   despite, policy, demonstrate, significant, contribute, establish, indicate, \
@@ -93,20 +94,21 @@ C2 — mastery; near-native academic or literary vocabulary:
   impecunious, opprobrious
 
 ==== STEP 3 — Additional rules ====
+- Include ONLY words/phrases at B1, B2, C1, or C2. Never A1 or A2.
+- Prefer harder vocabulary: collocations, phrasal verbs, idiomatic expressions, AWL words.
 - Exclude proper nouns (place names, person names, organizations, brand names).
 - Exclude extremely niche technical jargon unlikely in academic or exam contexts.
-- Prioritize AWL (Academic Word List) words, useful collocations, and phrasal verbs.
 - Japanese meanings MUST reflect the word's meaning in THIS script's context.
-- If fewer than 20 words qualify at B1+, add A2 words to reach up to 20.
-- Sort output hardest-first: C2 → C1 → B2 → B1 → A2.
+- Return up to 20 items; fewer is fine if the script lacks enough B1+ vocabulary.
+- Sort output hardest-first: C2 → C1 → B2 → B1.
 - Return exactly the structured JSON format requested.\
 """
 
 _USER_PROMPT_TEMPLATE = """\
 Extract up to 20 important vocabulary items from the news script below.
-Follow the CEFR calibration benchmarks in the system prompt exactly — do NOT \
-assign B1 or higher to common A1 words like "wear", "get", "face", "reach", \
-"lead", "report", "major", etc.
+Include ONLY B1, B2, C1, or C2 level words, phrases, and expressions.
+Do NOT include A1 or A2 words (e.g. wear, get, prepare, describe, report, major).
+Follow the CEFR calibration benchmarks in the system prompt exactly.
 
 --- English script ---
 {script}
@@ -114,11 +116,11 @@ assign B1 or higher to common A1 words like "wear", "get", "face", "reach", \
 
 Return a JSON object with a `vocabulary` array. Each item must include:
 - "word": the word or phrase (lowercase, base form preferred)
-- "cefr": one of A2, B1, B2, C1, C2
+- "cefr": one of B1, B2, C1, C2 only
 - "part_of_speech": part of speech in Japanese (名詞、動詞、形容詞、副詞、熟語 など)
 - "meaning": Japanese meaning that fits THIS script's context
 
-Sort by difficulty descending (C2 → C1 → B2 → B1 → A2).\
+Sort by difficulty descending (C2 → C1 → B2 → B1).\
 """
 
 

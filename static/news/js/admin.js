@@ -1451,7 +1451,6 @@
     C1: "bg-red-50 text-red-700",
     B2: "bg-orange-50 text-orange-700",
     B1: "bg-sky-50 text-sky-700",
-    A2: "bg-green-50 text-green-700",
   };
 
   function renderAdminVocabPreview(items) {
