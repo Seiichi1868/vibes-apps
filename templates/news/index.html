@@ -141,7 +141,7 @@
     </div>
   </header>
 
-  <main class="mx-auto grid w-full max-w-6xl flex-1 min-h-0 grid-cols-1 grid-rows-[auto_auto_1fr] gap-2 p-2 sm:grid-cols-2 sm:grid-rows-2 sm:gap-3 sm:p-3">
+  <main class="mx-auto grid w-full max-w-6xl flex-1 min-h-0 grid-cols-1 grid-rows-[auto_auto_1fr] gap-2 p-2 sm:grid-cols-2 sm:grid-rows-[minmax(0,1.55fr)_minmax(0,0.85fr)] sm:gap-3 sm:p-3">
     <section class="glass flex min-h-0 flex-col overflow-hidden rounded-xl p-2 shadow-lg sm:col-start-1 sm:row-start-1">
       <div class="mb-1 flex shrink-0 items-center justify-between">
         <h2 class="text-xs font-semibold uppercase tracking-wider text-teal-700/80">News Clip</h2>
@@ -199,40 +199,40 @@
       </div>
     </section>
 
-    <section class="glass flex min-h-0 flex-col gap-1.5 rounded-xl p-2 shadow-lg sm:col-start-1 sm:row-start-2">
-      <div id="timers-row" class="grid shrink-0 grid-cols-2 gap-1.5 sm:grid-cols-4">
-        <div id="prep-timer-wrap" class="glass-inset rounded-lg px-1.5 py-1 text-center">
-          <p class="text-[10px] font-medium uppercase tracking-wide text-slate-500">準備</p>
-          <p id="prep-timer" class="text-lg font-bold tabular-nums leading-tight text-sky-600">01:00</p>
-          <button type="button" id="prep-start-btn" class="text-[10px] font-medium text-teal-600 hover:text-teal-800">開始</button>
+    <section class="glass flex min-h-0 flex-col gap-1 rounded-xl p-1.5 shadow-lg sm:col-start-1 sm:row-start-2">
+      <div id="timers-row" class="grid shrink-0 grid-cols-2 gap-1 sm:grid-cols-4">
+        <div id="prep-timer-wrap" class="glass-inset rounded-lg px-1 py-0.5 text-center">
+          <p class="text-[9px] font-medium uppercase tracking-wide text-slate-500 leading-none">準備</p>
+          <p id="prep-timer" class="text-base font-bold tabular-nums leading-none text-sky-600">01:00</p>
+          <button type="button" id="prep-start-btn" class="text-[9px] font-medium leading-none text-teal-600 hover:text-teal-800">開始</button>
         </div>
-        <div id="record-timer-wrap" class="glass-inset rounded-lg px-1.5 py-1 text-center">
-          <p class="text-[10px] font-medium uppercase tracking-wide text-slate-500">録音</p>
-          <p id="record-timer" class="text-lg font-bold tabular-nums leading-tight text-emerald-600">01:00</p>
+        <div id="record-timer-wrap" class="glass-inset rounded-lg px-1 py-0.5 text-center">
+          <p class="text-[9px] font-medium uppercase tracking-wide text-slate-500 leading-none">録音</p>
+          <p id="record-timer" class="text-base font-bold tabular-nums leading-none text-emerald-600">01:00</p>
         </div>
-        <div class="glass-inset flex flex-col items-center justify-center rounded-lg px-1 py-0.5 text-center leading-none">
-          <p class="text-[10px] font-medium text-slate-500">レベル</p>
-          <p id="level-display" class="text-sm font-semibold text-slate-800">{{ initial_level }}</p>
+        <div class="glass-inset flex flex-col items-center justify-center rounded-lg px-1 py-0 text-center leading-none">
+          <p class="text-[9px] font-medium text-slate-500">レベル</p>
+          <p id="level-display" class="text-xs font-semibold text-slate-800">{{ initial_level }}</p>
           <input type="hidden" id="level-select" value="{{ initial_level }}">
         </div>
-        <div class="flex flex-col justify-center gap-0.5">
+        <div class="flex flex-col justify-center gap-0">
           <button type="button" id="record-btn"
-            class="w-full rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 px-2 py-1.5 text-xs font-semibold text-white shadow-sm hover:from-teal-500 hover:to-emerald-500 transition">
+            class="w-full rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 px-2 py-1 text-[11px] font-semibold text-white shadow-sm hover:from-teal-500 hover:to-emerald-500 transition">
             録音開始
           </button>
-          <span id="record-status" class="text-center text-[10px] text-slate-500">待機中</span>
+          <span id="record-status" class="text-center text-[9px] leading-tight text-slate-500">待機中</span>
         </div>
       </div>
 
       <div class="flex min-h-0 flex-1 flex-col">
-        <label class="mb-0.5 shrink-0 block text-[10px] font-medium text-slate-600">要約スピーチ（英語）</label>
+        <label class="mb-0 shrink-0 block text-[9px] font-medium text-slate-600">要約スピーチ（英語）</label>
         <textarea id="transcript-area"
-          class="min-h-0 flex-1 w-full resize-none rounded-lg border border-teal-100 bg-white/60 px-2 py-1.5 text-xs leading-relaxed text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-300 shadow-inner"
+          class="min-h-0 flex-1 w-full resize-none rounded-lg border border-teal-100 bg-white/60 px-2 py-1 text-xs leading-snug text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-300 shadow-inner"
           placeholder="録音または貼り付け…"></textarea>
       </div>
 
       <button type="button" id="submit-btn"
-        class="shrink-0 w-full rounded-lg bg-gradient-to-r from-sky-600 to-blue-600 py-1.5 text-sm font-semibold text-white shadow-sm hover:from-sky-500 hover:to-blue-500 transition disabled:cursor-not-allowed disabled:opacity-40"
+        class="shrink-0 w-full rounded-lg bg-gradient-to-r from-sky-600 to-blue-600 py-1 text-xs font-semibold text-white shadow-sm hover:from-sky-500 hover:to-blue-500 transition disabled:cursor-not-allowed disabled:opacity-40"
         disabled>
         要約を AI に提出
       </button>
