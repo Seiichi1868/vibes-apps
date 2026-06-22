@@ -1,10 +1,14 @@
 """スクリプトから導入用イラスト画像プロンプトと質問5問を生成するサービス。"""
 from __future__ import annotations
 
-from openai import OpenAI
+import logging
+
+from openai import OpenAI, BadRequestError
 from pydantic import BaseModel, Field
 
 from news_app.services.openai_utils import create_parsed_chat_completion
+
+logger = logging.getLogger(__name__)
 
 WARMUP_MODEL = "gpt-5.4-mini"
 
@@ -61,6 +65,50 @@ Please analyze the following English news script and produce:
 """
 
 
+def _generate_image(client: OpenAI, prompt: str) -> str:
+    """
+    DALL-E 3 で画像を生成し URL を返す。
+    モデル不在・アカウント制限エラーの場合は DALL-E 2 でフォールバック再試行する。
+    """
+    try:
+        response = client.images.generate(
+            model="dall-e-3",
+            prompt=prompt,
+            size="1024x1024",
+            quality="standard",
+            n=1,
+        )
+        return response.data[0].url
+    except BadRequestError as exc:
+        logger.error(
+            "dall-e-3 でエラー（BadRequestError）が発生しました。"
+            " dall-e-2 へフォールバックします。OpenAI エラー: %s",
+            exc,
+        )
+    except Exception as exc:
+        logger.error(
+            "dall-e-3 で予期しないエラーが発生しました。"
+            " dall-e-2 へフォールバックします。OpenAI エラー: %s",
+            exc,
+        )
+
+    # フォールバック: dall-e-2
+    try:
+        response = client.images.generate(
+            model="dall-e-2",
+            prompt=prompt[:1000],  # dall-e-2 はプロンプト上限 1000 文字
+            size="512x512",
+            n=1,
+        )
+        logger.info("dall-e-2 フォールバック成功。")
+        return response.data[0].url
+    except Exception as exc:
+        logger.error("dall-e-2 フォールバックも失敗しました。OpenAI エラー: %s", exc)
+        raise ValueError(
+            f"画像生成に失敗しました（dall-e-3 / dall-e-2 どちらも利用できません）: {exc}"
+        ) from exc
+
+
 def extract_warmup_from_script(
     script: str,
     *,
@@ -99,14 +147,7 @@ def extract_warmup_from_script(
         temperature=0.7,
     )
 
-    image_response = client.images.generate(
-        model="dall-e-3",
-        prompt=extraction.image_prompt,
-        size="1024x1024",
-        quality="standard",
-        n=1,
-    )
-    image_url = image_response.data[0].url
+    image_url = _generate_image(client, extraction.image_prompt)
 
     questions = [
         {"id": i + 1, "text": q.strip(), "selected": True}
