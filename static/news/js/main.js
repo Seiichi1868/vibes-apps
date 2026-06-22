@@ -37,6 +37,15 @@
   const youtubePlayer = document.getElementById("youtube-player");
   const videoPlaceholder = document.getElementById("video-placeholder");
 
+  const vocabAccordion = document.getElementById("vocab-accordion");
+  const vocabToggleBtn = document.getElementById("vocab-toggle-btn");
+  const vocabToggleLabel = document.getElementById("vocab-toggle-label");
+  const vocabBody = document.getElementById("vocab-body");
+  const vocabTableWrap = document.getElementById("vocab-table-wrap");
+  const vocabAccordionLabel = document.getElementById("vocab-accordion-label");
+
+  let vocabOpen = false;
+
   let selectedClassId = "";
   let prepSeconds = 60;
   let recordSeconds = 60;
@@ -79,6 +88,77 @@
   function escHtml(str) {
     return String(str || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
+
+  // ── 語彙補助アコーディオン ────────────────────────────────────
+
+  function renderVocabTable(items) {
+    if (!vocabTableWrap) return;
+    if (!items || !items.length) {
+      vocabTableWrap.innerHTML =
+        '<p class="py-1 text-[10px] text-slate-400">語彙データがありません。</p>';
+      return;
+    }
+    let html =
+      '<table class="w-full border-collapse text-[10px]">' +
+      '<thead><tr class="border-b border-teal-100 text-[9px] uppercase tracking-wide text-slate-400">' +
+      '<th class="pb-1 pr-3 text-left font-medium">単語・熟語</th>' +
+      '<th class="pb-1 pr-2 text-left font-medium w-10">CEFR</th>' +
+      '<th class="pb-1 pr-3 text-left font-medium hidden sm:table-cell">品詞</th>' +
+      '<th class="pb-1 text-left font-medium">意味（文脈）</th>' +
+      '</tr></thead><tbody>';
+    items.forEach(function (item) {
+      var badgeCls = "vocab-badge-" + (item.cefr || "B1");
+      html +=
+        '<tr class="border-b border-slate-50 hover:bg-amber-50/40 transition-colors">' +
+        '<td class="py-1 pr-3 font-semibold text-slate-800 whitespace-nowrap leading-snug">' +
+        escHtml(item.word) + "</td>" +
+        '<td class="py-1 pr-2">' +
+        '<span class="inline-flex items-center rounded px-1 py-0.5 text-[9px] font-bold leading-none ' +
+        badgeCls + '">' + escHtml(item.cefr) + "</span></td>" +
+        '<td class="py-1 pr-3 text-slate-400 leading-snug hidden sm:table-cell">' +
+        escHtml(item.part_of_speech) + "</td>" +
+        '<td class="py-1 text-slate-700 leading-relaxed">' + escHtml(item.meaning) + "</td>" +
+        "</tr>";
+    });
+    html += "</tbody></table>";
+    vocabTableWrap.innerHTML = html;
+  }
+
+  function renderVocabulary(items, enabled) {
+    if (!vocabAccordion) return;
+    if (!enabled || !items || !items.length) {
+      vocabAccordion.classList.add("hidden");
+      return;
+    }
+    renderVocabTable(items);
+    if (vocabAccordionLabel) {
+      vocabAccordionLabel.textContent =
+        "動画を見る前に：重要ボキャブラリーをチェック（" + items.length + "語）";
+    }
+    vocabAccordion.classList.remove("hidden");
+    // 毎回クラス切り替え時は折りたたんだ状態にリセット
+    vocabOpen = false;
+    if (vocabBody) vocabBody.style.maxHeight = "0";
+    if (vocabToggleLabel) vocabToggleLabel.textContent = "開く ▼";
+  }
+
+  if (vocabToggleBtn) {
+    vocabToggleBtn.addEventListener("click", function () {
+      vocabOpen = !vocabOpen;
+      if (vocabOpen) {
+        var h = Math.min(vocabBody.scrollHeight, 220);
+        vocabBody.style.maxHeight = h + "px";
+        vocabBody.style.overflowY = vocabBody.scrollHeight > 220 ? "auto" : "hidden";
+        if (vocabToggleLabel) vocabToggleLabel.textContent = "閉じる ▲";
+      } else {
+        vocabBody.style.maxHeight = "0";
+        vocabBody.style.overflowY = "hidden";
+        if (vocabToggleLabel) vocabToggleLabel.textContent = "開く ▼";
+      }
+    });
+  }
+
+  // ──────────────────────────────────────────────────────────────
 
   function renderFeedback(text) {
     const html = escHtml(text)
@@ -447,6 +527,10 @@
     if (activeClassNameEl) activeClassNameEl.textContent = cls.name;
 
     applyTimerSettings(cls.timers || {});
+    renderVocabulary(
+      cls.vocabulary_data || [],
+      cls.vocabulary_scaffolding_enabled === true
+    );
     setVideoPlayer(cls.video);
 
     if (!cls.video.has_script) {

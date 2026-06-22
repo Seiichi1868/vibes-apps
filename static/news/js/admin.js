@@ -48,6 +48,10 @@
   const rosterFileInput = document.getElementById("roster-file-input");
   const rosterUploadBtn = document.getElementById("roster-upload-btn");
   const rosterMessage = document.getElementById("roster-message");
+  const vocabScaffoldingEnabledEl = document.getElementById("vocab-scaffolding-enabled");
+  const vocabExtractBtn = document.getElementById("vocab-extract-btn");
+  const vocabExtractStatus = document.getElementById("vocab-extract-status");
+  const vocabPreview = document.getElementById("vocab-preview");
   let adminClasses = window.ADMIN_CLASSES || [];
   let adminSettingsPasswordValue = "";
   let latestSubmissions = [];
@@ -643,6 +647,8 @@
     document.getElementById("subtitles-enabled").checked = c.subtitles_enabled === true;
     const requireStudentInfoEl = document.getElementById("require-student-info");
     if (requireStudentInfoEl) requireStudentInfoEl.checked = cls.require_student_info === true;
+    if (vocabScaffoldingEnabledEl) vocabScaffoldingEnabledEl.checked = c.vocabulary_scaffolding_enabled === true;
+    renderAdminVocabPreview(c.vocabulary_data || []);
     scriptAutoManaged = false;
     suppressAutoScriptFill = false;
     if (lessonClassId) lessonClassId.value = cls.id;
@@ -909,6 +915,7 @@
         timers_visible: document.getElementById("timers-visible").checked,
         subtitles_enabled: document.getElementById("subtitles-enabled").checked,
         require_student_info: document.getElementById("require-student-info")?.checked ?? false,
+        vocabulary_scaffolding_enabled: vocabScaffoldingEnabledEl?.checked ?? false,
       };
 
       try {
@@ -1433,6 +1440,107 @@
         showMessage(rosterMessage, `✓ ${data.count} 件の名簿を登録しました。`, false);
       } catch (err) {
         showMessage(rosterMessage, err.message, true);
+      }
+    });
+  }
+
+  // ── 語彙補助（Scaffolding）──────────────────────────────────────
+
+  const VOCAB_ADMIN_COLORS = {
+    C2: "bg-purple-50 text-purple-800",
+    C1: "bg-red-50 text-red-700",
+    B2: "bg-orange-50 text-orange-700",
+    B1: "bg-sky-50 text-sky-700",
+  };
+
+  function renderAdminVocabPreview(items) {
+    if (!vocabPreview) return;
+    if (!items || !items.length) {
+      vocabPreview.classList.add("hidden");
+      return;
+    }
+    let html = `<p class="mb-1.5 font-semibold text-slate-600">抽出語彙プレビュー（${items.length}語）</p>`;
+    html += `<div class="space-y-px">`;
+    items.forEach((item, i) => {
+      const colorClass = VOCAB_ADMIN_COLORS[item.cefr] || "bg-slate-50 text-slate-700";
+      const rowBg = i % 2 === 0 ? "bg-white/70" : "";
+      html += `<div class="flex items-start gap-2 rounded px-1.5 py-1 ${rowBg}">
+        <span class="shrink-0 w-28 font-semibold text-slate-800 leading-snug">${esc(item.word)}</span>
+        <span class="shrink-0 rounded px-1 py-0.5 text-[9px] font-bold leading-none ${colorClass}">${esc(item.cefr)}</span>
+        <span class="shrink-0 w-12 text-slate-400 leading-snug">${esc(item.part_of_speech)}</span>
+        <span class="text-slate-600 leading-snug">${esc(item.meaning)}</span>
+      </div>`;
+    });
+    html += `</div>`;
+    vocabPreview.innerHTML = html;
+    vocabPreview.classList.remove("hidden");
+  }
+
+  if (vocabScaffoldingEnabledEl) {
+    vocabScaffoldingEnabledEl.addEventListener("change", async () => {
+      const classId = getSelectedClassId() || (lessonClassId && lessonClassId.value);
+      if (!classId) {
+        showMessage(lessonMessage, "クラスを選択してから操作してください。", true);
+        vocabScaffoldingEnabledEl.checked = !vocabScaffoldingEnabledEl.checked;
+        return;
+      }
+      const enabled = vocabScaffoldingEnabledEl.checked;
+      try {
+        const res = await fetch("/news/admin/api/class/lesson/vocabulary/toggle", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ class_id: classId, vocabulary_scaffolding_enabled: enabled }),
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "保存に失敗しました");
+        showMessage(lessonMessage, data.message || "語彙補助の設定を保存しました。", false);
+      } catch (err) {
+        showMessage(lessonMessage, err.message, true);
+        vocabScaffoldingEnabledEl.checked = !enabled;
+      }
+    });
+  }
+
+  if (vocabExtractBtn) {
+    vocabExtractBtn.addEventListener("click", async () => {
+      const classId = getSelectedClassId() || (lessonClassId && lessonClassId.value);
+      if (!classId) {
+        showMessage(lessonMessage, "クラスを選択または作成してください。", true);
+        return;
+      }
+      const script = document.getElementById("lesson-script")?.value.trim() || "";
+      if (!script) {
+        showMessage(lessonMessage, "スクリプトを入力してから語彙を抽出してください。", true);
+        return;
+      }
+
+      vocabExtractBtn.disabled = true;
+      vocabExtractBtn.textContent = "抽出中…";
+      if (vocabExtractStatus) {
+        vocabExtractStatus.textContent = "AI が語彙を抽出中です（数秒かかります）…";
+        vocabExtractStatus.classList.remove("hidden");
+      }
+      if (vocabPreview) vocabPreview.classList.add("hidden");
+
+      try {
+        const res = await fetch("/news/admin/api/class/lesson/vocabulary", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ class_id: classId, script }),
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "語彙抽出に失敗しました");
+        renderAdminVocabPreview(data.vocabulary_data || []);
+        showMessage(lessonMessage, data.message || "語彙を抽出しました。", false);
+        if (vocabExtractStatus) vocabExtractStatus.classList.add("hidden");
+      } catch (err) {
+        showMessage(lessonMessage, err.message, true);
+        if (vocabExtractStatus) {
+          vocabExtractStatus.textContent = "⚠ 抽出に失敗しました。";
+        }
+      } finally {
+        vocabExtractBtn.disabled = false;
+        vocabExtractBtn.textContent = "✨ AI で語彙リストを自動抽出";
       }
     });
   }

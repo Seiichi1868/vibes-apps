@@ -366,6 +366,25 @@
           <span>YouTube字幕を表示する（動画側に字幕がある場合）</span>
         </label>
 
+        <!-- ── 語彙補助 (Scaffolding) ── -->
+        <div class="shrink-0 rounded-lg border border-violet-100/70 bg-violet-50/30 px-2.5 py-2 space-y-2">
+          <p class="text-[11px] font-semibold text-violet-800/80">💡 語彙補助（Scaffolding）</p>
+          <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-700">
+            <input type="checkbox" id="vocab-scaffolding-enabled"
+              class="h-4 w-4 rounded border-violet-200 text-violet-600"
+              {% if current.vocabulary_scaffolding_enabled %}checked{% endif %}>
+            <span>生徒画面に語彙リストを表示する</span>
+          </label>
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="button" id="vocab-extract-btn"
+              class="compact-btn border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 disabled:opacity-50">
+              ✨ AI で語彙リストを自動抽出
+            </button>
+            <span id="vocab-extract-status" class="hidden text-[10px] text-slate-500 italic"></span>
+          </div>
+          <div id="vocab-preview" class="hidden max-h-52 overflow-y-auto rounded-lg border border-slate-100 bg-white/80 p-2 text-[10px]"></div>
+        </div>
+
         <button type="submit" id="save-lesson-btn" class="compact-btn shrink-0 bg-emerald-600 hover:bg-emerald-500"
           {% if not active_class %}disabled{% endif %}>
           授業設定を保存
