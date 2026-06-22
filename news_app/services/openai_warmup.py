@@ -68,7 +68,9 @@ Please analyze the following English news script and produce:
 def _generate_image(client: OpenAI, prompt: str) -> str:
     """
     DALL-E 3 で画像を生成し URL を返す。
-    モデル不在・アカウント制限エラーの場合は DALL-E 2 でフォールバック再試行する。
+    - BadRequestError（モデル不在・アカウント制限）→ dall-e-2 でフォールバック
+    - dall-e-2 も失敗 → 空文字を返す（画像なしで質問のみ表示）
+    どちらの失敗も logger.error にOpenAI生エラーを記録する。
     """
     try:
         response = client.images.generate(
@@ -103,10 +105,12 @@ def _generate_image(client: OpenAI, prompt: str) -> str:
         logger.info("dall-e-2 フォールバック成功。")
         return response.data[0].url
     except Exception as exc:
-        logger.error("dall-e-2 フォールバックも失敗しました。OpenAI エラー: %s", exc)
-        raise ValueError(
-            f"画像生成に失敗しました（dall-e-3 / dall-e-2 どちらも利用できません）: {exc}"
-        ) from exc
+        logger.error(
+            "dall-e-2 フォールバックも失敗しました。画像なしで続行します。OpenAI エラー: %s",
+            exc,
+        )
+        # 画像生成が完全に使えなくてもアプリを止めない。質問のみ返す。
+        return ""
 
 
 def extract_warmup_from_script(

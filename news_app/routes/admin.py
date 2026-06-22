@@ -404,13 +404,22 @@ def api_generate_warmup():
                 "warmup_questions": result["questions"],
             },
         )
+        has_image = bool(result["image_url"])
+        q_count = len(result["questions"])
+        if has_image:
+            msg = f"イラストと質問 {q_count} 問を生成しました。"
+        else:
+            msg = (
+                f"質問 {q_count} 問を生成しました。"
+                "（イラスト生成はこのアカウントでは利用できないため省略されました）"
+            )
         return jsonify(
             {
                 "ok": True,
                 "class": cls,
                 "warmup_image_url": result["image_url"],
                 "warmup_questions": result["questions"],
-                "message": f"ウォームアップ画像と質問 {len(result['questions'])} 問を生成しました。",
+                "message": msg,
             }
         )
     except ValueError as exc:
