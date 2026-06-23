@@ -1657,7 +1657,7 @@
         }
       } finally {
         vocabExtractBtn.disabled = false;
-        vocabExtractBtn.textContent = "✨ AI で語彙リストを自動抽出";
+        vocabExtractBtn.textContent = "✨ AI抽出";
       }
     });
   }
@@ -1707,12 +1707,12 @@
     manualQuestions.forEach((q) => {
       const index = adminWarmupQuestions.indexOf(q);
       const dimClass = q.selected ? "" : " opacity-50";
-      html += `<label class="flex items-start gap-2 rounded px-1.5 py-1 bg-white/70${dimClass} cursor-pointer">
-        <input type="checkbox" class="warmup-manual-select-cb shrink-0 mt-1 h-3.5 w-3.5 rounded border-sky-200 text-sky-600"
+      html += `<label class="flex items-center gap-1 rounded px-1 py-0.5 bg-white/70${dimClass} cursor-pointer">
+        <input type="checkbox" class="warmup-manual-select-cb shrink-0 h-3.5 w-3.5 rounded border-sky-200 text-sky-600"
           data-index="${index}" ${q.selected ? "checked" : ""}>
-        <span class="shrink-0 mt-0.5 mr-1 text-sky-600 font-bold">Q${q.id}.</span>
-        <input type="text" class="warmup-manual-input compact-input flex-1 text-[10px]"
-          data-index="${index}" value="${esc(q.text)}" placeholder="質問を入力（英語）">
+        <span class="shrink-0 text-[9px] font-bold text-sky-600">Q${q.id}</span>
+        <input type="text" class="warmup-manual-input compact-input min-w-0 flex-1 text-[10px] py-0.5"
+          data-index="${index}" value="${esc(q.text)}" placeholder="質問（英語）">
       </label>`;
     });
     warmupManualRows.innerHTML = html;
@@ -1936,7 +1936,7 @@
         }
       } finally {
         warmupGenerateBtn.disabled = false;
-        warmupGenerateBtn.textContent = "🎨 AI でイラストと質問を自動生成";
+        warmupGenerateBtn.textContent = "🎨 AI生成";
       }
     });
   }
