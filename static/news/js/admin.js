@@ -52,13 +52,23 @@
   const vocabExtractBtn = document.getElementById("vocab-extract-btn");
   const vocabExtractStatus = document.getElementById("vocab-extract-status");
   const vocabPreview = document.getElementById("vocab-preview");
+  const vocabManualWord = document.getElementById("vocab-manual-word");
+  const vocabManualPos = document.getElementById("vocab-manual-pos");
+  const vocabManualMeaning = document.getElementById("vocab-manual-meaning");
+  const vocabManualCefr = document.getElementById("vocab-manual-cefr");
+  const vocabManualAddBtn = document.getElementById("vocab-manual-add-btn");
   let adminVocabItems = [];
   const warmupScaffoldingEnabledEl = document.getElementById("warmup-scaffolding-enabled");
   const warmupGenerateBtn = document.getElementById("warmup-generate-btn");
   const warmupGenerateStatus = document.getElementById("warmup-generate-status");
   const warmupPreview = document.getElementById("warmup-preview");
+  const warmupManualSection = document.getElementById("warmup-manual-section");
+  const warmupManualRows = document.getElementById("warmup-manual-rows");
+  const warmupAddQuestionBtn = document.getElementById("warmup-add-question-btn");
   let adminWarmupQuestions = [];
+  let adminWarmupImageUrl = "";
   let warmupSelectionSaving = false;
+  let warmupManualSaveTimer = null;
   let vocabSelectionSaving = false;
   let adminClasses = window.ADMIN_CLASSES || [];
   let adminSettingsPasswordValue = "";
@@ -1460,6 +1470,38 @@
     return (items || []).filter((item) => item.selected !== false).length;
   }
 
+  function nextWarmupQuestionId() {
+    const ids = adminWarmupQuestions.map((q) => Number(q.id)).filter((id) => Number.isFinite(id));
+    return ids.length ? Math.max(...ids) + 1 : 1;
+  }
+
+  function getManualWarmupQuestions() {
+    return adminWarmupQuestions.filter((q) => q.manual);
+  }
+
+  function getAiWarmupQuestions() {
+    return adminWarmupQuestions.filter((q) => !q.manual);
+  }
+
+  function ensureManualWarmupRow() {
+    if (!getManualWarmupQuestions().length) {
+      adminWarmupQuestions.push({
+        id: nextWarmupQuestionId(),
+        text: "",
+        selected: true,
+        manual: true,
+      });
+    }
+  }
+
+  function scheduleWarmupManualSave() {
+    if (warmupManualSaveTimer) clearTimeout(warmupManualSaveTimer);
+    warmupManualSaveTimer = setTimeout(() => {
+      warmupManualSaveTimer = null;
+      saveWarmupSelection({ silent: true });
+    }, 700);
+  }
+
   function renderAdminVocabPreview(items) {
     if (!vocabPreview) return;
     adminVocabItems = (items || []).map((item) => ({
@@ -1620,32 +1662,138 @@
     });
   }
 
+  if (vocabManualAddBtn) {
+    vocabManualAddBtn.addEventListener("click", async () => {
+      const word = vocabManualWord?.value.trim() || "";
+      const meaning = vocabManualMeaning?.value.trim() || "";
+      const partOfSpeech = vocabManualPos?.value.trim() || "";
+      const cefr = vocabManualCefr?.value || "B1";
+      if (!word) {
+        showMessage(lessonMessage, "単語を入力してください。", true);
+        vocabManualWord?.focus();
+        return;
+      }
+      if (!meaning) {
+        showMessage(lessonMessage, "意味を入力してください。", true);
+        vocabManualMeaning?.focus();
+        return;
+      }
+      adminVocabItems.push({
+        word,
+        cefr,
+        part_of_speech: partOfSpeech,
+        meaning,
+        selected: true,
+      });
+      if (vocabManualWord) vocabManualWord.value = "";
+      if (vocabManualPos) vocabManualPos.value = "";
+      if (vocabManualMeaning) vocabManualMeaning.value = "";
+      renderAdminVocabPreview(adminVocabItems);
+      const ok = await saveVocabSelection({ silent: false });
+      if (!ok) {
+        adminVocabItems.pop();
+        renderAdminVocabPreview(adminVocabItems);
+      }
+    });
+  }
+
   // ── 導入補助（Warmup Scaffolding） ─────────────────────────────
 
-  function renderAdminWarmupPreview(imageUrl, questions) {
-    if (!warmupPreview) return;
-    adminWarmupQuestions = (questions || []).map(function (q) {
-      return { id: q.id, text: q.text || "", selected: q.selected !== false };
+  function renderWarmupManualRows() {
+    if (!warmupManualRows) return;
+    ensureManualWarmupRow();
+    const manualQuestions = getManualWarmupQuestions();
+    let html = "";
+    manualQuestions.forEach((q) => {
+      const index = adminWarmupQuestions.indexOf(q);
+      const dimClass = q.selected ? "" : " opacity-50";
+      html += `<label class="flex items-start gap-2 rounded px-1.5 py-1 bg-white/70${dimClass} cursor-pointer">
+        <input type="checkbox" class="warmup-manual-select-cb shrink-0 mt-1 h-3.5 w-3.5 rounded border-sky-200 text-sky-600"
+          data-index="${index}" ${q.selected ? "checked" : ""}>
+        <span class="shrink-0 mt-0.5 mr-1 text-sky-600 font-bold">Q${q.id}.</span>
+        <input type="text" class="warmup-manual-input compact-input flex-1 text-[10px]"
+          data-index="${index}" value="${esc(q.text)}" placeholder="質問を入力（英語）">
+      </label>`;
     });
-    if (!imageUrl && !adminWarmupQuestions.length) {
-      warmupPreview.classList.add("hidden");
+    warmupManualRows.innerHTML = html;
+
+    warmupManualRows.querySelectorAll(".warmup-manual-select-cb").forEach((cb) => {
+      cb.addEventListener("change", onWarmupSelectionChange);
+    });
+    warmupManualRows.querySelectorAll(".warmup-manual-input").forEach((input) => {
+      input.addEventListener("input", onWarmupManualInputChange);
+      input.addEventListener("blur", () => saveWarmupSelection({ silent: true }));
+    });
+  }
+
+  function onWarmupManualInputChange(event) {
+    const index = Number(event.target.dataset.index);
+    if (!Number.isInteger(index) || !adminWarmupQuestions[index]) return;
+    adminWarmupQuestions[index].text = event.target.value;
+    scheduleWarmupManualSave();
+  }
+
+  function addManualWarmupRow() {
+    adminWarmupQuestions.push({
+      id: nextWarmupQuestionId(),
+      text: "",
+      selected: true,
+      manual: true,
+    });
+    renderWarmupManualRows();
+    const inputs = warmupManualRows?.querySelectorAll(".warmup-manual-input") || [];
+    const lastInput = inputs[inputs.length - 1];
+    if (lastInput) lastInput.focus();
+  }
+
+  if (warmupAddQuestionBtn) {
+    warmupAddQuestionBtn.addEventListener("click", addManualWarmupRow);
+  }
+
+  function renderAdminWarmupPreview(imageUrl, questions) {
+    if (typeof imageUrl === "string") {
+      adminWarmupImageUrl = imageUrl;
+    }
+    const incoming = (questions || []).map(function (q) {
+      return {
+        id: q.id,
+        text: q.text || "",
+        selected: q.selected !== false,
+        manual: q.manual === true,
+      };
+    });
+    const manualFromState = incoming.length
+      ? incoming.filter((q) => q.manual)
+      : getManualWarmupQuestions();
+    const aiFromState = incoming.filter((q) => !q.manual);
+    adminWarmupQuestions = [...aiFromState, ...manualFromState];
+
+    const aiQuestions = getAiWarmupQuestions();
+    if (!warmupPreview) {
+      renderWarmupManualRows();
       return;
     }
-    const selectedCount = adminWarmupQuestions.filter(function (q) { return q.selected; }).length;
+    if (!adminWarmupImageUrl && !aiQuestions.length) {
+      warmupPreview.classList.add("hidden");
+      renderWarmupManualRows();
+      return;
+    }
+    const selectedCount = aiQuestions.filter(function (q) { return q.selected; }).length;
     let html = "";
-    if (imageUrl) {
-      html += `<div class="mb-2"><img src="${esc(imageUrl)}" alt="Warmup illustration"
+    if (adminWarmupImageUrl) {
+      html += `<div class="mb-2"><img src="${esc(adminWarmupImageUrl)}" alt="Warmup illustration"
         class="w-full max-h-48 rounded-lg object-contain border border-slate-100 bg-slate-50"></div>`;
     }
-    if (adminWarmupQuestions.length) {
-      html += `<p class="mb-1 font-semibold text-slate-600">導入質問（表示 ${selectedCount} / ${adminWarmupQuestions.length} 問）</p>`;
+    if (aiQuestions.length) {
+      html += `<p class="mb-1 font-semibold text-slate-600">AI生成の導入質問（表示 ${selectedCount} / ${aiQuestions.length} 問）</p>`;
       html += `<p class="mb-1 text-[9px] text-slate-500">チェックを外した質問は生徒画面に表示されません。</p>`;
       html += `<div class="space-y-1">`;
-      adminWarmupQuestions.forEach(function (q, i) {
+      aiQuestions.forEach(function (q) {
+        const index = adminWarmupQuestions.indexOf(q);
         const dimClass = q.selected ? "" : " opacity-50";
-        html += `<label class="flex items-start gap-2 rounded px-1.5 py-1 ${i % 2 === 0 ? "bg-white/70" : ""}${dimClass} cursor-pointer">
+        html += `<label class="flex items-start gap-2 rounded px-1.5 py-1 ${index % 2 === 0 ? "bg-white/70" : ""}${dimClass} cursor-pointer">
           <input type="checkbox" class="warmup-select-cb shrink-0 mt-0.5 h-3.5 w-3.5 rounded border-sky-200 text-sky-600"
-            data-index="${i}" ${q.selected ? "checked" : ""}>
+            data-index="${index}" ${q.selected ? "checked" : ""}>
           <span class="shrink-0 mr-1 text-sky-600 font-bold">Q${q.id}.</span>
           <span class="text-slate-700 leading-snug">${esc(q.text)}</span>
         </label>`;
@@ -1657,25 +1805,39 @@
     warmupPreview.querySelectorAll(".warmup-select-cb").forEach(function (cb) {
       cb.addEventListener("change", onWarmupSelectionChange);
     });
+    renderWarmupManualRows();
   }
 
   async function saveWarmupSelection(options) {
     const silent = options && options.silent;
     const classId = getSelectedClassId() || (lessonClassId && lessonClassId.value);
-    if (!classId || !adminWarmupQuestions.length) return true;
+    if (!classId) return true;
+    const questionsToSave = adminWarmupQuestions.filter((q) => (q.text || "").trim());
+    if (!questionsToSave.length) return true;
     warmupSelectionSaving = true;
     try {
       const res = await fetch("/news/admin/api/class/lesson/warmup/selection", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ class_id: classId, warmup_questions: adminWarmupQuestions }),
+        body: JSON.stringify({ class_id: classId, warmup_questions: questionsToSave }),
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "保存に失敗しました");
-      adminWarmupQuestions = (data.warmup_questions || adminWarmupQuestions).map(function (q) {
-        return { id: q.id, text: q.text || "", selected: q.selected !== false };
+      const savedManual = getManualWarmupQuestions();
+      const savedFromServer = (data.warmup_questions || questionsToSave).map(function (q) {
+        return {
+          id: q.id,
+          text: q.text || "",
+          selected: q.selected !== false,
+          manual: q.manual === true,
+        };
       });
+      const serverManual = savedFromServer.filter((q) => q.manual);
+      const serverAi = savedFromServer.filter((q) => !q.manual);
+      const draftManual = savedManual.filter((q) => !(q.text || "").trim());
+      adminWarmupQuestions = [...serverAi, ...serverManual, ...draftManual];
       if (!silent) {
+        renderAdminWarmupPreview(adminWarmupImageUrl, adminWarmupQuestions);
         showMessage(lessonMessage, data.message || "質問の表示設定を保存しました。", false);
       }
       return true;
@@ -1696,12 +1858,11 @@
     if (!Number.isInteger(index) || !adminWarmupQuestions[index]) return;
     const previous = adminWarmupQuestions[index].selected;
     adminWarmupQuestions[index].selected = event.target.checked;
-    const currentImageUrl = warmupPreview ? (warmupPreview.querySelector("img") || {}).src || "" : "";
-    renderAdminWarmupPreview(currentImageUrl, adminWarmupQuestions);
+    renderAdminWarmupPreview(adminWarmupImageUrl, adminWarmupQuestions);
     const ok = await saveWarmupSelection({ silent: true });
     if (!ok) {
       adminWarmupQuestions[index].selected = previous;
-      renderAdminWarmupPreview(currentImageUrl, adminWarmupQuestions);
+      renderAdminWarmupPreview(adminWarmupImageUrl, adminWarmupQuestions);
       showMessage(lessonMessage, "質問の表示設定の保存に失敗しました。", true);
     }
   }
@@ -1758,7 +1919,14 @@
         });
         const data = await res.json();
         if (!data.ok) throw new Error(data.error || "生成に失敗しました");
-        renderAdminWarmupPreview(data.warmup_image_url || "", data.warmup_questions || []);
+        const preservedManual = getManualWarmupQuestions();
+        const aiQuestions = (data.warmup_questions || []).map((q) => ({
+          id: q.id,
+          text: q.text || "",
+          selected: q.selected !== false,
+          manual: false,
+        }));
+        renderAdminWarmupPreview(data.warmup_image_url || "", [...aiQuestions, ...preservedManual]);
         showMessage(lessonMessage, data.message || "導入補助を生成しました。", false);
         if (warmupGenerateStatus) warmupGenerateStatus.classList.add("hidden");
       } catch (err) {
@@ -1775,8 +1943,10 @@
 
   if (window.ADMIN_ACTIVE_CLASS) {
     fillLessonForm(window.ADMIN_ACTIVE_CLASS);
+  } else {
+    renderAdminWarmupPreview("", []);
   }
-  if (window.ADMIN_WARMUP_IMAGE_URL || (window.ADMIN_WARMUP_QUESTIONS && window.ADMIN_WARMUP_QUESTIONS.length)) {
+  if (!window.ADMIN_ACTIVE_CLASS && (window.ADMIN_WARMUP_IMAGE_URL || (window.ADMIN_WARMUP_QUESTIONS && window.ADMIN_WARMUP_QUESTIONS.length))) {
     renderAdminWarmupPreview(window.ADMIN_WARMUP_IMAGE_URL || "", window.ADMIN_WARMUP_QUESTIONS || []);
   }
 })();

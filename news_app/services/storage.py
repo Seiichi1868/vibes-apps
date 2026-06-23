@@ -8,7 +8,13 @@ from datetime import datetime, timezone
 
 import openpyxl
 
-from news_app.config import CEFR_LEVELS, DATA_DIR, STATE_FILE, VOCAB_CEFR_LEVELS, VOCAB_EXTRACTION_MAX
+from news_app.config import (
+    CEFR_LEVELS,
+    DATA_DIR,
+    STATE_FILE,
+    VOCAB_CEFR_LEVELS,
+    VOCAB_STORAGE_MAX,
+)
 
 _lock = threading.Lock()
 ROSTER_FILE = DATA_DIR / "roster.json"
@@ -147,7 +153,15 @@ def _normalize_warmup_questions(raw) -> list[dict]:
             selected = selected_raw.strip().lower() not in {"false", "0", "no", "off"}
         else:
             selected = bool(selected_raw)
-        items.append({"id": q_id, "text": text, "selected": selected})
+        manual_raw = entry.get("manual", False)
+        if isinstance(manual_raw, str):
+            manual = manual_raw.strip().lower() in {"true", "1", "yes", "on"}
+        else:
+            manual = bool(manual_raw)
+        item = {"id": q_id, "text": text, "selected": selected}
+        if manual:
+            item["manual"] = True
+        items.append(item)
     return items
 
 
@@ -182,7 +196,7 @@ def _normalize_vocabulary_data(raw) -> list[dict]:
         normalized = _normalize_vocabulary_item(entry)
         if normalized:
             items.append(normalized)
-    return items[:VOCAB_EXTRACTION_MAX]
+    return items[:VOCAB_STORAGE_MAX]
 
 
 def vocabulary_for_student(items: list[dict] | None) -> list[dict]:

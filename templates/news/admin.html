@@ -383,6 +383,37 @@
             <span id="vocab-extract-status" class="hidden text-[10px] text-slate-500 italic"></span>
           </div>
           <div id="vocab-preview" class="hidden max-h-80 overflow-y-auto rounded-lg border border-slate-100 bg-white/80 p-2 text-[10px]"></div>
+          <div id="vocab-manual-add" class="space-y-1.5 rounded-lg border border-violet-100/60 bg-white/60 p-2">
+            <p class="text-[10px] font-semibold text-slate-600">単語を手動で追加</p>
+            <p class="text-[9px] text-slate-500">AI抽出結果に加えて、教師が任意の語彙を追加できます。</p>
+            <div class="flex flex-wrap items-end gap-1.5">
+              <div class="min-w-[5rem] flex-1">
+                <label class="mb-0.5 block text-[9px] text-slate-500">単語</label>
+                <input type="text" id="vocab-manual-word" class="compact-input w-full text-[10px]" placeholder="word">
+              </div>
+              <div class="min-w-[4rem] w-16">
+                <label class="mb-0.5 block text-[9px] text-slate-500">品詞</label>
+                <input type="text" id="vocab-manual-pos" class="compact-input w-full text-[10px]" placeholder="n.">
+              </div>
+              <div class="min-w-[6rem] flex-[2]">
+                <label class="mb-0.5 block text-[9px] text-slate-500">意味</label>
+                <input type="text" id="vocab-manual-meaning" class="compact-input w-full text-[10px]" placeholder="意味（日本語）">
+              </div>
+              <div class="w-14">
+                <label class="mb-0.5 block text-[9px] text-slate-500">CEFR</label>
+                <select id="vocab-manual-cefr" class="compact-input w-full text-[10px]">
+                  <option value="B1" selected>B1</option>
+                  <option value="B2">B2</option>
+                  <option value="C1">C1</option>
+                  <option value="C2">C2</option>
+                </select>
+              </div>
+              <button type="button" id="vocab-manual-add-btn"
+                class="compact-btn shrink-0 border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100">
+                ＋ 追加
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- ── 導入補助 AI（Warmup Scaffolding） ── -->
@@ -402,6 +433,15 @@
             <span id="warmup-generate-status" class="hidden text-[10px] text-slate-500 italic"></span>
           </div>
           <div id="warmup-preview" class="hidden rounded-lg border border-slate-100 bg-white/80 p-2 text-[10px]"></div>
+          <div id="warmup-manual-section" class="space-y-1.5 rounded-lg border border-sky-100/60 bg-white/60 p-2">
+            <p class="text-[10px] font-semibold text-slate-600">手動で質問を追加</p>
+            <p class="text-[9px] text-slate-500">AI生成の質問に加えて、自分で書いた導入質問も追加できます。</p>
+            <div id="warmup-manual-rows" class="space-y-1"></div>
+            <button type="button" id="warmup-add-question-btn"
+              class="compact-btn border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100">
+              ＋ 質問を追加
+            </button>
+          </div>
         </div>
 
         <button type="submit" id="save-lesson-btn" class="compact-btn shrink-0 bg-emerald-600 hover:bg-emerald-500"
