@@ -7,17 +7,22 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
   </head>
   <body class="splash-active">
     <div id="splashScreen" class="splash-screen" role="presentation" aria-label="起動中">
-      <div class="splash-screen__stage">
-        <p class="splash-brand">
-          <span class="splash-brand__text">Vibe Speak</span>
-        </p>
+      <div class="splash-screen__bg" aria-hidden="true"></div>
+      <div class="splash-screen__veil splash-screen__veil--1" aria-hidden="true"></div>
+      <div class="splash-screen__veil splash-screen__veil--2" aria-hidden="true"></div>
+      <div class="splash-vibe-orb splash-vibe-orb--left" aria-hidden="true"></div>
+      <div class="splash-vibe-orb splash-vibe-orb--right" aria-hidden="true"></div>
+      <div class="splash-intro-card">
+        <p class="splash-intro-glass-label">Welcome to</p>
+        <h1 class="splash-intro-glass-logo">Vibe Speak</h1>
+        <p class="splash-intro-glass-sub">Read. Speak. Get instant feedback.</p>
       </div>
     </div>
     <div class="bg-blobs" aria-hidden="true">
@@ -1179,9 +1184,8 @@
         }, FLAG_TAP_WINDOW_MS);
       }
 
-      const SPLASH_FADE_IN_MS = 1800;
-      const SPLASH_HOLD_MS = 1700;
-      const SPLASH_FADE_OUT_MS = 650;
+      const SPLASH_INTRO_MS = 1950;
+      const SPLASH_OVERLAY_FADE_MS = 320;
 
       function initSplashScreen(onComplete) {
         const splash = document.getElementById("splashScreen");
@@ -1194,43 +1198,21 @@
             return;
           }
 
-          const hideAfterFade = () => {
+          splash.classList.add("is-hiding");
+          splash.setAttribute("aria-hidden", "true");
+          splash.style.transition = "opacity 300ms ease";
+          splash.style.opacity = "0";
+          splash.style.pointerEvents = "none";
+
+          window.setTimeout(() => {
             splash.classList.add("hidden");
             splash.classList.remove("is-hiding");
             splash.style.removeProperty("transition");
             splash.style.removeProperty("opacity");
-            splash.style.removeProperty("animation");
+            splash.style.removeProperty("pointer-events");
             document.body.classList.remove("splash-active");
             done();
-          };
-
-          splash.classList.add("is-hiding");
-          splash.setAttribute("aria-hidden", "true");
-          splash.style.animation = "none";
-          splash.style.opacity = "1";
-          void splash.offsetWidth;
-          splash.style.transition = `opacity ${SPLASH_FADE_OUT_MS}ms ease`;
-
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              splash.style.opacity = "0";
-            });
-          });
-
-          let finished = false;
-          const onFadeDone = (event) => {
-            if (finished || event.target !== splash || event.propertyName !== "opacity") return;
-            finished = true;
-            splash.removeEventListener("transitionend", onFadeDone);
-            hideAfterFade();
-          };
-          splash.addEventListener("transitionend", onFadeDone);
-          window.setTimeout(() => {
-            if (finished) return;
-            finished = true;
-            splash.removeEventListener("transitionend", onFadeDone);
-            hideAfterFade();
-          }, SPLASH_FADE_OUT_MS + 80);
+          }, SPLASH_OVERLAY_FADE_MS);
         }
 
         if (!splash) {
@@ -1247,7 +1229,7 @@
           return;
         }
 
-        window.setTimeout(finishSplash, SPLASH_FADE_IN_MS + SPLASH_HOLD_MS);
+        window.setTimeout(finishSplash, SPLASH_INTRO_MS);
       }
 
       async function initSecurityGate() {

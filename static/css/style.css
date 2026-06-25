@@ -1884,10 +1884,37 @@ body.gate-locked {
   flex-shrink: 0;
 }
 
-/* Splash screen (startup motion) */
+/* Splash screen (startup motion — matches Vibe Speak News intro) */
+@keyframes splashIntroFade {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  28% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  78% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-8px) scale(1.02);
+  }
+}
+
+@keyframes splashOrbFloat {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -12px, 0);
+  }
+}
+
 .splash-screen {
-  --splash-fade-in: 1.8s;
-  --splash-fade-out: 0.65s;
   position: fixed;
   inset: 0;
   z-index: 3000;
@@ -1895,36 +1922,122 @@ body.gate-locked {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 52%, #ffffff 100%);
-  opacity: 0;
-  animation: splashScreenFadeIn var(--splash-fade-in) ease forwards;
+  padding: 1.5rem;
+  background: linear-gradient(to bottom right, #f0f9ff, #ffffff, #ecfdf5);
   pointer-events: auto;
 }
 
-.splash-screen::before,
-.splash-screen::after {
-  content: "";
+.splash-screen__bg {
+  position: absolute;
+  inset: 0;
+  transform: scale(1.1);
+  opacity: 0.45;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.72)),
+    url("https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1800&q=80");
+  background-size: cover;
+  background-position: center;
+}
+
+.splash-screen__veil {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.splash-screen__veil--1 {
+  background: linear-gradient(
+    to bottom right,
+    rgba(255, 255, 255, 0.7),
+    rgba(240, 249, 255, 0.55),
+    rgba(236, 253, 245, 0.65)
+  );
+}
+
+.splash-screen__veil--2 {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.splash-vibe-orb {
   position: absolute;
   border-radius: 50%;
   pointer-events: none;
-  filter: blur(48px);
-  -webkit-filter: blur(48px);
+  filter: blur(64px);
+  -webkit-filter: blur(64px);
+  animation: splashOrbFloat 2.8s ease-in-out infinite;
 }
 
-.splash-screen::before {
-  width: min(52vw, 280px);
-  height: min(52vw, 280px);
-  top: 12%;
-  left: 8%;
-  background: radial-gradient(circle, rgba(124, 198, 255, 0.42) 0%, transparent 68%);
+.splash-vibe-orb--left {
+  top: 3.5rem;
+  left: -4rem;
+  width: 12rem;
+  height: 12rem;
+  background: rgba(186, 230, 253, 0.45);
 }
 
-.splash-screen::after {
-  width: min(48vw, 260px);
-  height: min(48vw, 260px);
-  bottom: 10%;
-  right: 6%;
-  background: radial-gradient(circle, rgba(117, 201, 139, 0.28) 0%, transparent 70%);
+.splash-vibe-orb--right {
+  right: -3rem;
+  bottom: 4rem;
+  width: 14rem;
+  height: 14rem;
+  background: rgba(167, 243, 208, 0.45);
+  animation-delay: 0.35s;
+}
+
+.splash-intro-card {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  animation: splashIntroFade 2.1s ease both;
+}
+
+.splash-intro-glass-label {
+  margin: 0 0 0.5rem;
+  font-family: "Outfit", system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: rgba(13, 148, 136, 0.88);
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.55),
+    0 0 8px rgba(255, 255, 255, 0.25);
+}
+
+.splash-intro-glass-logo {
+  margin: 0;
+  font-family: "Outfit", system-ui, sans-serif;
+  font-size: clamp(2.25rem, 8vw, 3rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  background: linear-gradient(
+    168deg,
+    rgba(56, 189, 248, 0.82) 0%,
+    rgba(3, 105, 161, 0.96) 30%,
+    rgba(15, 118, 110, 0.98) 62%,
+    rgba(4, 120, 87, 1) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  -webkit-text-stroke: 0.3px rgba(255, 255, 255, 0.22);
+  paint-order: stroke fill;
+  filter:
+    drop-shadow(0 1px 0 rgba(255, 255, 255, 0.45))
+    drop-shadow(0 4px 14px rgba(14, 116, 144, 0.2))
+    drop-shadow(0 1px 3px rgba(3, 105, 161, 0.15));
+}
+
+.splash-intro-glass-sub {
+  margin: 0.75rem 0 0;
+  font-family: "Outfit", system-ui, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: rgba(100, 116, 139, 0.92);
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.5),
+    0 0 6px rgba(255, 255, 255, 0.2);
 }
 
 .splash-screen.hidden {
@@ -1935,53 +2048,9 @@ body.gate-locked {
   pointer-events: none;
 }
 
-.splash-screen__stage {
-  position: relative;
-  width: min(92vw, 400px);
-  min-height: 140px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-}
-
-.splash-brand {
-  position: relative;
-  z-index: 1;
-  margin: 0;
-}
-
-.splash-brand__text {
-  display: inline-block;
-  font-family: "Montserrat", "Inter", "Helvetica Neue", Arial, sans-serif;
-  font-size: clamp(1.65rem, 6.2vw, 2.45rem);
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  line-height: 1.1;
-  text-transform: uppercase;
-  color: #0284c7;
-  -webkit-text-fill-color: #0284c7;
-  text-shadow:
-    0 1px 0 rgba(255, 255, 255, 1),
-    0 -1px 0 rgba(255, 255, 255, 0.55),
-    0 2px 4px rgba(3, 105, 161, 0.45),
-    0 5px 16px rgba(2, 132, 199, 0.35),
-    0 0 12px rgba(56, 189, 248, 0.42),
-    0 0 26px rgba(124, 198, 255, 0.28);
-}
-
 body.splash-active .page,
 body.splash-active .bg-blobs {
   visibility: hidden;
-}
-
-@keyframes splashScreenFadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
