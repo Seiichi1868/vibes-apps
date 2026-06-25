@@ -276,6 +276,26 @@
     vocabContent.innerHTML = html;
   }
 
+  function warmupQuestionFontSize(count, hasImage) {
+    const scale = hasImage ? 0.82 : 1;
+    if (count <= 1) {
+      return "clamp(" + (2 * scale).toFixed(2) + "rem, " + (6.5 * scale).toFixed(1) + "vmin, " + (5.5 * scale).toFixed(1) + "rem)";
+    }
+    if (count <= 2) {
+      return "clamp(" + (1.85 * scale).toFixed(2) + "rem, " + (5.5 * scale).toFixed(1) + "vmin, " + (4.5 * scale).toFixed(1) + "rem)";
+    }
+    if (count <= 3) {
+      return "clamp(" + (1.6 * scale).toFixed(2) + "rem, " + (4.8 * scale).toFixed(1) + "vmin, " + (3.75 * scale).toFixed(1) + "rem)";
+    }
+    return "clamp(" + (1.35 * scale).toFixed(2) + "rem, " + (4 * scale).toFixed(1) + "vmin, " + (3.25 * scale).toFixed(1) + "rem)";
+  }
+
+  function warmupImageMaxHeight(count) {
+    if (count <= 1) return "min(28vh, 18rem)";
+    if (count <= 2) return "min(24vh, 16rem)";
+    return "min(20vh, 14rem)";
+  }
+
   function renderWarmup(imageUrl, questions) {
     if (!warmupContent) return;
     if (!imageUrl && (!questions || !questions.length)) {
@@ -283,22 +303,26 @@
         '<p class="text-center text-lg text-slate-500">表示する導入質問がありません。管理画面で質問を選択してください。</p>';
       return;
     }
+    const qCount = questions ? questions.length : 0;
+    const hasImage = Boolean(imageUrl);
+    warmupContent.style.setProperty("--warmup-q-size", warmupQuestionFontSize(qCount, hasImage));
+    warmupContent.style.setProperty("--warmup-img-max-h", warmupImageMaxHeight(qCount));
+
     let html = "";
     if (imageUrl) {
       html +=
-        '<div class="mb-6 flex justify-center">' +
-        '<img src="' + escHtml(imageUrl) + '" alt="Warmup illustration"' +
-        ' class="max-h-[min(42vh,28rem)] w-auto max-w-full rounded-xl object-contain">' +
+        '<div class="screen-warmup-img-wrap">' +
+        '<img src="' + escHtml(imageUrl) + '" alt="Warmup illustration">' +
         "</div>";
     }
     if (questions && questions.length) {
-      html += '<p class="mb-4 text-lg font-semibold text-sky-300 sm:text-xl">動画を見る前に考えてみよう</p>';
-      html += '<ol class="space-y-4">';
+      html += '<p class="screen-warmup-heading">動画を見る前に考えてみよう</p>';
+      html += '<ol class="screen-warmup-list">';
       questions.forEach(function (q, i) {
         html +=
-          '<li class="screen-warmup-q flex items-start gap-3">' +
+          '<li class="screen-warmup-q flex items-start gap-[0.35em]">' +
           '<span class="screen-warmup-num">Q' + (i + 1) + ".</span>" +
-          "<span>" + escHtml(q.text) + "</span>" +
+          '<span class="screen-warmup-text">' + escHtml(q.text) + "</span>" +
           "</li>";
       });
       html += "</ol>";
