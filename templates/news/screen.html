@@ -1,0 +1,162 @@
+{% extends "news/base.html" %}
+{% block title %}教室スクリーン — Vibe Speak News{% endblock %}
+
+{% block head %}
+<style>
+  body { overflow: hidden; }
+  .screen-root {
+    background: #0f172a;
+    color: #f8fafc;
+  }
+  .screen-view {
+    position: absolute;
+    inset: 0;
+    display: none;
+  }
+  .screen-view.is-active {
+    display: flex;
+  }
+  .screen-controls {
+    position: absolute;
+    z-index: 40;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem;
+    padding: 0.2rem 0.25rem;
+    border-radius: 9999px;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    opacity: 0.45;
+    transition: opacity 0.2s;
+  }
+  .screen-controls:hover,
+  .screen-controls:focus-within {
+    opacity: 0.95;
+  }
+  .screen-ctrl-btn {
+    border-radius: 9999px;
+    padding: 0.15rem 0.45rem;
+    font-size: 0.625rem;
+    font-weight: 600;
+    line-height: 1.2;
+    color: rgba(226, 232, 240, 0.9);
+    background: rgba(51, 65, 85, 0.65);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    transition: background 0.15s, color 0.15s;
+  }
+  .screen-ctrl-btn:hover {
+    background: rgba(71, 85, 105, 0.85);
+    color: #fff;
+  }
+  .screen-ctrl-btn.is-active {
+    background: rgba(14, 116, 144, 0.85);
+    border-color: rgba(45, 212, 191, 0.45);
+    color: #fff;
+  }
+  .screen-ctrl-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+  .screen-class-label {
+    position: absolute;
+    top: 0.4rem;
+    left: 0.5rem;
+    z-index: 30;
+    max-width: calc(100% - 6rem);
+    font-size: 0.6rem;
+    font-weight: 500;
+    color: rgba(148, 163, 184, 0.55);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+  }
+  .screen-vocab-table {
+    width: 100%;
+    max-width: 72rem;
+    border-collapse: collapse;
+    font-size: clamp(1rem, 2.2vw, 1.75rem);
+  }
+  .screen-vocab-table th {
+    padding: 0.5rem 1rem 0.65rem;
+    text-align: left;
+    font-size: 0.55em;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(148, 163, 184, 0.85);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+  }
+  .screen-vocab-table td {
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid rgba(51, 65, 85, 0.6);
+    vertical-align: top;
+  }
+  .screen-vocab-word {
+    font-weight: 700;
+    color: #fbbf24;
+    white-space: nowrap;
+  }
+  .screen-vocab-pos {
+    color: rgba(148, 163, 184, 0.8);
+    font-size: 0.75em;
+  }
+  .screen-warmup-q {
+    font-size: clamp(1.1rem, 2.4vw, 2rem);
+    line-height: 1.45;
+  }
+  .screen-warmup-num {
+    color: #38bdf8;
+    font-weight: 700;
+    min-width: 2.5rem;
+  }
+  #youtube-player-screen > iframe,
+  #youtube-player-screen > div {
+    width: 100% !important;
+    height: 100% !important;
+  }
+</style>
+{% endblock %}
+
+{% block body %}
+<div id="screen-app" class="screen-root fixed inset-0">
+  <p id="screen-class-label" class="screen-class-label"></p>
+
+  <div id="screen-loading" class="absolute inset-0 z-20 flex items-center justify-center text-sm text-slate-400">
+    読み込み中…
+  </div>
+  <div id="screen-error" class="absolute inset-0 z-20 hidden items-center justify-center p-6 text-center text-sm text-red-300"></div>
+
+  <div id="view-video" class="screen-view is-active flex-col">
+    <div id="video-placeholder-screen" class="flex flex-1 items-center justify-center text-sm text-slate-500">
+      動画が未設定です
+    </div>
+    <div id="youtube-player-screen" class="absolute inset-0 hidden [&>iframe]:h-full [&>iframe]:w-full [&>iframe]:border-0"></div>
+  </div>
+
+  <div id="view-vocab" class="screen-view items-center justify-center overflow-auto p-6 sm:p-10">
+    <div id="vocab-content-screen" class="w-full"></div>
+  </div>
+
+  <div id="view-warmup" class="screen-view items-center justify-center overflow-auto p-6 sm:p-10">
+    <div id="warmup-content-screen" class="w-full max-w-5xl"></div>
+  </div>
+
+  <div id="screen-controls" class="screen-controls bottom-2 right-2 sm:bottom-3 sm:right-3 hidden">
+    <button type="button" class="screen-ctrl-btn" data-view="video" title="動画">動画</button>
+    <button type="button" class="screen-ctrl-btn" data-view="vocab" title="単語">単語</button>
+    <button type="button" class="screen-ctrl-btn" data-view="warmup" title="導入質問">導入</button>
+    <button type="button" id="screen-fullscreen-btn" class="screen-ctrl-btn" title="全画面">⛶</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.SCREEN_INITIAL_CLASS_ID = {{ initial_class_id|tojson }};
+  window.SCREEN_CLASSES = {{ classes|tojson }};
+</script>
+<script src="{{ url_for('static', filename='news/js/screen.js') }}"></script>
+{% endblock %}

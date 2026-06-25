@@ -607,6 +607,17 @@ def share_link():
     return jsonify({"ok": True, "link": link, "level": level, "class_id": class_id})
 
 
+@admin_bp.route("/api/screen-link", methods=["GET"])
+def screen_link():
+    class_id = (request.args.get("class_id") or get_active_class_id()).strip()
+    if not class_id:
+        return jsonify({"ok": False, "error": "クラスを選択してください。"}), 400
+
+    base = get_public_base_url(request)
+    link = f"{base}/news/screen/?class={class_id}"
+    return jsonify({"ok": True, "link": link, "class_id": class_id})
+
+
 # ── 名簿アップロード ──────────────────────────────────────────
 
 @admin_bp.route("/api/roster/upload", methods=["POST"])

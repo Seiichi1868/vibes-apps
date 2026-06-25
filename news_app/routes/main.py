@@ -91,6 +91,59 @@ def _class_public_payload(class_id: str, origin: str) -> dict | None:
     }
 
 
+def _class_screen_payload(class_id: str, origin: str) -> dict | None:
+    """教室スクリーン投影向け。管理画面で選択した語彙・導入質問をそのまま返す。"""
+    cls = get_class(class_id)
+    if not cls:
+        return None
+    current = cls.get("current") or {}
+    video_id = (current.get("video_id") or "").strip()
+    start_sec = int(current.get("start_seconds") or 0)
+    end_sec = int(current.get("end_seconds") or 0)
+    subtitles_enabled = bool(current.get("subtitles_enabled", False))
+    vocabulary_data = vocabulary_for_student(
+        current.get("vocabulary_data") if isinstance(current.get("vocabulary_data"), list) else []
+    )
+    warmup_image_url = str(current.get("warmup_image_url") or "").strip()
+    raw_warmup_questions = current.get("warmup_questions") if isinstance(current.get("warmup_questions"), list) else []
+    warmup_questions = [
+        {"id": i + 1, "text": str(q.get("text") or "").strip()}
+        for i, q in enumerate(
+            q
+            for q in raw_warmup_questions
+            if isinstance(q, dict) and q.get("selected", True) and str(q.get("text") or "").strip()
+        )
+    ]
+    embed_url = (
+        build_youtube_embed_url(
+            video_id,
+            start_sec,
+            end_sec,
+            origin=origin,
+            subtitles_enabled=subtitles_enabled,
+        )
+        if video_id
+        else ""
+    )
+    return {
+        "id": cls["id"],
+        "name": cls["name"],
+        "video": {
+            "video_id": video_id,
+            "start_seconds": start_sec,
+            "end_seconds": end_sec,
+            "embed_url": embed_url,
+            "subtitles_enabled": subtitles_enabled,
+        },
+        "vocabulary_data": vocabulary_data,
+        "warmup_image_url": warmup_image_url,
+        "warmup_questions": warmup_questions,
+        "has_video": bool(video_id),
+        "has_vocab": bool(vocabulary_data),
+        "has_warmup": bool(warmup_image_url or warmup_questions),
+    }
+
+
 @main_bp.route("/")
 def index():
     state = load_state()
@@ -124,6 +177,32 @@ def index():
 @main_bp.route("/api/classes", methods=["GET"])
 def api_classes():
     return jsonify({"ok": True, "classes": list_classes()})
+
+
+@main_bp.route("/screen/")
+def screen():
+    class_id = (request.args.get("class") or get_active_class_id()).strip()
+    classes = list_classes()
+    return render_template(
+        "news/screen.html",
+        initial_class_id=class_id,
+        classes=classes,
+        page_origin=request.host_url.rstrip("/"),
+    )
+
+
+@main_bp.route("/api/screen")
+def screen_config():
+    class_id = (request.args.get("class_id") or request.args.get("class") or "").strip()
+    if not class_id:
+        return jsonify({"ok": False, "error": "クラス ID が必要です。"}), 400
+
+    origin = request.host_url.rstrip("/")
+    payload = _class_screen_payload(class_id, origin)
+    if not payload:
+        return jsonify({"ok": False, "error": "クラスが見つかりません。"}), 404
+
+    return jsonify({"ok": True, "page_origin": origin, "class": payload})
 
 
 @main_bp.route("/api/config")

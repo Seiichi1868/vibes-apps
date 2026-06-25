@@ -241,6 +241,19 @@
           </button>
         </div>
         <p class="mt-1 text-[10px] text-slate-500">選択したクラス・CEFR レベル付きの生徒画面リンクを生成します。</p>
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+          <button type="button" id="open-screen-btn"
+            class="compact-btn border border-violet-200 bg-violet-50 text-violet-800 hover:bg-violet-100"
+            {% if not active_class %}disabled{% endif %}>
+            教室スクリーンを開く
+          </button>
+          <button type="button" id="copy-screen-link-btn"
+            class="rounded border border-violet-100 bg-white/80 px-2 py-1 text-[10px] font-semibold text-violet-700 hover:bg-violet-50"
+            {% if not active_class %}disabled{% endif %}>
+            スクリーンURLコピー
+          </button>
+        </div>
+        <p class="mt-1 text-[10px] text-slate-500">投影用：管理画面で選択した動画・単語・導入質問を全画面表示します。</p>
       </section>
 
       <section class="glass-panel min-h-0 flex-1 rounded-xl p-2.5 lg:overflow-hidden">

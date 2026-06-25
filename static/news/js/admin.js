@@ -26,6 +26,8 @@
   const generateLinkBtn = document.getElementById("generate-link-btn");
   const copyShareLinkBtn = document.getElementById("copy-share-link-btn");
   const shareLinkOutput = document.getElementById("share-link-output");
+  const openScreenBtn = document.getElementById("open-screen-btn");
+  const copyScreenLinkBtn = document.getElementById("copy-screen-link-btn");
   const cnn10OpenBtn = document.getElementById("cnn10-open-btn");
   const cnn10Panel = document.getElementById("cnn10-panel");
   const cnn10CloseBtn = document.getElementById("cnn10-close-btn");
@@ -681,7 +683,23 @@
     if (resetLessonBtn) resetLessonBtn.disabled = false;
     const saveBtn = document.getElementById("save-lesson-btn");
     if (saveBtn) saveBtn.disabled = false;
+    updateScreenButtons(cls.id);
     renderArchiveList(cls);
+  }
+
+  function updateScreenButtons(classId) {
+    const enabled = Boolean(classId);
+    if (openScreenBtn) openScreenBtn.disabled = !enabled;
+    if (copyScreenLinkBtn) copyScreenLinkBtn.disabled = !enabled;
+  }
+
+  async function fetchScreenLink(classId) {
+    const res = await fetch(
+      `/news/admin/api/screen-link?class_id=${encodeURIComponent(classId)}`
+    );
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "スクリーンリンクの取得に失敗しました");
+    return data.link;
   }
 
   function formatTime(sec) {
@@ -1158,6 +1176,48 @@
   if (copyShareLinkBtn) {
     copyShareLinkBtn.addEventListener("click", () => {
       copyTextFromInput(shareLinkOutput, copyShareLinkBtn, "先に共有リンクを生成してください。");
+    });
+  }
+
+  if (openScreenBtn) {
+    openScreenBtn.addEventListener("click", async () => {
+      const classId = getSelectedClassId();
+      if (!classId) {
+        alert("クラスを選択してください。");
+        return;
+      }
+      try {
+        const link = await fetchScreenLink(classId);
+        window.open(link, "_blank", "noopener,noreferrer");
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+  }
+
+  if (copyScreenLinkBtn) {
+    copyScreenLinkBtn.addEventListener("click", async () => {
+      const classId = getSelectedClassId();
+      if (!classId) {
+        alert("クラスを選択してください。");
+        return;
+      }
+      try {
+        const link = await fetchScreenLink(classId);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(link);
+        } else {
+          prompt("教室スクリーン URL:", link);
+          return;
+        }
+        const prev = copyScreenLinkBtn.textContent;
+        copyScreenLinkBtn.textContent = "済";
+        setTimeout(() => {
+          copyScreenLinkBtn.textContent = prev;
+        }, 1200);
+      } catch (err) {
+        alert(err.message);
+      }
     });
   }
 
