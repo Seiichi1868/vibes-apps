@@ -1833,7 +1833,8 @@ body.gate-locked {
     align-items: flex-start;
   }
 
-  .admin-dashboard {
+  .admin-dashboard,
+  .admin-settings-gated {
     grid-template-columns: 1fr;
   }
 
