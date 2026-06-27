@@ -1342,6 +1342,62 @@ body.gate-locked {
   gap: 8px 14px;
 }
 
+.admin-settings-unlock {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-settings-password {
+  width: 4.5rem;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(255, 255, 255, 0.92);
+  font-size: 0.78rem;
+  color: #19324a;
+}
+
+.admin-settings-unlock-btn {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(14, 165, 233, 0.35);
+  background: rgba(255, 255, 255, 0.92);
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #0369a1;
+  cursor: pointer;
+}
+
+.admin-settings-unlock-btn:hover {
+  background: rgba(224, 242, 254, 0.95);
+}
+
+.admin-settings-lock-message {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: 0.72rem;
+  color: #b91c1c;
+}
+
+.admin-settings-lock-message.hidden {
+  display: none;
+}
+
+.admin-settings-gated {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+
+.admin-settings-gated.hidden {
+  display: none;
+}
+
 .admin-page-title {
   margin: 0;
   font-size: 1.2rem;
@@ -1752,7 +1808,8 @@ body.gate-locked {
 }
 
 @media (max-width: 1024px) {
-  .admin-dashboard {
+  .admin-dashboard,
+  .admin-settings-gated {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

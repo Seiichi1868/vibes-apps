@@ -14,6 +14,20 @@
           <h1 class="admin-page-title">管理ダッシュボード</h1>
         </div>
         <div class="admin-top-bar__actions">
+          <div class="admin-settings-unlock">
+            <input
+              type="password"
+              id="adminSettingsPassword"
+              class="admin-settings-password"
+              inputmode="numeric"
+              autocomplete="off"
+              aria-label="管理設定パスワード"
+            />
+            <button type="button" id="adminSettingsUnlock" class="admin-settings-unlock-btn">
+              管理設定
+            </button>
+            <p id="adminSettingsLockMessage" class="admin-settings-lock-message hidden" role="alert"></p>
+          </div>
           <p id="adminStatus" class="admin-status" aria-live="polite"></p>
           <a class="admin-back-link" href="{{ url_for('main.index') }}">← 生徒画面へ戻る</a>
         </div>
@@ -40,26 +54,6 @@
         </div>
 
         <p class="admin-meta">本日のクラスコード（参考）: <strong id="adminTodayCode">----</strong></p>
-      </section>
-
-      <section class="admin-card">
-        <h2 class="admin-card__title">TTS音声（OpenAI）</h2>
-        <p class="admin-lead">
-          ON にすると、生徒が「見本を聴く」を押した時だけ OpenAI のネイティブ音声を生成します。OFF 時はブラウザ標準音声です。
-        </p>
-
-        <div class="admin-lock-panel">
-          <div class="admin-lock-status">
-            <span id="adminTtsLabel" class="admin-lock-label">読み込み中...</span>
-            <span id="adminTtsHint" class="admin-lock-hint">—</span>
-          </div>
-          <label class="admin-toggle" for="adminTtsToggle">
-            <input id="adminTtsToggle" type="checkbox" role="switch" aria-labelledby="adminTtsLabel" />
-            <span class="admin-toggle-track" aria-hidden="true">
-              <span class="admin-toggle-thumb"></span>
-            </span>
-          </label>
-        </div>
       </section>
 
       <section class="admin-card">
@@ -118,49 +112,71 @@
         </fieldset>
       </section>
 
-      <section class="admin-card admin-card--span-2">
-        <h2 class="admin-card__title">AIモデル選択</h2>
-        <p class="admin-lead">
-          添削・解説・発音アドバイスのみ切り替わります。OCR など基本処理は常に gpt-4o-mini です。
-        </p>
+      <div id="adminSettingsGated" class="admin-settings-gated hidden">
+        <section class="admin-card">
+          <h2 class="admin-card__title">TTS音声（OpenAI）</h2>
+          <p class="admin-lead">
+            ON にすると、生徒が「見本を聴く」を押した時だけ OpenAI のネイティブ音声を生成します。OFF 時はブラウザ標準音声です。
+          </p>
 
-        <fieldset class="admin-mode-fieldset">
-          <legend class="admin-mode-legend">4つのAIモード</legend>
-          <div class="admin-mode-options admin-mode-options--grid" id="adminAiModeOptions">
-            <label class="admin-mode-option">
-              <input type="radio" name="aiMode" value="4o-mini" />
-              <span class="admin-mode-option-body">
-                <span class="admin-mode-option-title">① 節約モード</span>
-                <span class="admin-mode-option-desc">全機能 gpt-4o-mini</span>
-              </span>
-            </label>
-            <label class="admin-mode-option">
-              <input type="radio" name="aiMode" value="5-mini" />
-              <span class="admin-mode-option-body">
-                <span class="admin-mode-option-title">② 前世代mini</span>
-                <span class="admin-mode-option-desc">添削・解説・発音 gpt-5-mini</span>
-              </span>
-            </label>
-            <label class="admin-mode-option">
-              <input type="radio" name="aiMode" value="5.4-mini" />
-              <span class="admin-mode-option-body">
-                <span class="admin-mode-option-title">③ 最新高精度</span>
-                <span class="admin-mode-option-desc">添削・解説・発音 gpt-5.4-mini</span>
-              </span>
-            </label>
-            <label class="admin-mode-option">
-              <input type="radio" name="aiMode" value="5.4-nano" />
-              <span class="admin-mode-option-body">
-                <span class="admin-mode-option-title">④ 最安実験</span>
-                <span class="admin-mode-option-desc">添削・解説・発音 gpt-5.4-nano</span>
+          <div class="admin-lock-panel">
+            <div class="admin-lock-status">
+              <span id="adminTtsLabel" class="admin-lock-label">読み込み中...</span>
+              <span id="adminTtsHint" class="admin-lock-hint">—</span>
+            </div>
+            <label class="admin-toggle" for="adminTtsToggle">
+              <input id="adminTtsToggle" type="checkbox" role="switch" aria-labelledby="adminTtsLabel" />
+              <span class="admin-toggle-track" aria-hidden="true">
+                <span class="admin-toggle-thumb"></span>
               </span>
             </label>
           </div>
-        </fieldset>
+        </section>
 
-        <p class="admin-meta">現在のAIモデル: <strong id="adminActiveModel">—</strong></p>
-        <p id="adminAiHint" class="admin-lock-hint admin-ai-hint">—</p>
-      </section>
+        <section class="admin-card admin-card--span-2">
+          <h2 class="admin-card__title">AIモデル選択</h2>
+          <p class="admin-lead">
+            添削・解説・発音アドバイスのみ切り替わります。OCR など基本処理は常に gpt-4o-mini です。
+          </p>
+
+          <fieldset class="admin-mode-fieldset">
+            <legend class="admin-mode-legend">4つのAIモード</legend>
+            <div class="admin-mode-options admin-mode-options--grid" id="adminAiModeOptions">
+              <label class="admin-mode-option">
+                <input type="radio" name="aiMode" value="4o-mini" />
+                <span class="admin-mode-option-body">
+                  <span class="admin-mode-option-title">① 節約モード</span>
+                  <span class="admin-mode-option-desc">全機能 gpt-4o-mini</span>
+                </span>
+              </label>
+              <label class="admin-mode-option">
+                <input type="radio" name="aiMode" value="5-mini" />
+                <span class="admin-mode-option-body">
+                  <span class="admin-mode-option-title">② 前世代mini</span>
+                  <span class="admin-mode-option-desc">添削・解説・発音 gpt-5-mini</span>
+                </span>
+              </label>
+              <label class="admin-mode-option">
+                <input type="radio" name="aiMode" value="5.4-mini" />
+                <span class="admin-mode-option-body">
+                  <span class="admin-mode-option-title">③ 最新高精度</span>
+                  <span class="admin-mode-option-desc">添削・解説・発音 gpt-5.4-mini</span>
+                </span>
+              </label>
+              <label class="admin-mode-option">
+                <input type="radio" name="aiMode" value="5.4-nano" />
+                <span class="admin-mode-option-body">
+                  <span class="admin-mode-option-title">④ 最安実験</span>
+                  <span class="admin-mode-option-desc">添削・解説・発音 gpt-5.4-nano</span>
+                </span>
+              </label>
+            </div>
+          </fieldset>
+
+          <p class="admin-meta">現在のAIモデル: <strong id="adminActiveModel">—</strong></p>
+          <p id="adminAiHint" class="admin-lock-hint admin-ai-hint">—</p>
+        </section>
+      </div>
 
       <section class="admin-card admin-card--span-full admin-card--link-gen">
         <h2 class="admin-card__title">🔗 共有用リンク生成（Link Generator）</h2>
@@ -223,6 +239,10 @@
       const shareLinkPreview = document.getElementById("shareLinkPreview");
       const shareLinkCopyBtn = document.getElementById("shareLinkCopyBtn");
       const shareLinkCopyToast = document.getElementById("shareLinkCopyToast");
+      const adminSettingsPassword = document.getElementById("adminSettingsPassword");
+      const adminSettingsUnlock = document.getElementById("adminSettingsUnlock");
+      const adminSettingsLockMessage = document.getElementById("adminSettingsLockMessage");
+      const adminSettingsGated = document.getElementById("adminSettingsGated");
 
       const ALL_SHARE_TARGET_LANGS = ["en", "es", "ja", "ro"];
       const SHARE_TARGET_LABELS = {
@@ -233,6 +253,63 @@
       };
       let shareLinkEnabledLangs = [...ALL_SHARE_TARGET_LANGS];
       let shareLinkCopyToastTimer = null;
+      let adminSettingsPasswordValue = null;
+
+      function showAdminSettingsLockMessage(message) {
+        if (!adminSettingsLockMessage) return;
+        adminSettingsLockMessage.textContent = message;
+        adminSettingsLockMessage.classList.remove("hidden");
+      }
+
+      function hideAdminSettingsLockMessage() {
+        if (adminSettingsLockMessage) adminSettingsLockMessage.classList.add("hidden");
+      }
+
+      function openAdminSettingsPanel() {
+        hideAdminSettingsLockMessage();
+        if (adminSettingsGated) adminSettingsGated.classList.remove("hidden");
+      }
+
+      function unlockAdminSettings() {
+        if (adminSettingsPasswordValue) {
+          openAdminSettingsPanel();
+          return;
+        }
+
+        const password = adminSettingsPassword ? adminSettingsPassword.value.trim() : "";
+        if (password !== "2479") {
+          showAdminSettingsLockMessage("パスワードが違います。");
+          return;
+        }
+
+        adminSettingsPasswordValue = password;
+        openAdminSettingsPanel();
+        loadAdvancedAdminState().catch((error) => {
+          console.error(error);
+          statusText.textContent = "管理設定の取得に失敗しました。";
+        });
+      }
+
+      async function loadAdvancedAdminState() {
+        if (!adminSettingsPasswordValue) return;
+
+        statusText.textContent = "管理設定を取得中...";
+        const [aiRes, ttsRes] = await Promise.all([
+          fetch("/api/admin/ai-mode"),
+          fetch("/api/admin/tts"),
+        ]);
+        const aiData = await aiRes.json();
+        const ttsData = await ttsRes.json();
+        if (!aiRes.ok) {
+          throw new Error(aiData.error || "AIモードの取得に失敗しました");
+        }
+        if (!ttsRes.ok) {
+          throw new Error(ttsData.error || "TTS状態の取得に失敗しました");
+        }
+        renderAiModeState(aiData);
+        renderTtsState(Boolean(ttsData.tts_enabled));
+        statusText.textContent = "管理設定を表示中";
+      }
 
       function renderLockState(lockEnabled) {
         lockToggle.checked = lockEnabled;
@@ -355,25 +432,18 @@
 
       async function loadAdminState() {
         statusText.textContent = "状態を取得中...";
-        const [lockRes, aiRes, langRes, uiLangRes, ttsRes, codeRes] = await Promise.all([
+        const [lockRes, langRes, uiLangRes, codeRes] = await Promise.all([
           fetch("/api/admin/gate-lock"),
-          fetch("/api/admin/ai-mode"),
           fetch("/api/admin/languages"),
           fetch("/api/admin/ui-language"),
-          fetch("/api/admin/tts"),
           fetch("/api/gate/today"),
         ]);
         const lockData = await lockRes.json();
-        const aiData = await aiRes.json();
         const langData = await langRes.json();
         const uiLangData = await uiLangRes.json();
-        const ttsData = await ttsRes.json();
         const codeData = await codeRes.json();
         if (!lockRes.ok) {
           throw new Error(lockData.error || "ロック状態の取得に失敗しました");
-        }
-        if (!aiRes.ok) {
-          throw new Error(aiData.error || "AIモードの取得に失敗しました");
         }
         if (!langRes.ok) {
           throw new Error(langData.error || "言語設定の取得に失敗しました");
@@ -381,21 +451,20 @@
         if (!uiLangRes.ok) {
           throw new Error(uiLangData.error || "表示言語設定の取得に失敗しました");
         }
-        if (!ttsRes.ok) {
-          throw new Error(ttsData.error || "TTS状態の取得に失敗しました");
-        }
         renderLockState(Boolean(lockData.lock_enabled));
-        renderAiModeState(aiData);
         renderLanguageState(langData);
         renderUiLanguageState(uiLangData.default_ui_language);
         if (shareLinkUiSelect) {
           const uiDefault = uiLangData.default_ui_language === "en" ? "en" : "ja";
           if (!shareLinkUiSelect.value) shareLinkUiSelect.value = uiDefault;
         }
-        renderTtsState(Boolean(ttsData.tts_enabled));
         todayCode.textContent = String(codeData.code || "----").padStart(4, "0");
         updateShareLinkPreview();
-        statusText.textContent = "準備完了";
+        if (adminSettingsPasswordValue) {
+          await loadAdvancedAdminState();
+        } else {
+          statusText.textContent = "準備完了";
+        }
       }
 
       async function saveGateLockState(lockEnabled) {
@@ -425,6 +494,10 @@
       }
 
       async function saveAiModeState(aiMode) {
+        if (!adminSettingsPasswordValue) {
+          statusText.textContent = "管理設定のパスワードが必要です。";
+          return;
+        }
         aiModeInputs.forEach((input) => {
           input.disabled = true;
         });
@@ -433,7 +506,7 @@
           const response = await fetch("/api/admin/ai-mode", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ai_mode: aiMode }),
+            body: JSON.stringify({ ai_mode: aiMode, admin_password: adminSettingsPasswordValue }),
           });
           const data = await response.json();
           if (!response.ok) {
@@ -510,13 +583,17 @@
       }
 
       async function saveTtsState(ttsEnabled) {
+        if (!adminSettingsPasswordValue) {
+          statusText.textContent = "管理設定のパスワードが必要です。";
+          return;
+        }
         ttsToggle.disabled = true;
         statusText.textContent = "TTS設定を保存中...";
         try {
           const response = await fetch("/api/admin/tts", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ tts_enabled: ttsEnabled }),
+            body: JSON.stringify({ tts_enabled: ttsEnabled, admin_password: adminSettingsPasswordValue }),
           });
           const data = await response.json();
           if (!response.ok) {
@@ -571,6 +648,19 @@
       }
       if (shareLinkCopyBtn) {
         shareLinkCopyBtn.addEventListener("click", copyShareLinkUrl);
+      }
+
+      if (adminSettingsUnlock) {
+        adminSettingsUnlock.addEventListener("click", unlockAdminSettings);
+      }
+
+      if (adminSettingsPassword) {
+        adminSettingsPassword.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            unlockAdminSettings();
+          }
+        });
       }
 
       renderShareLinkTargetOptions();

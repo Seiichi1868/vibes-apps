@@ -17,6 +17,12 @@ from flask_app.utils.language_utils import (
 
 admin_bp = Blueprint("admin", __name__)
 
+ADMIN_SETTINGS_PASSWORD = "2479"
+
+
+def _admin_password_ok(payload: dict) -> bool:
+    return str(payload.get("admin_password") or "") == ADMIN_SETTINGS_PASSWORD
+
 
 @admin_bp.route("/admin/gate-lock", methods=["GET", "POST"])
 def admin_gate_lock():
@@ -47,6 +53,9 @@ def admin_ai_mode():
         return jsonify(ai_mode_response())
 
     payload = request.get_json(silent=True) or {}
+    if not _admin_password_ok(payload):
+        return jsonify({"error": "管理設定のパスワードが違います。"}), 403
+
     raw_mode = payload.get("ai_mode")
     if raw_mode is None and payload.get("use_gpt5_mode") is not None:
         raw = payload.get("use_gpt5_mode")
@@ -89,6 +98,9 @@ def admin_tts():
         return jsonify({"ok": True, "tts_enabled": is_tts_enabled()})
 
     payload = request.get_json(silent=True) or {}
+    if not _admin_password_ok(payload):
+        return jsonify({"error": "管理設定のパスワードが違います。"}), 403
+
     raw = payload.get("tts_enabled")
     if raw is None:
         raw = payload.get("enabled")
