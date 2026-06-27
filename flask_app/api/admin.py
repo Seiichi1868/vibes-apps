@@ -124,6 +124,9 @@ def admin_languages():
         return jsonify(languages_response())
 
     payload = request.get_json(silent=True) or {}
+    if not _admin_password_ok(payload):
+        return jsonify({"error": "管理設定のパスワードが違います。"}), 403
+
     raw = payload.get("enabled_languages")
     if raw is None:
         raw = payload.get("languages")

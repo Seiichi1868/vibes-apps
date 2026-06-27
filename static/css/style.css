@@ -1705,6 +1705,85 @@ body.gate-locked {
   gap: 6px;
 }
 
+.admin-card__title-en {
+  font-size: 0.82em;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.admin-select-field {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-select-field-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.admin-lang-select {
+  min-height: 6.5rem;
+  margin-top: 8px;
+}
+
+.admin-lang-dropdown {
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(255, 255, 255, 0.88);
+  overflow: hidden;
+}
+
+.admin-lang-dropdown-summary {
+  padding: 8px 10px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #19324a;
+  cursor: pointer;
+  list-style: none;
+}
+
+.admin-lang-dropdown-summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-lang-dropdown[open] .admin-lang-dropdown-summary {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.admin-lang-dropdown .admin-lang-select {
+  width: 100%;
+  margin-top: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.admin-lang-select-hint {
+  margin-top: 8px;
+}
+
+.admin-lang-save-btn {
+  margin-top: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(14, 165, 233, 0.35);
+  background: rgba(255, 255, 255, 0.92);
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #0369a1;
+  cursor: pointer;
+}
+
+.admin-lang-save-btn:hover:not(:disabled) {
+  background: rgba(224, 242, 254, 0.95);
+}
+
+.admin-lang-save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .admin-link-gen-field-label {
   font-size: 0.68rem;
   font-weight: 700;

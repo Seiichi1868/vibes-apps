@@ -57,59 +57,19 @@
       </section>
 
       <section class="admin-card">
-        <h2 class="admin-card__title">利用可能な言語</h2>
+        <h2 class="admin-card__title">表示言語設定 <span class="admin-card__title-en">(Display Language Settings)</span></h2>
         <p class="admin-lead">
-          チェックを入れた言語だけが、生徒画面の「学習する言語を選択」に表示されます。
+          初回アクセス時の UI 表示言語です（学習言語とは別）。<br />
+          Default UI language on first visit (separate from the study language).
         </p>
 
-        <fieldset class="admin-mode-fieldset">
-          <legend class="admin-mode-legend">言語の有効化</legend>
-          <div class="admin-lang-options admin-lang-options--grid" id="adminLangOptions">
-            <label class="admin-lang-option">
-              <input type="checkbox" name="adminLang" value="en" />
-              <span>🇬🇧 英語</span>
-            </label>
-            <label class="admin-lang-option">
-              <input type="checkbox" name="adminLang" value="es" />
-              <span>🇪🇸 スペイン語</span>
-            </label>
-            <label class="admin-lang-option">
-              <input type="checkbox" name="adminLang" value="ja" />
-              <span>🇯🇵 日本語</span>
-            </label>
-            <label class="admin-lang-option">
-              <input type="checkbox" name="adminLang" value="ro" />
-              <span>🇷🇴 ルーマニア語</span>
-            </label>
-          </div>
-        </fieldset>
-      </section>
-
-      <section class="admin-card">
-        <h2 class="admin-card__title">表示言語の初期設定</h2>
-        <p class="admin-lead">
-          初回アクセス時の UI 表示言語（学習言語とは別）です。
-        </p>
-
-        <fieldset class="admin-mode-fieldset">
-          <legend class="admin-mode-legend">Default UI Language</legend>
-          <div class="admin-mode-options admin-mode-options--compact" id="adminUiLangOptions">
-            <label class="admin-mode-option">
-              <input type="radio" name="uiLang" value="ja" />
-              <span class="admin-mode-option-body">
-                <span class="admin-mode-option-title">日本語</span>
-                <span class="admin-mode-option-desc">UI を日本語で表示</span>
-              </span>
-            </label>
-            <label class="admin-mode-option">
-              <input type="radio" name="uiLang" value="en" />
-              <span class="admin-mode-option-body">
-                <span class="admin-mode-option-title">English</span>
-                <span class="admin-mode-option-desc">UI in English</span>
-              </span>
-            </label>
-          </div>
-        </fieldset>
+        <label class="admin-select-field" for="adminUiLangSelect">
+          <span class="admin-select-field-label">表示言語 / Display Language</span>
+          <select id="adminUiLangSelect" class="admin-link-gen-select">
+            <option value="ja">日本語 (Japanese)</option>
+            <option value="en">English</option>
+          </select>
+        </label>
       </section>
 
       <div id="adminSettingsGated" class="admin-settings-gated hidden">
@@ -133,7 +93,30 @@
           </div>
         </section>
 
-        <section class="admin-card admin-card--span-2">
+        <section class="admin-card">
+          <h2 class="admin-card__title">使用可能な言語 <span class="admin-card__title-en">(Available Languages)</span></h2>
+          <p class="admin-lead">
+            生徒画面の「学習する言語を選択」に表示する言語を選びます。<br />
+            Choose which study languages appear on the student screen.
+          </p>
+
+          <details class="admin-lang-dropdown" id="adminLangDropdown">
+            <summary class="admin-lang-dropdown-summary">言語を選択 / Select languages</summary>
+            <select id="adminLangSelect" class="admin-link-gen-select admin-lang-select" multiple size="4">
+              <option value="en">🇬🇧 英語 (English)</option>
+              <option value="es">🇪🇸 スペイン語 (Spanish)</option>
+              <option value="ja">🇯🇵 日本語 (Japanese)</option>
+              <option value="ro">🇷🇴 ルーマニア語 (Romanian)</option>
+            </select>
+          </details>
+          <p class="admin-lock-hint admin-lang-select-hint">
+            複数選択: Ctrl+クリック (Windows) / ⌘+クリック (Mac)<br />
+            Multi-select: Ctrl+click (Windows) / ⌘+click (Mac)
+          </p>
+          <button type="button" id="adminLangSaveBtn" class="admin-lang-save-btn">言語設定を保存 / Save languages</button>
+        </section>
+
+        <section class="admin-card admin-card--span-full">
           <h2 class="admin-card__title">AIモデル選択</h2>
           <p class="admin-lead">
             添削・解説・発音アドバイスのみ切り替わります。OCR など基本処理は常に gpt-4o-mini です。
@@ -229,8 +212,9 @@
       const ttsToggle = document.getElementById("adminTtsToggle");
       const ttsLabel = document.getElementById("adminTtsLabel");
       const ttsHint = document.getElementById("adminTtsHint");
-      const langInputs = Array.from(document.querySelectorAll('input[name="adminLang"]'));
-      const uiLangInputs = Array.from(document.querySelectorAll('input[name="uiLang"]'));
+      const adminLangSelect = document.getElementById("adminLangSelect");
+      const adminLangSaveBtn = document.getElementById("adminLangSaveBtn");
+      const adminUiLangSelect = document.getElementById("adminUiLangSelect");
       const activeModel = document.getElementById("adminActiveModel");
       const todayCode = document.getElementById("adminTodayCode");
       const statusText = document.getElementById("adminStatus");
@@ -337,12 +321,24 @@
           : "生徒は無料のブラウザ標準音声で聞けます";
       }
 
+      function updateLanguageDropdownSummary() {
+        const summaryEl = document.querySelector("#adminLangDropdown > summary");
+        if (!summaryEl || !adminLangSelect) return;
+        const selected = Array.from(adminLangSelect.selectedOptions).map((option) => option.textContent.trim());
+        summaryEl.textContent = selected.length
+          ? selected.join(", ")
+          : "言語を選択 / Select languages";
+      }
+
       function renderLanguageState(langData) {
         const enabled = new Set(Array.isArray(langData.enabled_languages) ? langData.enabled_languages : []);
-        langInputs.forEach((input) => {
-          input.checked = enabled.has(input.value);
-          input.disabled = false;
-        });
+        if (adminLangSelect) {
+          Array.from(adminLangSelect.options).forEach((option) => {
+            option.selected = enabled.has(option.value);
+          });
+          adminLangSelect.disabled = false;
+          updateLanguageDropdownSummary();
+        }
         const enabledList = ALL_SHARE_TARGET_LANGS.filter((id) => enabled.has(id));
         shareLinkEnabledLangs = enabledList.length ? enabledList : [...ALL_SHARE_TARGET_LANGS];
         renderShareLinkTargetOptions();
@@ -424,10 +420,10 @@
 
       function renderUiLanguageState(uiLang) {
         const lang = String(uiLang || "ja");
-        uiLangInputs.forEach((input) => {
-          input.checked = input.value === lang;
-          input.disabled = false;
-        });
+        if (adminUiLangSelect) {
+          adminUiLangSelect.value = lang === "en" ? "en" : "ja";
+          adminUiLangSelect.disabled = false;
+        }
       }
 
       async function loadAdminState() {
@@ -522,21 +518,29 @@
       }
 
       async function saveLanguageState() {
-        const enabled = langInputs.filter((input) => input.checked).map((input) => input.value);
+        if (!adminSettingsPasswordValue) {
+          statusText.textContent = "管理設定のパスワードが必要です。";
+          return;
+        }
+        const enabled = adminLangSelect
+          ? Array.from(adminLangSelect.selectedOptions).map((option) => option.value)
+          : [];
         if (!enabled.length) {
-          statusText.textContent = "少なくとも1つの言語を有効にしてください。";
+          statusText.textContent = "少なくとも1つの言語を選択してください。 / Select at least one language.";
           await loadAdminState();
           return;
         }
-        langInputs.forEach((input) => {
-          input.disabled = true;
-        });
+        if (adminLangSelect) adminLangSelect.disabled = true;
+        if (adminLangSaveBtn) adminLangSaveBtn.disabled = true;
         statusText.textContent = "言語設定を保存中...";
         try {
           const response = await fetch("/api/admin/languages", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ enabled_languages: enabled }),
+            body: JSON.stringify({
+              enabled_languages: enabled,
+              admin_password: adminSettingsPasswordValue,
+            }),
           });
           const data = await response.json();
           if (!response.ok) {
@@ -548,14 +552,15 @@
           console.error(error);
           statusText.textContent = "言語設定の保存に失敗しました。";
           await loadAdminState();
+        } finally {
+          if (adminLangSelect) adminLangSelect.disabled = false;
+          if (adminLangSaveBtn) adminLangSaveBtn.disabled = false;
         }
       }
 
       async function saveUiLanguageState(uiLanguage) {
-        uiLangInputs.forEach((input) => {
-          input.disabled = true;
-        });
-        statusText.textContent = "表示言語の初期設定を保存中...";
+        if (adminUiLangSelect) adminUiLangSelect.disabled = true;
+        statusText.textContent = "表示言語設定を保存中...";
         try {
           const response = await fetch("/api/admin/ui-language", {
             method: "POST",
@@ -569,16 +574,14 @@
           renderUiLanguageState(data.default_ui_language);
           statusText.textContent =
             data.default_ui_language === "en"
-              ? "初期表示言語を English に設定しました（新規アクセスに反映）"
-              : "初期表示言語を日本語に設定しました（新規アクセスに反映）";
+              ? "表示言語を English に設定しました（新規アクセスに反映）"
+              : "表示言語を日本語に設定しました（新規アクセスに反映）";
         } catch (error) {
           console.error(error);
           statusText.textContent = "表示言語設定の保存に失敗しました。";
           await loadAdminState();
         } finally {
-          uiLangInputs.forEach((input) => {
-            input.disabled = false;
-          });
+          if (adminUiLangSelect) adminUiLangSelect.disabled = false;
         }
       }
 
@@ -627,18 +630,19 @@
         saveTtsState(ttsToggle.checked);
       });
 
-      langInputs.forEach((input) => {
-        input.addEventListener("change", () => {
-          saveLanguageState();
-        });
-      });
+      if (adminLangSaveBtn) {
+        adminLangSaveBtn.addEventListener("click", saveLanguageState);
+      }
 
-      uiLangInputs.forEach((input) => {
-        input.addEventListener("change", () => {
-          if (!input.checked) return;
-          saveUiLanguageState(input.value);
+      if (adminLangSelect) {
+        adminLangSelect.addEventListener("change", updateLanguageDropdownSummary);
+      }
+
+      if (adminUiLangSelect) {
+        adminUiLangSelect.addEventListener("change", () => {
+          saveUiLanguageState(adminUiLangSelect.value);
         });
-      });
+      }
 
       if (shareLinkUiSelect) {
         shareLinkUiSelect.addEventListener("change", updateShareLinkPreview);
