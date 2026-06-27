@@ -184,6 +184,9 @@
                 <div id="accuracyBarFill" class="progress-fill"></div>
               </div>
             </div>
+            <button id="pronunciationAdviceBtn" class="btn ghost pronunciation-advice-btn hidden" type="button">
+              🎧 発音アドバイスを見る
+            </button>
             <div id="pronunciationAdviceBlock" class="pronunciation-advice hidden" aria-live="polite">
               <p class="pronunciation-advice-label" id="pronunciationAdviceLabel">🎧 AI発音コーチからのアドバイス</p>
               <p id="pronunciationAdviceText" class="pronunciation-advice-text">—</p>
@@ -236,6 +239,7 @@
       const accuracyBarFill = document.getElementById("accuracyBarFill");
       const accuracyProgress = document.getElementById("accuracyProgress");
       const pronunciationAdviceBlock = document.getElementById("pronunciationAdviceBlock");
+      const pronunciationAdviceBtn = document.getElementById("pronunciationAdviceBtn");
       const pronunciationAdviceText = document.getElementById("pronunciationAdviceText");
       const settingsBtn = document.getElementById("settingsBtn");
       const settingsPanel = document.getElementById("settingsPanel");
@@ -798,6 +802,9 @@
         if (resultCardHeading) resultCardHeading.textContent = t("resultHeading");
         if (comparisonCardHeading) comparisonCardHeading.textContent = t("comparisonHeading");
         if (pronunciationAdviceLabel) pronunciationAdviceLabel.textContent = t("adviceLabel");
+        if (pronunciationAdviceBtn && !pronunciationAdviceBtn.disabled) {
+          pronunciationAdviceBtn.textContent = t("adviceBtn");
+        }
         if (legendChipExact) legendChipExact.textContent = t("chipExact");
         if (legendChipNear) legendChipNear.textContent = t("chipNear");
         if (legendChipMiss) legendChipMiss.textContent = t("chipMiss");
@@ -1833,6 +1840,21 @@
         pronunciationAdviceText.textContent = "—";
       }
 
+      function setPronunciationAdviceBtnLoading(loading) {
+        if (!pronunciationAdviceBtn) return;
+        pronunciationAdviceBtn.disabled = loading;
+        pronunciationAdviceBtn.textContent = loading ? t("adviceBtnLoading") : t("adviceBtn");
+      }
+
+      function updatePronunciationAdviceBtn() {
+        if (!pronunciationAdviceBtn) return;
+        const hasSpoken = Boolean(finalTranscript.trim());
+        pronunciationAdviceBtn.classList.toggle("hidden", !hasSpoken);
+        if (hasSpoken) {
+          setPronunciationAdviceBtnLoading(false);
+        }
+      }
+
       function showPronunciationAdviceLoading() {
         pronunciationAdviceBlock.classList.remove("hidden");
         pronunciationAdviceBlock.classList.add("is-loading");
@@ -1870,6 +1892,7 @@
 
         const requestId = ++pronunciationAdviceRequestId;
         showPronunciationAdviceLoading();
+        setPronunciationAdviceBtnLoading(true);
 
         try {
           const response = await fetch("/api/pronunciation-advice", {
@@ -1903,6 +1926,10 @@
           pronunciationAdviceBlock.classList.remove("is-loading");
           pronunciationAdviceBlock.classList.remove("hidden");
           pronunciationAdviceText.textContent = t("adviceFail");
+        } finally {
+          if (requestId === pronunciationAdviceRequestId) {
+            setPronunciationAdviceBtnLoading(false);
+          }
         }
       }
 
@@ -1937,12 +1964,20 @@
         updateAccuracyBar(compared);
         comparisonCard.classList.remove("hidden");
 
-        const spokenForAdvice = finalTranscript.trim();
-        if (spokenForAdvice) {
-          fetchPronunciationAdvice(referenceRaw, spokenForAdvice, computeAccuracyPercent(compared));
-        } else {
-          hidePronunciationAdvice();
-        }
+        hidePronunciationAdvice();
+        updatePronunciationAdviceBtn();
+      }
+
+      function requestPronunciationAdviceFromComparison() {
+        const referenceRaw = referenceText.value.trim();
+        const spoken = finalTranscript.trim();
+        if (!referenceRaw || !spoken) return;
+
+        const compared = compareWords(
+          extractWordTokens(referenceRaw),
+          extractWordTokens(spoken)
+        );
+        fetchPronunciationAdvice(referenceRaw, spoken, computeAccuracyPercent(compared));
       }
 
       const SECTION_STORAGE_KEY = "vibespeak-section-visibility";
@@ -2649,6 +2684,9 @@
 
       listenModelBtn.addEventListener("click", speakReferenceText);
       grammarCheckBtn.addEventListener("click", runGrammarCheck);
+      if (pronunciationAdviceBtn) {
+        pronunciationAdviceBtn.addEventListener("click", requestPronunciationAdviceFromComparison);
+      }
 
       if (!SpeechRecognition) {
         setStatus(t("speechUnsupported"));
@@ -2668,6 +2706,7 @@
           comparisonCard.classList.add("hidden");
           accuracyBlock.classList.add("hidden");
           hidePronunciationAdvice();
+          if (pronunciationAdviceBtn) pronunciationAdviceBtn.classList.add("hidden");
           startBtn.disabled = true;
           stopBtn.disabled = false;
           setStatus(getStudyLangConfig().recordPrompt);
