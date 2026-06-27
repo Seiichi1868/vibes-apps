@@ -36,9 +36,7 @@
       <div class="admin-dashboard">
       <section class="admin-card">
         <h2 class="admin-card__title">クラスコードロック</h2>
-        <p class="admin-lead">
-          生徒全員にリアルタイムで反映されます。OFF にするとコード入力なしで利用できます。
-        </p>
+        <p class="admin-lead">OFF にするとコード入力なしで利用できます。</p>
 
         <div class="admin-lock-panel">
           <div class="admin-lock-status">
@@ -57,27 +55,17 @@
       </section>
 
       <section class="admin-card">
-        <h2 class="admin-card__title">表示言語設定 <span class="admin-card__title-en">(Display Language Settings)</span></h2>
-        <p class="admin-lead">
-          初回アクセス時の UI 表示言語です（学習言語とは別）。<br />
-          Default UI language on first visit (separate from the study language).
-        </p>
-
-        <label class="admin-select-field" for="adminUiLangSelect">
-          <span class="admin-select-field-label">表示言語 / Display Language</span>
-          <select id="adminUiLangSelect" class="admin-link-gen-select">
-            <option value="ja">日本語 (Japanese)</option>
-            <option value="en">English</option>
-          </select>
-        </label>
+        <h2 class="admin-card__title">表示言語設定 <span class="admin-card__title-en">(Display Language)</span></h2>
+        <select id="adminUiLangSelect" class="admin-link-gen-select admin-card-select">
+          <option value="ja">日本語 (Japanese)</option>
+          <option value="en">English</option>
+        </select>
       </section>
 
       <div id="adminSettingsGated" class="admin-settings-gated hidden">
         <section class="admin-card">
           <h2 class="admin-card__title">TTS音声（OpenAI）</h2>
-          <p class="admin-lead">
-            ON にすると、生徒が「見本を聴く」を押した時だけ OpenAI のネイティブ音声を生成します。OFF 時はブラウザ標準音声です。
-          </p>
+          <p class="admin-lead">「見本を聴く」時のみ OpenAI 音声を生成</p>
 
           <div class="admin-lock-panel">
             <div class="admin-lock-status">
@@ -94,33 +82,35 @@
         </section>
 
         <section class="admin-card">
-          <h2 class="admin-card__title">使用可能な言語 <span class="admin-card__title-en">(Available Languages)</span></h2>
-          <p class="admin-lead">
-            生徒画面の「学習する言語を選択」に表示する言語を選びます。<br />
-            Choose which study languages appear on the student screen.
-          </p>
+          <h2 class="admin-card__title">学習言語 <span class="admin-card__title-en">(Study Languages)</span></h2>
 
           <details class="admin-lang-dropdown" id="adminLangDropdown">
-            <summary class="admin-lang-dropdown-summary">言語を選択 / Select languages</summary>
-            <select id="adminLangSelect" class="admin-link-gen-select admin-lang-select" multiple size="4">
-              <option value="en">🇬🇧 英語 (English)</option>
-              <option value="es">🇪🇸 スペイン語 (Spanish)</option>
-              <option value="ja">🇯🇵 日本語 (Japanese)</option>
-              <option value="ro">🇷🇴 ルーマニア語 (Romanian)</option>
-            </select>
+            <summary class="admin-lang-dropdown-summary">学習言語を選択 / Select study languages</summary>
+            <div class="admin-lang-checklist" id="adminLangOptions">
+              <label class="admin-lang-check">
+                <input type="checkbox" name="adminLang" value="en" />
+                <span>🇬🇧 英語 (English)</span>
+              </label>
+              <label class="admin-lang-check">
+                <input type="checkbox" name="adminLang" value="es" />
+                <span>🇪🇸 スペイン語 (Spanish)</span>
+              </label>
+              <label class="admin-lang-check">
+                <input type="checkbox" name="adminLang" value="ja" />
+                <span>🇯🇵 日本語 (Japanese)</span>
+              </label>
+              <label class="admin-lang-check">
+                <input type="checkbox" name="adminLang" value="ro" />
+                <span>🇷🇴 ルーマニア語 (Romanian)</span>
+              </label>
+            </div>
           </details>
-          <p class="admin-lock-hint admin-lang-select-hint">
-            複数選択: Ctrl+クリック (Windows) / ⌘+クリック (Mac)<br />
-            Multi-select: Ctrl+click (Windows) / ⌘+click (Mac)
-          </p>
-          <button type="button" id="adminLangSaveBtn" class="admin-lang-save-btn">言語設定を保存 / Save languages</button>
+          <button type="button" id="adminLangSaveBtn" class="admin-lang-save-btn">保存 / Save</button>
         </section>
 
         <section class="admin-card admin-card--span-full">
           <h2 class="admin-card__title">AIモデル選択</h2>
-          <p class="admin-lead">
-            添削・解説・発音アドバイスのみ切り替わります。OCR など基本処理は常に gpt-4o-mini です。
-          </p>
+          <p class="admin-lead">添削・解説・発音アドバイス用（OCR 等は gpt-4o-mini 固定）</p>
 
           <fieldset class="admin-mode-fieldset">
             <legend class="admin-mode-legend">4つのAIモード</legend>
@@ -162,37 +152,32 @@
       </div>
 
       <section class="admin-card admin-card--span-full admin-card--link-gen">
-        <h2 class="admin-card__title">🔗 共有用リンク生成（Link Generator）</h2>
-        <p class="admin-lead">
-          表示言語と学習言語を選ぶと、生徒が開いた瞬間にその設定が反映されるURLを自動作成します。クエリは
-          <code>?ui=xx&amp;target=xx</code> 形式です。
-        </p>
+        <h2 class="admin-card__title">🔗 共有リンク生成 <span class="admin-card__title-en">(Link Generator)</span></h2>
+        <p class="admin-lead">表示言語・学習言語を URL に反映（<code>?ui=xx&amp;target=xx</code>）</p>
 
         <div class="admin-link-gen-row">
         <div class="admin-link-gen-form">
           <label class="admin-link-gen-field" for="shareLinkUiSelect">
-            <span class="admin-link-gen-field-label">アプリの表示言語 (UI Language)</span>
+            <span class="admin-link-gen-field-label">表示言語 (UI)</span>
             <select id="shareLinkUiSelect" class="admin-link-gen-select">
               <option value="ja">日本語</option>
               <option value="en">English</option>
             </select>
           </label>
           <label class="admin-link-gen-field" for="shareLinkTargetSelect">
-            <span class="admin-link-gen-field-label">学習対象の言語 (Target Language)</span>
+            <span class="admin-link-gen-field-label">学習言語 (Target)</span>
             <select id="shareLinkTargetSelect" class="admin-link-gen-select"></select>
           </label>
         </div>
 
         <div class="admin-link-gen-preview-wrap">
-          <p class="admin-link-gen-preview-label">生成URL（プレビュー）</p>
+          <p class="admin-link-gen-preview-label">URL</p>
           <output
             id="shareLinkPreview"
             class="admin-link-gen-preview"
             for="shareLinkUiSelect shareLinkTargetSelect"
           ></output>
-          <button id="shareLinkCopyBtn" type="button" class="admin-link-gen-copy-btn">
-            URLをコピー（Copy URL）
-          </button>
+          <button id="shareLinkCopyBtn" type="button" class="admin-link-gen-copy-btn">コピー / Copy</button>
         </div>
         </div>
         <p id="shareLinkCopyToast" class="admin-link-gen-toast hidden" role="status" aria-live="polite">
@@ -212,7 +197,7 @@
       const ttsToggle = document.getElementById("adminTtsToggle");
       const ttsLabel = document.getElementById("adminTtsLabel");
       const ttsHint = document.getElementById("adminTtsHint");
-      const adminLangSelect = document.getElementById("adminLangSelect");
+      const adminLangInputs = Array.from(document.querySelectorAll('input[name="adminLang"]'));
       const adminLangSaveBtn = document.getElementById("adminLangSaveBtn");
       const adminUiLangSelect = document.getElementById("adminUiLangSelect");
       const activeModel = document.getElementById("adminActiveModel");
@@ -297,10 +282,8 @@
 
       function renderLockState(lockEnabled) {
         lockToggle.checked = lockEnabled;
-        lockLabel.textContent = lockEnabled ? "ロック ON（コード必須）" : "ロック OFF（解放中）";
-        lockHint.textContent = lockEnabled
-          ? "生徒は4桁コードの入力が必要です"
-          : "生徒はコードなしでそのまま入室できます";
+        lockLabel.textContent = lockEnabled ? "ロック ON" : "ロック OFF";
+        lockHint.textContent = lockEnabled ? "4桁コード必須" : "コード不要";
       }
 
       function renderAiModeState(aiData) {
@@ -315,30 +298,28 @@
 
       function renderTtsState(ttsEnabled) {
         ttsToggle.checked = ttsEnabled;
-        ttsLabel.textContent = ttsEnabled ? "TTS音声 ON（OpenAI）" : "TTS音声 OFF（ブラウザ標準）";
-        ttsHint.textContent = ttsEnabled
-          ? "再生ボタン押下時のみ tts-1 で音声を生成します"
-          : "生徒は無料のブラウザ標準音声で聞けます";
+        ttsLabel.textContent = ttsEnabled ? "TTS ON（OpenAI）" : "TTS OFF（ブラウザ）";
+        ttsHint.textContent = ttsEnabled ? "見本を聴く時のみ生成" : "ブラウザ標準音声";
       }
 
       function updateLanguageDropdownSummary() {
         const summaryEl = document.querySelector("#adminLangDropdown > summary");
-        if (!summaryEl || !adminLangSelect) return;
-        const selected = Array.from(adminLangSelect.selectedOptions).map((option) => option.textContent.trim());
+        if (!summaryEl) return;
+        const selected = adminLangInputs
+          .filter((input) => input.checked)
+          .map((input) => input.nextElementSibling?.textContent.trim() || input.value);
         summaryEl.textContent = selected.length
           ? selected.join(", ")
-          : "言語を選択 / Select languages";
+          : "学習言語を選択 / Select study languages";
       }
 
       function renderLanguageState(langData) {
         const enabled = new Set(Array.isArray(langData.enabled_languages) ? langData.enabled_languages : []);
-        if (adminLangSelect) {
-          Array.from(adminLangSelect.options).forEach((option) => {
-            option.selected = enabled.has(option.value);
-          });
-          adminLangSelect.disabled = false;
-          updateLanguageDropdownSummary();
-        }
+        adminLangInputs.forEach((input) => {
+          input.checked = enabled.has(input.value);
+          input.disabled = false;
+        });
+        updateLanguageDropdownSummary();
         const enabledList = ALL_SHARE_TARGET_LANGS.filter((id) => enabled.has(id));
         shareLinkEnabledLangs = enabledList.length ? enabledList : [...ALL_SHARE_TARGET_LANGS];
         renderShareLinkTargetOptions();
@@ -522,17 +503,17 @@
           statusText.textContent = "管理設定のパスワードが必要です。";
           return;
         }
-        const enabled = adminLangSelect
-          ? Array.from(adminLangSelect.selectedOptions).map((option) => option.value)
-          : [];
+        const enabled = adminLangInputs.filter((input) => input.checked).map((input) => input.value);
         if (!enabled.length) {
-          statusText.textContent = "少なくとも1つの言語を選択してください。 / Select at least one language.";
+          statusText.textContent = "少なくとも1つの言語を選択してください。";
           await loadAdminState();
           return;
         }
-        if (adminLangSelect) adminLangSelect.disabled = true;
+        adminLangInputs.forEach((input) => {
+          input.disabled = true;
+        });
         if (adminLangSaveBtn) adminLangSaveBtn.disabled = true;
-        statusText.textContent = "言語設定を保存中...";
+        statusText.textContent = "学習言語を保存中...";
         try {
           const response = await fetch("/api/admin/languages", {
             method: "POST",
@@ -547,13 +528,15 @@
             throw new Error(data.error || "保存に失敗しました");
           }
           renderLanguageState(data);
-          statusText.textContent = "利用可能な言語を更新しました（生徒画面に即時反映）";
+          statusText.textContent = "学習言語を更新しました（生徒画面に即時反映）";
         } catch (error) {
           console.error(error);
-          statusText.textContent = "言語設定の保存に失敗しました。";
+          statusText.textContent = "学習言語の保存に失敗しました。";
           await loadAdminState();
         } finally {
-          if (adminLangSelect) adminLangSelect.disabled = false;
+          adminLangInputs.forEach((input) => {
+            input.disabled = false;
+          });
           if (adminLangSaveBtn) adminLangSaveBtn.disabled = false;
         }
       }
@@ -634,8 +617,13 @@
         adminLangSaveBtn.addEventListener("click", saveLanguageState);
       }
 
-      if (adminLangSelect) {
-        adminLangSelect.addEventListener("change", updateLanguageDropdownSummary);
+      adminLangInputs.forEach((input) => {
+        input.addEventListener("change", updateLanguageDropdownSummary);
+      });
+
+      const adminLangChecklist = document.getElementById("adminLangOptions");
+      if (adminLangChecklist) {
+        adminLangChecklist.addEventListener("click", (e) => e.stopPropagation());
       }
 
       if (adminUiLangSelect) {
