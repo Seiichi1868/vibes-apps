@@ -34,40 +34,61 @@
       </header>
 
       <div class="admin-dashboard">
-      <section class="admin-card">
+      <section class="admin-card admin-card--compact">
         <h2 class="admin-card__title">クラスコードロック</h2>
-        <p class="admin-lead">OFF にするとコード入力なしで利用できます。</p>
-
-        <div class="admin-lock-panel">
-          <div class="admin-lock-status">
-            <span id="adminLockLabel" class="admin-lock-label">読み込み中...</span>
-            <span id="adminLockHint" class="admin-lock-hint">—</span>
+        <div class="admin-card-row">
+          <div class="admin-lock-panel admin-lock-panel--inline">
+            <div class="admin-lock-status">
+              <span id="adminLockLabel" class="admin-lock-label">読み込み中...</span>
+              <span id="adminLockHint" class="admin-lock-hint">—</span>
+            </div>
+            <label class="admin-toggle" for="adminLockToggle">
+              <input id="adminLockToggle" type="checkbox" role="switch" aria-labelledby="adminLockLabel" />
+              <span class="admin-toggle-track" aria-hidden="true">
+                <span class="admin-toggle-thumb"></span>
+              </span>
+            </label>
           </div>
-          <label class="admin-toggle" for="adminLockToggle">
-            <input id="adminLockToggle" type="checkbox" role="switch" aria-labelledby="adminLockLabel" />
-            <span class="admin-toggle-track" aria-hidden="true">
-              <span class="admin-toggle-thumb"></span>
+          <p class="admin-meta admin-meta--inline">コード: <strong id="adminTodayCode">----</strong></p>
+        </div>
+      </section>
+
+      <section class="admin-card admin-card--compact">
+        <h2 class="admin-card__title">表示言語設定 <span class="admin-card__title-en">(Display Language)</span></h2>
+        <div class="admin-mode-options admin-mode-options--stack" id="adminUiLangOptions">
+          <label class="admin-mode-option admin-mode-option--compact">
+            <input type="radio" name="uiLang" value="ja" />
+            <span class="admin-mode-option-body">
+              <span class="admin-mode-option-title">日本語 (Japanese)</span>
+              <span class="admin-mode-option-desc">UI in Japanese</span>
+            </span>
+          </label>
+          <label class="admin-mode-option admin-mode-option--compact">
+            <input type="radio" name="uiLang" value="en" />
+            <span class="admin-mode-option-body">
+              <span class="admin-mode-option-title">English</span>
+              <span class="admin-mode-option-desc">UI in English</span>
             </span>
           </label>
         </div>
-
-        <p class="admin-meta">本日のクラスコード（参考）: <strong id="adminTodayCode">----</strong></p>
       </section>
 
-      <section class="admin-card">
-        <h2 class="admin-card__title">表示言語設定 <span class="admin-card__title-en">(Display Language)</span></h2>
-        <select id="adminUiLangSelect" class="admin-link-gen-select admin-card-select">
-          <option value="ja">日本語 (Japanese)</option>
-          <option value="en">English</option>
-        </select>
+      <section class="admin-card admin-card--compact">
+        <h2 class="admin-card__title">表示するセクション <span class="admin-card__title-en">(Visible Sections)</span></h2>
+        <div class="admin-section-chips" id="adminSectionOptions">
+          <label class="admin-section-chip"><input type="checkbox" name="adminSection" value="sample" checked /><span>練習用サンプル文</span></label>
+          <label class="admin-section-chip"><input type="checkbox" name="adminSection" value="compose" checked /><span>自由作文</span></label>
+          <label class="admin-section-chip"><input type="checkbox" name="adminSection" value="grammar" checked /><span>文法添削</span></label>
+          <label class="admin-section-chip"><input type="checkbox" name="adminSection" value="recorder" checked /><span>ステータス</span></label>
+          <label class="admin-section-chip"><input type="checkbox" name="adminSection" value="result" checked /><span>判定結果</span></label>
+          <label class="admin-section-chip"><input type="checkbox" name="adminSection" value="comparison" checked /><span>発音一致率</span></label>
+        </div>
       </section>
 
       <div id="adminSettingsGated" class="admin-settings-gated hidden">
-        <section class="admin-card">
+        <section class="admin-card admin-card--compact">
           <h2 class="admin-card__title">TTS音声（OpenAI）</h2>
-          <p class="admin-lead">「見本を聴く」時のみ OpenAI 音声を生成</p>
-
-          <div class="admin-lock-panel">
+          <div class="admin-lock-panel admin-lock-panel--inline">
             <div class="admin-lock-status">
               <span id="adminTtsLabel" class="admin-lock-label">読み込み中...</span>
               <span id="adminTtsHint" class="admin-lock-hint">—</span>
@@ -81,9 +102,8 @@
           </div>
         </section>
 
-        <section class="admin-card">
+        <section class="admin-card admin-card--compact">
           <h2 class="admin-card__title">学習言語 <span class="admin-card__title-en">(Study Languages)</span></h2>
-
           <details class="admin-lang-dropdown" id="adminLangDropdown">
             <summary class="admin-lang-dropdown-summary">学習言語を選択 / Select study languages</summary>
             <div class="admin-lang-checklist" id="adminLangOptions">
@@ -108,81 +128,62 @@
           <button type="button" id="adminLangSaveBtn" class="admin-lang-save-btn">保存 / Save</button>
         </section>
 
-        <section class="admin-card admin-card--span-full">
+        <section class="admin-card admin-card--span-2 admin-card--compact">
           <h2 class="admin-card__title">AIモデル選択</h2>
-          <p class="admin-lead">添削・解説・発音アドバイス用（OCR 等は gpt-4o-mini 固定）</p>
-
-          <fieldset class="admin-mode-fieldset">
-            <legend class="admin-mode-legend">4つのAIモード</legend>
-            <div class="admin-mode-options admin-mode-options--grid" id="adminAiModeOptions">
-              <label class="admin-mode-option">
-                <input type="radio" name="aiMode" value="4o-mini" />
-                <span class="admin-mode-option-body">
-                  <span class="admin-mode-option-title">① 節約モード</span>
-                  <span class="admin-mode-option-desc">全機能 gpt-4o-mini</span>
-                </span>
-              </label>
-              <label class="admin-mode-option">
-                <input type="radio" name="aiMode" value="5-mini" />
-                <span class="admin-mode-option-body">
-                  <span class="admin-mode-option-title">② 前世代mini</span>
-                  <span class="admin-mode-option-desc">添削・解説・発音 gpt-5-mini</span>
-                </span>
-              </label>
-              <label class="admin-mode-option">
-                <input type="radio" name="aiMode" value="5.4-mini" />
-                <span class="admin-mode-option-body">
-                  <span class="admin-mode-option-title">③ 最新高精度</span>
-                  <span class="admin-mode-option-desc">添削・解説・発音 gpt-5.4-mini</span>
-                </span>
-              </label>
-              <label class="admin-mode-option">
-                <input type="radio" name="aiMode" value="5.4-nano" />
-                <span class="admin-mode-option-body">
-                  <span class="admin-mode-option-title">④ 最安実験</span>
-                  <span class="admin-mode-option-desc">添削・解説・発音 gpt-5.4-nano</span>
-                </span>
-              </label>
-            </div>
-          </fieldset>
-
-          <p class="admin-meta">現在のAIモデル: <strong id="adminActiveModel">—</strong></p>
-          <p id="adminAiHint" class="admin-lock-hint admin-ai-hint">—</p>
+          <div class="admin-mode-options admin-mode-options--grid admin-mode-options--ai" id="adminAiModeOptions">
+            <label class="admin-mode-option admin-mode-option--compact">
+              <input type="radio" name="aiMode" value="4o-mini" />
+              <span class="admin-mode-option-body">
+                <span class="admin-mode-option-title">① 節約</span>
+                <span class="admin-mode-option-desc">gpt-4o-mini</span>
+              </span>
+            </label>
+            <label class="admin-mode-option admin-mode-option--compact">
+              <input type="radio" name="aiMode" value="5-mini" />
+              <span class="admin-mode-option-body">
+                <span class="admin-mode-option-title">② 前世代mini</span>
+                <span class="admin-mode-option-desc">gpt-5-mini</span>
+              </span>
+            </label>
+            <label class="admin-mode-option admin-mode-option--compact">
+              <input type="radio" name="aiMode" value="5.4-mini" />
+              <span class="admin-mode-option-body">
+                <span class="admin-mode-option-title">③ 最新高精度</span>
+                <span class="admin-mode-option-desc">gpt-5.4-mini</span>
+              </span>
+            </label>
+            <label class="admin-mode-option admin-mode-option--compact">
+              <input type="radio" name="aiMode" value="5.4-nano" />
+              <span class="admin-mode-option-body">
+                <span class="admin-mode-option-title">④ 最安実験</span>
+                <span class="admin-mode-option-desc">gpt-5.4-nano</span>
+              </span>
+            </label>
+          </div>
+          <p class="admin-meta admin-meta--inline">現在: <strong id="adminActiveModel">—</strong> <span id="adminAiHint" class="admin-lock-hint">—</span></p>
         </section>
       </div>
 
-      <section class="admin-card admin-card--span-full admin-card--link-gen">
-        <h2 class="admin-card__title">🔗 共有リンク生成 <span class="admin-card__title-en">(Link Generator)</span></h2>
-        <p class="admin-lead">表示言語・学習言語を URL に反映（<code>?ui=xx&amp;target=xx</code>）</p>
-
+      <section class="admin-card admin-card--span-full admin-card--link-gen admin-card--compact">
+        <h2 class="admin-card__title">🔗 共有リンク <span class="admin-card__title-en">(Link Generator)</span></h2>
         <div class="admin-link-gen-row">
-        <div class="admin-link-gen-form">
+        <div class="admin-link-gen-form admin-link-gen-form--inline">
           <label class="admin-link-gen-field" for="shareLinkUiSelect">
-            <span class="admin-link-gen-field-label">表示言語 (UI)</span>
+            <span class="admin-link-gen-field-label">UI</span>
             <select id="shareLinkUiSelect" class="admin-link-gen-select">
               <option value="ja">日本語</option>
               <option value="en">English</option>
             </select>
           </label>
           <label class="admin-link-gen-field" for="shareLinkTargetSelect">
-            <span class="admin-link-gen-field-label">学習言語 (Target)</span>
+            <span class="admin-link-gen-field-label">学習言語</span>
             <select id="shareLinkTargetSelect" class="admin-link-gen-select"></select>
           </label>
-        </div>
-
-        <div class="admin-link-gen-preview-wrap">
-          <p class="admin-link-gen-preview-label">URL</p>
-          <output
-            id="shareLinkPreview"
-            class="admin-link-gen-preview"
-            for="shareLinkUiSelect shareLinkTargetSelect"
-          ></output>
           <button id="shareLinkCopyBtn" type="button" class="admin-link-gen-copy-btn">コピー / Copy</button>
         </div>
+        <output id="shareLinkPreview" class="admin-link-gen-preview admin-link-gen-preview--inline" for="shareLinkUiSelect shareLinkTargetSelect"></output>
         </div>
-        <p id="shareLinkCopyToast" class="admin-link-gen-toast hidden" role="status" aria-live="polite">
-          コピーしました！
-        </p>
+        <p id="shareLinkCopyToast" class="admin-link-gen-toast hidden" role="status" aria-live="polite">コピーしました！</p>
       </section>
 
       </div>
@@ -199,7 +200,8 @@
       const ttsHint = document.getElementById("adminTtsHint");
       const adminLangInputs = Array.from(document.querySelectorAll('input[name="adminLang"]'));
       const adminLangSaveBtn = document.getElementById("adminLangSaveBtn");
-      const adminUiLangSelect = document.getElementById("adminUiLangSelect");
+      const adminSectionInputs = Array.from(document.querySelectorAll('input[name="adminSection"]'));
+      const uiLangInputs = Array.from(document.querySelectorAll('input[name="uiLang"]'));
       const activeModel = document.getElementById("adminActiveModel");
       const todayCode = document.getElementById("adminTodayCode");
       const statusText = document.getElementById("adminStatus");
@@ -294,6 +296,22 @@
         });
         activeModel.textContent = aiData.active_model || "—";
         aiHint.textContent = aiData.hint || aiData.label || "—";
+      }
+
+      function renderSectionState(sectionData) {
+        const visible = sectionData.visible_sections || {};
+        adminSectionInputs.forEach((input) => {
+          input.checked = visible[input.value] !== false;
+          input.disabled = false;
+        });
+      }
+
+      function buildVisibleSectionsPayload() {
+        const payload = {};
+        adminSectionInputs.forEach((input) => {
+          payload[input.value] = input.checked;
+        });
+        return payload;
       }
 
       function renderTtsState(ttsEnabled) {
@@ -401,23 +419,25 @@
 
       function renderUiLanguageState(uiLang) {
         const lang = String(uiLang || "ja");
-        if (adminUiLangSelect) {
-          adminUiLangSelect.value = lang === "en" ? "en" : "ja";
-          adminUiLangSelect.disabled = false;
-        }
+        uiLangInputs.forEach((input) => {
+          input.checked = input.value === lang;
+          input.disabled = false;
+        });
       }
 
       async function loadAdminState() {
         statusText.textContent = "状態を取得中...";
-        const [lockRes, langRes, uiLangRes, codeRes] = await Promise.all([
+        const [lockRes, langRes, uiLangRes, sectionsRes, codeRes] = await Promise.all([
           fetch("/api/admin/gate-lock"),
           fetch("/api/admin/languages"),
           fetch("/api/admin/ui-language"),
+          fetch("/api/admin/sections"),
           fetch("/api/gate/today"),
         ]);
         const lockData = await lockRes.json();
         const langData = await langRes.json();
         const uiLangData = await uiLangRes.json();
+        const sectionsData = await sectionsRes.json();
         const codeData = await codeRes.json();
         if (!lockRes.ok) {
           throw new Error(lockData.error || "ロック状態の取得に失敗しました");
@@ -428,9 +448,13 @@
         if (!uiLangRes.ok) {
           throw new Error(uiLangData.error || "表示言語設定の取得に失敗しました");
         }
+        if (!sectionsRes.ok) {
+          throw new Error(sectionsData.error || "セクション設定の取得に失敗しました");
+        }
         renderLockState(Boolean(lockData.lock_enabled));
         renderLanguageState(langData);
         renderUiLanguageState(uiLangData.default_ui_language);
+        renderSectionState(sectionsData);
         if (shareLinkUiSelect) {
           const uiDefault = uiLangData.default_ui_language === "en" ? "en" : "ja";
           if (!shareLinkUiSelect.value) shareLinkUiSelect.value = uiDefault;
@@ -541,8 +565,38 @@
         }
       }
 
+      async function saveSectionState() {
+        adminSectionInputs.forEach((input) => {
+          input.disabled = true;
+        });
+        statusText.textContent = "セクション表示を保存中...";
+        try {
+          const response = await fetch("/api/admin/sections", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ visible_sections: buildVisibleSectionsPayload() }),
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || "保存に失敗しました");
+          }
+          renderSectionState(data);
+          statusText.textContent = "表示セクションを更新しました（生徒画面に即時反映）";
+        } catch (error) {
+          console.error(error);
+          statusText.textContent = "セクション設定の保存に失敗しました。";
+          await loadAdminState();
+        } finally {
+          adminSectionInputs.forEach((input) => {
+            input.disabled = false;
+          });
+        }
+      }
+
       async function saveUiLanguageState(uiLanguage) {
-        if (adminUiLangSelect) adminUiLangSelect.disabled = true;
+        uiLangInputs.forEach((input) => {
+          input.disabled = true;
+        });
         statusText.textContent = "表示言語設定を保存中...";
         try {
           const response = await fetch("/api/admin/ui-language", {
@@ -564,7 +618,9 @@
           statusText.textContent = "表示言語設定の保存に失敗しました。";
           await loadAdminState();
         } finally {
-          if (adminUiLangSelect) adminUiLangSelect.disabled = false;
+          uiLangInputs.forEach((input) => {
+            input.disabled = false;
+          });
         }
       }
 
@@ -626,11 +682,16 @@
         adminLangChecklist.addEventListener("click", (e) => e.stopPropagation());
       }
 
-      if (adminUiLangSelect) {
-        adminUiLangSelect.addEventListener("change", () => {
-          saveUiLanguageState(adminUiLangSelect.value);
+      adminSectionInputs.forEach((input) => {
+        input.addEventListener("change", saveSectionState);
+      });
+
+      uiLangInputs.forEach((input) => {
+        input.addEventListener("change", () => {
+          if (!input.checked) return;
+          saveUiLanguageState(input.value);
         });
-      }
+      });
 
       if (shareLinkUiSelect) {
         shareLinkUiSelect.addEventListener("change", updateShareLinkPreview);

@@ -92,23 +92,6 @@
               <span id="statusText" class="header-status" data-section="recorder">待機中</span>
             </div>
           </header>
-          <div class="settings-wrap">
-            <button id="settingsBtn" class="settings-btn" type="button" aria-expanded="false" aria-controls="settingsPanel" title="表示設定">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
-              </svg>
-            </button>
-            <div id="settingsPanel" class="settings-panel hidden" role="dialog" aria-label="表示設定">
-              <h3 id="settingsPanelHeading">表示するセクション</h3>
-              <label id="settingsLabelSample"><input type="checkbox" data-toggle-section="sample" checked /> 練習用サンプル文</label>
-              <label id="settingsLabelCompose"><input type="checkbox" data-toggle-section="compose" checked /> 自由作文</label>
-              <label id="settingsLabelGrammar"><input type="checkbox" data-toggle-section="grammar" checked /> 文法添削</label>
-              <label id="settingsLabelRecorder"><input type="checkbox" data-toggle-section="recorder" checked /> ステータス表示</label>
-              <label id="settingsLabelResult"><input type="checkbox" data-toggle-section="result" checked /> 判定結果</label>
-              <label id="settingsLabelComparison"><input type="checkbox" data-toggle-section="comparison" checked /> 発音一致率</label>
-            </div>
-          </div>
         </div>
 
         <div class="dashboard">
@@ -241,9 +224,6 @@
       const pronunciationAdviceBlock = document.getElementById("pronunciationAdviceBlock");
       const pronunciationAdviceBtn = document.getElementById("pronunciationAdviceBtn");
       const pronunciationAdviceText = document.getElementById("pronunciationAdviceText");
-      const settingsBtn = document.getElementById("settingsBtn");
-      const settingsPanel = document.getElementById("settingsPanel");
-      const sectionToggles = document.querySelectorAll("[data-toggle-section]");
       const baseReferenceLayer = document.getElementById("baseReferenceLayer");
       const highlightLayer = document.getElementById("highlightLayer");
       const listenModelBtn = document.getElementById("listenModelBtn");
@@ -292,13 +272,6 @@
       const legendChipNear = document.getElementById("legendChipNear");
       const legendChipMiss = document.getElementById("legendChipMiss");
       const grammarHistoryToggleLabel = document.getElementById("grammarHistoryToggleLabel");
-      const settingsPanelHeading = document.getElementById("settingsPanelHeading");
-      const settingsLabelSample = document.getElementById("settingsLabelSample");
-      const settingsLabelCompose = document.getElementById("settingsLabelCompose");
-      const settingsLabelGrammar = document.getElementById("settingsLabelGrammar");
-      const settingsLabelRecorder = document.getElementById("settingsLabelRecorder");
-      const settingsLabelResult = document.getElementById("settingsLabelResult");
-      const settingsLabelComparison = document.getElementById("settingsLabelComparison");
       const gateOverlay = document.getElementById("gateOverlay");
       const gateCodeInput = document.getElementById("gateCodeInput");
       const gateSubmitBtn = document.getElementById("gateSubmitBtn");
@@ -766,30 +739,6 @@
         if (gateCodeInput) gateCodeInput.setAttribute("aria-label", t("gateCodeAria"));
         if (gateSubmitBtn) gateSubmitBtn.textContent = t("gateSubmit");
 
-        if (settingsBtn) settingsBtn.title = t("settingsTitle");
-        if (settingsPanel) settingsPanel.setAttribute("aria-label", t("settingsTitle"));
-        if (settingsPanelHeading) settingsPanelHeading.textContent = t("settingsHeading");
-        const settingsPairs = [
-          [settingsLabelSample, "settingsSample", "sample"],
-          [settingsLabelCompose, "settingsCompose", "compose"],
-          [settingsLabelGrammar, "settingsGrammar", "grammar"],
-          [settingsLabelRecorder, "settingsRecorder", "recorder"],
-          [settingsLabelResult, "settingsResult", "result"],
-          [settingsLabelComparison, "settingsComparison", "comparison"],
-        ];
-        settingsPairs.forEach(([labelEl, textKey, sectionKey]) => {
-          if (!labelEl) return;
-          const input = labelEl.querySelector("input");
-          labelEl.textContent = "";
-          if (input) {
-            labelEl.appendChild(input);
-            labelEl.append(` ${t(textKey)}`);
-          } else {
-            labelEl.textContent = t(textKey);
-          }
-          if (input) input.dataset.toggleSection = sectionKey;
-        });
-
         if (sampleBlockLabel) sampleBlockLabel.textContent = t("sampleLabel");
         if (cefrTablist) cefrTablist.setAttribute("aria-label", t("cefrAria"));
         if (cefrTabA1) cefrTabA1.textContent = t("cefrA1");
@@ -1021,7 +970,20 @@
           renderStudyLangSelect();
           applyUrlInitTargetLanguage();
         }
+        if (data.visible_sections) {
+          applySectionVisibilityFromServer(data.visible_sections);
+        }
         return serverGateLockEnabled;
+      }
+
+      function applySectionVisibilityFromServer(sections) {
+        if (!sections || typeof sections !== "object") return;
+        document.querySelectorAll("[data-section]").forEach((el) => {
+          const key = el.getAttribute("data-section");
+          if (!key) return;
+          const visible = sections[key] !== false;
+          el.classList.toggle("section-hidden", !visible);
+        });
       }
 
       async function unlockGateFromServerBypass() {
@@ -1980,63 +1942,6 @@
         fetchPronunciationAdvice(referenceRaw, spoken, computeAccuracyPercent(compared));
       }
 
-      const SECTION_STORAGE_KEY = "vibespeak-section-visibility";
-
-      function applySectionVisibility() {
-        document.querySelectorAll("[data-section]").forEach((el) => {
-          const key = el.getAttribute("data-section");
-          const checkbox = document.querySelector(`[data-toggle-section="${key}"]`);
-          const visible = checkbox ? checkbox.checked : true;
-          el.classList.toggle("section-hidden", !visible);
-        });
-      }
-
-      function loadSectionSettings() {
-        try {
-          const saved = JSON.parse(localStorage.getItem(SECTION_STORAGE_KEY) || "{}");
-          sectionToggles.forEach((cb) => {
-            const key = cb.getAttribute("data-toggle-section");
-            if (Object.prototype.hasOwnProperty.call(saved, key)) cb.checked = saved[key];
-          });
-        } catch (_) {
-          /* use defaults */
-        }
-        applySectionVisibility();
-      }
-
-      function saveSectionSettings() {
-        const state = {};
-        sectionToggles.forEach((cb) => {
-          state[cb.getAttribute("data-toggle-section")] = cb.checked;
-        });
-        localStorage.setItem(SECTION_STORAGE_KEY, JSON.stringify(state));
-      }
-
-      settingsBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const isHidden = settingsPanel.classList.toggle("hidden");
-        settingsBtn.setAttribute("aria-expanded", isHidden ? "false" : "true");
-      });
-
-      document.addEventListener("click", (e) => {
-        if (
-          !settingsPanel.classList.contains("hidden") &&
-          !settingsPanel.contains(e.target) &&
-          e.target !== settingsBtn &&
-          !settingsBtn.contains(e.target)
-        ) {
-          settingsPanel.classList.add("hidden");
-          settingsBtn.setAttribute("aria-expanded", "false");
-        }
-      });
-
-      sectionToggles.forEach((cb) => {
-        cb.addEventListener("change", () => {
-          applySectionVisibility();
-          saveSectionSettings();
-        });
-      });
-
       function setStatus(text) {
         statusText.textContent = text;
       }
@@ -2560,7 +2465,6 @@
       });
 
       fillSampleSelect("A1");
-      loadSectionSettings();
       autoResizeReferenceText();
 
       referenceText.addEventListener("input", () => {

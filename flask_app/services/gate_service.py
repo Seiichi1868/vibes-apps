@@ -13,6 +13,7 @@ from flask_app.utils.language_utils import (
     is_tts_enabled,
     languages_response,
 )
+from flask_app.utils.section_utils import get_visible_sections
 
 
 def _today_date_key() -> str:
@@ -66,4 +67,5 @@ def gate_status_payload() -> dict:
         "enabled_languages": get_enabled_study_languages(),
         "languages": languages_response()["languages"],
         "default_ui_language": get_default_ui_language(),
+        "visible_sections": get_visible_sections(),
     }

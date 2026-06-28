@@ -14,6 +14,7 @@ from flask_app.utils.language_utils import (
     set_enabled_study_languages,
     set_tts_enabled,
 )
+from flask_app.utils.section_utils import sections_response, set_visible_sections
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -138,3 +139,20 @@ def admin_languages():
         return jsonify({"error": str(exc)}), 400
 
     return jsonify(languages_response() | {"enabled_languages": enabled})
+
+
+@admin_bp.route("/admin/sections", methods=["GET", "POST"])
+def admin_sections():
+    if request.method == "GET":
+        return jsonify(sections_response())
+
+    payload = request.get_json(silent=True) or {}
+    raw = payload.get("visible_sections")
+    if raw is None:
+        raw = payload.get("sections")
+    try:
+        visible = set_visible_sections(raw if raw is not None else {})
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    return jsonify(sections_response() | {"visible_sections": visible})

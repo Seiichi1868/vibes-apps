@@ -11,6 +11,7 @@ from flask_app.utils.language_utils import (
     normalize_enabled_languages,
     normalize_ui_language,
 )
+from flask_app.utils.section_utils import DEFAULT_VISIBLE_SECTIONS, normalize_visible_sections
 
 _lock = threading.Lock()
 DATA_DIR = Path(
@@ -24,6 +25,7 @@ DEFAULT_SETTINGS = {
     "ai_mode": None,
     "enabled_study_languages": None,
     "default_ui_language": None,
+    "visible_sections": None,
 }
 
 
@@ -59,6 +61,9 @@ def _normalize_settings(raw: dict | None) -> dict:
     if raw.get("default_ui_language"):
         data["default_ui_language"] = normalize_ui_language(raw.get("default_ui_language"))
 
+    if raw.get("visible_sections") is not None:
+        data["visible_sections"] = normalize_visible_sections(raw.get("visible_sections"))
+
     return data
 
 
@@ -90,6 +95,7 @@ def current_runtime_settings() -> dict:
         "ai_mode": state.AI_MODE,
         "enabled_study_languages": list(state.ENABLED_STUDY_LANGUAGES),
         "default_ui_language": state.DEFAULT_UI_LANGUAGE,
+        "visible_sections": dict(state.VISIBLE_SECTIONS),
     }
 
 
@@ -115,6 +121,11 @@ def apply_runtime_settings(data: dict | None = None) -> None:
 
     if normalized["default_ui_language"]:
         state.DEFAULT_UI_LANGUAGE = normalized["default_ui_language"]
+
+    if normalized.get("visible_sections") is not None:
+        state.VISIBLE_SECTIONS = dict(normalized["visible_sections"])
+    else:
+        state.VISIBLE_SECTIONS = dict(DEFAULT_VISIBLE_SECTIONS)
 
 
 def update_runtime_settings(**kwargs) -> dict:

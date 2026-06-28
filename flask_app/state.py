@@ -97,3 +97,5 @@ CLASS_CODE_LOCK_ENABLED = _env_bool(
     default=not _on_render,
 )
 DEFAULT_UI_LANGUAGE = "ja"
+DEFAULT_VISIBLE_SECTIONS: dict[str, bool] = {key: True for key in ("sample", "compose", "grammar", "recorder", "result", "comparison")}
+VISIBLE_SECTIONS: dict[str, bool] = dict(DEFAULT_VISIBLE_SECTIONS)

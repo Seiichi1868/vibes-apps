@@ -1688,10 +1688,10 @@ body.gate-locked {
 }
 
 .admin-link-gen-row {
-  display: grid;
-  grid-template-columns: minmax(11rem, 20rem) minmax(0, 1fr);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
   gap: 6px;
-  align-items: start;
 }
 
 .admin-link-gen-form {
@@ -1813,6 +1813,103 @@ body.gate-locked {
 .admin-lang-save-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.admin-card--compact {
+  gap: 3px;
+  padding: 6px 8px;
+}
+
+.admin-card-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.admin-lock-panel--inline {
+  flex: 1 1 12rem;
+  margin-top: 0;
+}
+
+.admin-meta--inline {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.admin-mode-options--stack {
+  grid-template-columns: 1fr;
+  margin-bottom: 0;
+}
+
+.admin-mode-options--ai {
+  margin-bottom: 0;
+}
+
+.admin-mode-option--compact {
+  padding: 4px 6px;
+  gap: 5px;
+}
+
+.admin-mode-option--compact .admin-mode-option-title {
+  font-size: 0.72rem;
+}
+
+.admin-mode-option--compact .admin-mode-option-desc {
+  font-size: 0.62rem;
+}
+
+.admin-section-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.admin-section-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #19324a;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.admin-section-chip input {
+  accent-color: #0284c7;
+  flex-shrink: 0;
+}
+
+.admin-section-chip:has(input:checked) {
+  border-color: rgba(2, 132, 199, 0.55);
+  background: rgba(224, 242, 254, 0.85);
+}
+
+.admin-link-gen-form--inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 6px;
+}
+
+.admin-link-gen-form--inline .admin-link-gen-field {
+  flex: 0 1 7rem;
+}
+
+.admin-link-gen-form--inline .admin-link-gen-copy-btn {
+  flex: 0 0 auto;
+  align-self: end;
+}
+
+.admin-link-gen-preview--inline {
+  flex: 1 1 12rem;
+  min-width: 0;
+  margin: 0;
 }
 
 .admin-card-select {
