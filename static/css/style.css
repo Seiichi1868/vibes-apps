@@ -1842,6 +1842,10 @@ body.gate-locked {
   margin-bottom: 0;
 }
 
+.admin-settings-gated > .admin-card--span-2 {
+  grid-column: 1 / -1;
+}
+
 .admin-mode-options--ai {
   margin-bottom: 0;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1879,14 +1883,15 @@ body.gate-locked {
   display: flex;
   flex: 1;
   gap: 2px;
-  min-width: 0;
+  min-width: 2.75rem;
 }
 
 .admin-mode-rating-seg {
   flex: 1;
-  height: 3px;
+  min-width: 3px;
+  height: 4px;
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.28);
+  background: rgba(148, 163, 184, 0.35);
 }
 
 .admin-mode-rating-seg.is-filled {
