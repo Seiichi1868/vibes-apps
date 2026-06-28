@@ -137,6 +137,7 @@
             <button id="grammarCheckBtn" class="btn ghost" type="button">文法チェック</button>
             <button id="startBtn" class="btn primary" type="button">録音開始</button>
             <button id="stopBtn" class="btn ghost" type="button" disabled>停止</button>
+            <button id="resetWorkBtn" class="btn ghost reset-work-btn" type="button">入力をリセット</button>
           </div>
         </section>
 
@@ -228,6 +229,7 @@
       const highlightLayer = document.getElementById("highlightLayer");
       const listenModelBtn = document.getElementById("listenModelBtn");
       const grammarCheckBtn = document.getElementById("grammarCheckBtn");
+      const resetWorkBtn = document.getElementById("resetWorkBtn");
       const ocrCameraInput = document.getElementById("ocrCameraInput");
       const ocrFileInput = document.getElementById("ocrFileInput");
       const ocrCameraBtn = document.getElementById("ocrCameraBtn");
@@ -289,7 +291,9 @@
       const FLAG_BYPASS_TAPS = 5;
       const GRAMMAR_HISTORY_KEY = "vibespeak-grammar-history";
       const GRAMMAR_HISTORY_MAX = 40;
+      const WORK_STATE_STORAGE_KEY = "vibespeak-work-state";
       const GATE_LOCK_POLL_MS = 30000;
+      let workStateSaveTimer = null;
       let gateLockPollTimer = null;
       let serverGateLockEnabled = true;
       let serverTtsEnabled = false;
@@ -762,6 +766,7 @@
         if (saveGrammarHistoryBtn) saveGrammarHistoryBtn.textContent = t("saveHistory");
 
         grammarCheckBtn.textContent = t("grammarBtn");
+        if (resetWorkBtn) resetWorkBtn.textContent = t("resetBtn");
         startBtn.textContent = t("recordStart");
         stopBtn.textContent = t("recordStop");
         ocrCameraBtn.textContent = t("ocrCamera");
@@ -1504,6 +1509,157 @@
         grammarCard.classList.add("hidden");
       }
 
+      function collectWorkState() {
+        return {
+          version: 1,
+          studyLang,
+          referenceText: referenceText.value,
+          referenceFromSample,
+          sampleLevel,
+          sampleSelectValue: sampleSelect.value,
+          finalTranscript,
+          recognizedDisplay: recognizedText.textContent,
+          grammar: {
+            visible: !grammarCard.classList.contains("hidden"),
+            correctedHtml: grammarCorrectedText.innerHTML,
+            tipsHtml: grammarExplainList.innerHTML,
+            lastGrammarResult: lastGrammarResult,
+          },
+          advice: {
+            visible: !pronunciationAdviceBlock.classList.contains("hidden"),
+            adviceHtml: pronunciationAdviceText.innerHTML,
+            isLoading: pronunciationAdviceBlock.classList.contains("is-loading"),
+          },
+        };
+      }
+
+      function scheduleSaveWorkState() {
+        if (workStateSaveTimer) window.clearTimeout(workStateSaveTimer);
+        workStateSaveTimer = window.setTimeout(() => {
+          workStateSaveTimer = null;
+          saveWorkState();
+        }, 250);
+      }
+
+      function saveWorkState() {
+        try {
+          sessionStorage.setItem(WORK_STATE_STORAGE_KEY, JSON.stringify(collectWorkState()));
+        } catch (_) {
+          /* ignore quota errors */
+        }
+      }
+
+      function clearSavedWorkState() {
+        try {
+          sessionStorage.removeItem(WORK_STATE_STORAGE_KEY);
+        } catch (_) {
+          /* ignore */
+        }
+      }
+
+      function restoreWorkState() {
+        let saved = null;
+        try {
+          saved = JSON.parse(sessionStorage.getItem(WORK_STATE_STORAGE_KEY) || "null");
+        } catch (_) {
+          saved = null;
+        }
+        if (!saved || saved.version !== 1) return false;
+
+        if (saved.studyLang && STUDY_LANG[saved.studyLang] && saved.studyLang !== studyLang) {
+          applyStudyLanguage(saved.studyLang, { resetReference: false });
+        }
+
+        if (typeof saved.sampleLevel === "string" && saved.sampleLevel) {
+          sampleLevel = saved.sampleLevel;
+          cefrTabButtons.forEach((btn) => {
+            const on = btn.dataset.level === sampleLevel;
+            btn.classList.toggle("is-active", on);
+            btn.setAttribute("aria-selected", on ? "true" : "false");
+          });
+          fillSampleSelect(sampleLevel);
+        }
+
+        referenceText.value = String(saved.referenceText || "");
+        referenceFromSample = Boolean(saved.referenceFromSample);
+        if (saved.sampleSelectValue) {
+          sampleSelect.value = saved.sampleSelectValue;
+        }
+        autoResizeReferenceText();
+        updateWordCountDisplay();
+
+        finalTranscript = String(saved.finalTranscript || "");
+        interimTranscript = "";
+        recognizedText.textContent = saved.recognizedDisplay || (finalTranscript ? finalTranscript : "-");
+
+        const grammar = saved.grammar || {};
+        if (grammar.visible) {
+          grammarCorrectedText.innerHTML = grammar.correctedHtml || "-";
+          grammarExplainList.innerHTML = grammar.tipsHtml || "";
+          lastGrammarResult = grammar.lastGrammarResult || null;
+          setGrammarSaveReady(lastGrammarResult);
+          grammarCard.classList.remove("hidden");
+        } else {
+          hideGrammarPanel();
+          setGrammarSaveReady(null);
+        }
+
+        const advice = saved.advice || {};
+        if (advice.visible) {
+          pronunciationAdviceBlock.classList.remove("hidden");
+          pronunciationAdviceBlock.classList.toggle("is-loading", Boolean(advice.isLoading));
+          pronunciationAdviceText.innerHTML = advice.adviceHtml || "—";
+        } else {
+          hidePronunciationAdvice();
+        }
+
+        if (finalTranscript.trim() && referenceText.value.trim()) {
+          renderComparison();
+        } else {
+          comparisonCard.classList.add("hidden");
+          accuracyBlock.classList.add("hidden");
+          hidePronunciationAdvice();
+          updatePronunciationAdviceBtn();
+        }
+
+        return true;
+      }
+
+      function resetWorkSession({ confirmAction = true } = {}) {
+        if (confirmAction && !window.confirm(t("resetConfirm"))) return false;
+
+        stopCurrentTtsPlayback();
+        if (recognition) {
+          try {
+            recognition.stop();
+          } catch (_) {
+            /* ignore */
+          }
+        }
+
+        clearSavedWorkState();
+        referenceText.value = "";
+        referenceFromSample = false;
+        sampleSelect.selectedIndex = 0;
+        finalTranscript = "";
+        interimTranscript = "";
+        recognizedText.textContent = "-";
+        autoResizeReferenceText();
+        updateWordCountDisplay();
+        hideGrammarPanel();
+        grammarCorrectedText.textContent = "-";
+        grammarExplainList.innerHTML = "";
+        setGrammarSaveReady(null);
+        comparisonCard.classList.add("hidden");
+        accuracyBlock.classList.add("hidden");
+        hidePronunciationAdvice();
+        updatePronunciationAdviceBtn();
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        setStatus(t("resetDone"));
+        return true;
+      }
+
       function loadGrammarHistory() {
         try {
           const raw = localStorage.getItem(GRAMMAR_HISTORY_KEY);
@@ -1882,6 +2038,7 @@
             clarifyJapaneseMessage(String(data.advice || "").trim()),
             data.advice_english ? clarifyJapaneseMessage(String(data.advice_english).trim()) : ""
           );
+          saveWorkState();
         } catch (error) {
           if (requestId !== pronunciationAdviceRequestId) return;
           console.error("Pronunciation advice error:", error);
@@ -2415,6 +2572,7 @@
           } else {
             setStatus(t("grammarDone"));
           }
+          saveWorkState();
         } catch (error) {
           if (String(error.message) === "GATE_REQUIRED") return;
           console.error("Grammar check error:", error);
@@ -2436,8 +2594,10 @@
           autoResizeReferenceText();
           renderComparison();
           grammarCard.classList.add("hidden");
+          saveWorkState();
         } else {
           referenceFromSample = false;
+          scheduleSaveWorkState();
         }
       });
 
@@ -2466,12 +2626,14 @@
 
       fillSampleSelect("A1");
       autoResizeReferenceText();
+      restoreWorkState();
 
       referenceText.addEventListener("input", () => {
         referenceFromSample = false;
         autoResizeReferenceText();
         renderComparison();
         grammarCard.classList.add("hidden");
+        scheduleSaveWorkState();
       });
       function setOcrControlsBusy(busy, activeBtn) {
         ocrCameraBtn.disabled = busy;
@@ -2517,6 +2679,7 @@
           grammarCard.classList.add("hidden");
           renderComparison();
           setStatus(config.ocrDone || t("ocrDone"));
+          saveWorkState();
         } catch (error) {
           console.error("OCR import error:", error);
           setStatus(t("ocrFail"));
@@ -2588,6 +2751,11 @@
 
       listenModelBtn.addEventListener("click", speakReferenceText);
       grammarCheckBtn.addEventListener("click", runGrammarCheck);
+      if (resetWorkBtn) {
+        resetWorkBtn.addEventListener("click", () => {
+          resetWorkSession({ confirmAction: true });
+        });
+      }
       if (pronunciationAdviceBtn) {
         pronunciationAdviceBtn.addEventListener("click", requestPronunciationAdviceFromComparison);
       }
@@ -2657,6 +2825,7 @@
             setStatus(t("recogNone"));
           }
           renderComparison();
+          saveWorkState();
         };
       }
 

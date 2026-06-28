@@ -34,7 +34,7 @@
       </header>
 
       <div class="admin-dashboard">
-      <section class="admin-card admin-card--compact">
+      <section class="admin-card admin-card--compact admin-card--row1">
         <h2 class="admin-card__title">クラスコードロック</h2>
         <div class="admin-card-row">
           <div class="admin-lock-panel admin-lock-panel--inline">
@@ -53,27 +53,21 @@
         </div>
       </section>
 
-      <section class="admin-card admin-card--compact">
+      <section class="admin-card admin-card--compact admin-card--row1">
         <h2 class="admin-card__title">表示言語設定 <span class="admin-card__title-en">(Display Language)</span></h2>
-        <div class="admin-mode-options admin-mode-options--stack" id="adminUiLangOptions">
-          <label class="admin-mode-option admin-mode-option--compact">
+        <div class="admin-ui-lang-row" id="adminUiLangOptions">
+          <label class="admin-ui-lang-chip">
             <input type="radio" name="uiLang" value="ja" />
-            <span class="admin-mode-option-body">
-              <span class="admin-mode-option-title">日本語 (Japanese)</span>
-              <span class="admin-mode-option-desc">UI in Japanese</span>
-            </span>
+            <span>日本語 (Japanese)</span>
           </label>
-          <label class="admin-mode-option admin-mode-option--compact">
+          <label class="admin-ui-lang-chip">
             <input type="radio" name="uiLang" value="en" />
-            <span class="admin-mode-option-body">
-              <span class="admin-mode-option-title">English</span>
-              <span class="admin-mode-option-desc">UI in English</span>
-            </span>
+            <span>English</span>
           </label>
         </div>
       </section>
 
-      <section class="admin-card admin-card--compact">
+      <section class="admin-card admin-card--compact admin-card--row1">
         <h2 class="admin-card__title">表示するセクション <span class="admin-card__title-en">(Visible Sections)</span></h2>
         <div class="admin-section-chips" id="adminSectionOptions">
           <label class="admin-section-chip"><input type="checkbox" name="adminSection" value="sample" checked /><span>練習用サンプル文</span></label>

@@ -1859,6 +1859,42 @@ body.gate-locked {
   font-size: 0.62rem;
 }
 
+.admin-card--row1 {
+  justify-content: flex-start;
+}
+
+.admin-ui-lang-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.admin-ui-lang-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #19324a;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.admin-ui-lang-chip input {
+  accent-color: #0284c7;
+  flex-shrink: 0;
+}
+
+.admin-ui-lang-chip:has(input:checked) {
+  border-color: rgba(2, 132, 199, 0.55);
+  background: rgba(224, 242, 254, 0.85);
+}
+
 .admin-section-chips {
   display: flex;
   flex-wrap: wrap;
