@@ -1689,8 +1689,8 @@ body.gate-locked {
 
 .admin-link-gen-row {
   display: flex;
-  flex-wrap: wrap;
-  align-items: stretch;
+  flex-wrap: nowrap;
+  align-items: end;
   gap: 6px;
 }
 
@@ -1957,24 +1957,23 @@ body.gate-locked {
 }
 
 .admin-link-gen-form--inline {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: 6px;
+  display: contents;
 }
 
-.admin-link-gen-form--inline .admin-link-gen-field {
-  flex: 0 1 7rem;
+.admin-link-gen-row .admin-link-gen-field {
+  flex: 0 0 6.5rem;
+  min-width: 0;
 }
 
-.admin-link-gen-form--inline .admin-link-gen-copy-btn {
+.admin-link-gen-row .admin-link-gen-copy-btn {
   flex: 0 0 auto;
-  align-self: end;
+  white-space: nowrap;
 }
 
 .admin-link-gen-preview--inline {
-  flex: 1 1 12rem;
+  flex: 1 1 0;
   min-width: 0;
+  max-width: 16rem;
   margin: 0;
 }
 
@@ -2129,7 +2128,12 @@ body.gate-locked {
   }
 
   .admin-link-gen-row {
-    grid-template-columns: 1fr;
+    flex-wrap: wrap;
+  }
+
+  .admin-link-gen-preview--inline {
+    flex: 1 1 100%;
+    max-width: none;
   }
 }
 
