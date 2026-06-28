@@ -1391,7 +1391,7 @@ body.gate-locked {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .admin-settings-gated.hidden {
@@ -1899,20 +1899,28 @@ body.gate-locked {
 }
 
 .admin-card--tts {
-  gap: 0;
-  padding: 4px 8px;
+  gap: 3px;
+  padding: 6px 8px;
+  height: 100%;
 }
 
-.admin-tts-row {
+.admin-tts-panel {
   display: flex;
+  flex: 1;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
+  min-height: 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(255, 255, 255, 0.88);
 }
 
-.admin-card--tts .admin-card__title {
-  margin: 0;
+.admin-tts-spacer {
+  margin-top: 4px;
+  min-height: calc(0.74rem + 12px);
   flex-shrink: 0;
-  font-size: 0.82rem;
 }
 
 .admin-tts-status {
@@ -1922,7 +1930,7 @@ body.gate-locked {
   font-weight: 700;
   color: #475569;
   line-height: 1.2;
-  text-align: right;
+  text-align: left;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
