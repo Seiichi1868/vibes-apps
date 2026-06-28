@@ -80,13 +80,10 @@
       </section>
 
       <div id="adminSettingsGated" class="admin-settings-gated hidden">
-        <section class="admin-card admin-card--compact">
-          <h2 class="admin-card__title">TTS音声（OpenAI）</h2>
-          <div class="admin-lock-panel admin-lock-panel--inline">
-            <div class="admin-lock-status">
-              <span id="adminTtsLabel" class="admin-lock-label">読み込み中...</span>
-              <span id="adminTtsHint" class="admin-lock-hint">—</span>
-            </div>
+        <section class="admin-card admin-card--compact admin-card--tts">
+          <div class="admin-tts-row">
+            <h2 class="admin-card__title">TTS音声（OpenAI）</h2>
+            <span id="adminTtsLabel" class="admin-tts-status">読み込み中...</span>
             <label class="admin-toggle" for="adminTtsToggle">
               <input id="adminTtsToggle" type="checkbox" role="switch" aria-labelledby="adminTtsLabel" />
               <span class="admin-toggle-track" aria-hidden="true">
@@ -94,6 +91,7 @@
               </span>
             </label>
           </div>
+          <span id="adminTtsHint" class="sr-only">—</span>
         </section>
 
         <section class="admin-card admin-card--compact">
@@ -125,36 +123,128 @@
         <section class="admin-card admin-card--span-2 admin-card--compact">
           <h2 class="admin-card__title">AIモデル選択</h2>
           <div class="admin-mode-options admin-mode-options--grid admin-mode-options--ai" id="adminAiModeOptions">
-            <label class="admin-mode-option admin-mode-option--compact">
+            <label class="admin-mode-option admin-mode-option--compact admin-mode-option--rated">
               <input type="radio" name="aiMode" value="4o-mini" />
               <span class="admin-mode-option-body">
-                <span class="admin-mode-option-title">① 節約</span>
-                <span class="admin-mode-option-desc">gpt-4o-mini</span>
+                <span class="admin-mode-option-title">gpt-4o-mini</span>
+                <span class="admin-mode-ratings">
+                  <span class="admin-mode-rating-row">
+                    <span class="admin-mode-rating-label">コスパ</span>
+                    <span class="admin-mode-rating-bar" aria-label="コスパ 5/5">
+                      <span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span>
+                    </span>
+                  </span>
+                  <span class="admin-mode-rating-row">
+                    <span class="admin-mode-rating-label">性能</span>
+                    <span class="admin-mode-rating-bar" aria-label="性能 3/5">
+                      <span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg"></span><span class="admin-mode-rating-seg"></span>
+                    </span>
+                  </span>
+                </span>
               </span>
             </label>
-            <label class="admin-mode-option admin-mode-option--compact">
-              <input type="radio" name="aiMode" value="5-mini" />
-              <span class="admin-mode-option-body">
-                <span class="admin-mode-option-title">② 前世代mini</span>
-                <span class="admin-mode-option-desc">gpt-5-mini</span>
-              </span>
-            </label>
-            <label class="admin-mode-option admin-mode-option--compact">
-              <input type="radio" name="aiMode" value="5.4-mini" />
-              <span class="admin-mode-option-body">
-                <span class="admin-mode-option-title">③ 最新高精度</span>
-                <span class="admin-mode-option-desc">gpt-5.4-mini</span>
-              </span>
-            </label>
-            <label class="admin-mode-option admin-mode-option--compact">
+            <label class="admin-mode-option admin-mode-option--compact admin-mode-option--rated">
               <input type="radio" name="aiMode" value="5.4-nano" />
               <span class="admin-mode-option-body">
-                <span class="admin-mode-option-title">④ 最安実験</span>
-                <span class="admin-mode-option-desc">gpt-5.4-nano</span>
+                <span class="admin-mode-option-title">gpt-5.4-nano</span>
+                <span class="admin-mode-ratings">
+                  <span class="admin-mode-rating-row">
+                    <span class="admin-mode-rating-label">コスパ</span>
+                    <span class="admin-mode-rating-bar" aria-label="コスパ 5/5">
+                      <span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span>
+                    </span>
+                  </span>
+                  <span class="admin-mode-rating-row">
+                    <span class="admin-mode-rating-label">性能</span>
+                    <span class="admin-mode-rating-bar" aria-label="性能 2/5">
+                      <span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg"></span><span class="admin-mode-rating-seg"></span><span class="admin-mode-rating-seg"></span>
+                    </span>
+                  </span>
+                </span>
+              </span>
+            </label>
+            <label class="admin-mode-option admin-mode-option--compact admin-mode-option--rated">
+              <input type="radio" name="aiMode" value="5-mini" />
+              <span class="admin-mode-option-body">
+                <span class="admin-mode-option-title">gpt-5-mini</span>
+                <span class="admin-mode-ratings">
+                  <span class="admin-mode-rating-row">
+                    <span class="admin-mode-rating-label">コスパ</span>
+                    <span class="admin-mode-rating-bar" aria-label="コスパ 4/5">
+                      <span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg"></span>
+                    </span>
+                  </span>
+                  <span class="admin-mode-rating-row">
+                    <span class="admin-mode-rating-label">性能</span>
+                    <span class="admin-mode-rating-bar" aria-label="性能 3/5">
+                      <span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg"></span><span class="admin-mode-rating-seg"></span>
+                    </span>
+                  </span>
+                </span>
+              </span>
+            </label>
+            <label class="admin-mode-option admin-mode-option--compact admin-mode-option--rated">
+              <input type="radio" name="aiMode" value="5.4-mini" />
+              <span class="admin-mode-option-body">
+                <span class="admin-mode-option-title">gpt-5.4-mini</span>
+                <span class="admin-mode-ratings">
+                  <span class="admin-mode-rating-row">
+                    <span class="admin-mode-rating-label">コスパ</span>
+                    <span class="admin-mode-rating-bar" aria-label="コスパ 3/5">
+                      <span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg"></span><span class="admin-mode-rating-seg"></span>
+                    </span>
+                  </span>
+                  <span class="admin-mode-rating-row">
+                    <span class="admin-mode-rating-label">性能</span>
+                    <span class="admin-mode-rating-bar" aria-label="性能 4/5">
+                      <span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg"></span>
+                    </span>
+                  </span>
+                </span>
+              </span>
+            </label>
+            <label class="admin-mode-option admin-mode-option--compact admin-mode-option--rated">
+              <input type="radio" name="aiMode" value="4o" />
+              <span class="admin-mode-option-body">
+                <span class="admin-mode-option-title">gpt-4o</span>
+                <span class="admin-mode-ratings">
+                  <span class="admin-mode-rating-row">
+                    <span class="admin-mode-rating-label">コスパ</span>
+                    <span class="admin-mode-rating-bar" aria-label="コスパ 2/5">
+                      <span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg"></span><span class="admin-mode-rating-seg"></span><span class="admin-mode-rating-seg"></span>
+                    </span>
+                  </span>
+                  <span class="admin-mode-rating-row">
+                    <span class="admin-mode-rating-label">性能</span>
+                    <span class="admin-mode-rating-bar" aria-label="性能 4/5">
+                      <span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg"></span>
+                    </span>
+                  </span>
+                </span>
+              </span>
+            </label>
+            <label class="admin-mode-option admin-mode-option--compact admin-mode-option--rated">
+              <input type="radio" name="aiMode" value="5.4" />
+              <span class="admin-mode-option-body">
+                <span class="admin-mode-option-title">gpt-5.4</span>
+                <span class="admin-mode-ratings">
+                  <span class="admin-mode-rating-row">
+                    <span class="admin-mode-rating-label">コスパ</span>
+                    <span class="admin-mode-rating-bar" aria-label="コスパ 1/5">
+                      <span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg"></span><span class="admin-mode-rating-seg"></span><span class="admin-mode-rating-seg"></span><span class="admin-mode-rating-seg"></span>
+                    </span>
+                  </span>
+                  <span class="admin-mode-rating-row">
+                    <span class="admin-mode-rating-label">性能</span>
+                    <span class="admin-mode-rating-bar" aria-label="性能 5/5">
+                      <span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span><span class="admin-mode-rating-seg is-filled"></span>
+                    </span>
+                  </span>
+                </span>
               </span>
             </label>
           </div>
-          <p class="admin-meta admin-meta--inline">現在: <strong id="adminActiveModel">—</strong> <span id="adminAiHint" class="admin-lock-hint">—</span></p>
+          <p class="admin-meta admin-meta--inline">現在: <strong id="adminActiveModel">—</strong></p>
         </section>
       </div>
 
@@ -188,7 +278,6 @@
       const lockLabel = document.getElementById("adminLockLabel");
       const lockHint = document.getElementById("adminLockHint");
       const aiModeInputs = Array.from(document.querySelectorAll('input[name="aiMode"]'));
-      const aiHint = document.getElementById("adminAiHint");
       const ttsToggle = document.getElementById("adminTtsToggle");
       const ttsLabel = document.getElementById("adminTtsLabel");
       const ttsHint = document.getElementById("adminTtsHint");
@@ -289,7 +378,6 @@
           input.disabled = false;
         });
         activeModel.textContent = aiData.active_model || "—";
-        aiHint.textContent = aiData.hint || aiData.label || "—";
       }
 
       function renderSectionState(sectionData) {
@@ -508,7 +596,7 @@
             throw new Error(data.error || "保存に失敗しました");
           }
           renderAiModeState(data);
-          statusText.textContent = `${data.label || aiMode}（${data.active_model}）に切り替えました`;
+          statusText.textContent = `${data.active_model || aiMode} に切り替えました`;
         } catch (error) {
           console.error(error);
           statusText.textContent = "AIモデル設定の保存に失敗しました。";

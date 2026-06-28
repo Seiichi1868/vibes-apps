@@ -95,6 +95,11 @@ def normalize_ai_mode(raw: str) -> str:
         "gpt-5.4-nano": "5.4-nano",
         "gpt-54-nano": "5.4-nano",
         "5.4nano": "5.4-nano",
+        "gpt-4o": "4o",
+        "4o": "4o",
+        "gpt-54": "5.4",
+        "gpt-5.4": "5.4",
+        "5.4": "5.4",
     }
     value = aliases.get(value, value)
     if value in AI_MODE_OPTIONS:

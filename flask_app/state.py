@@ -19,26 +19,48 @@ def _env_bool(name: str, default: bool) -> bool:
 
 _on_render = os.environ.get("RENDER", "").strip().lower() == "true"
 
-AI_MODE_OPTIONS: dict[str, dict[str, str]] = {
+AI_MODE_OPTIONS: dict[str, dict[str, str | int]] = {
     "4o-mini": {
-        "label": "節約モード",
-        "hint": "全機能で gpt-4o-mini を使用",
+        "label": "gpt-4o-mini",
+        "hint": "gpt-4o-mini",
         "model": Config.MODEL_ECONOMY,
-    },
-    "5-mini": {
-        "label": "前世代miniモード",
-        "hint": "添削・解説・発音に gpt-5-mini",
-        "model": "gpt-5-mini",
-    },
-    "5.4-mini": {
-        "label": "最新高精度モード",
-        "hint": "添削・解説・発音に gpt-5.4-mini",
-        "model": "gpt-5.4-mini",
+        "cost_performance": 5,
+        "performance": 3,
     },
     "5.4-nano": {
-        "label": "最安実験モード",
-        "hint": "添削・解説・発音に gpt-5.4-nano",
+        "label": "gpt-5.4-nano",
+        "hint": "gpt-5.4-nano",
         "model": "gpt-5.4-nano",
+        "cost_performance": 5,
+        "performance": 2,
+    },
+    "5-mini": {
+        "label": "gpt-5-mini",
+        "hint": "gpt-5-mini",
+        "model": "gpt-5-mini",
+        "cost_performance": 4,
+        "performance": 3,
+    },
+    "5.4-mini": {
+        "label": "gpt-5.4-mini",
+        "hint": "gpt-5.4-mini",
+        "model": "gpt-5.4-mini",
+        "cost_performance": 3,
+        "performance": 4,
+    },
+    "4o": {
+        "label": "gpt-4o",
+        "hint": "gpt-4o",
+        "model": "gpt-4o",
+        "cost_performance": 2,
+        "performance": 4,
+    },
+    "5.4": {
+        "label": "gpt-5.4",
+        "hint": "gpt-5.4",
+        "model": "gpt-5.4",
+        "cost_performance": 1,
+        "performance": 5,
     },
 }
 
