@@ -251,3 +251,92 @@
   transform: translateX(20px);
 }
 
+/* ── 管理画面コンパクト ─────────────────────────────────── */
+.admin-page {
+  font-size: 0.8125rem;
+}
+
+.admin-page .glass-header {
+  border-bottom-width: 1px;
+}
+
+.admin-card-compact {
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+}
+
+.admin-card-title-compact {
+  font-size: 0.8125rem;
+  margin-bottom: 0;
+}
+
+.admin-input-compact {
+  padding: 0.28rem 0.45rem;
+  font-size: 0.75rem;
+  min-width: 0;
+}
+
+.admin-btn-compact {
+  padding: 0.28rem 0.55rem;
+  font-size: 0.72rem;
+}
+
+.admin-toggle-compact .admin-toggle-track {
+  width: 36px;
+  height: 20px;
+}
+
+.admin-toggle-compact .admin-toggle-thumb {
+  width: 16px;
+  height: 16px;
+}
+
+.admin-toggle-compact input:checked + .admin-toggle-track .admin-toggle-thumb {
+  transform: translateX(16px);
+}
+
+.admin-part-row {
+  border: 1px solid rgba(203, 213, 225, 0.55);
+  border-radius: 0.55rem;
+  padding: 0.45rem 0.55rem;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.bg-pick-btn {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.2rem;
+  border-radius: 0.45rem;
+  border: 2px solid transparent;
+  background: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.bg-pick-btn:hover {
+  border-color: rgba(79, 70, 229, 0.35);
+}
+
+.bg-pick-btn-active {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.25);
+}
+
+.bg-pick-thumb {
+  display: block;
+  width: 3.25rem;
+  height: 2rem;
+  border-radius: 0.3rem;
+  background-size: cover;
+  background-position: center;
+}
+
+.bg-pick-label {
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: #475569;
+  line-height: 1;
+}
+

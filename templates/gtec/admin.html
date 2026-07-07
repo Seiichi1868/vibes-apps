@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='gtec/css/style.css') }}">
   <style>
     .gtec-page-bg {
-      background-image: url("{{ url_for('static', filename='news/images/nature-bg.jpg') }}");
+      background-image: url("{{ url_for('static', filename=current_background.background_image) }}");
       background-size: cover;
       background-position: center;
       background-attachment: fixed;
@@ -16,60 +16,81 @@
     }
   </style>
 </head>
-<body class="relative min-h-screen text-slate-800 antialiased">
+<body class="admin-page relative min-h-screen text-slate-800 antialiased">
 
   <div class="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
-    <div class="gtec-page-bg absolute inset-0 scale-105 opacity-[0.38]"></div>
+    <div id="page-bg-layer" class="gtec-page-bg absolute inset-0 scale-105 opacity-[0.38]"></div>
     <div class="absolute inset-0 bg-gradient-to-br from-sky-100/75 via-white/55 to-emerald-100/70"></div>
     <div class="absolute inset-0 bg-gradient-to-t from-emerald-50/40 via-transparent to-sky-50/30"></div>
   </div>
 
   <header class="glass-header sticky top-0 z-40">
-    <div class="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-      <div>
-        <p class="text-xs font-semibold text-indigo-500 uppercase tracking-wider">GTEC Admin</p>
-        <h1 class="text-lg font-bold text-indigo-800">管理画面</h1>
+    <div class="max-w-3xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
+      <div class="flex items-baseline gap-2 min-w-0">
+        <h1 class="text-base font-bold text-indigo-800 truncate">GTEC 管理</h1>
+        <span class="text-[10px] text-slate-500 shrink-0">準備時間・背景</span>
       </div>
-      <a href="/gtec" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium whitespace-nowrap">← 生徒画面へ</a>
+      <div class="flex items-center gap-1.5 shrink-0">
+        <div id="admin-lock" class="flex items-center gap-1">
+          <input id="admin-password" type="password" inputmode="numeric" autocomplete="off"
+            placeholder="PW" class="admin-input admin-input-compact w-16" />
+          <button id="unlock-btn" type="button" class="admin-btn admin-btn-primary admin-btn-compact">解除</button>
+        </div>
+        <a href="/gtec" class="text-[11px] text-indigo-600 hover:text-indigo-800 font-medium whitespace-nowrap">← 生徒</a>
+      </div>
     </div>
+    <p id="lock-message" class="max-w-3xl mx-auto px-3 pb-1 text-[11px] text-red-600 hidden" role="alert"></p>
   </header>
 
-  <main class="max-w-2xl mx-auto px-4 py-6 space-y-4">
+  <main class="max-w-3xl mx-auto px-3 py-3">
 
-    <section class="admin-card">
-      <h2 class="admin-card-title">管理設定の解除</h2>
-      <div class="flex flex-wrap gap-2 items-center">
-        <input id="admin-password" type="password" inputmode="numeric" autocomplete="off"
-          placeholder="管理パスワード" class="admin-input" />
-        <button id="unlock-btn" type="button" class="admin-btn admin-btn-primary">解除</button>
-      </div>
-      <p id="lock-message" class="text-sm text-red-600 mt-2 hidden" role="alert"></p>
-    </section>
+    <div id="settings-panel" class="hidden space-y-2">
+      <p id="status-message" class="text-[11px] text-emerald-700 font-medium min-h-[1rem]" aria-live="polite"></p>
 
-    <div id="settings-panel" class="hidden space-y-4">
-      <p id="status-message" class="text-sm text-emerald-700 font-medium" aria-live="polite"></p>
-
-      {% for part, label in parts.items() %}
-      <section class="admin-card" data-part="{{ part }}">
-        <h2 class="admin-card-title">{{ label }}</h2>
-        <div class="flex items-center justify-between gap-4 py-2">
-          <div>
-            <p class="font-semibold text-slate-800">準備時間</p>
-            <p class="text-xs text-slate-500 mt-0.5">オフにすると、スタート後すぐに録音（または質問音声）が始まります</p>
-          </div>
-          <label class="admin-toggle">
-            <input class="prep-toggle" data-part="{{ part }}" type="checkbox" role="switch" checked />
-            <span class="admin-toggle-track"><span class="admin-toggle-thumb"></span></span>
-          </label>
+      <section class="admin-card admin-card-compact">
+        <div class="flex items-center justify-between gap-2 mb-2">
+          <h2 class="admin-card-title admin-card-title-compact">背景の自然風景</h2>
+          <span id="bg-current-label" class="text-[10px] text-indigo-600 font-medium">{{ current_background.background_label }}</span>
         </div>
-        <div class="prep-seconds-row mt-3 flex flex-wrap items-center gap-2">
-          <label class="text-sm text-slate-600">準備時間（秒）</label>
-          <input class="prep-seconds admin-input w-24" data-part="{{ part }}" type="number"
-            min="0" max="600" step="1" value="{{ defaults[part].prep_seconds }}" />
-          <span class="prep-status text-xs text-indigo-600 font-medium" data-part="{{ part }}"></span>
+        <div id="bg-picker" class="flex flex-wrap gap-1.5">
+          {% for bg_id, bg in backgrounds.items() %}
+          <button type="button"
+            class="bg-pick-btn{% if bg_id == current_background.background_id %} bg-pick-btn-active{% endif %}"
+            data-bg-id="{{ bg_id }}"
+            data-bg-image="{{ url_for('static', filename=bg.image) }}"
+            title="{{ bg.label }}">
+            <span class="bg-pick-thumb" style="background-image: url('{{ url_for('static', filename=bg.image) }}');"></span>
+            <span class="bg-pick-label">{{ bg.label }}</span>
+          </button>
+          {% endfor %}
         </div>
       </section>
-      {% endfor %}
+
+      <section class="admin-card admin-card-compact">
+        <h2 class="admin-card-title admin-card-title-compact mb-2">準備時間（Part A〜D）</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {% for part, label in parts.items() %}
+          <div class="admin-part-row" data-part="{{ part }}">
+            <div class="flex items-center justify-between gap-2">
+              <div class="min-w-0">
+                <p class="text-[11px] font-semibold text-slate-800 truncate">{{ label.split('：')[0] }}</p>
+                <p class="text-[10px] text-slate-500 truncate">{{ label.split('：')[1] if '：' in label else label }}</p>
+              </div>
+              <label class="admin-toggle admin-toggle-compact shrink-0">
+                <input class="prep-toggle" data-part="{{ part }}" type="checkbox" role="switch" checked />
+                <span class="admin-toggle-track"><span class="admin-toggle-thumb"></span></span>
+              </label>
+            </div>
+            <div class="prep-seconds-row mt-1.5 flex items-center gap-1.5">
+              <label class="text-[10px] text-slate-600 shrink-0">秒</label>
+              <input class="prep-seconds admin-input admin-input-compact w-14" data-part="{{ part }}" type="number"
+                min="0" max="600" step="1" value="{{ defaults[part].prep_seconds }}" />
+              <span class="prep-status text-[10px] text-indigo-600 font-medium truncate" data-part="{{ part }}"></span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
     </div>
 
   </main>

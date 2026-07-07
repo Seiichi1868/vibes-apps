@@ -114,8 +114,18 @@ async function loadSettings() {
     const res = await fetch('/gtec/api/settings');
     if (res.ok) {
       App.settings = { ...App.settings, ...(await res.json()) };
+      applyBackgroundFromSettings();
     }
   } catch (_) { /* デフォルト設定を使用 */ }
+}
+
+function applyBackgroundFromSettings() {
+  const image = App.settings.background_image;
+  if (!image) return;
+  const layer = document.getElementById('page-bg-layer');
+  if (layer) {
+    layer.style.backgroundImage = `url("/static/${image}")`;
+  }
 }
 
 function getPrepConfig(partLetter) {
