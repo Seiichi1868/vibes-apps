@@ -74,6 +74,7 @@ const App = {
   part: 'A',
   running: false,
   cancelRequested: false,
+  submitRequested: false,
   recognition: null,
   settings: {
     part_a_prep_enabled: true, part_a_prep_seconds: 30,
@@ -83,6 +84,7 @@ const App = {
   },
   currentAudio: null,
   currentUtterance: null,
+  partBPreloadedAudio: null,
 };
 
 // ─── 3. 設定読み込み ─────────────────────────────────────────
@@ -127,13 +129,13 @@ function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
 }
 
-// Promise でラップしたカウントダウン。cancel中断可。
+// Promise でラップしたカウントダウン。cancel / submit 中断可。
 function countdown(seconds, onTick) {
   return new Promise(resolve => {
     let remaining = seconds;
     onTick(remaining);
     const id = setInterval(() => {
-      if (App.cancelRequested) { clearInterval(id); resolve(); return; }
+      if (App.cancelRequested || App.submitRequested) { clearInterval(id); resolve(); return; }
       remaining--;
       onTick(remaining);
       if (remaining <= 0) { clearInterval(id); resolve(); }
@@ -392,24 +394,70 @@ function renderWordComparisonHTML(referenceText, spokenText) {
 // ─── 6. TTS（サーバー OpenAI + ブラウザ fallback）────────────
 
 let speakChain = Promise.resolve();
-let audioUnlockPromise = null;
 let voicesReadyPromise = null;
 
 function isChromeBrowser() {
   return /Chrome/i.test(navigator.userAgent) && !/Edg|OPR|Brave/i.test(navigator.userAgent);
 }
 
-function unlockAudioPlayback() {
-  if (!audioUnlockPromise) {
-    audioUnlockPromise = (async () => {
-      const silent = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
-      const audio = new Audio(silent);
+/**
+ * ユーザージェスチャー直後に呼ぶこと。
+ * AudioContext + 無音 Audio 両方で iOS / Android を unlock する。
+ */
+function unlockAudioSync() {
+  // AudioContext unlock
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) {
+      const ctx = new AC();
+      const buf = ctx.createBuffer(1, 1, 22050);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      src.start(0);
+      src.onended = () => ctx.close().catch(() => {});
+    }
+  } catch (_) {}
+
+  // Audio element unlock
+  try {
+    const silent = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+    const a = new Audio(silent);
+    a.playsInline = true;
+    a.volume = 0.001;
+    a.play().catch(() => {});
+  } catch (_) {}
+}
+
+/**
+ * Part B 用: スタートボタン直後（まだジェスチャーウィンドウ内）に
+ * 全質問の音声を fetch → Audio 作成 → play+pause で iOS に "認可" させる。
+ */
+async function preloadTTSAudio(texts) {
+  const cache = {};
+  await Promise.all(texts.map(async text => {
+    try {
+      const res = await fetch('/gtec/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) return;
+      const { url } = await res.json();
+      const audio = new Audio(url);
       audio.playsInline = true;
-      audio.volume = 0.01;
-      try { await audio.play(); } catch (_) { /* gesture 不足時は後続で再試行 */ }
-    })();
-  }
-  return audioUnlockPromise;
+      audio.preload = 'auto';
+      // iOS autoplay unlock: play → pause でユーザー許可済みとして登録
+      try {
+        const p = audio.play();
+        if (p) await p;
+        audio.pause();
+        audio.currentTime = 0;
+      } catch (_) {}
+      cache[text] = audio;
+    } catch (_) {}
+  }));
+  return cache;
 }
 
 function ensureVoicesLoaded() {
@@ -475,7 +523,6 @@ async function speakOnce(text) {
   if (!content || App.cancelRequested) return;
 
   stopCurrentSpeech();
-  await unlockAudioPlayback();
 
   try {
     await speakFromServer(content);
@@ -486,6 +533,12 @@ async function speakOnce(text) {
 }
 
 async function speakFromServer(text) {
+  // Part B プリロード済み Audio があればそれを使う（iOS autoplay 対策）
+  const preloaded = App.partBPreloadedAudio?.[text];
+  if (preloaded) {
+    return playAudioElement(preloaded);
+  }
+
   const res = await fetch('/gtec/api/tts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -498,22 +551,27 @@ async function speakFromServer(text) {
   }
 
   const { url } = await res.json();
-  await unlockAudioPlayback();
+  const audio = new Audio(url);
+  audio.playsInline = true;
+  audio.preload = 'auto';
+  return playAudioElement(audio);
+}
 
+function playAudioElement(audio) {
   return new Promise((resolve, reject) => {
-    const audio = new Audio(url);
-    audio.playsInline = true;
-    audio.preload = 'auto';
+    audio.currentTime = 0;
     App.currentAudio = audio;
-    audio.onended = () => {
+
+    const cleanup = () => {
+      audio.onended = null;
+      audio.onerror = null;
       if (App.currentAudio === audio) App.currentAudio = null;
-      resolve();
     };
-    audio.onerror = () => {
-      if (App.currentAudio === audio) App.currentAudio = null;
-      reject(new Error('音声の再生に失敗しました'));
-    };
-    audio.play().catch(reject);
+
+    audio.onended = () => { cleanup(); resolve(); };
+    audio.onerror = () => { cleanup(); reject(new Error('音声の再生に失敗しました')); };
+
+    audio.play().catch(err => { cleanup(); reject(err); });
   });
 }
 
@@ -631,7 +689,7 @@ function startRecording(maxSeconds, transcriptEl) {
     };
 
     rec.onend = () => {
-      if (App.cancelRequested) { finish(); return; }
+      if (App.cancelRequested || App.submitRequested) { finish(); return; }
       const elapsed = (Date.now() - startMs) / 1000;
       if (elapsed < maxSeconds - 0.5) {
         try {
@@ -644,7 +702,7 @@ function startRecording(maxSeconds, transcriptEl) {
     };
 
     rec.onerror = e => {
-      if (App.cancelRequested) { finish(); return; }
+      if (App.cancelRequested || App.submitRequested) { finish(); return; }
       clearTimeout(stopTimer);
       App.recognition = null;
       if (e.error === 'no-speech' || e.error === 'aborted') {
@@ -862,6 +920,26 @@ function retryBtn() {
     </button>`;
 }
 
+function submitBtn(label = 'ここで提出する（早く終わった場合）') {
+  return `
+    <button id="submit-btn"
+      class="mt-3 w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95
+             text-white font-bold text-sm shadow transition-all">
+      ✅ ${label}
+    </button>`;
+}
+
+function wireSubmitBtn() {
+  App.submitRequested = false;
+  const btn = document.getElementById('submit-btn');
+  if (btn) {
+    btn.addEventListener('click', () => {
+      App.submitRequested = true;
+      stopAllMedia();
+    }, { once: true });
+  }
+}
+
 // ─── 9. Part A ───────────────────────────────────────────────
 
 async function runPartA() {
@@ -903,14 +981,17 @@ async function runPartA() {
     </div>
     <p class="text-xs text-slate-400 mb-1">文字起こし</p>
     ${transcriptBox('transcript-el')}
+    ${submitBtn()}
   `);
   timerEl  = document.getElementById('timer-wrap');
   transEl  = document.getElementById('transcript-el');
+  wireSubmitBtn();
 
   const [{ text, duration }] = await Promise.all([
     startRecording(d.recTime, transEl),
     countdown(d.recTime, sec => { timerEl.innerHTML = timerDisplay(sec, 'rec'); }),
   ]);
+  App.submitRequested = false;
   if (App.cancelRequested) return;
   if (!App.running) return;
 
@@ -979,13 +1060,25 @@ async function runPartB() {
   if (App.cancelRequested) return;
 
   await renderPartIdle('B');
-  await waitForClick('start-btn');
+  await waitForClick('start-btn');   // ← ここがジェスチャーウィンドウ
   if (App.cancelRequested) return;
   setStopButtonVisible(true);
 
-  const prep = getPrepConfig('B');
+  // スタート直後（まだジェスチャーウィンドウ内）に全質問の音声をプリロード
+  $root().innerHTML = cardWrap(`
+    <p class="text-xs font-bold text-sky-600 uppercase tracking-wider mb-2">${d.title}</p>
+    <div class="flex items-center justify-center py-5 gap-3">
+      <div class="w-6 h-6 border-2 border-sky-300 border-t-sky-600 rounded-full animate-spin"></div>
+      <p class="text-sky-700 font-semibold">質問音声を準備中...</p>
+    </div>
+    <div class="border border-sky-200 rounded-xl overflow-hidden">${buildScheduleHTML(d.schedule)}</div>
+  `);
+  App.partBPreloadedAudio = await preloadTTSAudio(d.questions.map(q => q.text));
+  if (App.cancelRequested) return;
 
+  const prep = getPrepConfig('B');
   const recordings = [];
+  let earlySubmit = false;
 
   for (let qi = 0; qi < d.questions.length; qi++) {
     if (App.cancelRequested) return;
@@ -1006,7 +1099,6 @@ async function runPartB() {
       await countdown(prep.seconds, sec => { timerEl.innerHTML = timerDisplay(sec, 'prep'); });
       if (App.cancelRequested) return;
     } else if (qi === 0) {
-      // 準備なしでも1問目は案内を短く表示
       $root().innerHTML = cardWrap(`
         <p class="text-xs font-bold text-sky-600 uppercase tracking-wider mb-1">${d.title} — 質問 ${qi + 1} / ${d.questions.length}</p>
         <div class="border border-sky-200 rounded-xl overflow-hidden mb-3">${buildScheduleHTML(d.schedule)}</div>
@@ -1014,7 +1106,7 @@ async function runPartB() {
           まもなく質問が流れます
         </div>
       `);
-      await sleep(800);
+      await sleep(600);
       if (App.cancelRequested) return;
     }
 
@@ -1029,38 +1121,52 @@ async function runPartB() {
     `);
     await speak(q.text);
     if (App.cancelRequested) return;
-    await sleep(500);
+    await sleep(400);
 
     // recording
     let timerEl;
     let transEl;
     $root().innerHTML = cardWrap(`
-      <p class="text-xs font-bold text-red-600 uppercase tracking-wider mb-1">${d.title} — Q${qi + 1} 解答</p>
+      <p class="text-xs font-bold text-red-600 uppercase tracking-wider mb-1">${d.title} — Q${qi + 1} / ${d.questions.length} 解答</p>
       <div id="timer-wrap"></div>
       ${recIndicator(true)}
       <div class="border border-sky-200 rounded-xl overflow-hidden mb-3">${buildScheduleHTML(d.schedule)}</div>
       <p class="text-xs text-slate-400 mb-1">文字起こし</p>
       ${transcriptBox('transcript-el')}
+      ${submitBtn(`Q${qi + 1} の回答でここまで提出`)}
     `);
     timerEl = document.getElementById('timer-wrap');
     transEl = document.getElementById('transcript-el');
+    wireSubmitBtn();
 
     const [{ text, duration }] = await Promise.all([
       startRecording(d.recTime, transEl),
       countdown(d.recTime, sec => { timerEl.innerHTML = timerDisplay(sec, 'rec'); }),
     ]);
+    const wasSubmit = App.submitRequested;
+    App.submitRequested = false;
     if (App.cancelRequested || !App.running) return;
     stopRecognition();
     recordings.push({ text, duration, question: q });
+
+    if (wasSubmit) { earlySubmit = true; break; }
   }
 
   if (App.cancelRequested || !App.running) return;
   setStopButtonVisible(false);
-  renderLoading('Part B 採点中... (4問)');
+  const qCount = recordings.length;
+  renderLoading(`Part B 採点中... (${qCount}問)`);
+
+  // 空回答はスキップして採点
+  const answeredRecordings = recordings.filter(r => r.text.trim());
+  if (!answeredRecordings.length) {
+    renderError('回答が録音されていません。もう一度練習してください。');
+    return;
+  }
 
   try {
     const results = await Promise.all(
-      recordings.map(r =>
+      answeredRecordings.map(r =>
         callEvaluate({
           part: 'B',
           text: r.text,
@@ -1070,14 +1176,21 @@ async function runPartB() {
         })
       )
     );
-    renderPartBResult(results, recordings);
+    renderPartBResult(results, answeredRecordings, recordings.length);
   } catch (e) {
     renderError(e.message);
   }
 }
 
-function renderPartBResult(results, recordings) {
+function renderPartBResult(results, recordings, totalQCount = 4) {
   const total = results.reduce((s, r) => s + (r.scores?.goal_achievement ?? 0), 0);
+  const answeredCount = recordings.length;
+  const partialNote = answeredCount < totalQCount
+    ? `<p class="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+        ⚡ ${answeredCount} / ${totalQCount} 問を提出しました
+       </p>`
+    : '';
+
   const qCards = results.map((r, i) => {
     const score = r.scores?.goal_achievement ?? 0;
     const badge = score === 1
@@ -1093,8 +1206,9 @@ function renderPartBResult(results, recordings) {
 
   $root().innerHTML = cardWrap(`
     <p class="text-xs font-bold text-sky-600 uppercase tracking-wider mb-4">Part B 結果</p>
+    ${partialNote}
     <div class="flex justify-around mb-5">
-      ${scoreCircle(total, 4, 'Goal合計', 'sky')}
+      ${scoreCircle(total, answeredCount, 'Goal合計', 'sky')}
     </div>
     ${qCards}
     ${feedbackBlockPartB(mergePartBFeedback(results))}
@@ -1152,14 +1266,17 @@ async function runPartC() {
     ${buildPanelGrid(d.panels)}
     <p class="text-xs text-slate-400 mb-1">文字起こし</p>
     ${transcriptBox('transcript-el')}
+    ${submitBtn()}
   `);
   timerEl = document.getElementById('timer-wrap');
   transEl = document.getElementById('transcript-el');
+  wireSubmitBtn();
 
   const [{ text, duration }] = await Promise.all([
     startRecording(d.recTime, transEl),
     countdown(d.recTime, sec => { timerEl.innerHTML = timerDisplay(sec, 'rec'); }),
   ]);
+  App.submitRequested = false;
   if (App.cancelRequested || !App.running) return;
   stopRecognition();
   setStopButtonVisible(false);
@@ -1253,14 +1370,17 @@ async function runPartD() {
     </div>
     <p class="text-xs text-slate-400 mb-1">文字起こし</p>
     ${transcriptBox('transcript-el')}
+    ${submitBtn()}
   `);
   timerEl = document.getElementById('timer-wrap');
   transEl = document.getElementById('transcript-el');
+  wireSubmitBtn();
 
   const [{ text, duration }] = await Promise.all([
     startRecording(d.recTime, transEl),
     countdown(d.recTime, sec => { timerEl.innerHTML = timerDisplay(sec, 'rec'); }),
   ]);
+  App.submitRequested = false;
   if (App.cancelRequested || !App.running) return;
   stopRecognition();
   setStopButtonVisible(false);
@@ -1329,7 +1449,7 @@ function waitForClick(id) {
     const btn = document.getElementById(id);
     if (!btn) { resolve(); return; }
     btn.addEventListener('click', () => {
-      unlockAudioPlayback();
+      unlockAudioSync();   // ジェスチャーウィンドウ内で AudioContext を unlock
       resolve();
     }, { once: true });
   });
@@ -1446,8 +1566,10 @@ function setActiveTab(partId) {
 
 async function startPart(partId) {
   App.cancelRequested = true;
+  App.submitRequested = false;
   stopAllMedia();
   speakChain = Promise.resolve();
+  App.partBPreloadedAudio = null;
   await sleep(150);
 
   App.part = partId;
