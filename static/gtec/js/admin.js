@@ -1,12 +1,13 @@
 'use strict';
 
+const PARTS = ['a', 'b', 'c', 'd'];
+const DEFAULT_SECONDS = { a: 30, b: 10, c: 30, d: 60 };
+
 const passwordInput = document.getElementById('admin-password');
 const unlockBtn = document.getElementById('unlock-btn');
 const lockMessage = document.getElementById('lock-message');
 const settingsPanel = document.getElementById('settings-panel');
 const statusMessage = document.getElementById('status-message');
-const prepToggle = document.getElementById('part-a-prep-toggle');
-const prepStatus = document.getElementById('part-a-prep-status');
 
 let unlocked = false;
 let saveTimer = null;
@@ -20,10 +21,22 @@ function hideLockMessage() {
   lockMessage.classList.add('hidden');
 }
 
-function updatePrepStatus(enabled) {
-  prepStatus.textContent = enabled
-    ? '準備時間: オン（30秒）'
-    : '準備時間: オフ（即録音開始）';
+function updatePartUI(part, enabled, seconds) {
+  const row = document.querySelector(`.prep-seconds-row .prep-seconds[data-part="${part}"]`)?.closest('.admin-card');
+  if (!row) return;
+
+  const secondsInput = row.querySelector(`.prep-seconds[data-part="${part}"]`);
+  const statusEl = row.querySelector(`.prep-status[data-part="${part}"]`);
+  const secondsRow = row.querySelector('.prep-seconds-row');
+
+  if (secondsInput) secondsInput.disabled = !enabled;
+  if (secondsRow) secondsRow.style.opacity = enabled ? '1' : '0.5';
+
+  if (statusEl) {
+    statusEl.textContent = enabled
+      ? `準備時間: オン（${seconds}秒）`
+      : '準備時間: オフ（即開始）';
+  }
 }
 
 async function fetchSettings() {
@@ -41,6 +54,17 @@ async function saveSettings(payload) {
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || '保存に失敗しました');
   return data;
+}
+
+function collectPayload() {
+  const payload = { admin_password: passwordInput.value.trim() };
+  PARTS.forEach(part => {
+    const toggle = document.querySelector(`.prep-toggle[data-part="${part}"]`);
+    const secondsInput = document.querySelector(`.prep-seconds[data-part="${part}"]`);
+    payload[`part_${part}_prep_enabled`] = toggle?.checked !== false;
+    payload[`part_${part}_prep_seconds`] = parseInt(secondsInput?.value, 10) || DEFAULT_SECONDS[part];
+  });
+  return payload;
 }
 
 async function tryUnlock() {
@@ -77,9 +101,15 @@ async function tryUnlock() {
 
 async function loadSettingsIntoUI() {
   const data = await fetchSettings();
-  const enabled = data.part_a_prep_enabled !== false;
-  prepToggle.checked = enabled;
-  updatePrepStatus(enabled);
+  PARTS.forEach(part => {
+    const enabled = data[`part_${part}_prep_enabled`] !== false;
+    const seconds = parseInt(data[`part_${part}_prep_seconds`], 10) || DEFAULT_SECONDS[part];
+    const toggle = document.querySelector(`.prep-toggle[data-part="${part}"]`);
+    const secondsInput = document.querySelector(`.prep-seconds[data-part="${part}"]`);
+    if (toggle) toggle.checked = enabled;
+    if (secondsInput) secondsInput.value = seconds;
+    updatePartUI(part, enabled, seconds);
+  });
 }
 
 function scheduleSave() {
@@ -87,22 +117,36 @@ function scheduleSave() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
     try {
-      const enabled = prepToggle.checked;
-      await saveSettings({
-        admin_password: passwordInput.value.trim(),
-        part_a_prep_enabled: enabled,
+      const payload = collectPayload();
+      const saved = await saveSettings(payload);
+      PARTS.forEach(part => {
+        const enabled = saved[`part_${part}_prep_enabled`] !== false;
+        const seconds = parseInt(saved[`part_${part}_prep_seconds`], 10) || DEFAULT_SECONDS[part];
+        updatePartUI(part, enabled, seconds);
       });
-      updatePrepStatus(enabled);
       statusMessage.textContent = '設定を保存しました';
     } catch (err) {
       statusMessage.textContent = '';
       showLockMessage(err.message);
     }
-  }, 300);
+  }, 400);
 }
 
 unlockBtn.addEventListener('click', tryUnlock);
 passwordInput.addEventListener('keydown', e => {
   if (e.key === 'Enter') tryUnlock();
 });
-prepToggle.addEventListener('change', scheduleSave);
+
+document.querySelectorAll('.prep-toggle').forEach(el => {
+  el.addEventListener('change', () => {
+    const part = el.dataset.part;
+    const seconds = parseInt(document.querySelector(`.prep-seconds[data-part="${part}"]`)?.value, 10)
+      || DEFAULT_SECONDS[part];
+    updatePartUI(part, el.checked, seconds);
+    scheduleSave();
+  });
+});
+
+document.querySelectorAll('.prep-seconds').forEach(el => {
+  el.addEventListener('input', scheduleSave);
+});

@@ -75,8 +75,13 @@ const App = {
   running: false,
   cancelRequested: false,
   recognition: null,
-  settings: { part_a_prep_enabled: true },
-  currentUtterance: null,
+  settings: {
+    part_a_prep_enabled: true, part_a_prep_seconds: 30,
+    part_b_prep_enabled: true, part_b_prep_seconds: 10,
+    part_c_prep_enabled: true, part_c_prep_seconds: 30,
+    part_d_prep_enabled: true, part_d_prep_seconds: 60,
+  },
+  currentAudio: null,
 };
 
 // ─── 3. 設定読み込み ─────────────────────────────────────────
@@ -90,8 +95,21 @@ async function loadSettings() {
   } catch (_) { /* デフォルト設定を使用 */ }
 }
 
-function partAPrepEnabled() {
-  return App.settings.part_a_prep_enabled !== false;
+function getPrepConfig(partLetter) {
+  const p = partLetter.toLowerCase();
+  const fallback = GTEC_DATA[partLetter.toUpperCase()]?.prepTime ?? 30;
+  const enabled = App.settings[`part_${p}_prep_enabled`] !== false;
+  const sec = parseInt(App.settings[`part_${p}_prep_seconds`], 10);
+  return {
+    enabled,
+    seconds: Number.isFinite(sec) && sec >= 0 ? sec : fallback,
+  };
+}
+
+function prepLabel(partLetter) {
+  const prep = getPrepConfig(partLetter);
+  if (!prep.enabled) return 'なし';
+  return `${prep.seconds}秒`;
 }
 
 // ─── 4. ユーティリティ ───────────────────────────────────────
@@ -208,6 +226,24 @@ function extractWordTokens(text) {
   return normalized ? normalized.split(' ').filter(Boolean) : [];
 }
 
+function tokenizeReference(text) {
+  return String(text || '')
+    .replace(/\r\n|\r|\n/g, ' ')
+    .replace(/[,.!?;:()[\]{}"""''…—–-]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(display => ({
+      display,
+      norm: canonicalCompareToken(display) || normalizeSingleToken(display),
+    }));
+}
+
+function normalizeSingleToken(word) {
+  let w = String(word || '').toLowerCase().trim();
+  if (/^\d+$/.test(w)) return intToEnglish(parseInt(w, 10));
+  return w.replace(/^[^a-z0-9]+|[^a-z0-9]+$/gi, '');
+}
+
 function canonicalCompareToken(token) {
   const word = String(token || '').trim().toLowerCase();
   if (!word) return '';
@@ -239,7 +275,8 @@ function tokenMatchScore(refToken, spokenToken) {
   const refNorm = canonicalCompareToken(refToken);
   const spokenNorm = canonicalCompareToken(spokenToken);
   if (!refNorm || !spokenNorm) return -2;
-  if (refNorm === spokenNorm) return 3;
+  // スピーキング採点: 大文字・小文字の違いは不一致にしない
+  if (refNorm.toLowerCase() === spokenNorm.toLowerCase()) return 3;
   if (levenshtein(refNorm, spokenNorm) <= 1) return 1;
   const refParts = refNorm.split(' ').filter(Boolean);
   const spokenParts = spokenNorm.split(' ').filter(Boolean);
@@ -314,16 +351,16 @@ function escapeHTML(value) {
 }
 
 function renderWordComparisonHTML(referenceText, spokenText) {
-  const referenceWords = extractWordTokens(referenceText);
+  const refTokens = tokenizeReference(referenceText);
   const spokenWords = extractWordTokens(spokenText);
-  const compared = compareWords(referenceWords, spokenWords);
+  const compared = compareWords(refTokens.map(t => t.norm), spokenWords);
   const percent = computeAccuracyPercent(compared);
 
-  const baseLayer = referenceWords.map(w =>
-    `<span class="token">${escapeHTML(w)}</span>`
+  const baseLayer = refTokens.map(t =>
+    `<span class="token">${escapeHTML(t.display)}</span>`
   ).join('');
-  const highlightLayer = compared.map(item =>
-    `<span class="token ${item.state}">${escapeHTML(item.word)}</span>`
+  const highlightLayer = compared.map((item, idx) =>
+    `<span class="token ${item.state}">${escapeHTML(refTokens[idx]?.display || item.word)}</span>`
   ).join('');
 
   return {
@@ -351,108 +388,52 @@ function renderWordComparisonHTML(referenceText, spokenText) {
   };
 }
 
-// ─── 6. TTS（Web Speech Synthesis）─────────────────────────
-
-let voicesReadyPromise = null;
-
-function isChromeBrowser() {
-  return /Chrome/i.test(navigator.userAgent) && !/Edg|OPR|Brave/i.test(navigator.userAgent);
-}
-
-function ensureVoicesLoaded() {
-  if (!voicesReadyPromise) {
-    voicesReadyPromise = new Promise(resolve => {
-      const tryResolve = () => {
-        const voices = speechSynthesis.getVoices();
-        if (voices.length) {
-          resolve(voices);
-          return true;
-        }
-        return false;
-      };
-      if (tryResolve()) return;
-      speechSynthesis.addEventListener('voiceschanged', () => tryResolve(), { once: true });
-      setTimeout(() => resolve(speechSynthesis.getVoices()), 1500);
-    });
-  }
-  return voicesReadyPromise;
-}
-
-function getEnglishVoice() {
-  const voices = speechSynthesis.getVoices();
-  if (!voices.length) return null;
-
-  const enUS = voices.filter(v => v.lang === 'en-US' || v.lang.startsWith('en-US'));
-  const pool = enUS.length ? enUS : voices.filter(v => v.lang.startsWith('en'));
-  if (!pool.length) return null;
-
-  if (isChromeBrowser()) {
-    // Chrome のローカル音声は壊れることが多い → Google 等のネットワーク音声を優先
-    const google = pool.find(v => /google/i.test(v.name));
-    if (google) return google;
-    const online = pool.find(v => !v.localService);
-    if (online) return online;
-  } else {
-    const local = pool.find(v => v.localService);
-    if (local) return local;
-    const samantha = pool.find(v => /samantha|karen|daniel|alex/i.test(v.name));
-    if (samantha) return samantha;
-  }
-
-  return pool[0];
-}
+// ─── 6. TTS（サーバー OpenAI TTS — Chrome でも安定）──────────
 
 let speakChain = Promise.resolve();
 
 function speak(text) {
-  speakChain = speakChain.then(() => speakOnce(text)).catch(() => {});
+  speakChain = speakChain.then(() => speakFromServer(text)).catch(err => {
+    console.error('TTS error:', err);
+  });
   return speakChain;
 }
 
-function speakOnce(text) {
-  return ensureVoicesLoaded().then(() => new Promise(resolve => {
-    const content = String(text || '').trim();
-    if (!content) { resolve(); return; }
+async function speakFromServer(text) {
+  const content = String(text || '').trim();
+  if (!content) return;
 
-    speechSynthesis.cancel();
+  if (App.currentAudio) {
+    App.currentAudio.pause();
+    App.currentAudio = null;
+  }
 
-    setTimeout(() => {
-      const utt = new SpeechSynthesisUtterance(content);
-      utt.lang = 'en-US';
-      utt.rate = 1;
-      utt.pitch = 1;
-      utt.volume = 1;
+  const res = await fetch('/gtec/api/tts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: content }),
+  });
 
-      const voice = getEnglishVoice();
-      if (voice) {
-        utt.voice = voice;
-        utt.lang = voice.lang || 'en-US';
-      }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `TTS failed: ${res.status}`);
+  }
 
-      App.currentUtterance = utt;
+  const { url } = await res.json();
 
-      let started = false;
-      const finish = () => {
-        App.currentUtterance = null;
-        resolve();
-      };
-
-      utt.onstart = () => { started = true; };
-      utt.onend = finish;
-      utt.onerror = finish;
-
-      speechSynthesis.speak(utt);
-
-      // Chrome: 音声が開始されない場合のフォールバック（voice 未設定で再試行）
-      setTimeout(() => {
-        if (!started) {
-          utt.voice = null;
-          utt.lang = 'en-US';
-          speechSynthesis.speak(utt);
-        }
-      }, 300);
-    }, 120);
-  }));
+  return new Promise((resolve, reject) => {
+    const audio = new Audio(url);
+    App.currentAudio = audio;
+    audio.onended = () => {
+      if (App.currentAudio === audio) App.currentAudio = null;
+      resolve();
+    };
+    audio.onerror = () => {
+      if (App.currentAudio === audio) App.currentAudio = null;
+      reject(new Error('音声の再生に失敗しました'));
+    };
+    audio.play().catch(reject);
+  });
 }
 
 // ─── 5. 音声認識（Web Speech API）──────────────────────────
@@ -718,8 +699,7 @@ async function runPartA() {
   if (App.cancelRequested) return;
 
   await loadSettings();
-  const prepOn = partAPrepEnabled();
-  const prepLabel = prepOn ? '30秒' : 'なし';
+  const prep = getPrepConfig('A');
 
   // idle
   $root().innerHTML = cardWrap(`
@@ -729,7 +709,7 @@ async function runPartA() {
       ${d.text}
     </div>
     <div class="flex gap-3 text-xs text-slate-500 mb-4">
-      <span>⏱ 準備: ${prepLabel}</span><span>🎤 解答: 40秒</span><span>📊 満点: 4点</span>
+      <span>⏱ 準備: ${prepLabel('A')}</span><span>🎤 解答: 40秒</span><span>📊 満点: 4点</span>
     </div>
     ${startBtn('練習スタート')}
   `);
@@ -737,7 +717,7 @@ async function runPartA() {
   if (App.cancelRequested) return;
 
   // prep（管理設定でオフの場合はスキップ）
-  if (prepOn) {
+  if (prep.enabled) {
     let timerEl;
     $root().innerHTML = cardWrap(`
       <p class="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-3">${d.title} — 準備</p>
@@ -748,7 +728,7 @@ async function runPartA() {
       <p class="text-center text-sm text-slate-400 mt-3">英文をよく読んで発音を確認してください</p>
     `);
     timerEl = document.getElementById('timer-wrap');
-    await countdown(d.prepTime, sec => { timerEl.innerHTML = timerDisplay(sec, 'prep'); });
+    await countdown(prep.seconds, sec => { timerEl.innerHTML = timerDisplay(sec, 'prep'); });
     if (App.cancelRequested) return;
   }
 
@@ -838,13 +818,16 @@ async function runPartB() {
   const d = GTEC_DATA.B;
   if (App.cancelRequested) return;
 
+  await loadSettings();
+  const prep = getPrepConfig('B');
+
   // idle
   $root().innerHTML = cardWrap(`
     <p class="text-xs font-bold text-sky-600 uppercase tracking-wider mb-1">${d.title}</p>
     <p class="text-sm text-slate-500 whitespace-pre-line mb-4">${d.desc}</p>
     <div class="border border-sky-200 rounded-xl overflow-hidden mb-4">${buildScheduleHTML(d.schedule)}</div>
     <div class="flex gap-3 text-xs text-slate-500 mb-4">
-      <span>⏱ 準備: 10秒/問</span><span>🎤 解答: 15秒/問</span><span>📊 満点: 4点</span>
+      <span>⏱ 準備: ${prepLabel('B')}/問</span><span>🎤 解答: 15秒/問</span><span>📊 満点: 4点</span>
     </div>
     <p class="text-xs bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-amber-700 mb-4">
       ⚠️ 質問文は<strong>画面に表示されません</strong>。スピーカーの音声をよく聞いて答えてください。
@@ -861,29 +844,46 @@ async function runPartB() {
     const q = d.questions[qi];
 
     // prep
-    let timerEl;
-    $root().innerHTML = cardWrap(`
-      <p class="text-xs font-bold text-sky-600 uppercase tracking-wider mb-1">${d.title} — 質問 ${qi + 1} / ${d.questions.length}</p>
-      <div id="timer-wrap"></div>
-      <div class="border border-sky-200 rounded-xl overflow-hidden mb-3">${buildScheduleHTML(d.schedule)}</div>
-      <div class="bg-sky-50 border border-sky-100 rounded-xl px-4 py-3 text-center text-sky-700 font-semibold">
-        スピーカーから質問が流れます。よく聞いて答えてください
-      </div>
-    `);
-    timerEl = document.getElementById('timer-wrap');
-    await countdown(d.prepTime, sec => { timerEl.innerHTML = timerDisplay(sec, 'prep'); });
-    if (App.cancelRequested) return;
+    if (prep.enabled) {
+      let timerEl;
+      $root().innerHTML = cardWrap(`
+        <p class="text-xs font-bold text-sky-600 uppercase tracking-wider mb-1">${d.title} — 質問 ${qi + 1} / ${d.questions.length}</p>
+        <div id="timer-wrap"></div>
+        <div class="border border-sky-200 rounded-xl overflow-hidden mb-3">${buildScheduleHTML(d.schedule)}</div>
+        <div class="bg-sky-50 border border-sky-100 rounded-xl px-4 py-3 text-center text-sky-700 font-semibold">
+          スピーカーから質問が流れます。よく聞いて答えてください
+        </div>
+      `);
+      timerEl = document.getElementById('timer-wrap');
+      await countdown(prep.seconds, sec => { timerEl.innerHTML = timerDisplay(sec, 'prep'); });
+      if (App.cancelRequested) return;
+    } else if (qi === 0) {
+      // 準備なしでも1問目は案内を短く表示
+      $root().innerHTML = cardWrap(`
+        <p class="text-xs font-bold text-sky-600 uppercase tracking-wider mb-1">${d.title} — 質問 ${qi + 1} / ${d.questions.length}</p>
+        <div class="border border-sky-200 rounded-xl overflow-hidden mb-3">${buildScheduleHTML(d.schedule)}</div>
+        <div class="bg-sky-50 border border-sky-100 rounded-xl px-4 py-3 text-center text-sky-700 font-semibold">
+          まもなく質問が流れます
+        </div>
+      `);
+      await sleep(800);
+      if (App.cancelRequested) return;
+    }
 
     // TTS
-    $root().querySelector('#timer-wrap').innerHTML = `
+    $root().innerHTML = cardWrap(`
+      <p class="text-xs font-bold text-sky-600 uppercase tracking-wider mb-1">${d.title} — 質問 ${qi + 1} / ${d.questions.length}</p>
       <div class="bg-sky-50 border border-sky-200 rounded-2xl p-4 mb-4 text-center">
         <span class="text-2xl">🔊</span>
         <p class="text-sky-700 font-semibold mt-1">質問を読み上げています...</p>
-      </div>`;
+      </div>
+      <div class="border border-sky-200 rounded-xl overflow-hidden">${buildScheduleHTML(d.schedule)}</div>
+    `);
     await speak(q.text);
     if (App.cancelRequested) return;
 
     // recording
+    let timerEl;
     let transEl;
     $root().innerHTML = cardWrap(`
       <p class="text-xs font-bold text-red-600 uppercase tracking-wider mb-1">${d.title} — Q${qi + 1} 解答</p>
@@ -970,13 +970,16 @@ async function runPartC() {
   const d = GTEC_DATA.C;
   if (App.cancelRequested) return;
 
+  await loadSettings();
+  const prep = getPrepConfig('C');
+
   // idle
   $root().innerHTML = cardWrap(`
     <p class="text-xs font-bold text-violet-600 uppercase tracking-wider mb-1">${d.title}</p>
     <p class="text-sm text-slate-500 mb-4">${d.desc}</p>
     ${buildPanelGrid(d.panels)}
     <div class="flex gap-3 text-xs text-slate-500 mb-4">
-      <span>⏱ 準備: 30秒</span><span>🎤 解答: 60秒</span><span>📊 満点: 12点</span>
+      <span>⏱ 準備: ${prepLabel('C')}</span><span>🎤 解答: 60秒</span><span>📊 満点: 12点</span>
     </div>
     ${startBtn('練習スタート')}
   `);
@@ -984,16 +987,18 @@ async function runPartC() {
   if (App.cancelRequested) return;
 
   // prep
-  let timerEl;
-  $root().innerHTML = cardWrap(`
-    <p class="text-xs font-bold text-violet-600 uppercase tracking-wider mb-3">${d.title} — 準備</p>
-    <div id="timer-wrap"></div>
-    ${buildPanelGrid(d.panels)}
-    <p class="text-center text-sm text-slate-400">4コマのストーリーを英語でどう話すか考えてください</p>
-  `);
-  timerEl = document.getElementById('timer-wrap');
-  await countdown(d.prepTime, sec => { timerEl.innerHTML = timerDisplay(sec, 'prep'); });
-  if (App.cancelRequested) return;
+  if (prep.enabled) {
+    let timerEl;
+    $root().innerHTML = cardWrap(`
+      <p class="text-xs font-bold text-violet-600 uppercase tracking-wider mb-3">${d.title} — 準備</p>
+      <div id="timer-wrap"></div>
+      ${buildPanelGrid(d.panels)}
+      <p class="text-center text-sm text-slate-400">4コマのストーリーを英語でどう話すか考えてください</p>
+    `);
+    timerEl = document.getElementById('timer-wrap');
+    await countdown(prep.seconds, sec => { timerEl.innerHTML = timerDisplay(sec, 'prep'); });
+    if (App.cancelRequested) return;
+  }
 
   // recording
   let transEl;
@@ -1067,6 +1072,9 @@ async function runPartD() {
   const d = GTEC_DATA.D;
   if (App.cancelRequested) return;
 
+  await loadSettings();
+  const prep = getPrepConfig('D');
+
   // idle
   $root().innerHTML = cardWrap(`
     <p class="text-xs font-bold text-rose-600 uppercase tracking-wider mb-1">${d.title}</p>
@@ -1087,7 +1095,7 @@ async function runPartD() {
       </div>
     </div>
     <div class="flex gap-3 text-xs text-slate-500 mb-4">
-      <span>⏱ 準備: 60秒</span><span>🎤 解答: 60秒</span><span>📊 満点: 11点</span>
+      <span>⏱ 準備: ${prepLabel('D')}</span><span>🎤 解答: 60秒</span><span>📊 満点: 11点</span>
     </div>
     ${startBtn('練習スタート')}
   `);
@@ -1095,20 +1103,22 @@ async function runPartD() {
   if (App.cancelRequested) return;
 
   // prep
-  let timerEl;
-  $root().innerHTML = cardWrap(`
-    <p class="text-xs font-bold text-rose-600 uppercase tracking-wider mb-3">${d.title} — 準備</p>
-    <div id="timer-wrap"></div>
-    <div class="bg-rose-50 border border-rose-200 rounded-xl p-4 mb-3">
-      <p class="font-semibold text-rose-800 text-base leading-relaxed">${d.topic}</p>
-    </div>
-    <p class="text-xs text-slate-400 text-center">
-      ① 自分の意見（賛成/反対）→ ② 客観的な理由・具体例 の順で話す練習をしてください
-    </p>
-  `);
-  timerEl = document.getElementById('timer-wrap');
-  await countdown(d.prepTime, sec => { timerEl.innerHTML = timerDisplay(sec, 'prep'); });
-  if (App.cancelRequested) return;
+  if (prep.enabled) {
+    let timerEl;
+    $root().innerHTML = cardWrap(`
+      <p class="text-xs font-bold text-rose-600 uppercase tracking-wider mb-3">${d.title} — 準備</p>
+      <div id="timer-wrap"></div>
+      <div class="bg-rose-50 border border-rose-200 rounded-xl p-4 mb-3">
+        <p class="font-semibold text-rose-800 text-base leading-relaxed">${d.topic}</p>
+      </div>
+      <p class="text-xs text-slate-400 text-center">
+        ① 自分の意見（賛成/反対）→ ② 客観的な理由・具体例 の順で話す練習をしてください
+      </p>
+    `);
+    timerEl = document.getElementById('timer-wrap');
+    await countdown(prep.seconds, sec => { timerEl.innerHTML = timerDisplay(sec, 'prep'); });
+    if (App.cancelRequested) return;
+  }
 
   // recording
   let transEl;
@@ -1204,7 +1214,10 @@ function stopRecognition() {
     try { App.recognition.stop(); } catch (_) {}
     App.recognition = null;
   }
-  speechSynthesis.cancel();
+  if (App.currentAudio) {
+    App.currentAudio.pause();
+    App.currentAudio = null;
+  }
 }
 
 // ─── 15. タブ・パート切り替え ────────────────────────────────
@@ -1252,14 +1265,6 @@ async function init() {
   }
 
   await loadSettings();
-
-  ensureVoicesLoaded();
-
-  // TTS 音声ロード（非同期）
-  if (speechSynthesis.onvoiceschanged !== undefined) {
-    speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices();
-  }
-  speechSynthesis.getVoices();
 
   // タブクリック
   document.querySelectorAll('.tab-btn').forEach(btn => {

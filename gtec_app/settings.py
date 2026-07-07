@@ -12,8 +12,19 @@ DATA_DIR = Path(
 ).expanduser()
 SETTINGS_FILE = DATA_DIR / "gtec_settings.json"
 
+PART_DEFAULTS = {
+    "a": {"prep_enabled": True, "prep_seconds": 30},
+    "b": {"prep_enabled": True, "prep_seconds": 10},
+    "c": {"prep_enabled": True, "prep_seconds": 30},
+    "d": {"prep_enabled": True, "prep_seconds": 60},
+}
+
 DEFAULT_SETTINGS = {
-    "part_a_prep_enabled": True,
+    f"part_{p}_prep_enabled": v["prep_enabled"]
+    for p, v in PART_DEFAULTS.items()
+} | {
+    f"part_{p}_prep_seconds": v["prep_seconds"]
+    for p, v in PART_DEFAULTS.items()
 }
 
 
@@ -21,12 +32,27 @@ def _ensure_data_dir() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def _clamp_seconds(value, default: int) -> int:
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(0, min(n, 600))
+
+
 def _normalize(raw: dict | None) -> dict:
     data = deepcopy(DEFAULT_SETTINGS)
     if not isinstance(raw, dict):
         return data
-    if "part_a_prep_enabled" in raw:
-        data["part_a_prep_enabled"] = bool(raw.get("part_a_prep_enabled"))
+
+    for part, defaults in PART_DEFAULTS.items():
+        enabled_key = f"part_{part}_prep_enabled"
+        seconds_key = f"part_{part}_prep_seconds"
+        if enabled_key in raw:
+            data[enabled_key] = bool(raw.get(enabled_key))
+        if seconds_key in raw:
+            data[seconds_key] = _clamp_seconds(raw.get(seconds_key), defaults["prep_seconds"])
+
     return data
 
 
@@ -58,6 +84,5 @@ def update_settings(**kwargs) -> dict:
 
 
 def public_settings() -> dict:
-    """生徒画面向けに公開する設定のみ。"""
-    s = load_settings()
-    return {"part_a_prep_enabled": s["part_a_prep_enabled"]}
+    """生徒画面向けに公開する設定。"""
+    return load_settings()

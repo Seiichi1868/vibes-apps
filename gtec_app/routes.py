@@ -16,6 +16,7 @@ from gtec_app.evaluator import (
     evaluate_part_d,
 )
 from gtec_app.settings import public_settings
+from gtec_app.tts import synthesize_question
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,29 @@ def index():
 @gtec_bp.route("/gtec/api/settings", methods=["GET"])
 def get_settings():
     return jsonify(public_settings())
+
+
+@gtec_bp.route("/gtec/api/tts", methods=["POST"])
+def generate_tts():
+    """Part B 質問読み上げ用 TTS（OpenAI・MP3）。"""
+    data = request.get_json(force=True, silent=True) or {}
+    text = str(data.get("text", "")).strip()
+    if not text:
+        return jsonify({"error": "text is required"}), 400
+    if len(text) > 500:
+        return jsonify({"error": "text is too long"}), 400
+
+    try:
+        path, cached = synthesize_question(text)
+        return jsonify({
+            "url": f"/static/audio/gtec/{path.name}",
+            "cached": cached,
+        })
+    except openai.AuthenticationError:
+        return jsonify({"error": "OpenAI APIキーが正しく設定されていません。"}), 500
+    except Exception as exc:
+        logger.exception("GTEC TTS failed: %s", exc)
+        return jsonify({"error": f"音声生成に失敗しました: {exc}"}), 502
 
 
 @gtec_bp.route("/gtec/evaluate", methods=["POST"])
