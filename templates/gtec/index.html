@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GTEC Speaking 対策アプリ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='gtec/css/style.css') }}">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { DEFAULT: '#4f46e5', dark: '#3730a3', light: '#818cf8' }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+
+  <!-- ── Header ─────────────────────────────────────────────── -->
+  <header class="bg-white border-b border-indigo-100 shadow-sm sticky top-0 z-40">
+    <div class="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white text-lg font-bold shadow">G</div>
+        <div>
+          <h1 class="text-lg font-bold text-indigo-700 leading-tight">GTEC Speaking 対策</h1>
+          <p class="text-xs text-slate-400">ベネッセ公式評価基準準拠 · 自動採点</p>
+        </div>
+      </div>
+      <div id="browser-badge" class="hidden text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 font-medium">
+        音声認識 OK
+      </div>
+    </div>
+  </header>
+
+  <!-- ── No-support Banner ──────────────────────────────────── -->
+  <div id="no-support-banner" class="hidden max-w-3xl mx-auto mt-4 px-4">
+    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
+      <span class="text-amber-500 text-xl">⚠️</span>
+      <div>
+        <p class="font-semibold text-amber-800">このブラウザは音声認識に対応していません</p>
+        <p class="text-sm text-amber-700 mt-1">
+          <strong>Google Chrome</strong>（PC・Android）でアクセスしてください。
+          Safariや Firefox では Web Speech API が使えません。
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Part Tabs ──────────────────────────────────────────── -->
+  <nav class="max-w-3xl mx-auto px-4 mt-5">
+    <div class="grid grid-cols-4 gap-1.5 bg-white rounded-2xl p-1.5 shadow-sm border border-indigo-50">
+      <button class="tab-btn" data-part="A">
+        <span class="block font-bold text-sm">Part A</span>
+        <span class="block text-xs opacity-75">音読</span>
+      </button>
+      <button class="tab-btn" data-part="B">
+        <span class="block font-bold text-sm">Part B</span>
+        <span class="block text-xs opacity-75">やり取り</span>
+      </button>
+      <button class="tab-btn" data-part="C">
+        <span class="block font-bold text-sm">Part C</span>
+        <span class="block text-xs opacity-75">ストーリー</span>
+      </button>
+      <button class="tab-btn" data-part="D">
+        <span class="block font-bold text-sm">Part D</span>
+        <span class="block text-xs opacity-75">意見表明</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ── Main Content (JS-rendered) ────────────────────────── -->
+  <main class="max-w-3xl mx-auto px-4 mt-5 pb-12" id="app-root"></main>
+
+  <script src="{{ url_for('static', filename='gtec/js/app.js') }}"></script>
+</body>
+</html>

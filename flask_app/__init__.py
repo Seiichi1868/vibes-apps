@@ -43,8 +43,10 @@ def create_app(config_class=Config):
     )
     from flask_app.views import main_bp
     from news_app import create_news_blueprints
+    from gtec_app import gtec_bp
 
     app.register_blueprint(main_bp)
+    app.register_blueprint(gtec_bp)
 
     news_bps = create_news_blueprints()
     app.register_blueprint(news_bps["main"], url_prefix="/news")
