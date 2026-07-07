@@ -8,9 +8,13 @@ const unlockBtn = document.getElementById('unlock-btn');
 const lockMessage = document.getElementById('lock-message');
 const settingsPanel = document.getElementById('settings-panel');
 const statusMessage = document.getElementById('status-message');
+const pageBgLayer = document.getElementById('page-bg-layer');
+const bgCurrentLabel = document.getElementById('bg-current-label');
+const bgPicker = document.getElementById('bg-picker');
 
 let unlocked = false;
 let saveTimer = null;
+let currentBackgroundId = null;
 
 function showLockMessage(msg) {
   lockMessage.textContent = msg;
@@ -21,8 +25,21 @@ function hideLockMessage() {
   lockMessage.classList.add('hidden');
 }
 
+function applyBackground(bgId, imageUrl, label) {
+  currentBackgroundId = bgId;
+  if (pageBgLayer && imageUrl) {
+    pageBgLayer.style.backgroundImage = `url("${imageUrl}")`;
+  }
+  if (bgCurrentLabel && label) {
+    bgCurrentLabel.textContent = label;
+  }
+  document.querySelectorAll('.bg-pick-btn').forEach(btn => {
+    btn.classList.toggle('bg-pick-btn-active', btn.dataset.bgId === bgId);
+  });
+}
+
 function updatePartUI(part, enabled, seconds) {
-  const row = document.querySelector(`.prep-seconds-row .prep-seconds[data-part="${part}"]`)?.closest('.admin-card');
+  const row = document.querySelector(`.admin-part-row[data-part="${part}"]`);
   if (!row) return;
 
   const secondsInput = row.querySelector(`.prep-seconds[data-part="${part}"]`);
@@ -30,12 +47,12 @@ function updatePartUI(part, enabled, seconds) {
   const secondsRow = row.querySelector('.prep-seconds-row');
 
   if (secondsInput) secondsInput.disabled = !enabled;
-  if (secondsRow) secondsRow.style.opacity = enabled ? '1' : '0.5';
+  if (secondsRow) secondsRow.style.opacity = enabled ? '1' : '0.45';
 
   if (statusEl) {
     statusEl.textContent = enabled
-      ? `準備時間: オン（${seconds}秒）`
-      : '準備時間: オフ（即開始）';
+      ? `オン ${seconds}秒`
+      : 'オフ';
   }
 }
 
@@ -64,6 +81,9 @@ function collectPayload() {
     payload[`part_${part}_prep_enabled`] = toggle?.checked !== false;
     payload[`part_${part}_prep_seconds`] = parseInt(secondsInput?.value, 10) || DEFAULT_SECONDS[part];
   });
+  if (currentBackgroundId) {
+    payload.background_id = currentBackgroundId;
+  }
   return payload;
 }
 
@@ -110,6 +130,13 @@ async function loadSettingsIntoUI() {
     if (secondsInput) secondsInput.value = seconds;
     updatePartUI(part, enabled, seconds);
   });
+
+  const activeBtn = bgPicker?.querySelector(`.bg-pick-btn[data-bg-id="${data.background_id}"]`);
+  applyBackground(
+    data.background_id,
+    activeBtn?.dataset.bgImage,
+    data.background_label || activeBtn?.title,
+  );
 }
 
 function scheduleSave() {
@@ -124,7 +151,13 @@ function scheduleSave() {
         const seconds = parseInt(saved[`part_${part}_prep_seconds`], 10) || DEFAULT_SECONDS[part];
         updatePartUI(part, enabled, seconds);
       });
-      statusMessage.textContent = '設定を保存しました';
+      const activeBtn = bgPicker?.querySelector(`.bg-pick-btn[data-bg-id="${saved.background_id}"]`);
+      applyBackground(
+        saved.background_id,
+        activeBtn?.dataset.bgImage,
+        saved.background_label || activeBtn?.title,
+      );
+      statusMessage.textContent = '保存しました';
     } catch (err) {
       statusMessage.textContent = '';
       showLockMessage(err.message);
@@ -149,4 +182,11 @@ document.querySelectorAll('.prep-toggle').forEach(el => {
 
 document.querySelectorAll('.prep-seconds').forEach(el => {
   el.addEventListener('input', scheduleSave);
+});
+
+bgPicker?.addEventListener('click', e => {
+  const btn = e.target.closest('.bg-pick-btn');
+  if (!btn || !unlocked) return;
+  applyBackground(btn.dataset.bgId, btn.dataset.bgImage, btn.title);
+  scheduleSave();
 });

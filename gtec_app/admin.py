@@ -4,7 +4,13 @@ import os
 
 from flask import Blueprint, jsonify, render_template, request
 
-from gtec_app.settings import PART_DEFAULTS, load_settings, update_settings
+from gtec_app.settings import (
+    BACKGROUND_PRESETS,
+    PART_DEFAULTS,
+    load_settings,
+    resolve_background,
+    update_settings,
+)
 
 gtec_admin_bp = Blueprint("gtec_admin", __name__)
 
@@ -24,13 +30,22 @@ def _password_ok(payload: dict) -> bool:
 
 @gtec_admin_bp.route("/gtec/admin")
 def admin_page():
-    return render_template("gtec/admin.html", parts=PART_LABELS, defaults=PART_DEFAULTS)
+    settings = load_settings()
+    bg = resolve_background(settings.get("background_id"))
+    return render_template(
+        "gtec/admin.html",
+        parts=PART_LABELS,
+        defaults=PART_DEFAULTS,
+        backgrounds=BACKGROUND_PRESETS,
+        current_background=bg,
+    )
 
 
 @gtec_admin_bp.route("/gtec/admin/api/settings", methods=["GET", "POST"])
 def admin_settings():
     if request.method == "GET":
-        return jsonify({"ok": True, **load_settings()})
+        settings = load_settings()
+        return jsonify({"ok": True, **settings, **resolve_background(settings.get("background_id"))})
 
     payload = request.get_json(silent=True) or {}
     if not _password_ok(payload):
@@ -45,8 +60,14 @@ def admin_settings():
         if seconds_key in payload:
             updates[seconds_key] = payload.get(seconds_key)
 
+    if "background_id" in payload:
+        bg_id = str(payload.get("background_id") or "")
+        if bg_id in BACKGROUND_PRESETS:
+            updates["background_id"] = bg_id
+
     if not updates:
-        return jsonify({"ok": True, **load_settings()})
+        settings = load_settings()
+        return jsonify({"ok": True, **settings, **resolve_background(settings.get("background_id"))})
 
     saved = update_settings(**updates)
-    return jsonify({"ok": True, **saved})
+    return jsonify({"ok": True, **saved, **resolve_background(saved.get("background_id"))})

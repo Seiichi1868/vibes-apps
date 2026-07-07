@@ -19,12 +19,39 @@ PART_DEFAULTS = {
     "d": {"prep_enabled": True, "prep_seconds": 60},
 }
 
+BACKGROUND_PRESETS = {
+    "meadow": {
+        "label": "草原",
+        "image": "news/images/nature-bg.jpg",
+    },
+    "forest": {
+        "label": "森",
+        "image": "gtec/images/bg/forest.jpg",
+    },
+    "mountain": {
+        "label": "山",
+        "image": "gtec/images/bg/mountain.jpg",
+    },
+    "ocean": {
+        "label": "海",
+        "image": "gtec/images/bg/ocean.jpg",
+    },
+    "misty-lake": {
+        "label": "湖",
+        "image": "gtec/images/bg/misty-lake.jpg",
+    },
+}
+
+DEFAULT_BACKGROUND_ID = "meadow"
+
 DEFAULT_SETTINGS = {
     f"part_{p}_prep_enabled": v["prep_enabled"]
     for p, v in PART_DEFAULTS.items()
 } | {
     f"part_{p}_prep_seconds": v["prep_seconds"]
     for p, v in PART_DEFAULTS.items()
+} | {
+    "background_id": DEFAULT_BACKGROUND_ID,
 }
 
 
@@ -53,7 +80,22 @@ def _normalize(raw: dict | None) -> dict:
         if seconds_key in raw:
             data[seconds_key] = _clamp_seconds(raw.get(seconds_key), defaults["prep_seconds"])
 
+    bg_id = raw.get("background_id") if isinstance(raw, dict) else None
+    if bg_id in BACKGROUND_PRESETS:
+        data["background_id"] = bg_id
+
     return data
+
+
+def resolve_background(background_id: str | None = None) -> dict:
+    """背景プリセット ID から表示用メタデータを返す。"""
+    preset_id = background_id if background_id in BACKGROUND_PRESETS else DEFAULT_BACKGROUND_ID
+    preset = BACKGROUND_PRESETS[preset_id]
+    return {
+        "background_id": preset_id,
+        "background_label": preset["label"],
+        "background_image": preset["image"],
+    }
 
 
 def load_settings() -> dict:
@@ -85,4 +127,5 @@ def update_settings(**kwargs) -> dict:
 
 def public_settings() -> dict:
     """生徒画面向けに公開する設定。"""
-    return load_settings()
+    settings = load_settings()
+    return {**settings, **resolve_background(settings.get("background_id"))}
