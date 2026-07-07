@@ -84,7 +84,6 @@ const App = {
   },
   currentAudio: null,
   currentUtterance: null,
-  partBPreloadedAudio: null,
 };
 
 // ─── 3. 設定読み込み ─────────────────────────────────────────
@@ -391,21 +390,20 @@ function renderWordComparisonHTML(referenceText, spokenText) {
   };
 }
 
-// ─── 6. TTS（サーバー OpenAI + ブラウザ fallback）────────────
+// ─── 6. TTS（ブラウザ合成音声優先 + OpenAI サーバー fallback）────────────
 
 let speakChain = Promise.resolve();
 let voicesReadyPromise = null;
+
+function isMobileDevice() {
+  return /Mobi|Android|iPad|iPhone|iPod/i.test(navigator.userAgent);
+}
 
 function isChromeBrowser() {
   return /Chrome/i.test(navigator.userAgent) && !/Edg|OPR|Brave/i.test(navigator.userAgent);
 }
 
-/**
- * ユーザージェスチャー直後に呼ぶこと。
- * AudioContext + 無音 Audio 両方で iOS / Android を unlock する。
- */
 function unlockAudioSync() {
-  // AudioContext unlock
   try {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (AC) {
@@ -419,45 +417,15 @@ function unlockAudioSync() {
     }
   } catch (_) {}
 
-  // Audio element unlock
-  try {
-    const silent = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
-    const a = new Audio(silent);
-    a.playsInline = true;
-    a.volume = 0.001;
-    a.play().catch(() => {});
-  } catch (_) {}
-}
-
-/**
- * Part B 用: スタートボタン直後（まだジェスチャーウィンドウ内）に
- * 全質問の音声を fetch → Audio 作成 → play+pause で iOS に "認可" させる。
- */
-async function preloadTTSAudio(texts) {
-  const cache = {};
-  await Promise.all(texts.map(async text => {
+  // 音声合成もジェスチャー内で primer を流す（iOS でのセッション認証）
+  if ('speechSynthesis' in window) {
     try {
-      const res = await fetch('/gtec/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      });
-      if (!res.ok) return;
-      const { url } = await res.json();
-      const audio = new Audio(url);
-      audio.playsInline = true;
-      audio.preload = 'auto';
-      // iOS autoplay unlock: play → pause でユーザー許可済みとして登録
-      try {
-        const p = audio.play();
-        if (p) await p;
-        audio.pause();
-        audio.currentTime = 0;
-      } catch (_) {}
-      cache[text] = audio;
+      speechSynthesis.cancel();
+      const primer = new SpeechSynthesisUtterance(' ');
+      primer.volume = 0;
+      speechSynthesis.speak(primer);
     } catch (_) {}
-  }));
-  return cache;
+  }
 }
 
 function ensureVoicesLoaded() {
@@ -486,6 +454,11 @@ function getEnglishVoice() {
   const pool = enUS.length ? enUS : voices.filter(v => v.lang.startsWith('en'));
   if (!pool.length) return null;
 
+  // iOS/Android: ローカル声を優先
+  if (isMobileDevice()) {
+    const local = pool.find(v => v.localService);
+    if (local) return local;
+  }
   if (isChromeBrowser()) {
     const google = pool.find(v => /google/i.test(v.name));
     if (google) return google;
@@ -500,127 +473,148 @@ function getEnglishVoice() {
   return pool[0];
 }
 
+/** 現在の音声・合成音声を完全停止 */
 function stopCurrentSpeech() {
   if (App.currentAudio) {
     App.currentAudio.pause();
     App.currentAudio = null;
   }
-  if (App.currentUtterance && 'speechSynthesis' in window) {
+  if ('speechSynthesis' in window) {
     speechSynthesis.cancel();
     App.currentUtterance = null;
   }
 }
 
 function speak(text) {
-  speakChain = speakChain.then(() => speakOnce(text)).catch(err => {
-    console.error('TTS error:', err);
-  });
+  speakChain = speakChain.then(() => speakOnce(text)).catch(() => {});
   return speakChain;
 }
 
+/**
+ * ブラウザ合成音声を優先。3 秒以内に再生開始しなければサーバー TTS へ fallback。
+ * cancelRequested / submitRequested 時は即座に return。
+ */
 async function speakOnce(text) {
   const content = String(text || '').trim();
   if (!content || App.cancelRequested) return;
 
+  // 必ず先に既存の音声・合成音声を完全停止（Chrome 二重再生防止）
   stopCurrentSpeech();
 
-  try {
-    await speakFromServer(content);
-  } catch (err) {
-    console.warn('Server TTS failed, using browser fallback:', err);
-    await speakWithBrowser(content);
+  // ブラウザ合成音声を優先（費用ゼロ）
+  const voices = await ensureVoicesLoaded();
+  if (voices.length > 0 && !App.cancelRequested) {
+    const ok = await speakWithBrowser(content);
+    if (ok) return;
+  }
+
+  // サーバー TTS fallback（声が全くない環境向け）
+  if (!App.cancelRequested) {
+    await speakFromServer(content).catch(err => console.warn('Server TTS:', err));
   }
 }
 
-async function speakFromServer(text) {
-  // Part B プリロード済み Audio があればそれを使う（iOS autoplay 対策）
-  const preloaded = App.partBPreloadedAudio?.[text];
-  if (preloaded) {
-    return playAudioElement(preloaded);
-  }
+/**
+ * ブラウザ合成音声で再生。
+ * @returns {Promise<boolean>} 再生が開始されたら true、タイムアウト/エラーなら false
+ */
+function speakWithBrowser(text) {
+  if (!('speechSynthesis' in window)) return Promise.resolve(false);
+  const voices = speechSynthesis.getVoices();
+  if (!voices.length) return Promise.resolve(false);
 
+  return new Promise(resolve => {
+    if (App.cancelRequested) { resolve(false); return; }
+
+    speechSynthesis.cancel();
+
+    setTimeout(() => {
+      if (App.cancelRequested) { resolve(false); return; }
+
+      const makeUtt = (fallbackVoice = false) => {
+        const utt = new SpeechSynthesisUtterance(text);
+        utt.lang = 'en-US';
+        utt.rate = 1;
+        utt.pitch = 1;
+        utt.volume = 1;
+        if (!fallbackVoice) {
+          const voice = getEnglishVoice();
+          if (voice) { utt.voice = voice; utt.lang = voice.lang || 'en-US'; }
+        }
+        return utt;
+      };
+
+      let started = false;
+      let resolved = false;
+      const done = (val) => { if (!resolved) { resolved = true; App.currentUtterance = null; resolve(val); } };
+
+      // 3 秒以内に onstart が来なければ false（サーバー TTS へ）
+      const failTimer = setTimeout(() => { if (!started) { speechSynthesis.cancel(); done(false); } }, 3000);
+
+      const utt = makeUtt();
+      App.currentUtterance = utt;
+
+      utt.onstart = () => { started = true; clearTimeout(failTimer); };
+      utt.onend   = () => { clearTimeout(failTimer); done(true); };
+      utt.onerror = () => { clearTimeout(failTimer); done(false); };
+
+      speechSynthesis.speak(utt);
+
+      // Chrome: voice 指定で始まらない場合、voice なしで再試行
+      setTimeout(() => {
+        if (!started && !App.cancelRequested) {
+          speechSynthesis.cancel();
+          const utt2 = makeUtt(true);
+          App.currentUtterance = utt2;
+          utt2.onstart = () => { started = true; clearTimeout(failTimer); };
+          utt2.onend   = () => { clearTimeout(failTimer); done(true); };
+          utt2.onerror = () => { clearTimeout(failTimer); done(false); };
+          speechSynthesis.speak(utt2);
+        }
+      }, 400);
+    }, 80);
+  });
+}
+
+/**
+ * スマホで gesturecontext 内から直接呼ぶ TTS（play ボタン tap 時）
+ */
+function speakInGestureContext(text) {
+  return new Promise(resolve => {
+    if (!('speechSynthesis' in window)) { resolve(); return; }
+    speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.lang = 'en-US';
+    utt.rate = 1;
+    utt.pitch = 1;
+    utt.volume = 1;
+    const voice = getEnglishVoice();
+    if (voice) { utt.voice = voice; utt.lang = voice.lang || 'en-US'; }
+    App.currentUtterance = utt;
+    utt.onend   = () => { App.currentUtterance = null; resolve(); };
+    utt.onerror = () => { App.currentUtterance = null; resolve(); };
+    speechSynthesis.speak(utt);
+  });
+}
+
+/** サーバー TTS fallback（費用発生 ── 合成音声が使えない環境のみ）*/
+async function speakFromServer(text) {
   const res = await fetch('/gtec/api/tts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text }),
   });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `TTS failed: ${res.status}`);
-  }
-
+  if (!res.ok) throw new Error(`TTS ${res.status}`);
   const { url } = await res.json();
-  const audio = new Audio(url);
-  audio.playsInline = true;
-  audio.preload = 'auto';
-  return playAudioElement(audio);
-}
-
-function playAudioElement(audio) {
   return new Promise((resolve, reject) => {
-    audio.currentTime = 0;
+    const audio = new Audio(url);
+    audio.playsInline = true;
     App.currentAudio = audio;
-
-    const cleanup = () => {
-      audio.onended = null;
-      audio.onerror = null;
-      if (App.currentAudio === audio) App.currentAudio = null;
-    };
-
+    const cleanup = () => { audio.onended = audio.onerror = null; if (App.currentAudio === audio) App.currentAudio = null; };
     audio.onended = () => { cleanup(); resolve(); };
-    audio.onerror = () => { cleanup(); reject(new Error('音声の再生に失敗しました')); };
-
-    audio.play().catch(err => { cleanup(); reject(err); });
+    audio.onerror = () => { cleanup(); reject(new Error('Audio playback failed')); };
+    audio.play().catch(reject);
   });
-}
-
-function speakWithBrowser(text) {
-  if (!('speechSynthesis' in window)) {
-    return Promise.reject(new Error('このブラウザは音声読み上げに対応していません'));
-  }
-
-  return ensureVoicesLoaded().then(() => new Promise(resolve => {
-    if (App.cancelRequested) { resolve(); return; }
-
-    speechSynthesis.cancel();
-
-    setTimeout(() => {
-      const utt = new SpeechSynthesisUtterance(text);
-      utt.lang = 'en-US';
-      utt.rate = 1;
-      utt.pitch = 1;
-      utt.volume = 1;
-
-      const voice = getEnglishVoice();
-      if (voice) {
-        utt.voice = voice;
-        utt.lang = voice.lang || 'en-US';
-      }
-
-      App.currentUtterance = utt;
-
-      let started = false;
-      const finish = () => {
-        App.currentUtterance = null;
-        resolve();
-      };
-
-      utt.onstart = () => { started = true; };
-      utt.onend = finish;
-      utt.onerror = finish;
-
-      speechSynthesis.speak(utt);
-
-      setTimeout(() => {
-        if (!started && !App.cancelRequested) {
-          utt.voice = null;
-          utt.lang = 'en-US';
-          speechSynthesis.speak(utt);
-        }
-      }, 300);
-    }, 120);
-  }));
 }
 
 // ─── 5. 音声認識（Web Speech API）──────────────────────────
@@ -1060,25 +1054,14 @@ async function runPartB() {
   if (App.cancelRequested) return;
 
   await renderPartIdle('B');
-  await waitForClick('start-btn');   // ← ここがジェスチャーウィンドウ
+  await waitForClick('start-btn');
   if (App.cancelRequested) return;
   setStopButtonVisible(true);
-
-  // スタート直後（まだジェスチャーウィンドウ内）に全質問の音声をプリロード
-  $root().innerHTML = cardWrap(`
-    <p class="text-xs font-bold text-sky-600 uppercase tracking-wider mb-2">${d.title}</p>
-    <div class="flex items-center justify-center py-5 gap-3">
-      <div class="w-6 h-6 border-2 border-sky-300 border-t-sky-600 rounded-full animate-spin"></div>
-      <p class="text-sky-700 font-semibold">質問音声を準備中...</p>
-    </div>
-    <div class="border border-sky-200 rounded-xl overflow-hidden">${buildScheduleHTML(d.schedule)}</div>
-  `);
-  App.partBPreloadedAudio = await preloadTTSAudio(d.questions.map(q => q.text));
-  if (App.cancelRequested) return;
 
   const prep = getPrepConfig('B');
   const recordings = [];
   let earlySubmit = false;
+  const mobile = isMobileDevice();
 
   for (let qi = 0; qi < d.questions.length; qi++) {
     if (App.cancelRequested) return;
@@ -1091,37 +1074,49 @@ async function runPartB() {
         <p class="text-xs font-bold text-sky-600 uppercase tracking-wider mb-1">${d.title} — 質問 ${qi + 1} / ${d.questions.length}</p>
         <div id="timer-wrap"></div>
         <div class="border border-sky-200 rounded-xl overflow-hidden mb-3">${buildScheduleHTML(d.schedule)}</div>
-        <div class="bg-sky-50 border border-sky-100 rounded-xl px-4 py-3 text-center text-sky-700 font-semibold">
-          スピーカーから質問が流れます。よく聞いて答えてください
+        <div class="bg-sky-50 border border-sky-100 rounded-xl px-4 py-3 text-center text-sky-700 font-semibold text-sm">
+          ${mobile ? '準備ができたら下のボタンをタップして質問を聞いてください' : 'スピーカーから質問が流れます。よく聞いて答えてください'}
         </div>
       `);
       timerEl = document.getElementById('timer-wrap');
       await countdown(prep.seconds, sec => { timerEl.innerHTML = timerDisplay(sec, 'prep'); });
       if (App.cancelRequested) return;
-    } else if (qi === 0) {
-      $root().innerHTML = cardWrap(`
-        <p class="text-xs font-bold text-sky-600 uppercase tracking-wider mb-1">${d.title} — 質問 ${qi + 1} / ${d.questions.length}</p>
-        <div class="border border-sky-200 rounded-xl overflow-hidden mb-3">${buildScheduleHTML(d.schedule)}</div>
-        <div class="bg-sky-50 border border-sky-100 rounded-xl px-4 py-3 text-center text-sky-700 font-semibold">
-          まもなく質問が流れます
-        </div>
-      `);
-      await sleep(600);
-      if (App.cancelRequested) return;
     }
 
-    // TTS
-    $root().innerHTML = cardWrap(`
-      <p class="text-xs font-bold text-sky-600 uppercase tracking-wider mb-1">${d.title} — 質問 ${qi + 1} / ${d.questions.length}</p>
-      <div class="bg-sky-50 border border-sky-200 rounded-2xl p-4 mb-4 text-center">
-        <span class="text-2xl">🔊</span>
-        <p class="text-sky-700 font-semibold mt-1">質問を読み上げています...</p>
-      </div>
-      <div class="border border-sky-200 rounded-xl overflow-hidden">${buildScheduleHTML(d.schedule)}</div>
-    `);
-    await speak(q.text);
+    // TTS フェーズ
+    if (mobile) {
+      // スマホ: ユーザーがタップするまで待つ → ジェスチャー内で即座に読み上げ
+      $root().innerHTML = cardWrap(`
+        <p class="text-xs font-bold text-sky-600 uppercase tracking-wider mb-1">${d.title} — 質問 ${qi + 1} / ${d.questions.length}</p>
+        <div class="border border-sky-200 rounded-xl overflow-hidden mb-4">${buildScheduleHTML(d.schedule)}</div>
+        <button id="hear-btn"
+          class="w-full py-4 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white font-bold text-base shadow-lg transition-all">
+          🔊 タップして質問を聞く（Q${qi + 1}）
+        </button>
+      `);
+      await new Promise(resolve => {
+        const btn = document.getElementById('hear-btn');
+        if (!btn) { resolve(); return; }
+        btn.addEventListener('click', () => {
+          btn.disabled = true;
+          btn.innerHTML = '<span class="opacity-70">🔊 読み上げ中...</span>';
+          speakInGestureContext(q.text).then(resolve);
+        }, { once: true });
+      });
+    } else {
+      // PC: 自動読み上げ
+      $root().innerHTML = cardWrap(`
+        <p class="text-xs font-bold text-sky-600 uppercase tracking-wider mb-1">${d.title} — 質問 ${qi + 1} / ${d.questions.length}</p>
+        <div class="bg-sky-50 border border-sky-200 rounded-2xl p-4 mb-4 text-center">
+          <span class="text-2xl">🔊</span>
+          <p class="text-sky-700 font-semibold mt-1">質問を読み上げています...</p>
+        </div>
+        <div class="border border-sky-200 rounded-xl overflow-hidden">${buildScheduleHTML(d.schedule)}</div>
+      `);
+      await speak(q.text);
+    }
     if (App.cancelRequested) return;
-    await sleep(400);
+    await sleep(300);
 
     // recording
     let timerEl;
@@ -1466,8 +1461,11 @@ function stopAllMedia() {
     try { App.recognition.abort(); } catch (_) {}
     App.recognition = null;
   }
+  // 音声・合成音声を必ず停止
   stopCurrentSpeech();
 }
+
+function stopRecognition() { stopAllMedia(); }
 
 async function stopAndReset() {
   App.cancelRequested = true;
@@ -1550,10 +1548,6 @@ async function renderPartIdle(partId) {
   }
 }
 
-function stopRecognition() {
-  stopAllMedia();
-}
-
 // ─── 15. タブ・パート切り替え ────────────────────────────────
 
 function setActiveTab(partId) {
@@ -1569,7 +1563,6 @@ async function startPart(partId) {
   App.submitRequested = false;
   stopAllMedia();
   speakChain = Promise.resolve();
-  App.partBPreloadedAudio = null;
   await sleep(150);
 
   App.part = partId;
@@ -1603,6 +1596,9 @@ async function init() {
   }
 
   await loadSettings();
+
+  // ブラウザ合成音声リストを事前ロード（Part B TTS のラグを減らす）
+  ensureVoicesLoaded().catch(() => {});
 
   // タブクリック
   document.querySelectorAll('.tab-btn').forEach(btn => {
