@@ -83,13 +83,8 @@ Return exactly this JSON (no extra keys):
   "scores": {{
     "fluency_pronunciation": <integer 0–4>
   }},
-  "wpm_calculated": {wpm},
-  "feedback": {{
-    "grammar_corrections": [{{"original": "<phrase>", "corrected": "<corrected>", "explanation": "<Japanese>"}}]
-  }}
-}}
-
-Only include grammar_corrections for clear errors. Use an empty array if none."""
+  "wpm_calculated": {wpm}
+}}"""
     return _call(prompt)
 
 

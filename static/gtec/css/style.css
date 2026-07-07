@@ -1,5 +1,22 @@
 /* GTEC Speaking App — カスタムスタイル */
 
+/* ── 背景・ガラスパネル（News と同系統）──────────────────── */
+.glass-header {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(167, 243, 208, 0.55);
+  box-shadow: 0 4px 24px rgba(15, 118, 110, 0.06);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(167, 243, 208, 0.55);
+  box-shadow: 0 10px 40px rgba(15, 118, 110, 0.09), 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+}
+
 /* ── タブボタン ─────────────────────────────────────────── */
 .tab-btn {
   padding: 0.6rem 0.25rem;
@@ -25,7 +42,7 @@
 }
 
 .tab-btn.tab-inactive:hover {
-  background-color: #f1f5f9;
+  background-color: rgba(255, 255, 255, 0.55);
   color: #4f46e5;
 }
 
@@ -134,11 +151,13 @@
 
 /* ── 管理画面 ───────────────────────────────────────────── */
 .admin-card {
-  background: #fff;
-  border: 1px solid #e0e7ff;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(167, 243, 208, 0.55);
   border-radius: 1rem;
   padding: 1.25rem;
-  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.06);
+  box-shadow: 0 10px 40px rgba(15, 118, 110, 0.09), 0 1px 0 rgba(255, 255, 255, 0.8) inset;
 }
 
 .admin-card-title {

@@ -6,10 +6,25 @@
   <title>GTEC Speaking 管理画面</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='gtec/css/style.css') }}">
+  <style>
+    .gtec-page-bg {
+      background-image: url("{{ url_for('static', filename='news/images/nature-bg.jpg') }}");
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+      background-repeat: no-repeat;
+    }
+  </style>
 </head>
-<body class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+<body class="relative min-h-screen text-slate-800 antialiased">
 
-  <header class="bg-white border-b border-indigo-100 shadow-sm sticky top-0 z-40">
+  <div class="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
+    <div class="gtec-page-bg absolute inset-0 scale-105 opacity-[0.38]"></div>
+    <div class="absolute inset-0 bg-gradient-to-br from-sky-100/75 via-white/55 to-emerald-100/70"></div>
+    <div class="absolute inset-0 bg-gradient-to-t from-emerald-50/40 via-transparent to-sky-50/30"></div>
+  </div>
+
+  <header class="glass-header sticky top-0 z-40">
     <div class="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
       <div>
         <p class="text-xs font-semibold text-indigo-500 uppercase tracking-wider">GTEC Admin</p>
@@ -21,7 +36,6 @@
 
   <main class="max-w-2xl mx-auto px-4 py-6 space-y-4">
 
-    <!-- パスワード -->
     <section class="admin-card">
       <h2 class="admin-card-title">管理設定の解除</h2>
       <div class="flex flex-wrap gap-2 items-center">
@@ -38,7 +52,6 @@
       <p id="lock-message" class="text-sm text-red-600 mt-2 hidden" role="alert"></p>
     </section>
 
-    <!-- 設定（パスワード解除後） -->
     <div id="settings-panel" class="hidden space-y-4">
       <p id="status-message" class="text-sm text-emerald-700 font-medium" aria-live="polite"></p>
 

@@ -123,13 +123,83 @@ function countdown(seconds, onTick) {
 
 // ─── 5. 単語比較（音読判定アプリと同ロジック・英語専用）──────────
 
+const NUMBER_ONES = [
+  'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
+  'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen',
+  'seventeen', 'eighteen', 'nineteen',
+];
+const NUMBER_TENS = [
+  '', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety',
+];
+const ENGLISH_NUMBER_WORDS = new Set([
+  ...NUMBER_ONES,
+  ...NUMBER_TENS.filter(Boolean),
+  'hundred', 'thousand', 'million', 'oh',
+]);
+
+function intToEnglish(n) {
+  const num = Math.floor(Number(n));
+  if (!Number.isFinite(num) || num < 0) return '';
+  if (num < 20) return NUMBER_ONES[num];
+  if (num < 100) {
+    const tens = Math.floor(num / 10);
+    const ones = num % 10;
+    return ones ? `${NUMBER_TENS[tens]} ${NUMBER_ONES[ones]}` : NUMBER_TENS[tens];
+  }
+  if (num < 1000) {
+    const hundreds = Math.floor(num / 100);
+    const rest = num % 100;
+    if (!rest) return `${NUMBER_ONES[hundreds]} hundred`;
+    return `${NUMBER_ONES[hundreds]} hundred ${intToEnglish(rest)}`;
+  }
+  if (num < 1000000) {
+    const thousands = Math.floor(num / 1000);
+    const rest = num % 1000;
+    if (!rest) return `${intToEnglish(thousands)} thousand`;
+    return `${intToEnglish(thousands)} thousand ${intToEnglish(rest)}`;
+  }
+  return String(num);
+}
+
+function expandOrdinals(text) {
+  return String(text || '').replace(/\b(\d+)(st|nd|rd|th)\b/gi, (_, digits) =>
+    intToEnglish(parseInt(digits, 10))
+  );
+}
+
+function expandClockTimes(text) {
+  return String(text || '').replace(
+    /\b(\d{1,2}):(\d{2})\b/g,
+    (_, hour, minute) => {
+      const h = parseInt(hour, 10);
+      const m = parseInt(minute, 10);
+      if (h > 23 || m > 59) return `${hour} ${minute}`;
+      return `${intToEnglish(h)} ${intToEnglish(m)}`;
+    }
+  );
+}
+
+function expandSpacedClockTimes(text) {
+  return String(text || '').replace(/\b(\d{1,2})\s+(\d{2})\b/g, (match, hour, minute) => {
+    const h = parseInt(hour, 10);
+    const m = parseInt(minute, 10);
+    if (h > 23 || m > 59) return match;
+    return `${intToEnglish(h)} ${intToEnglish(m)}`;
+  });
+}
+
+function expandStandaloneNumbers(text) {
+  return String(text || '').replace(/\b\d+\b/g, digits => intToEnglish(parseInt(digits, 10)));
+}
+
 function normalizeTextForWords(text) {
-  return String(text || '')
-    .replace(/\r\n|\r|\n/g, ' ')
-    .toLowerCase()
-    .replace(/[,.!?;:()[\]{}"""''…—–-]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  let normalized = String(text || '').replace(/\r\n|\r|\n/g, ' ').toLowerCase();
+  normalized = expandOrdinals(normalized);
+  normalized = expandClockTimes(normalized);
+  normalized = expandSpacedClockTimes(normalized);
+  normalized = expandStandaloneNumbers(normalized);
+  normalized = normalized.replace(/[,.!?;:()[\]{}"""''…—–-]/g, ' ');
+  return normalized.replace(/\s+/g, ' ').trim();
 }
 
 function extractWordTokens(text) {
@@ -137,10 +207,16 @@ function extractWordTokens(text) {
   return normalized ? normalized.split(' ').filter(Boolean) : [];
 }
 
-function normalizeWordForDiff(word) {
-  return String(word || '')
-    .replace(/^[^a-z0-9]+|[^a-z0-9]+$/gi, '')
-    .toLowerCase();
+function canonicalCompareToken(token) {
+  const word = String(token || '').trim().toLowerCase();
+  if (!word) return '';
+  if (/^\d{1,2}:\d{2}$/.test(word)) {
+    const [hour, minute] = word.split(':');
+    return `${intToEnglish(parseInt(hour, 10))} ${intToEnglish(parseInt(minute, 10))}`;
+  }
+  if (/^\d+$/.test(word)) return intToEnglish(parseInt(word, 10));
+  if (ENGLISH_NUMBER_WORDS.has(word)) return word;
+  return word.replace(/^[^a-z0-9]+|[^a-z0-9]+$/gi, '');
 }
 
 function levenshtein(a, b) {
@@ -159,11 +235,15 @@ function levenshtein(a, b) {
 }
 
 function tokenMatchScore(refToken, spokenToken) {
-  const refNorm = normalizeWordForDiff(refToken);
-  const spokenNorm = normalizeWordForDiff(spokenToken);
+  const refNorm = canonicalCompareToken(refToken);
+  const spokenNorm = canonicalCompareToken(spokenToken);
   if (!refNorm || !spokenNorm) return -2;
   if (refNorm === spokenNorm) return 3;
   if (levenshtein(refNorm, spokenNorm) <= 1) return 1;
+  const refParts = refNorm.split(' ').filter(Boolean);
+  const spokenParts = spokenNorm.split(' ').filter(Boolean);
+  if (refParts.length > 1 && refParts.join(' ') === spokenNorm) return 3;
+  if (spokenParts.length > 1 && spokenParts.join(' ') === refNorm) return 3;
   return -2;
 }
 
@@ -382,7 +462,7 @@ async function callEvaluate(payload) {
 // ─── 7. UI パーツ ────────────────────────────────────────────
 
 function cardWrap(html) {
-  return `<div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 mb-4">${html}</div>`;
+  return `<div class="glass-card rounded-2xl p-5 mb-4">${html}</div>`;
 }
 
 function timerDisplay(sec, phase) {
@@ -454,24 +534,6 @@ function scoreCircle(score, max, label, color = 'indigo') {
       <span class="text-xs ${txt} font-semibold text-center leading-tight">${label}</span>
       <span class="text-xs text-slate-400">/ ${max}</span>
       <span class="text-base">${grade}</span>
-    </div>`;
-}
-
-function feedbackBlockPartA(fb) {
-  if (!fb) return '';
-  const corrections = (fb.grammar_corrections || []).map(c =>
-    `<li class="mb-1">
-      <span class="line-through text-red-400">${escapeHTML(c.original)}</span>
-      <span class="mx-1 text-slate-400">→</span>
-      <span class="text-emerald-700 font-medium">${escapeHTML(c.corrected)}</span>
-      ${c.explanation ? `<span class="text-slate-500 text-xs"> (${escapeHTML(c.explanation)})</span>` : ''}
-    </li>`
-  ).join('');
-  if (!corrections) return '';
-  return `
-    <div class="bg-orange-50 border border-orange-200 rounded-xl p-3 text-sm">
-      <p class="font-semibold text-orange-700 mb-2">📝 文法の訂正</p>
-      <ul class="space-y-1 text-slate-700">${corrections}</ul>
     </div>`;
 }
 
@@ -623,7 +685,6 @@ function renderPartAResult(result, text, duration, targetText) {
       ${comparison.html}
       <p class="text-xs text-slate-400 mb-1">あなたの回答（文字起こし）</p>
       <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-700 mb-4">${escapeHTML(text) || '（認識できませんでした）'}</div>
-      ${feedbackBlockPartA(result.feedback)}
       ${retryBtn()}
     `)}</div>`;
   document.getElementById('retry-btn').onclick = () => startPart('A');
