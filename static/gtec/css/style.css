@@ -53,6 +53,21 @@
   100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
 }
 
+/* ── Part C 4コマ漫画 ─────────────────────────────────────── */
+.part-c-comic {
+  border: 1px solid rgba(167, 139, 250, 0.45);
+  border-radius: 0.875rem;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.08);
+}
+
+.part-c-comic-img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 /* ── スコアサークル（グリッド補正）────────────────────────── */
 #app-root .grid.grid-cols-2 > div,
 #app-root .flex.justify-around > div {

@@ -49,11 +49,32 @@ const GTEC_DATA = {
     prepTime: 30,
     recTime: 60,
     maxScore: 12,
+    storyImage: '/static/gtec/images/part-c-story.png',
     panels: [
-      { id: 1, icon: '👛', caption: 'Panel 1: 財布を発見', description: 'A student finds a wallet lying on the ground near the school entrance.' },
-      { id: 2, icon: '🏫', caption: 'Panel 2: 職員室へ',   description: 'The student picks up the wallet and goes to the school office to hand it in.' },
-      { id: 3, icon: '📞', caption: 'Panel 3: 持ち主に連絡', description: 'The teacher at the office calls the wallet\'s owner on the phone.' },
-      { id: 4, icon: '🤝', caption: 'Panel 4: お礼を言われる', description: 'The owner comes to the school, collects the wallet, and thanks the student warmly.' },
+      {
+        id: 1,
+        caption: 'Panel 1: 財布を発見',
+        description: 'A student finds a pink purse lying on the ground near the school gate.',
+        example: 'One day, a student was walking to school when he noticed a pink purse on the ground near the school gate.',
+      },
+      {
+        id: 2,
+        caption: 'Panel 2: 職員室へ',
+        description: 'The student picks up the purse and brings it to the staff room.',
+        example: 'He picked it up and took it to the staff room to turn it in.',
+      },
+      {
+        id: 3,
+        caption: 'Panel 3: 持ち主に連絡',
+        description: 'A teacher in the staff room calls the owner of the purse on the phone.',
+        example: 'A teacher in the staff room called the owner of the purse on the phone.',
+      },
+      {
+        id: 4,
+        caption: 'Panel 4: お礼を言われる',
+        description: 'The owner comes to the school, receives the purse, and thanks the student warmly.',
+        example: 'The owner came to the school, got her purse back, and thanked the student warmly.',
+      },
     ],
   },
 
@@ -1214,15 +1235,29 @@ function renderPartBResult(results, recordings, totalQCount = 4) {
 
 // ─── 11. Part C ──────────────────────────────────────────────
 
-function buildPanelGrid(panels) {
+function buildStoryComic(imageSrc) {
   return `
-    <div class="grid grid-cols-2 gap-3 mb-4">
-      ${panels.map(p => `
-        <div class="bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-200 rounded-xl p-3 flex flex-col items-center gap-2">
-          <span class="text-3xl">${p.icon}</span>
-          <p class="text-xs font-bold text-violet-700">${p.caption}</p>
-          <p class="text-xs text-slate-500 text-center leading-relaxed">${p.description}</p>
-        </div>`).join('')}
+    <div class="part-c-comic mb-4">
+      <img
+        src="${imageSrc}"
+        alt="4コマのストーリーイラスト"
+        class="part-c-comic-img"
+        loading="lazy"
+      >
+    </div>`;
+}
+
+function buildPanelExamples(panels) {
+  return `
+    <div class="bg-violet-50 border border-violet-200 rounded-xl p-3 mb-4">
+      <p class="text-xs font-semibold text-violet-700 mb-3">見本（各コマの例文）</p>
+      <ol class="space-y-2 list-none">
+        ${panels.map((p, i) => `
+          <li class="text-sm leading-relaxed">
+            <span class="font-bold text-violet-600">Panel ${i + 1}:</span>
+            <span class="text-slate-700">${p.example}</span>
+          </li>`).join('')}
+      </ol>
     </div>`;
 }
 
@@ -1243,7 +1278,7 @@ async function runPartC() {
     $root().innerHTML = cardWrap(`
       <p class="text-xs font-bold text-violet-600 uppercase tracking-wider mb-3">${d.title} — 準備</p>
       <div id="timer-wrap"></div>
-      ${buildPanelGrid(d.panels)}
+      ${buildStoryComic(d.storyImage)}
       <p class="text-center text-sm text-slate-400">4コマのストーリーを英語でどう話すか考えてください</p>
     `);
     timerEl = document.getElementById('timer-wrap');
@@ -1258,7 +1293,7 @@ async function runPartC() {
     <p class="text-xs font-bold text-red-600 uppercase tracking-wider mb-3">${d.title} — 録音</p>
     <div id="timer-wrap"></div>
     ${recIndicator(true)}
-    ${buildPanelGrid(d.panels)}
+    ${buildStoryComic(d.storyImage)}
     <p class="text-xs text-slate-400 mb-1">文字起こし</p>
     ${transcriptBox('transcript-el')}
     ${submitBtn()}
@@ -1282,13 +1317,13 @@ async function runPartC() {
       part: 'C', text, duration,
       panel_descriptions: d.panels.map(p => p.description),
     });
-    renderPartCResult(result, text);
+    renderPartCResult(result, text, d.panels);
   } catch (e) {
     renderError(e.message);
   }
 }
 
-function renderPartCResult(result, text) {
+function renderPartCResult(result, text, panels) {
   const s = result.scores || {};
   const ga = (s.goal_achievement_panel1 ?? 0) + (s.goal_achievement_panel2 ?? 0) +
              (s.goal_achievement_panel3 ?? 0) + (s.goal_achievement_panel4 ?? 0);
@@ -1316,6 +1351,7 @@ function renderPartCResult(result, text) {
     <p class="text-center text-sm font-bold text-indigo-700 mb-4">合計: ${total} / 12点</p>
     <p class="text-xs text-slate-400 mb-1">あなたの回答</p>
     <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-700 mb-4">${text || '（認識できませんでした）'}</div>
+    ${buildPanelExamples(panels)}
     ${feedbackBlock(result.feedback)}
     ${retryBtn()}
   `);
@@ -1514,7 +1550,7 @@ async function renderPartIdle(partId) {
     $root().innerHTML = cardWrap(`
       <p class="text-xs font-bold text-violet-600 uppercase tracking-wider mb-1">${d.title}</p>
       <p class="text-sm text-slate-500 mb-4">${d.desc}</p>
-      ${buildPanelGrid(d.panels)}
+      ${buildStoryComic(d.storyImage)}
       <div class="flex gap-3 text-xs text-slate-500 mb-4">
         <span>⏱ 準備: ${prepLabel('C')}</span><span>🎤 解答: 60秒</span><span>📊 満点: 12点</span>
       </div>
