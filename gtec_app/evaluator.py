@@ -29,9 +29,16 @@ _SYSTEM = (
     "Evaluate spoken English using official GTEC scoring rubrics. "
     "Return ONLY a valid JSON object matching the exact schema in the prompt. "
     "Write all feedback text in Japanese. "
-    "Grammar corrections and vocabulary suggestions must be in English. "
-    "Be encouraging, specific, and constructive."
+    "Grammar and vocabulary corrections must be in English. "
+    "Be encouraging, specific, and constructive. "
+    "Score fluency_pronunciation generously: when uncertain between two adjacent scores, choose the higher one."
 )
+
+_FLUENCY_LENIENT = """Score fluency_pronunciation generously for high school learners.
+- Award 3–4 when speech is generally understandable and flows reasonably well.
+- Minor pauses, slightly slow/fast pace, or browser-transcription gaps should NOT heavily reduce the score.
+- WPM outside 120–150 is acceptable if delivery is still clear.
+- When uncertain between two adjacent scores, choose the higher one."""
 
 
 def _wpm(text: str, duration: float) -> float:
@@ -69,14 +76,16 @@ Student's speech (browser transcription):
 Duration: {duration:.1f}s | WPM: {wpm} (ideal 120–150)
 
 === Fluency & Pronunciation (0–4) ===
-4 – Natural pace (120–150 WPM), reads accurately, no significant omissions or repetitions
-3 – Mostly smooth; minor hesitations or 1–2 word omissions
-2 – Noticeable hesitations, pace too slow/fast, or several omissions
-1 – Significant disfluency, many omissions or repetitions
+{_FLUENCY_LENIENT}
+4 – Reads well with natural or mostly natural pace; only minor hesitations or a few small omissions
+3 – Generally smooth; some hesitations, slightly slow/fast pace, or several minor omissions are acceptable
+2 – Noticeable hesitations or pace issues, but a substantial portion of the text was read
+1 – Major difficulty delivering the text; many omissions or repetitions
 0 – No meaningful speech or entirely off-task
 
 Omissions: words present in target but absent in student text.
 Repetitions: same word/phrase appearing twice or more in student text.
+Browser transcription may miss or alter words — do NOT heavily penalize minor transcription differences.
 
 Return exactly this JSON (no extra keys):
 {{
@@ -114,13 +123,13 @@ Return exactly:
     "goal_achievement": <0 or 1>
   }},
   "feedback": {{
-    "grammar_corrections": [{{"original": "<phrase or word>", "corrected": "<corrected>", "explanation": "<brief Japanese or empty>"}}],
-    "upgrade_vocabulary": [{{"word": "<word used>", "suggestion": "<better alternative>"}}]
+    "grammar_corrections": [{{"original": "<phrase or word>", "corrected": "<corrected>", "explanation": "<brief Japanese or empty>"}}]
   }}
 }}
 
-Only include grammar_corrections and upgrade_vocabulary for clear errors. Use empty arrays if none.
-Do NOT include good_points, next_step_advice, or any advice about speaking more."""
+grammar_corrections may include both grammar mistakes and awkward word choices / vocabulary improvements.
+Only include clear errors. Use an empty array if none.
+Do NOT include good_points, next_step_advice, upgrade_vocabulary, or any advice about speaking more."""
     return _call(prompt)
 
 
@@ -150,7 +159,8 @@ Duration: {duration:.1f}s | WPM: {wpm} (ideal 120–150)
 0 – Incomprehensible
 
 === Fluency & Pronunciation (0–4) ===
-Based on WPM ({wpm}) and delivery smoothness.
+{_FLUENCY_LENIENT}
+WPM: {wpm}
 
 Return exactly:
 {{
@@ -164,12 +174,13 @@ Return exactly:
   }},
   "wpm_calculated": {wpm},
   "feedback": {{
-    "good_points": "<Japanese encouraging feedback>",
-    "grammar_corrections": [{{"original": "<phrase>", "corrected": "<corrected>", "explanation": "<Japanese>"}}],
-    "upgrade_vocabulary": [{{"word": "<word used>", "suggestion": "<better alternative>"}}],
-    "next_step_advice": "<Japanese specific advice>"
+    "grammar_corrections": [{{"original": "<phrase or word>", "corrected": "<corrected>", "explanation": "<brief Japanese or empty>"}}]
   }}
-}}"""
+}}
+
+grammar_corrections may include both grammar mistakes and awkward word choices / vocabulary improvements.
+Only include clear errors. Use an empty array if none.
+Do NOT include good_points, next_step_advice, or upgrade_vocabulary."""
     return _call(prompt)
 
 
@@ -201,7 +212,8 @@ Duration: {duration:.1f}s | WPM: {wpm} (ideal 120–150)
 0 – Incomprehensible
 
 === Fluency & Pronunciation (0–4) ===
-Based on WPM ({wpm}) and delivery smoothness.
+{_FLUENCY_LENIENT}
+WPM: {wpm}
 
 Return exactly:
 {{
@@ -213,10 +225,11 @@ Return exactly:
   }},
   "wpm_calculated": {wpm},
   "feedback": {{
-    "good_points": "<Japanese encouraging feedback>",
-    "grammar_corrections": [{{"original": "<phrase>", "corrected": "<corrected>", "explanation": "<Japanese>"}}],
-    "upgrade_vocabulary": [{{"word": "<word used>", "suggestion": "<better alternative>"}}],
-    "next_step_advice": "<Japanese advice on reasoning or structure>"
+    "grammar_corrections": [{{"original": "<phrase or word>", "corrected": "<corrected>", "explanation": "<brief Japanese or empty>"}}]
   }}
-}}"""
+}}
+
+grammar_corrections may include both grammar mistakes and awkward word choices / vocabulary improvements.
+Only include clear errors. Use an empty array if none.
+Do NOT include good_points, next_step_advice, or upgrade_vocabulary."""
     return _call(prompt)

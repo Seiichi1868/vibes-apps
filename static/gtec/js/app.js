@@ -885,44 +885,31 @@ function mergePartBFeedback(results) {
 function feedbackBlock(fb) {
   if (!fb) return '';
 
-  const corrections = (fb.grammar_corrections || []).map(c =>
+  const corrections = (fb.corrections || fb.grammar_corrections || []).map(c =>
     `<li class="mb-1">
-      <span class="line-through text-red-400">${c.original}</span>
+      <span class="line-through text-red-400">${escapeHTML(c.original)}</span>
       <span class="mx-1 text-slate-400">→</span>
-      <span class="text-emerald-700 font-medium">${c.corrected}</span>
-      ${c.explanation ? `<span class="text-slate-500 text-xs"> (${c.explanation})</span>` : ''}
+      <span class="text-emerald-700 font-medium">${escapeHTML(c.corrected)}</span>
+      ${c.explanation ? `<span class="text-slate-500 text-xs"> (${escapeHTML(c.explanation)})</span>` : ''}
     </li>`
-  ).join('');
+  );
 
-  const vocab = (fb.upgrade_vocabulary || []).map(v =>
-    `<li>${v.word} → <strong>${v.suggestion}</strong></li>`
-  ).join('');
+  (fb.upgrade_vocabulary || []).forEach(v => {
+    corrections.push(
+      `<li class="mb-1">
+        <span class="line-through text-red-400">${escapeHTML(v.word)}</span>
+        <span class="mx-1 text-slate-400">→</span>
+        <span class="text-emerald-700 font-medium">${escapeHTML(v.suggestion)}</span>
+      </li>`
+    );
+  });
+
+  if (!corrections.length) return '';
 
   return `
-    <div class="space-y-3 text-sm">
-      ${fb.good_points ? `
-        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
-          <p class="font-semibold text-emerald-700 mb-1">✅ 良かった点</p>
-          <p class="text-emerald-800">${fb.good_points}</p>
-        </div>` : ''}
-
-      ${corrections ? `
-        <div class="bg-orange-50 border border-orange-200 rounded-xl p-3">
-          <p class="font-semibold text-orange-700 mb-2">📝 文法の訂正</p>
-          <ul class="space-y-1 text-slate-700">${corrections}</ul>
-        </div>` : ''}
-
-      ${vocab ? `
-        <div class="bg-sky-50 border border-sky-200 rounded-xl p-3">
-          <p class="font-semibold text-sky-700 mb-2">🔤 語彙アップグレード</p>
-          <ul class="list-disc list-inside text-slate-700 space-y-0.5">${vocab}</ul>
-        </div>` : ''}
-
-      ${fb.next_step_advice ? `
-        <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-3">
-          <p class="font-semibold text-indigo-700 mb-1">🎯 次のステップ</p>
-          <p class="text-indigo-800">${fb.next_step_advice}</p>
-        </div>` : ''}
+    <div class="bg-orange-50 border border-orange-200 rounded-xl p-3 text-sm">
+      <p class="font-semibold text-orange-700 mb-2">📝 文法・語彙の訂正</p>
+      <ul class="space-y-1 text-slate-700">${corrections.join('')}</ul>
     </div>`;
 }
 
