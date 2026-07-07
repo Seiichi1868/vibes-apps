@@ -76,6 +76,7 @@ const App = {
   cancelRequested: false,
   recognition: null,
   settings: { part_a_prep_enabled: true },
+  currentUtterance: null,
 };
 
 // ─── 3. 設定読み込み ─────────────────────────────────────────
@@ -352,29 +353,106 @@ function renderWordComparisonHTML(referenceText, spokenText) {
 
 // ─── 6. TTS（Web Speech Synthesis）─────────────────────────
 
-function getEnglishVoice() {
-  const voices = speechSynthesis.getVoices();
-  return (
-    voices.find(v => v.lang === 'en-US' && v.localService) ||
-    voices.find(v => v.lang.startsWith('en-US')) ||
-    voices.find(v => v.lang.startsWith('en')) ||
-    null
-  );
+let voicesReadyPromise = null;
+
+function isChromeBrowser() {
+  return /Chrome/i.test(navigator.userAgent) && !/Edg|OPR|Brave/i.test(navigator.userAgent);
 }
 
+function ensureVoicesLoaded() {
+  if (!voicesReadyPromise) {
+    voicesReadyPromise = new Promise(resolve => {
+      const tryResolve = () => {
+        const voices = speechSynthesis.getVoices();
+        if (voices.length) {
+          resolve(voices);
+          return true;
+        }
+        return false;
+      };
+      if (tryResolve()) return;
+      speechSynthesis.addEventListener('voiceschanged', () => tryResolve(), { once: true });
+      setTimeout(() => resolve(speechSynthesis.getVoices()), 1500);
+    });
+  }
+  return voicesReadyPromise;
+}
+
+function getEnglishVoice() {
+  const voices = speechSynthesis.getVoices();
+  if (!voices.length) return null;
+
+  const enUS = voices.filter(v => v.lang === 'en-US' || v.lang.startsWith('en-US'));
+  const pool = enUS.length ? enUS : voices.filter(v => v.lang.startsWith('en'));
+  if (!pool.length) return null;
+
+  if (isChromeBrowser()) {
+    // Chrome のローカル音声は壊れることが多い → Google 等のネットワーク音声を優先
+    const google = pool.find(v => /google/i.test(v.name));
+    if (google) return google;
+    const online = pool.find(v => !v.localService);
+    if (online) return online;
+  } else {
+    const local = pool.find(v => v.localService);
+    if (local) return local;
+    const samantha = pool.find(v => /samantha|karen|daniel|alex/i.test(v.name));
+    if (samantha) return samantha;
+  }
+
+  return pool[0];
+}
+
+let speakChain = Promise.resolve();
+
 function speak(text) {
-  return new Promise(resolve => {
+  speakChain = speakChain.then(() => speakOnce(text)).catch(() => {});
+  return speakChain;
+}
+
+function speakOnce(text) {
+  return ensureVoicesLoaded().then(() => new Promise(resolve => {
+    const content = String(text || '').trim();
+    if (!content) { resolve(); return; }
+
     speechSynthesis.cancel();
-    const utt = new SpeechSynthesisUtterance(text);
-    utt.lang = 'en-US';
-    utt.rate = 0.88;
-    utt.pitch = 1;
-    const voice = getEnglishVoice();
-    if (voice) utt.voice = voice;
-    utt.onend = resolve;
-    utt.onerror = resolve;
-    speechSynthesis.speak(utt);
-  });
+
+    setTimeout(() => {
+      const utt = new SpeechSynthesisUtterance(content);
+      utt.lang = 'en-US';
+      utt.rate = 1;
+      utt.pitch = 1;
+      utt.volume = 1;
+
+      const voice = getEnglishVoice();
+      if (voice) {
+        utt.voice = voice;
+        utt.lang = voice.lang || 'en-US';
+      }
+
+      App.currentUtterance = utt;
+
+      let started = false;
+      const finish = () => {
+        App.currentUtterance = null;
+        resolve();
+      };
+
+      utt.onstart = () => { started = true; };
+      utt.onend = finish;
+      utt.onerror = finish;
+
+      speechSynthesis.speak(utt);
+
+      // Chrome: 音声が開始されない場合のフォールバック（voice 未設定で再試行）
+      setTimeout(() => {
+        if (!started) {
+          utt.voice = null;
+          utt.lang = 'en-US';
+          speechSynthesis.speak(utt);
+        }
+      }, 300);
+    }, 120);
+  }));
 }
 
 // ─── 5. 音声認識（Web Speech API）──────────────────────────
@@ -535,6 +613,49 @@ function scoreCircle(score, max, label, color = 'indigo') {
       <span class="text-xs text-slate-400">/ ${max}</span>
       <span class="text-base">${grade}</span>
     </div>`;
+}
+
+function feedbackBlockPartB(fb) {
+  if (!fb) return '';
+
+  const corrections = (fb.corrections || fb.grammar_corrections || []).map(c =>
+    `<li class="mb-1">
+      <span class="line-through text-red-400">${escapeHTML(c.original)}</span>
+      <span class="mx-1 text-slate-400">→</span>
+      <span class="text-emerald-700 font-medium">${escapeHTML(c.corrected)}</span>
+      ${c.explanation ? `<span class="text-slate-500 text-xs"> (${escapeHTML(c.explanation)})</span>` : ''}
+    </li>`
+  );
+
+  (fb.upgrade_vocabulary || []).forEach(v => {
+    corrections.push(
+      `<li class="mb-1">
+        <span class="line-through text-red-400">${escapeHTML(v.word)}</span>
+        <span class="mx-1 text-slate-400">→</span>
+        <span class="text-emerald-700 font-medium">${escapeHTML(v.suggestion)}</span>
+      </li>`
+    );
+  });
+
+  if (!corrections.length) return '';
+
+  return `
+    <div class="bg-orange-50 border border-orange-200 rounded-xl p-3 text-sm">
+      <p class="font-semibold text-orange-700 mb-2">📝 文法・語彙の訂正</p>
+      <ul class="space-y-1 text-slate-700">${corrections.join('')}</ul>
+    </div>`;
+}
+
+function mergePartBFeedback(results) {
+  const corrections = [];
+  results.forEach(r => {
+    const fb = r.feedback || {};
+    (fb.corrections || fb.grammar_corrections || []).forEach(c => corrections.push(c));
+    (fb.upgrade_vocabulary || []).forEach(v => {
+      corrections.push({ original: v.word, corrected: v.suggestion, explanation: '' });
+    });
+  });
+  return { corrections };
 }
 
 function feedbackBlock(fb) {
@@ -816,7 +937,6 @@ function renderPartBResult(results, recordings) {
         <p class="text-xs font-semibold text-sky-600 mb-1">Q${i + 1}: ${recordings[i].question.text}</p>
         <p class="text-sm text-slate-700 mb-1">回答: <em>"${recordings[i].text || '（認識できませんでした）'}"</em></p>
         <div class="flex items-center gap-2">${badge}</div>
-        ${r.feedback?.next_step_advice ? `<p class="text-xs text-slate-500 mt-1">💡 ${r.feedback.next_step_advice}</p>` : ''}
       </div>`;
   }).join('');
 
@@ -826,7 +946,7 @@ function renderPartBResult(results, recordings) {
       ${scoreCircle(total, 4, 'Goal合計', 'sky')}
     </div>
     ${qCards}
-    ${feedbackBlock(results[results.length - 1]?.feedback)}
+    ${feedbackBlockPartB(mergePartBFeedback(results))}
     ${retryBtn()}
   `);
   document.getElementById('retry-btn').onclick = () => startPart('B');
@@ -1132,6 +1252,8 @@ async function init() {
   }
 
   await loadSettings();
+
+  ensureVoicesLoaded();
 
   // TTS 音声ロード（非同期）
   if (speechSynthesis.onvoiceschanged !== undefined) {

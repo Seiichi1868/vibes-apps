@@ -103,7 +103,10 @@ Duration: {duration:.1f}s
 1 – Student conveyed the necessary information (even a single word or number is fine)
 0 – No response, irrelevant response, or required information not conveyed
 
-IMPORTANT: Even one-word answers earn full marks if they correctly answer the question.
+IMPORTANT:
+- Even one-word answers earn full marks if they correctly answer the question.
+- Part B only requires stating facts visible on the chart. Do NOT suggest elaborating, explaining more, or giving longer answers.
+- Do NOT advise the student to "explain in more detail" or similar.
 
 Return exactly:
 {{
@@ -111,12 +114,13 @@ Return exactly:
     "goal_achievement": <0 or 1>
   }},
   "feedback": {{
-    "good_points": "<Japanese encouraging feedback>",
-    "grammar_corrections": [{{"original": "<phrase>", "corrected": "<corrected>", "explanation": "<Japanese>"}}],
-    "upgrade_vocabulary": [{{"word": "<word used>", "suggestion": "<better alternative>"}}],
-    "next_step_advice": "<Japanese advice>"
+    "grammar_corrections": [{{"original": "<phrase or word>", "corrected": "<corrected>", "explanation": "<brief Japanese or empty>"}}],
+    "upgrade_vocabulary": [{{"word": "<word used>", "suggestion": "<better alternative>"}}]
   }}
-}}"""
+}}
+
+Only include grammar_corrections and upgrade_vocabulary for clear errors. Use empty arrays if none.
+Do NOT include good_points, next_step_advice, or any advice about speaking more."""
     return _call(prompt)
 
 
