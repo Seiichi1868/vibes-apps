@@ -82,6 +82,7 @@ const App = {
     part_d_prep_enabled: true, part_d_prep_seconds: 60,
   },
   currentAudio: null,
+  currentUtterance: null,
 };
 
 // ─── 3. 設定読み込み ─────────────────────────────────────────
@@ -388,30 +389,107 @@ function renderWordComparisonHTML(referenceText, spokenText) {
   };
 }
 
-// ─── 6. TTS（サーバー OpenAI TTS — Chrome でも安定）──────────
+// ─── 6. TTS（サーバー OpenAI + ブラウザ fallback）────────────
 
 let speakChain = Promise.resolve();
+let audioUnlockPromise = null;
+let voicesReadyPromise = null;
+
+function isChromeBrowser() {
+  return /Chrome/i.test(navigator.userAgent) && !/Edg|OPR|Brave/i.test(navigator.userAgent);
+}
+
+function unlockAudioPlayback() {
+  if (!audioUnlockPromise) {
+    audioUnlockPromise = (async () => {
+      const silent = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+      const audio = new Audio(silent);
+      audio.playsInline = true;
+      audio.volume = 0.01;
+      try { await audio.play(); } catch (_) { /* gesture 不足時は後続で再試行 */ }
+    })();
+  }
+  return audioUnlockPromise;
+}
+
+function ensureVoicesLoaded() {
+  if (!('speechSynthesis' in window)) return Promise.resolve([]);
+  if (!voicesReadyPromise) {
+    voicesReadyPromise = new Promise(resolve => {
+      const tryResolve = () => {
+        const voices = speechSynthesis.getVoices();
+        if (voices.length) { resolve(voices); return true; }
+        return false;
+      };
+      if (tryResolve()) return;
+      speechSynthesis.addEventListener('voiceschanged', () => tryResolve(), { once: true });
+      setTimeout(() => resolve(speechSynthesis.getVoices()), 1500);
+    });
+  }
+  return voicesReadyPromise;
+}
+
+function getEnglishVoice() {
+  if (!('speechSynthesis' in window)) return null;
+  const voices = speechSynthesis.getVoices();
+  if (!voices.length) return null;
+
+  const enUS = voices.filter(v => v.lang === 'en-US' || v.lang.startsWith('en-US'));
+  const pool = enUS.length ? enUS : voices.filter(v => v.lang.startsWith('en'));
+  if (!pool.length) return null;
+
+  if (isChromeBrowser()) {
+    const google = pool.find(v => /google/i.test(v.name));
+    if (google) return google;
+    const online = pool.find(v => !v.localService);
+    if (online) return online;
+  } else {
+    const local = pool.find(v => v.localService);
+    if (local) return local;
+    const named = pool.find(v => /samantha|karen|daniel|alex/i.test(v.name));
+    if (named) return named;
+  }
+  return pool[0];
+}
+
+function stopCurrentSpeech() {
+  if (App.currentAudio) {
+    App.currentAudio.pause();
+    App.currentAudio = null;
+  }
+  if (App.currentUtterance && 'speechSynthesis' in window) {
+    speechSynthesis.cancel();
+    App.currentUtterance = null;
+  }
+}
 
 function speak(text) {
-  speakChain = speakChain.then(() => speakFromServer(text)).catch(err => {
+  speakChain = speakChain.then(() => speakOnce(text)).catch(err => {
     console.error('TTS error:', err);
   });
   return speakChain;
 }
 
-async function speakFromServer(text) {
+async function speakOnce(text) {
   const content = String(text || '').trim();
-  if (!content) return;
+  if (!content || App.cancelRequested) return;
 
-  if (App.currentAudio) {
-    App.currentAudio.pause();
-    App.currentAudio = null;
+  stopCurrentSpeech();
+  await unlockAudioPlayback();
+
+  try {
+    await speakFromServer(content);
+  } catch (err) {
+    console.warn('Server TTS failed, using browser fallback:', err);
+    await speakWithBrowser(content);
   }
+}
 
+async function speakFromServer(text) {
   const res = await fetch('/gtec/api/tts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: content }),
+    body: JSON.stringify({ text }),
   });
 
   if (!res.ok) {
@@ -420,9 +498,12 @@ async function speakFromServer(text) {
   }
 
   const { url } = await res.json();
+  await unlockAudioPlayback();
 
   return new Promise((resolve, reject) => {
     const audio = new Audio(url);
+    audio.playsInline = true;
+    audio.preload = 'auto';
     App.currentAudio = audio;
     audio.onended = () => {
       if (App.currentAudio === audio) App.currentAudio = null;
@@ -434,6 +515,54 @@ async function speakFromServer(text) {
     };
     audio.play().catch(reject);
   });
+}
+
+function speakWithBrowser(text) {
+  if (!('speechSynthesis' in window)) {
+    return Promise.reject(new Error('このブラウザは音声読み上げに対応していません'));
+  }
+
+  return ensureVoicesLoaded().then(() => new Promise(resolve => {
+    if (App.cancelRequested) { resolve(); return; }
+
+    speechSynthesis.cancel();
+
+    setTimeout(() => {
+      const utt = new SpeechSynthesisUtterance(text);
+      utt.lang = 'en-US';
+      utt.rate = 1;
+      utt.pitch = 1;
+      utt.volume = 1;
+
+      const voice = getEnglishVoice();
+      if (voice) {
+        utt.voice = voice;
+        utt.lang = voice.lang || 'en-US';
+      }
+
+      App.currentUtterance = utt;
+
+      let started = false;
+      const finish = () => {
+        App.currentUtterance = null;
+        resolve();
+      };
+
+      utt.onstart = () => { started = true; };
+      utt.onend = finish;
+      utt.onerror = finish;
+
+      speechSynthesis.speak(utt);
+
+      setTimeout(() => {
+        if (!started && !App.cancelRequested) {
+          utt.voice = null;
+          utt.lang = 'en-US';
+          speechSynthesis.speak(utt);
+        }
+      }, 300);
+    }, 120);
+  }));
 }
 
 // ─── 5. 音声認識（Web Speech API）──────────────────────────
@@ -448,6 +577,11 @@ function checkSpeechSupport() {
  */
 function startRecording(maxSeconds, transcriptEl) {
   return new Promise((resolve, reject) => {
+    if (!checkSpeechSupport()) {
+      reject(new Error('このブラウザは音声認識に対応していません。Chrome をお使いください。'));
+      return;
+    }
+
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
     const rec = new SpeechRec();
     App.recognition = rec;
@@ -458,10 +592,29 @@ function startRecording(maxSeconds, transcriptEl) {
 
     let finalText = '';
     const startMs = Date.now();
+    let stopTimer = null;
+    let finished = false;
 
-    const stopTimer = setTimeout(() => {
-      try { rec.stop(); } catch (_) {}
-    }, maxSeconds * 1000);
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(stopTimer);
+      App.recognition = null;
+      const duration = (Date.now() - startMs) / 1000;
+      resolve({ text: finalText.trim(), duration });
+    };
+
+    const scheduleStop = () => {
+      clearTimeout(stopTimer);
+      const remaining = maxSeconds * 1000 - (Date.now() - startMs);
+      if (remaining <= 0) {
+        try { rec.stop(); } catch (_) {}
+        return;
+      }
+      stopTimer = setTimeout(() => {
+        try { rec.stop(); } catch (_) {}
+      }, remaining);
+    };
 
     rec.onresult = e => {
       let interim = '';
@@ -478,18 +631,33 @@ function startRecording(maxSeconds, transcriptEl) {
     };
 
     rec.onend = () => {
-      clearTimeout(stopTimer);
-      const duration = (Date.now() - startMs) / 1000;
-      App.recognition = null;
-      resolve({ text: finalText.trim(), duration });
+      if (App.cancelRequested) { finish(); return; }
+      const elapsed = (Date.now() - startMs) / 1000;
+      if (elapsed < maxSeconds - 0.5) {
+        try {
+          rec.start();
+          scheduleStop();
+          return;
+        } catch (_) { /* 再起動不可 → 終了 */ }
+      }
+      finish();
     };
 
     rec.onerror = e => {
+      if (App.cancelRequested) { finish(); return; }
       clearTimeout(stopTimer);
       App.recognition = null;
       if (e.error === 'no-speech' || e.error === 'aborted') {
-        const duration = (Date.now() - startMs) / 1000;
-        resolve({ text: finalText.trim(), duration });
+        const elapsed = (Date.now() - startMs) / 1000;
+        if (elapsed < maxSeconds - 0.5 && !App.cancelRequested) {
+          try {
+            App.recognition = rec;
+            rec.start();
+            scheduleStop();
+            return;
+          } catch (_) {}
+        }
+        finish();
       } else {
         reject(new Error(`音声認識エラー: ${e.error}`));
       }
@@ -497,7 +665,9 @@ function startRecording(maxSeconds, transcriptEl) {
 
     try {
       rec.start();
+      scheduleStop();
     } catch (err) {
+      App.recognition = null;
       reject(err);
     }
   });
@@ -698,23 +868,12 @@ async function runPartA() {
   const d = GTEC_DATA.A;
   if (App.cancelRequested) return;
 
-  await loadSettings();
-  const prep = getPrepConfig('A');
-
-  // idle
-  $root().innerHTML = cardWrap(`
-    <p class="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-1">${d.title}</p>
-    <p class="text-sm text-slate-500 mb-4">${d.desc}</p>
-    <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-4 text-base leading-relaxed text-slate-800 font-medium">
-      ${d.text}
-    </div>
-    <div class="flex gap-3 text-xs text-slate-500 mb-4">
-      <span>⏱ 準備: ${prepLabel('A')}</span><span>🎤 解答: 40秒</span><span>📊 満点: 4点</span>
-    </div>
-    ${startBtn('練習スタート')}
-  `);
+  await renderPartIdle('A');
   await waitForClick('start-btn');
   if (App.cancelRequested) return;
+  setStopButtonVisible(true);
+
+  const prep = getPrepConfig('A');
 
   // prep（管理設定でオフの場合はスキップ）
   if (prep.enabled) {
@@ -756,6 +915,7 @@ async function runPartA() {
   if (!App.running) return;
 
   stopRecognition();
+  setStopButtonVisible(false);
   renderLoading('Part A 採点中...');
 
   try {
@@ -818,24 +978,12 @@ async function runPartB() {
   const d = GTEC_DATA.B;
   if (App.cancelRequested) return;
 
-  await loadSettings();
-  const prep = getPrepConfig('B');
-
-  // idle
-  $root().innerHTML = cardWrap(`
-    <p class="text-xs font-bold text-sky-600 uppercase tracking-wider mb-1">${d.title}</p>
-    <p class="text-sm text-slate-500 whitespace-pre-line mb-4">${d.desc}</p>
-    <div class="border border-sky-200 rounded-xl overflow-hidden mb-4">${buildScheduleHTML(d.schedule)}</div>
-    <div class="flex gap-3 text-xs text-slate-500 mb-4">
-      <span>⏱ 準備: ${prepLabel('B')}/問</span><span>🎤 解答: 15秒/問</span><span>📊 満点: 4点</span>
-    </div>
-    <p class="text-xs bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-amber-700 mb-4">
-      ⚠️ 質問文は<strong>画面に表示されません</strong>。スピーカーの音声をよく聞いて答えてください。
-    </p>
-    ${startBtn('練習スタート')}
-  `);
+  await renderPartIdle('B');
   await waitForClick('start-btn');
   if (App.cancelRequested) return;
+  setStopButtonVisible(true);
+
+  const prep = getPrepConfig('B');
 
   const recordings = [];
 
@@ -881,6 +1029,7 @@ async function runPartB() {
     `);
     await speak(q.text);
     if (App.cancelRequested) return;
+    await sleep(500);
 
     // recording
     let timerEl;
@@ -900,11 +1049,13 @@ async function runPartB() {
       startRecording(d.recTime, transEl),
       countdown(d.recTime, sec => { timerEl.innerHTML = timerDisplay(sec, 'rec'); }),
     ]);
+    if (App.cancelRequested || !App.running) return;
     stopRecognition();
     recordings.push({ text, duration, question: q });
   }
 
-  if (App.cancelRequested) return;
+  if (App.cancelRequested || !App.running) return;
+  setStopButtonVisible(false);
   renderLoading('Part B 採点中... (4問)');
 
   try {
@@ -970,21 +1121,12 @@ async function runPartC() {
   const d = GTEC_DATA.C;
   if (App.cancelRequested) return;
 
-  await loadSettings();
-  const prep = getPrepConfig('C');
-
-  // idle
-  $root().innerHTML = cardWrap(`
-    <p class="text-xs font-bold text-violet-600 uppercase tracking-wider mb-1">${d.title}</p>
-    <p class="text-sm text-slate-500 mb-4">${d.desc}</p>
-    ${buildPanelGrid(d.panels)}
-    <div class="flex gap-3 text-xs text-slate-500 mb-4">
-      <span>⏱ 準備: ${prepLabel('C')}</span><span>🎤 解答: 60秒</span><span>📊 満点: 12点</span>
-    </div>
-    ${startBtn('練習スタート')}
-  `);
+  await renderPartIdle('C');
   await waitForClick('start-btn');
   if (App.cancelRequested) return;
+  setStopButtonVisible(true);
+
+  const prep = getPrepConfig('C');
 
   // prep
   if (prep.enabled) {
@@ -1001,6 +1143,7 @@ async function runPartC() {
   }
 
   // recording
+  let timerEl;
   let transEl;
   $root().innerHTML = cardWrap(`
     <p class="text-xs font-bold text-red-600 uppercase tracking-wider mb-3">${d.title} — 録音</p>
@@ -1017,8 +1160,9 @@ async function runPartC() {
     startRecording(d.recTime, transEl),
     countdown(d.recTime, sec => { timerEl.innerHTML = timerDisplay(sec, 'rec'); }),
   ]);
-  if (App.cancelRequested) return;
+  if (App.cancelRequested || !App.running) return;
   stopRecognition();
+  setStopButtonVisible(false);
 
   renderLoading('Part C 採点中...');
   try {
@@ -1072,35 +1216,12 @@ async function runPartD() {
   const d = GTEC_DATA.D;
   if (App.cancelRequested) return;
 
-  await loadSettings();
-  const prep = getPrepConfig('D');
-
-  // idle
-  $root().innerHTML = cardWrap(`
-    <p class="text-xs font-bold text-rose-600 uppercase tracking-wider mb-1">${d.title}</p>
-    <p class="text-sm text-slate-500 mb-4">${d.desc}</p>
-    <div class="bg-rose-50 border border-rose-200 rounded-xl p-4 mb-2">
-      <p class="font-semibold text-rose-800 text-base leading-relaxed">${d.topic}</p>
-    </div>
-    <p class="text-xs text-slate-500 text-right mb-4">🇯🇵 ${d.topicJa}</p>
-    <div class="grid grid-cols-3 gap-2 text-xs text-slate-500 mb-4">
-      <div class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-center">
-        <p class="font-bold text-rose-600">GA 意見</p><p>0〜1点</p>
-      </div>
-      <div class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-center">
-        <p class="font-bold text-rose-600">GA 理由</p><p>0〜2点</p>
-      </div>
-      <div class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-center">
-        <p class="font-bold text-rose-600">語い・流ちょう</p><p>各0〜4点</p>
-      </div>
-    </div>
-    <div class="flex gap-3 text-xs text-slate-500 mb-4">
-      <span>⏱ 準備: ${prepLabel('D')}</span><span>🎤 解答: 60秒</span><span>📊 満点: 11点</span>
-    </div>
-    ${startBtn('練習スタート')}
-  `);
+  await renderPartIdle('D');
   await waitForClick('start-btn');
   if (App.cancelRequested) return;
+  setStopButtonVisible(true);
+
+  const prep = getPrepConfig('D');
 
   // prep
   if (prep.enabled) {
@@ -1121,6 +1242,7 @@ async function runPartD() {
   }
 
   // recording
+  let timerEl;
   let transEl;
   $root().innerHTML = cardWrap(`
     <p class="text-xs font-bold text-red-600 uppercase tracking-wider mb-3">${d.title} — 録音</p>
@@ -1139,8 +1261,9 @@ async function runPartD() {
     startRecording(d.recTime, transEl),
     countdown(d.recTime, sec => { timerEl.innerHTML = timerDisplay(sec, 'rec'); }),
   ]);
-  if (App.cancelRequested) return;
+  if (App.cancelRequested || !App.running) return;
   stopRecognition();
+  setStopButtonVisible(false);
 
   renderLoading('Part D 採点中...');
   try {
@@ -1205,19 +1328,110 @@ function waitForClick(id) {
   return new Promise(resolve => {
     const btn = document.getElementById(id);
     if (!btn) { resolve(); return; }
-    btn.addEventListener('click', resolve, { once: true });
+    btn.addEventListener('click', () => {
+      unlockAudioPlayback();
+      resolve();
+    }, { once: true });
   });
 }
 
-function stopRecognition() {
+function setStopButtonVisible(visible) {
+  const btn = document.getElementById('stop-btn');
+  if (btn) btn.classList.toggle('hidden', !visible);
+}
+
+function stopAllMedia() {
   if (App.recognition) {
     try { App.recognition.stop(); } catch (_) {}
+    try { App.recognition.abort(); } catch (_) {}
     App.recognition = null;
   }
-  if (App.currentAudio) {
-    App.currentAudio.pause();
-    App.currentAudio = null;
+  stopCurrentSpeech();
+}
+
+async function stopAndReset() {
+  App.cancelRequested = true;
+  App.running = false;
+  stopAllMedia();
+  speakChain = Promise.resolve();
+  await sleep(300);
+  setStopButtonVisible(false);
+  const part = App.part;
+  await renderPartIdle(part);
+  App.cancelRequested = false;
+}
+
+async function renderPartIdle(partId) {
+  await loadSettings();
+
+  if (partId === 'A') {
+    const d = GTEC_DATA.A;
+    $root().innerHTML = cardWrap(`
+      <p class="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-1">${d.title}</p>
+      <p class="text-sm text-slate-500 mb-4">${d.desc}</p>
+      <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-4 text-base leading-relaxed text-slate-800 font-medium">
+        ${d.text}
+      </div>
+      <div class="flex gap-3 text-xs text-slate-500 mb-4">
+        <span>⏱ 準備: ${prepLabel('A')}</span><span>🎤 解答: 40秒</span><span>📊 満点: 4点</span>
+      </div>
+      ${startBtn('練習スタート')}
+    `);
+  } else if (partId === 'B') {
+    const d = GTEC_DATA.B;
+    $root().innerHTML = cardWrap(`
+      <p class="text-xs font-bold text-sky-600 uppercase tracking-wider mb-1">${d.title}</p>
+      <p class="text-sm text-slate-500 whitespace-pre-line mb-4">${d.desc}</p>
+      <div class="border border-sky-200 rounded-xl overflow-hidden mb-4">${buildScheduleHTML(d.schedule)}</div>
+      <div class="flex gap-3 text-xs text-slate-500 mb-4">
+        <span>⏱ 準備: ${prepLabel('B')}/問</span><span>🎤 解答: 15秒/問</span><span>📊 満点: 4点</span>
+      </div>
+      <p class="text-xs bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-amber-700 mb-4">
+        ⚠️ 質問文は<strong>画面に表示されません</strong>。スピーカーの音声をよく聞いて答えてください。
+      </p>
+      ${startBtn('練習スタート')}
+    `);
+  } else if (partId === 'C') {
+    const d = GTEC_DATA.C;
+    $root().innerHTML = cardWrap(`
+      <p class="text-xs font-bold text-violet-600 uppercase tracking-wider mb-1">${d.title}</p>
+      <p class="text-sm text-slate-500 mb-4">${d.desc}</p>
+      ${buildPanelGrid(d.panels)}
+      <div class="flex gap-3 text-xs text-slate-500 mb-4">
+        <span>⏱ 準備: ${prepLabel('C')}</span><span>🎤 解答: 60秒</span><span>📊 満点: 12点</span>
+      </div>
+      ${startBtn('練習スタート')}
+    `);
+  } else if (partId === 'D') {
+    const d = GTEC_DATA.D;
+    $root().innerHTML = cardWrap(`
+      <p class="text-xs font-bold text-rose-600 uppercase tracking-wider mb-1">${d.title}</p>
+      <p class="text-sm text-slate-500 mb-4">${d.desc}</p>
+      <div class="bg-rose-50 border border-rose-200 rounded-xl p-4 mb-2">
+        <p class="font-semibold text-rose-800 text-base leading-relaxed">${d.topic}</p>
+      </div>
+      <p class="text-xs text-slate-500 text-right mb-4">🇯🇵 ${d.topicJa}</p>
+      <div class="grid grid-cols-3 gap-2 text-xs text-slate-500 mb-4">
+        <div class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-center">
+          <p class="font-bold text-rose-600">GA 意見</p><p>0〜1点</p>
+        </div>
+        <div class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-center">
+          <p class="font-bold text-rose-600">GA 理由</p><p>0〜2点</p>
+        </div>
+        <div class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-center">
+          <p class="font-bold text-rose-600">語い・流ちょう</p><p>各0〜4点</p>
+        </div>
+      </div>
+      <div class="flex gap-3 text-xs text-slate-500 mb-4">
+        <span>⏱ 準備: ${prepLabel('D')}</span><span>🎤 解答: 60秒</span><span>📊 満点: 11点</span>
+      </div>
+      ${startBtn('練習スタート')}
+    `);
   }
+}
+
+function stopRecognition() {
+  stopAllMedia();
 }
 
 // ─── 15. タブ・パート切り替え ────────────────────────────────
@@ -1231,15 +1445,16 @@ function setActiveTab(partId) {
 }
 
 async function startPart(partId) {
-  // 実行中のテストをキャンセル
   App.cancelRequested = true;
-  stopRecognition();
+  stopAllMedia();
+  speakChain = Promise.resolve();
   await sleep(150);
 
   App.part = partId;
   App.cancelRequested = false;
   App.running = true;
   setActiveTab(partId);
+  setStopButtonVisible(false);
 
   try {
     if (partId === 'A') await runPartA();
@@ -1248,6 +1463,7 @@ async function startPart(partId) {
     else if (partId === 'D') await runPartD();
   } finally {
     App.running = false;
+    setStopButtonVisible(false);
   }
 }
 
@@ -1270,6 +1486,9 @@ async function init() {
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => startPart(btn.dataset.part));
   });
+
+  const stopBtn = document.getElementById('stop-btn');
+  if (stopBtn) stopBtn.addEventListener('click', () => stopAndReset());
 
   // Part A で初期表示
   startPart('A');
