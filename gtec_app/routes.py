@@ -15,6 +15,7 @@ from gtec_app.evaluator import (
     evaluate_part_c,
     evaluate_part_d,
 )
+from gtec_app.settings import public_settings
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,11 @@ gtec_bp = Blueprint("gtec", __name__)
 @gtec_bp.route("/gtec")
 def index():
     return render_template("gtec/index.html")
+
+
+@gtec_bp.route("/gtec/api/settings", methods=["GET"])
+def get_settings():
+    return jsonify(public_settings())
 
 
 @gtec_bp.route("/gtec/evaluate", methods=["POST"])

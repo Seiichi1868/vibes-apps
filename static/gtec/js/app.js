@@ -75,9 +75,25 @@ const App = {
   running: false,
   cancelRequested: false,
   recognition: null,
+  settings: { part_a_prep_enabled: true },
 };
 
-// ─── 3. ユーティリティ ───────────────────────────────────────
+// ─── 3. 設定読み込み ─────────────────────────────────────────
+
+async function loadSettings() {
+  try {
+    const res = await fetch('/gtec/api/settings');
+    if (res.ok) {
+      App.settings = { ...App.settings, ...(await res.json()) };
+    }
+  } catch (_) { /* デフォルト設定を使用 */ }
+}
+
+function partAPrepEnabled() {
+  return App.settings.part_a_prep_enabled !== false;
+}
+
+// ─── 4. ユーティリティ ───────────────────────────────────────
 
 const $root = () => document.getElementById('app-root');
 
@@ -105,7 +121,156 @@ function countdown(seconds, onTick) {
   });
 }
 
-// ─── 4. TTS（Web Speech Synthesis）─────────────────────────
+// ─── 5. 単語比較（音読判定アプリと同ロジック・英語専用）──────────
+
+function normalizeTextForWords(text) {
+  return String(text || '')
+    .replace(/\r\n|\r|\n/g, ' ')
+    .toLowerCase()
+    .replace(/[,.!?;:()[\]{}"""''…—–-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extractWordTokens(text) {
+  const normalized = normalizeTextForWords(text);
+  return normalized ? normalized.split(' ').filter(Boolean) : [];
+}
+
+function normalizeWordForDiff(word) {
+  return String(word || '')
+    .replace(/^[^a-z0-9]+|[^a-z0-9]+$/gi, '')
+    .toLowerCase();
+}
+
+function levenshtein(a, b) {
+  const m = a.length;
+  const n = b.length;
+  const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i += 1) dp[i][0] = i;
+  for (let j = 0; j <= n; j += 1) dp[0][j] = j;
+  for (let i = 1; i <= m; i += 1) {
+    for (let j = 1; j <= n; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+    }
+  }
+  return dp[m][n];
+}
+
+function tokenMatchScore(refToken, spokenToken) {
+  const refNorm = normalizeWordForDiff(refToken);
+  const spokenNorm = normalizeWordForDiff(spokenToken);
+  if (!refNorm || !spokenNorm) return -2;
+  if (refNorm === spokenNorm) return 3;
+  if (levenshtein(refNorm, spokenNorm) <= 1) return 1;
+  return -2;
+}
+
+function compareWords(referenceWords, spokenWords) {
+  const n = referenceWords.length;
+  const m = spokenWords.length;
+  if (n === 0) return [];
+  if (m === 0) return referenceWords.map(word => ({ word, state: 'miss' }));
+
+  const GAP = 1;
+  const dp = Array.from({ length: n + 1 }, () => Array(m + 1).fill(0));
+  const trace = Array.from({ length: n + 1 }, () => Array(m + 1).fill(null));
+
+  for (let i = 1; i <= n; i += 1) dp[i][0] = -i * GAP;
+  for (let j = 1; j <= m; j += 1) dp[0][j] = -j * GAP;
+
+  for (let i = 1; i <= n; i += 1) {
+    for (let j = 1; j <= m; j += 1) {
+      const match = dp[i - 1][j - 1] + tokenMatchScore(referenceWords[i - 1], spokenWords[j - 1]);
+      const skipSpoken = dp[i][j - 1] - GAP;
+      const skipRef = dp[i - 1][j] - GAP;
+      let best = match;
+      let dir = 'diag';
+      if (skipSpoken > best) { best = skipSpoken; dir = 'left'; }
+      if (skipRef > best) { best = skipRef; dir = 'up'; }
+      dp[i][j] = best;
+      trace[i][j] = dir;
+    }
+  }
+
+  const refStates = Array(n).fill('miss');
+  let i = n;
+  let j = m;
+  while (i > 0 || j > 0) {
+    const dir = trace[i][j];
+    if (i > 0 && j > 0 && dir === 'diag') {
+      const score = tokenMatchScore(referenceWords[i - 1], spokenWords[j - 1]);
+      refStates[i - 1] = score >= 3 ? 'exact' : score >= 1 ? 'near' : 'miss';
+      i -= 1; j -= 1;
+    } else if (i > 0 && (j === 0 || dir === 'up')) {
+      refStates[i - 1] = 'miss';
+      i -= 1;
+    } else {
+      j -= 1;
+    }
+  }
+
+  return referenceWords.map((word, idx) => ({ word, state: refStates[idx] }));
+}
+
+function computeAccuracyPercent(compared) {
+  if (!compared.length) return 0;
+  let score = 0;
+  compared.forEach(item => {
+    if (item.state === 'exact') score += 1;
+    else if (item.state === 'near') score += 0.5;
+  });
+  return Math.round((score / compared.length) * 100);
+}
+
+function escapeHTML(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function renderWordComparisonHTML(referenceText, spokenText) {
+  const referenceWords = extractWordTokens(referenceText);
+  const spokenWords = extractWordTokens(spokenText);
+  const compared = compareWords(referenceWords, spokenWords);
+  const percent = computeAccuracyPercent(compared);
+
+  const baseLayer = referenceWords.map(w =>
+    `<span class="token">${escapeHTML(w)}</span>`
+  ).join('');
+  const highlightLayer = compared.map(item =>
+    `<span class="token ${item.state}">${escapeHTML(item.word)}</span>`
+  ).join('');
+
+  return {
+    compared,
+    percent,
+    html: `
+      <div class="mb-3">
+        <div class="flex items-center justify-between mb-2">
+          <p class="text-xs font-semibold text-slate-600">発音一致率</p>
+          <span class="text-sm font-bold text-indigo-700">${percent}%</span>
+        </div>
+        <div class="accuracy-bar mb-2">
+          <div class="accuracy-bar-fill" style="width:${percent}%"></div>
+        </div>
+        <div class="word-overlay-wrap">
+          <p class="word-base-layer">${baseLayer}</p>
+          <p class="word-highlight-layer">${highlightLayer}</p>
+        </div>
+        <div class="word-legend">
+          <span class="word-legend-item"><span class="token exact">正確</span></span>
+          <span class="word-legend-item"><span class="token near">近似</span></span>
+          <span class="word-legend-item"><span class="token miss">不一致</span></span>
+        </div>
+      </div>`,
+  };
+}
+
+// ─── 6. TTS（Web Speech Synthesis）─────────────────────────
 
 function getEnglishVoice() {
   const voices = speechSynthesis.getVoices();
@@ -292,6 +457,24 @@ function scoreCircle(score, max, label, color = 'indigo') {
     </div>`;
 }
 
+function feedbackBlockPartA(fb) {
+  if (!fb) return '';
+  const corrections = (fb.grammar_corrections || []).map(c =>
+    `<li class="mb-1">
+      <span class="line-through text-red-400">${escapeHTML(c.original)}</span>
+      <span class="mx-1 text-slate-400">→</span>
+      <span class="text-emerald-700 font-medium">${escapeHTML(c.corrected)}</span>
+      ${c.explanation ? `<span class="text-slate-500 text-xs"> (${escapeHTML(c.explanation)})</span>` : ''}
+    </li>`
+  ).join('');
+  if (!corrections) return '';
+  return `
+    <div class="bg-orange-50 border border-orange-200 rounded-xl p-3 text-sm">
+      <p class="font-semibold text-orange-700 mb-2">📝 文法の訂正</p>
+      <ul class="space-y-1 text-slate-700">${corrections}</ul>
+    </div>`;
+}
+
 function feedbackBlock(fb) {
   if (!fb) return '';
 
@@ -351,6 +534,10 @@ async function runPartA() {
   const d = GTEC_DATA.A;
   if (App.cancelRequested) return;
 
+  await loadSettings();
+  const prepOn = partAPrepEnabled();
+  const prepLabel = prepOn ? '30秒' : 'なし';
+
   // idle
   $root().innerHTML = cardWrap(`
     <p class="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-1">${d.title}</p>
@@ -359,28 +546,31 @@ async function runPartA() {
       ${d.text}
     </div>
     <div class="flex gap-3 text-xs text-slate-500 mb-4">
-      <span>⏱ 準備: 30秒</span><span>🎤 解答: 40秒</span><span>📊 満点: 4点</span>
+      <span>⏱ 準備: ${prepLabel}</span><span>🎤 解答: 40秒</span><span>📊 満点: 4点</span>
     </div>
     ${startBtn('練習スタート')}
   `);
   await waitForClick('start-btn');
   if (App.cancelRequested) return;
 
-  // prep
-  let timerEl;
-  $root().innerHTML = cardWrap(`
-    <p class="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-3">${d.title} — 準備</p>
-    <div id="timer-wrap"></div>
-    <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-base leading-relaxed text-slate-800 font-medium">
-      ${d.text}
-    </div>
-    <p class="text-center text-sm text-slate-400 mt-3">英文をよく読んで発音を確認してください</p>
-  `);
-  timerEl = document.getElementById('timer-wrap');
-  await countdown(d.prepTime, sec => { timerEl.innerHTML = timerDisplay(sec, 'prep'); });
-  if (App.cancelRequested) return;
+  // prep（管理設定でオフの場合はスキップ）
+  if (prepOn) {
+    let timerEl;
+    $root().innerHTML = cardWrap(`
+      <p class="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-3">${d.title} — 準備</p>
+      <div id="timer-wrap"></div>
+      <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-base leading-relaxed text-slate-800 font-medium">
+        ${d.text}
+      </div>
+      <p class="text-center text-sm text-slate-400 mt-3">英文をよく読んで発音を確認してください</p>
+    `);
+    timerEl = document.getElementById('timer-wrap');
+    await countdown(d.prepTime, sec => { timerEl.innerHTML = timerDisplay(sec, 'prep'); });
+    if (App.cancelRequested) return;
+  }
 
   // recording
+  let timerEl;
   let transEl;
   $root().innerHTML = cardWrap(`
     <p class="text-xs font-bold text-red-600 uppercase tracking-wider mb-3">${d.title} — 録音</p>
@@ -410,28 +600,30 @@ async function runPartA() {
       part: 'A', text, duration,
       target_text: d.text,
     });
-    renderPartAResult(result, text, duration);
+    renderPartAResult(result, text, duration, d.text);
   } catch (e) {
     renderError(e.message);
   }
 }
 
-function renderPartAResult(result, text, duration) {
+function renderPartAResult(result, text, duration, targetText) {
   const s = result.scores || {};
   const wpm = result.wpm_calculated || 0;
+  const comparison = renderWordComparisonHTML(targetText, text);
+
   $root().innerHTML = `
     <div class="mb-4">${cardWrap(`
       <p class="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-4">Part A 結果</p>
       <div class="flex justify-around mb-4">
         ${scoreCircle(s.fluency_pronunciation ?? 0, 4, '発音・流ちょうさ', 'indigo')}
-        ${scoreCircle(s.fluency_pronunciation ?? 0, 4, '合計スコア', 'sky')}
       </div>
       <div class="text-xs text-slate-500 text-center mb-4">
         推定 WPM: <strong>${wpm}</strong>（目安: 120〜150）
       </div>
-      <p class="text-xs text-slate-400 mb-1">あなたの回答</p>
-      <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-700 mb-4">${text || '（認識できませんでした）'}</div>
-      ${feedbackBlock(result.feedback)}
+      ${comparison.html}
+      <p class="text-xs text-slate-400 mb-1">あなたの回答（文字起こし）</p>
+      <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-700 mb-4">${escapeHTML(text) || '（認識できませんでした）'}</div>
+      ${feedbackBlockPartA(result.feedback)}
       ${retryBtn()}
     `)}</div>`;
   document.getElementById('retry-btn').onclick = () => startPart('A');
@@ -867,7 +1059,7 @@ async function startPart(partId) {
 
 // ─── 16. 初期化 ──────────────────────────────────────────────
 
-function init() {
+async function init() {
   // ブラウザ対応チェック
   const supported = checkSpeechSupport();
   if (supported) {
@@ -877,6 +1069,8 @@ function init() {
     const banner = document.getElementById('no-support-banner');
     if (banner) banner.classList.remove('hidden');
   }
+
+  await loadSettings();
 
   // TTS 音声ロード（非同期）
   if (speechSynthesis.onvoiceschanged !== undefined) {

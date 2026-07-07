@@ -53,3 +53,167 @@
     font-size: 3rem;
   }
 }
+
+/* ── 単語色分け（音読判定と同様）────────────────────────── */
+.word-overlay-wrap {
+  position: relative;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0.75rem;
+  min-height: 3rem;
+}
+
+.word-base-layer,
+.word-highlight-layer {
+  margin: 0;
+  line-height: 1.65;
+  font-size: 0.875rem;
+  word-break: break-word;
+}
+
+.word-base-layer {
+  color: rgba(51, 65, 85, 0.35);
+}
+
+.word-highlight-layer {
+  position: absolute;
+  inset: 0.75rem;
+  color: transparent;
+}
+
+.token {
+  display: inline-block;
+  margin-right: 4px;
+  margin-bottom: 4px;
+  padding: 2px 5px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.token.exact {
+  background: rgba(34, 197, 94, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.65);
+}
+
+.token.near {
+  background: rgba(250, 204, 21, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(250, 204, 21, 0.7);
+}
+
+.token.miss {
+  background: rgba(239, 68, 68, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.7);
+}
+
+.word-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.word-legend-item .token {
+  font-size: 0.7rem;
+  padding: 1px 4px;
+}
+
+.accuracy-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.accuracy-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #6366f1, #818cf8);
+  transition: width 0.35s ease;
+}
+
+/* ── 管理画面 ───────────────────────────────────────────── */
+.admin-card {
+  background: #fff;
+  border: 1px solid #e0e7ff;
+  border-radius: 1rem;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.06);
+}
+
+.admin-card-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #3730a3;
+  margin-bottom: 0.75rem;
+}
+
+.admin-input {
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  min-width: 10rem;
+}
+
+.admin-btn {
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+}
+
+.admin-btn-primary {
+  background: #4f46e5;
+  color: #fff;
+}
+
+.admin-btn-primary:hover {
+  background: #4338ca;
+}
+
+.admin-toggle {
+  position: relative;
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.admin-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.admin-toggle-track {
+  display: block;
+  width: 44px;
+  height: 24px;
+  background: #cbd5e1;
+  border-radius: 999px;
+  transition: background 0.2s;
+  position: relative;
+}
+
+.admin-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.admin-toggle input:checked + .admin-toggle-track {
+  background: #4f46e5;
+}
+
+.admin-toggle input:checked + .admin-toggle-track .admin-toggle-thumb {
+  transform: translateX(20px);
+}
+

@@ -85,12 +85,11 @@ Return exactly this JSON (no extra keys):
   }},
   "wpm_calculated": {wpm},
   "feedback": {{
-    "good_points": "<Japanese encouraging feedback, 1–2 sentences>",
-    "grammar_corrections": [{{"original": "<phrase>", "corrected": "<corrected>", "explanation": "<Japanese>"}}],
-    "upgrade_vocabulary": [{{"word": "<simpler word>", "suggestion": "<advanced alternative>"}}],
-    "next_step_advice": "<Japanese specific improvement tip, 1–2 sentences>"
+    "grammar_corrections": [{{"original": "<phrase>", "corrected": "<corrected>", "explanation": "<Japanese>"}}]
   }}
-}}"""
+}}
+
+Only include grammar_corrections for clear errors. Use an empty array if none."""
     return _call(prompt)
 
 
