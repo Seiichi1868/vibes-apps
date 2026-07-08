@@ -89,62 +89,120 @@ function problemSelectOptions(selected) {
   ).join('');
 }
 
+function escapeHTML(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function normalizeProblemsData(data) {
+  const d = data || {};
+  const active = { a: 1, b: 1, c: 1, d: 1 };
+  PARTS.forEach(part => {
+    if (d.active && d.active[part] != null) {
+      active[part] = parseInt(d.active[part], 10) || 1;
+    }
+  });
+  return {
+    version: d.version || 1,
+    active,
+    sets: d.sets || { a: {}, b: {}, c: {}, d: {} },
+  };
+}
+
+function getProblemSet(part, num) {
+  return problemsData?.sets?.[part]?.[String(num)] || {};
+}
+
+function fillProblemFields() {
+  if (!problemAdmin || !problemsData) return;
+
+  problemAdmin.querySelectorAll('.problem-field').forEach(el => {
+    const part = el.dataset.part;
+    const num = el.dataset.num;
+    const key = el.dataset.key;
+    const set = getProblemSet(part, num);
+
+    if (key === 'text') el.value = set.text || '';
+    else if (key === 'topic') el.value = set.topic || '';
+    else if (key === 'topicJa') el.value = set.topicJa || '';
+    else if (key === 'storyImage') el.value = set.storyImage || '';
+    else if (key === 'schedule') el.value = JSON.stringify(set.schedule || [], null, 2);
+    else if (key === 'questions') el.value = JSON.stringify(set.questions || [], null, 2);
+    else if (key.startsWith('panel-desc-')) {
+      const i = parseInt(key.split('-').pop(), 10);
+      el.value = set.panels?.[i]?.description || '';
+    } else if (key.startsWith('panel-ex-')) {
+      const i = parseInt(key.split('-').pop(), 10);
+      el.value = set.panels?.[i]?.example || '';
+    }
+  });
+}
+
 function renderProblemAdmin() {
   if (!problemAdmin || !problemsData) return;
 
   problemAdmin.innerHTML = PARTS.map(part => {
     const editNum = problemEditNum[part] || 1;
-    const set = problemsData.sets?.[part]?.[String(editNum)] || {};
     const active = problemsData.active?.[part] || 1;
 
     let fields = '';
     if (part === 'a') {
       fields = `
         <label class="block text-[10px] text-slate-600 mb-1">音読テキスト</label>
-        <textarea class="admin-problem-textarea problem-field" data-part="${part}" data-num="${editNum}" data-key="text">${set.text || ''}</textarea>`;
+        <textarea class="admin-problem-textarea problem-field" data-part="${part}" data-num="${editNum}" data-key="text"></textarea>`;
     } else if (part === 'b') {
       fields = `
         <label class="block text-[10px] text-slate-600 mb-1">スケジュール（JSON）</label>
-        <textarea class="admin-problem-textarea problem-field" data-part="${part}" data-num="${editNum}" data-key="schedule" rows="4">${JSON.stringify(set.schedule || [], null, 2)}</textarea>
+        <textarea class="admin-problem-textarea problem-field" data-part="${part}" data-num="${editNum}" data-key="schedule" rows="4"></textarea>
         <label class="block text-[10px] text-slate-600 mt-2 mb-1">質問（JSON）</label>
-        <textarea class="admin-problem-textarea problem-field" data-part="${part}" data-num="${editNum}" data-key="questions" rows="5">${JSON.stringify(set.questions || [], null, 2)}</textarea>`;
+        <textarea class="admin-problem-textarea problem-field" data-part="${part}" data-num="${editNum}" data-key="questions" rows="5"></textarea>`;
     } else if (part === 'c') {
-      const panels = set.panels || [];
       fields = `
         <label class="block text-[10px] text-slate-600 mb-1">イラスト画像パス</label>
-        <input class="admin-problem-input problem-field mb-2" data-part="${part}" data-num="${editNum}" data-key="storyImage" value="${set.storyImage || ''}" placeholder="gtec/images/part-c-story-${editNum}.png" />
+        <input class="admin-problem-input problem-field mb-2" data-part="${part}" data-num="${editNum}" data-key="storyImage" placeholder="gtec/images/part-c-story-${editNum}.png" />
         ${[0, 1, 2, 3].map(i => `
           <div class="mt-2">
             <label class="block text-[10px] font-semibold text-violet-700 mb-1">Panel ${i + 1}</label>
-            <input class="admin-problem-input problem-field mb-1" data-part="${part}" data-num="${editNum}" data-key="panel-desc-${i}" value="${panels[i]?.description || ''}" placeholder="description" />
-            <input class="admin-problem-input problem-field" data-part="${part}" data-num="${editNum}" data-key="panel-ex-${i}" value="${panels[i]?.example || ''}" placeholder="example sentence" />
+            <input class="admin-problem-input problem-field mb-1" data-part="${part}" data-num="${editNum}" data-key="panel-desc-${i}" placeholder="description" />
+            <input class="admin-problem-input problem-field" data-part="${part}" data-num="${editNum}" data-key="panel-ex-${i}" placeholder="example sentence" />
           </div>
         `).join('')}`;
     } else if (part === 'd') {
       fields = `
         <label class="block text-[10px] text-slate-600 mb-1">トピック（英語）</label>
-        <textarea class="admin-problem-textarea problem-field" data-part="${part}" data-num="${editNum}" data-key="topic" rows="3">${set.topic || ''}</textarea>
+        <textarea class="admin-problem-textarea problem-field" data-part="${part}" data-num="${editNum}" data-key="topic" rows="3"></textarea>
         <label class="block text-[10px] text-slate-600 mt-2 mb-1">トピック（日本語）</label>
-        <textarea class="admin-problem-textarea problem-field" data-part="${part}" data-num="${editNum}" data-key="topicJa" rows="2">${set.topicJa || ''}</textarea>`;
+        <textarea class="admin-problem-textarea problem-field" data-part="${part}" data-num="${editNum}" data-key="topicJa" rows="2"></textarea>`;
     }
 
     return `
-      <div class="admin-problem-part" data-part="${part}">
-        <div class="flex flex-wrap items-center gap-2 mb-2">
-          <p class="text-[11px] font-bold text-indigo-800">${PART_LABELS[part]}</p>
-          <label class="text-[10px] text-slate-600">既定
-            <select class="admin-problem-select problem-active-select ml-1" data-part="${part}">${problemSelectOptions(active)}</select>
-          </label>
-          <label class="text-[10px] text-slate-600">編集
-            <select class="admin-problem-select problem-edit-select ml-1" data-part="${part}">${problemSelectOptions(editNum)}</select>
-          </label>
+      <details class="admin-problem-part" data-part="${part}" open>
+        <summary class="admin-problem-summary">
+          <span class="text-[11px] font-bold text-indigo-800">${PART_LABELS[part]}</span>
+          <span class="text-[10px] text-slate-500">既定: 問題${active} / 編集中: 問題${editNum}</span>
+        </summary>
+        <div class="admin-problem-body mt-2">
+          <div class="flex flex-wrap items-center gap-2 mb-2">
+            <label class="text-[10px] text-slate-600">既定
+              <select class="admin-problem-select problem-active-select ml-1" data-part="${part}">${problemSelectOptions(active)}</select>
+            </label>
+            <label class="text-[10px] text-slate-600">編集
+              <select class="admin-problem-select problem-edit-select ml-1" data-part="${part}">${problemSelectOptions(editNum)}</select>
+            </label>
+          </div>
+          ${fields}
         </div>
-        ${fields}
-      </div>`;
+      </details>`;
   }).join('');
+
+  fillProblemFields();
 
   problemAdmin.querySelectorAll('.problem-active-select').forEach(el => {
     el.addEventListener('change', () => {
+      if (!problemsData.active) problemsData.active = { a: 1, b: 1, c: 1, d: 1 };
       problemsData.active[el.dataset.part] = parseInt(el.value, 10) || 1;
       scheduleProblemSave();
     });
@@ -165,6 +223,8 @@ function renderProblemAdmin() {
 
 function collectProblemFieldsFromUI() {
   if (!problemsData) return;
+  if (!problemsData.sets) problemsData.sets = { a: {}, b: {}, c: {}, d: {} };
+  if (!problemsData.active) problemsData.active = { a: 1, b: 1, c: 1, d: 1 };
   problemAdmin?.querySelectorAll('.problem-field').forEach(el => {
     const part = el.dataset.part;
     const num = String(el.dataset.num);
@@ -206,7 +266,7 @@ function scheduleProblemSave() {
         active: problemsData.active,
         sets: problemsData.sets,
       });
-      problemsData = saved;
+      problemsData = normalizeProblemsData(saved);
       statusMessage.textContent = '問題を保存しました';
     } catch (err) {
       statusMessage.textContent = '';
@@ -280,7 +340,6 @@ async function tryUnlock() {
 
 async function loadSettingsIntoUI() {
   const data = await fetchSettings();
-  problemsData = await fetchProblems();
   PARTS.forEach(part => {
     const enabled = data[`part_${part}_prep_enabled`] !== false;
     const seconds = parseInt(data[`part_${part}_prep_seconds`], 10) || DEFAULT_SECONDS[part];
@@ -289,7 +348,6 @@ async function loadSettingsIntoUI() {
     if (toggle) toggle.checked = enabled;
     if (secondsInput) secondsInput.value = seconds;
     updatePartUI(part, enabled, seconds);
-    problemEditNum[part] = problemsData.active?.[part] || 1;
   });
 
   const activeBtn = bgPicker?.querySelector(`.bg-pick-btn[data-bg-id="${data.background_id}"]`);
@@ -298,7 +356,18 @@ async function loadSettingsIntoUI() {
     activeBtn?.dataset.bgImage,
     data.background_label || activeBtn?.title,
   );
-  renderProblemAdmin();
+
+  try {
+    problemsData = normalizeProblemsData(await fetchProblems());
+    PARTS.forEach(part => {
+      problemEditNum[part] = problemsData.active?.[part] || 1;
+    });
+    renderProblemAdmin();
+  } catch (err) {
+    if (problemAdmin) {
+      problemAdmin.innerHTML = `<p class="text-[11px] text-red-600">問題セットの読み込みに失敗しました: ${escapeHTML(err.message)}</p>`;
+    }
+  }
 }
 
 function scheduleSave() {

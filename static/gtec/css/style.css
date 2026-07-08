@@ -409,6 +409,37 @@
   background: rgba(255, 255, 255, 0.45);
 }
 
+.admin-problem-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.admin-problem-summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-problem-summary::before {
+  content: '▸';
+  color: #4f46e5;
+  font-size: 0.75rem;
+  margin-right: 0.25rem;
+  transition: transform 0.15s;
+}
+
+.admin-problem-part[open] > .admin-problem-summary::before {
+  transform: rotate(90deg);
+}
+
+.admin-problem-body {
+  border-top: 1px solid rgba(203, 213, 225, 0.45);
+  padding-top: 0.5rem;
+}
+
 .admin-problem-textarea {
   width: 100%;
   border: 1px solid #cbd5e1;
