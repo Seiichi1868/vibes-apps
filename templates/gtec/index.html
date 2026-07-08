@@ -31,7 +31,7 @@
 
   <!-- 背景透かし（News と同様の自然風景） -->
   <div class="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
-    <div id="page-bg-layer" class="gtec-page-bg absolute inset-0 scale-105 opacity-[0.38]"></div>
+    <div id="page-bg-layer" class="gtec-page-bg absolute inset-0 scale-105" style="opacity: {{ background_opacity }}"></div>
     <div class="absolute inset-0 bg-gradient-to-br from-sky-100/75 via-white/55 to-emerald-100/70"></div>
     <div class="absolute inset-0 bg-gradient-to-t from-emerald-50/40 via-transparent to-sky-50/30"></div>
   </div>

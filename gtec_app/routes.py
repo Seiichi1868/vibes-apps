@@ -16,7 +16,7 @@ from gtec_app.evaluator import (
     evaluate_part_d,
 )
 from gtec_app.problems import public_problems
-from gtec_app.settings import public_settings, resolve_background
+from gtec_app.settings import DEFAULT_BACKGROUND_OPACITY, public_settings, resolve_background
 from gtec_app.tts import synthesize_question
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,11 @@ gtec_bp = Blueprint("gtec", __name__)
 @gtec_bp.route("/gtec")
 def index():
     settings = public_settings()
-    return render_template("gtec/index.html", background=resolve_background(settings.get("background_id")))
+    return render_template(
+        "gtec/index.html",
+        background=resolve_background(settings.get("background_id")),
+        background_opacity=settings.get("background_opacity", DEFAULT_BACKGROUND_OPACITY),
+    )
 
 
 @gtec_bp.route("/gtec/api/settings", methods=["GET"])

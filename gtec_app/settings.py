@@ -43,6 +43,7 @@ BACKGROUND_PRESETS = {
 }
 
 DEFAULT_BACKGROUND_ID = "meadow"
+DEFAULT_BACKGROUND_OPACITY = 0.38
 
 DEFAULT_SETTINGS = {
     f"part_{p}_prep_enabled": v["prep_enabled"]
@@ -52,6 +53,7 @@ DEFAULT_SETTINGS = {
     for p, v in PART_DEFAULTS.items()
 } | {
     "background_id": DEFAULT_BACKGROUND_ID,
+    "background_opacity": DEFAULT_BACKGROUND_OPACITY,
 }
 
 
@@ -65,6 +67,14 @@ def _clamp_seconds(value, default: int) -> int:
     except (TypeError, ValueError):
         return default
     return max(0, min(n, 600))
+
+
+def _clamp_opacity(value, default: float = DEFAULT_BACKGROUND_OPACITY) -> float:
+    try:
+        n = float(value)
+    except (TypeError, ValueError):
+        return default
+    return round(max(0.0, min(n, 1.0)), 2)
 
 
 def _normalize(raw: dict | None) -> dict:
@@ -83,6 +93,9 @@ def _normalize(raw: dict | None) -> dict:
     bg_id = raw.get("background_id") if isinstance(raw, dict) else None
     if bg_id in BACKGROUND_PRESETS:
         data["background_id"] = bg_id
+
+    if "background_opacity" in raw:
+        data["background_opacity"] = _clamp_opacity(raw.get("background_opacity"))
 
     return data
 

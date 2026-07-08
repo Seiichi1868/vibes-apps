@@ -7,7 +7,9 @@ from flask import Blueprint, jsonify, render_template, request
 from gtec_app.problems import load_problems, public_problems, save_problems
 from gtec_app.settings import (
     BACKGROUND_PRESETS,
+    DEFAULT_BACKGROUND_OPACITY,
     PART_DEFAULTS,
+    _clamp_opacity,
     load_settings,
     resolve_background,
     update_settings,
@@ -39,6 +41,7 @@ def admin_page():
         defaults=PART_DEFAULTS,
         backgrounds=BACKGROUND_PRESETS,
         current_background=bg,
+        background_opacity=settings.get("background_opacity", DEFAULT_BACKGROUND_OPACITY),
     )
 
 
@@ -65,6 +68,9 @@ def admin_settings():
         bg_id = str(payload.get("background_id") or "")
         if bg_id in BACKGROUND_PRESETS:
             updates["background_id"] = bg_id
+
+    if "background_opacity" in payload:
+        updates["background_opacity"] = _clamp_opacity(payload.get("background_opacity"))
 
     if not updates:
         settings = load_settings()

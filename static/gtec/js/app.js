@@ -139,6 +139,8 @@ function applyBackgroundFromSettings() {
   const layer = document.getElementById('page-bg-layer');
   if (layer) {
     layer.style.backgroundImage = `url("/static/${image}")`;
+    const opacity = Number(App.settings.background_opacity);
+    layer.style.opacity = String(Number.isFinite(opacity) ? opacity : 0.38);
   }
 }
 

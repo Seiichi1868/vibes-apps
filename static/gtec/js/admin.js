@@ -20,6 +20,8 @@ const pageBgLayer = document.getElementById('page-bg-layer');
 const bgCurrentLabel = document.getElementById('bg-current-label');
 const bgPicker = document.getElementById('bg-picker');
 const problemAdmin = document.getElementById('problem-admin');
+const bgOpacitySlider = document.getElementById('bg-opacity-slider');
+const bgOpacityValue = document.getElementById('bg-opacity-value');
 
 let unlocked = false;
 
@@ -63,6 +65,19 @@ function showLockMessage(msg) {
 
 function hideLockMessage() {
   lockMessage.classList.add('hidden');
+}
+
+function applyBackgroundOpacity(opacity) {
+  const value = Math.max(0, Math.min(1, Number(opacity) || 0));
+  if (pageBgLayer) pageBgLayer.style.opacity = String(value);
+  const percent = Math.round(value * 100);
+  if (bgOpacitySlider) bgOpacitySlider.value = String(percent);
+  if (bgOpacityValue) bgOpacityValue.textContent = String(percent);
+}
+
+function getBackgroundOpacityFromSlider() {
+  const percent = parseInt(bgOpacitySlider?.value, 10);
+  return Number.isFinite(percent) ? percent / 100 : 0.38;
 }
 
 function applyBackground(bgId, imageUrl, label) {
@@ -381,6 +396,7 @@ function collectPayload() {
   if (currentBackgroundId) {
     payload.background_id = currentBackgroundId;
   }
+  payload.background_opacity = getBackgroundOpacityFromSlider();
   return payload;
 }
 
@@ -460,6 +476,7 @@ async function loadSettingsIntoUI() {
     activeBtn?.dataset.bgImage,
     data.background_label || activeBtn?.title,
   );
+  applyBackgroundOpacity(data.background_opacity ?? 0.38);
 
   try {
     problemsData = normalizeProblemsData(await fetchProblems());
@@ -492,6 +509,7 @@ function scheduleSave() {
         activeBtn?.dataset.bgImage,
         saved.background_label || activeBtn?.title,
       );
+      applyBackgroundOpacity(saved.background_opacity ?? 0.38);
       statusMessage.textContent = '保存しました';
     } catch (err) {
       statusMessage.textContent = '';
@@ -523,6 +541,12 @@ bgPicker?.addEventListener('click', e => {
   const btn = e.target.closest('.bg-pick-btn');
   if (!btn || !unlocked) return;
   applyBackground(btn.dataset.bgId, btn.dataset.bgImage, btn.title);
+  scheduleSave();
+});
+
+bgOpacitySlider?.addEventListener('input', () => {
+  if (!unlocked) return;
+  applyBackgroundOpacity(getBackgroundOpacityFromSlider());
   scheduleSave();
 });
 

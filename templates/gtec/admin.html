@@ -19,7 +19,7 @@
 <body class="admin-page relative min-h-screen text-slate-800 antialiased">
 
   <div class="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
-    <div id="page-bg-layer" class="gtec-page-bg absolute inset-0 scale-105 opacity-[0.38]"></div>
+    <div id="page-bg-layer" class="gtec-page-bg absolute inset-0 scale-105" style="opacity: {{ background_opacity }}"></div>
     <div class="absolute inset-0 bg-gradient-to-br from-sky-100/75 via-white/55 to-emerald-100/70"></div>
     <div class="absolute inset-0 bg-gradient-to-t from-emerald-50/40 via-transparent to-sky-50/30"></div>
   </div>
@@ -52,7 +52,8 @@
           <h2 class="admin-card-title admin-card-title-compact">背景の自然風景</h2>
           <span id="bg-current-label" class="text-[10px] text-indigo-600 font-medium">{{ current_background.background_label }}</span>
         </div>
-        <div id="bg-picker" class="flex flex-wrap gap-1.5">
+        <div class="flex flex-wrap items-end gap-3">
+          <div id="bg-picker" class="flex flex-wrap gap-1.5 flex-1 min-w-0">
           {% for bg_id, bg in backgrounds.items() %}
           <button type="button"
             class="bg-pick-btn{% if bg_id == current_background.background_id %} bg-pick-btn-active{% endif %}"
@@ -63,6 +64,15 @@
             <span class="bg-pick-label">{{ bg.label }}</span>
           </button>
           {% endfor %}
+          </div>
+          <div class="bg-opacity-control shrink-0">
+            <label for="bg-opacity-slider" class="block text-[10px] text-slate-600 font-medium mb-1 whitespace-nowrap">
+              透過 <span id="bg-opacity-value">{{ (background_opacity * 100)|round|int }}</span>%
+            </label>
+            <input id="bg-opacity-slider" type="range" min="0" max="100" step="1"
+              value="{{ (background_opacity * 100)|round|int }}"
+              class="bg-opacity-slider w-[7rem]" />
+          </div>
         </div>
       </section>
 

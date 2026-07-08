@@ -368,6 +368,25 @@
   line-height: 1;
 }
 
+.bg-opacity-control {
+  padding: 0.2rem 0.35rem 0.15rem;
+  border-radius: 0.45rem;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(203, 213, 225, 0.55);
+}
+
+.bg-opacity-slider {
+  display: block;
+  height: 0.35rem;
+  accent-color: #4f46e5;
+  cursor: pointer;
+}
+
+.bg-opacity-slider:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* ── 問題選択（生徒画面）────────────────────────────────── */
 .problem-btn {
   border-radius: 0.625rem;
