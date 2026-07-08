@@ -112,6 +112,36 @@ function normalizeProblemsData(data) {
   };
 }
 
+let problemOpenState = { a: true, b: false, c: false, d: false };
+
+function captureProblemOpenState() {
+  if (!problemAdmin) return;
+  problemAdmin.querySelectorAll('.admin-problem-part').forEach(el => {
+    const body = el.querySelector('.admin-problem-body');
+    if (body) problemOpenState[el.dataset.part] = !body.classList.contains('hidden');
+  });
+}
+
+function isProblemPartOpen(part) {
+  return !!problemOpenState[part];
+}
+
+function bindProblemToggles() {
+  if (!problemAdmin) return;
+  problemAdmin.querySelectorAll('.admin-problem-toggle').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const part = btn.dataset.part;
+      problemOpenState[part] = !isProblemPartOpen(part);
+      const body = btn.parentElement?.querySelector('.admin-problem-body');
+      const icon = btn.querySelector('.admin-problem-toggle-icon');
+      if (body) body.classList.toggle('hidden', !problemOpenState[part]);
+      if (icon) icon.textContent = problemOpenState[part] ? '▼' : '▶';
+    });
+  });
+}
+
 function getProblemSet(part, num) {
   return problemsData?.sets?.[part]?.[String(num)] || {};
 }
@@ -144,9 +174,12 @@ function fillProblemFields() {
 function renderProblemAdmin() {
   if (!problemAdmin || !problemsData) return;
 
+  captureProblemOpenState();
+
   problemAdmin.innerHTML = PARTS.map(part => {
     const editNum = problemEditNum[part] || 1;
     const active = problemsData.active?.[part] || 1;
+    const isOpen = isProblemPartOpen(part);
 
     let fields = '';
     if (part === 'a') {
@@ -179,12 +212,15 @@ function renderProblemAdmin() {
     }
 
     return `
-      <details class="admin-problem-part" data-part="${part}" open>
-        <summary class="admin-problem-summary">
-          <span class="text-[11px] font-bold text-indigo-800">${PART_LABELS[part]}</span>
-          <span class="text-[10px] text-slate-500">既定: 問題${active} / 編集中: 問題${editNum}</span>
-        </summary>
-        <div class="admin-problem-body mt-2">
+      <div class="admin-problem-part" data-part="${part}">
+        <button type="button" class="admin-problem-toggle" data-part="${part}" aria-expanded="${isOpen}">
+          <span class="admin-problem-toggle-icon">${isOpen ? '▼' : '▶'}</span>
+          <span class="admin-problem-toggle-label">
+            <span class="text-[11px] font-bold text-indigo-800">${PART_LABELS[part]}</span>
+            <span class="text-[10px] text-slate-500">既定: 問題${active} / 編集中: 問題${editNum}</span>
+          </span>
+        </button>
+        <div class="admin-problem-body mt-2${isOpen ? '' : ' hidden'}">
           <div class="flex flex-wrap items-center gap-2 mb-2">
             <label class="text-[10px] text-slate-600">既定
               <select class="admin-problem-select problem-active-select ml-1" data-part="${part}">${problemSelectOptions(active)}</select>
@@ -195,16 +231,27 @@ function renderProblemAdmin() {
           </div>
           ${fields}
         </div>
-      </details>`;
+      </div>`;
   }).join('');
 
-  fillProblemFields();
+  try {
+    fillProblemFields();
+  } catch (err) {
+    problemAdmin.insertAdjacentHTML(
+      'afterbegin',
+      `<p class="text-[11px] text-red-600 mb-2">フィールド表示エラー: ${escapeHTML(err.message)}</p>`,
+    );
+  }
+
+  bindProblemToggles();
 
   problemAdmin.querySelectorAll('.problem-active-select').forEach(el => {
     el.addEventListener('change', () => {
       if (!problemsData.active) problemsData.active = { a: 1, b: 1, c: 1, d: 1 };
       problemsData.active[el.dataset.part] = parseInt(el.value, 10) || 1;
+      captureProblemOpenState();
       scheduleProblemSave();
+      renderProblemAdmin();
     });
   });
 
@@ -212,6 +259,7 @@ function renderProblemAdmin() {
     el.addEventListener('change', () => {
       collectProblemFieldsFromUI();
       problemEditNum[el.dataset.part] = parseInt(el.value, 10) || 1;
+      captureProblemOpenState();
       renderProblemAdmin();
     });
   });
@@ -396,8 +444,8 @@ function scheduleSave() {
   }, 400);
 }
 
-unlockBtn.addEventListener('click', tryUnlock);
-passwordInput.addEventListener('keydown', e => {
+unlockBtn?.addEventListener('click', tryUnlock);
+passwordInput?.addEventListener('keydown', e => {
   if (e.key === 'Enter') tryUnlock();
 });
 

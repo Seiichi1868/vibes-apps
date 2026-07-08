@@ -96,12 +96,20 @@ def admin_problems():
     if "active" in incoming:
         current["active"].update(incoming["active"])
     if "sets" in incoming:
+        from gtec_app.problems import PROBLEM_NUMS, PARTS, _normalize_part_set
+
         for part, part_sets in incoming["sets"].items():
             if part not in current["sets"] or not isinstance(part_sets, dict):
                 continue
             for num, content in part_sets.items():
-                if str(num) in current["sets"][part]:
-                    current["sets"][part][str(num)] = content
+                try:
+                    num_int = int(num)
+                except (TypeError, ValueError):
+                    continue
+                if part in PARTS and num_int in PROBLEM_NUMS:
+                    current["sets"][part][str(num_int)] = _normalize_part_set(
+                        part, num_int, content if isinstance(content, dict) else None
+                    )
 
     saved = save_problems(current)
     return jsonify({"ok": True, **saved})

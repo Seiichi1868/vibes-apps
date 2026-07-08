@@ -409,35 +409,42 @@
   background: rgba(255, 255, 255, 0.45);
 }
 
-.admin-problem-summary {
+.admin-problem-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.admin-problem-toggle-icon {
+  color: #4f46e5;
+  font-size: 0.7rem;
+  width: 0.9rem;
+  flex-shrink: 0;
+}
+
+.admin-problem-toggle-label {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.35rem;
-  cursor: pointer;
-  list-style: none;
-}
-
-.admin-problem-summary::-webkit-details-marker {
-  display: none;
-}
-
-.admin-problem-summary::before {
-  content: '▸';
-  color: #4f46e5;
-  font-size: 0.75rem;
-  margin-right: 0.25rem;
-  transition: transform 0.15s;
-}
-
-.admin-problem-part[open] > .admin-problem-summary::before {
-  transform: rotate(90deg);
+  flex: 1;
+  min-width: 0;
 }
 
 .admin-problem-body {
   border-top: 1px solid rgba(203, 213, 225, 0.45);
   padding-top: 0.5rem;
+}
+
+.admin-problem-body.hidden {
+  display: none;
 }
 
 .admin-problem-textarea {
