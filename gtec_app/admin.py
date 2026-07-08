@@ -4,6 +4,7 @@ import os
 
 from flask import Blueprint, jsonify, render_template, request
 
+from gtec_app.problems import load_problems, public_problems, save_problems
 from gtec_app.settings import (
     BACKGROUND_PRESETS,
     PART_DEFAULTS,
@@ -71,3 +72,36 @@ def admin_settings():
 
     saved = update_settings(**updates)
     return jsonify({"ok": True, **saved, **resolve_background(saved.get("background_id"))})
+
+
+@gtec_admin_bp.route("/gtec/admin/api/problems", methods=["GET", "POST"])
+def admin_problems():
+    if request.method == "GET":
+        return jsonify({"ok": True, **load_problems()})
+
+    payload = request.get_json(silent=True) or {}
+    if not _password_ok(payload):
+        return jsonify({"ok": False, "error": "管理パスワードが違います。"}), 403
+
+    incoming = {}
+    if isinstance(payload.get("active"), dict):
+        incoming["active"] = payload["active"]
+    if isinstance(payload.get("sets"), dict):
+        incoming["sets"] = payload["sets"]
+
+    if not incoming:
+        return jsonify({"ok": True, **load_problems()})
+
+    current = load_problems()
+    if "active" in incoming:
+        current["active"].update(incoming["active"])
+    if "sets" in incoming:
+        for part, part_sets in incoming["sets"].items():
+            if part not in current["sets"] or not isinstance(part_sets, dict):
+                continue
+            for num, content in part_sets.items():
+                if str(num) in current["sets"][part]:
+                    current["sets"][part][str(num)] = content
+
+    saved = save_problems(current)
+    return jsonify({"ok": True, **saved})

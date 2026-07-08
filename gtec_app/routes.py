@@ -15,6 +15,7 @@ from gtec_app.evaluator import (
     evaluate_part_c,
     evaluate_part_d,
 )
+from gtec_app.problems import public_problems
 from gtec_app.settings import public_settings, resolve_background
 from gtec_app.tts import synthesize_question
 
@@ -32,6 +33,11 @@ def index():
 @gtec_bp.route("/gtec/api/settings", methods=["GET"])
 def get_settings():
     return jsonify(public_settings())
+
+
+@gtec_bp.route("/gtec/api/problems", methods=["GET"])
+def get_problems():
+    return jsonify(public_problems())
 
 
 @gtec_bp.route("/gtec/api/tts", methods=["POST"])

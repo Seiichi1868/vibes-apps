@@ -368,3 +368,71 @@
   line-height: 1;
 }
 
+/* ── 問題選択（生徒画面）────────────────────────────────── */
+.problem-btn {
+  border-radius: 0.625rem;
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  background: rgba(255, 255, 255, 0.72);
+  padding: 0.45rem 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #475569;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.problem-btn:hover {
+  border-color: rgba(79, 70, 229, 0.45);
+  color: #4f46e5;
+}
+
+.problem-btn-active {
+  background: #4f46e5;
+  border-color: #4f46e5;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);
+}
+
+.part-c-comic-placeholder {
+  background: rgba(248, 250, 252, 0.9);
+  min-height: 8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── 管理画面 問題編集 ───────────────────────────────────── */
+.admin-problem-part {
+  border: 1px solid rgba(203, 213, 225, 0.55);
+  border-radius: 0.55rem;
+  padding: 0.55rem;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.admin-problem-textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.45rem;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  min-height: 4.5rem;
+  resize: vertical;
+}
+
+.admin-problem-input {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.45rem;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.admin-problem-select {
+  border: 1px solid #cbd5e1;
+  border-radius: 0.45rem;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.75rem;
+  background: #fff;
+}
+

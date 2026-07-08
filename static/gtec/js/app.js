@@ -5,88 +5,42 @@
 //  Web Speech API で文字起こし → /gtec/evaluate へテキスト送信のみ
 // ============================================================
 
-// ─── 1. サンプル問題データ ──────────────────────────────────
+// ─── 1. パートメタデータ（問題本文は API から取得）────────────
 
-const GTEC_DATA = {
+const PART_META = {
   A: {
     title: 'Part A：音読 (Reading Aloud)',
     desc: '画面の英文を声に出して読んでください。準備時間 30 秒・解答時間 40 秒です。',
     prepTime: 30,
     recTime: 40,
     maxScore: 4,
-    text:
-      'Good morning, everyone! This is your Student Council with an important announcement. ' +
-      'We are excited to invite all students to our annual Quiz Competition. ' +
-      'The event will take place this Friday afternoon at three o\'clock in the school gymnasium. ' +
-      'Students will form teams of three and compete in categories including science, history, and popular culture. ' +
-      'Registration forms are available at the front office. ' +
-      'Please sign up by Wednesday at noon. We look forward to seeing you there!',
   },
-
   B: {
     title: 'Part B：やり取り (Interacting with Others)',
     desc: '画面のスケジュール表を見ながら、音声で読まれる質問に答えてください。\n質問は画面に表示されません。準備時間 10 秒・解答時間 15 秒 × 4 問。',
     prepTime: 10,
     recTime: 15,
     maxScore: 4,
-    schedule: [
-      { time: '9:00 AM',          activity: 'Tennis Practice', place: 'Sports Hall'  },
-      { time: '12:00 PM',         activity: 'Lunch',           place: 'Cafeteria'   },
-      { time: '2:00 PM – 4:00 PM',activity: 'Study Group',     place: 'Library'     },
-      { time: '5:00 PM',          activity: 'Movie',           place: 'Cinema'      },
-    ],
-    questions: [
-      { text: 'What time does Akiko start tennis practice?',   context: "Akiko's Saturday schedule" },
-      { text: 'Where will Akiko have lunch?',                  context: "Akiko's Saturday schedule" },
-      { text: 'How many hours will the study group last?',     context: "Akiko's Saturday schedule" },
-      { text: 'What will Akiko do at five o\'clock?',          context: "Akiko's Saturday schedule" },
-    ],
   },
-
   C: {
     title: 'Part C：ストーリーを話す (Telling a Story)',
     desc: '4 コマのイラストを見て、ストーリーを英語で話してください。準備時間 30 秒・解答時間 60 秒です。',
     prepTime: 30,
     recTime: 60,
     maxScore: 12,
-    storyImage: '/static/gtec/images/part-c-story.png',
-    panels: [
-      {
-        id: 1,
-        caption: 'Panel 1: 財布を発見',
-        description: 'A student finds a pink purse lying on the ground near the school gate.',
-        example: 'One day, a student was walking to school when he noticed a pink purse on the ground near the school gate.',
-      },
-      {
-        id: 2,
-        caption: 'Panel 2: 職員室へ',
-        description: 'The student picks up the purse and brings it to the staff room.',
-        example: 'He picked it up and took it to the staff room to turn it in.',
-      },
-      {
-        id: 3,
-        caption: 'Panel 3: 持ち主に連絡',
-        description: 'A teacher in the staff room calls the owner of the purse on the phone.',
-        example: 'A teacher in the staff room called the owner of the purse on the phone.',
-      },
-      {
-        id: 4,
-        caption: 'Panel 4: お礼を言われる',
-        description: 'The owner comes to the school, receives the purse, and thanks the student warmly.',
-        example: 'The owner came to the school, got her purse back, and thanked the student warmly.',
-      },
-    ],
   },
-
   D: {
     title: 'Part D：意見表明 (Expressing Your Opinion)',
     desc: 'トピックについて自分の意見と理由を英語で述べてください。準備時間 60 秒・解答時間 60 秒です。',
     prepTime: 60,
     recTime: 60,
     maxScore: 11,
-    topic:    'Should students be allowed to use smartphones at school? State your opinion clearly and support it with reasons and specific examples.',
-    topicJa:  '学校でのスマートフォン使用を許可すべきか？自分の意見を明確に述べ、理由と具体例を挙げて説明してください。',
   },
+};
+
+const DEFAULT_PROBLEMS = {
+  active: { a: 1, b: 1, c: 1, d: 1 },
+  sets: { a: {}, b: {}, c: {}, d: {} },
 };
 
 // ─── 2. アプリ状態 ───────────────────────────────────────────
@@ -105,9 +59,69 @@ const App = {
   },
   currentAudio: null,
   currentUtterance: null,
+  problems: null,
+  selectedProblem: { a: 1, b: 1, c: 1, d: 1 },
 };
 
-// ─── 3. 設定読み込み ─────────────────────────────────────────
+// ─── 3. 設定・問題読み込み ───────────────────────────────────
+
+async function loadProblems() {
+  try {
+    const res = await fetch('/gtec/api/problems');
+    if (res.ok) {
+      App.problems = await res.json();
+      for (const p of ['a', 'b', 'c', 'd']) {
+        if (!App.selectedProblem[p]) {
+          App.selectedProblem[p] = App.problems.active?.[p] || 1;
+        }
+      }
+      return;
+    }
+  } catch (_) { /* fallback */ }
+  App.problems = DEFAULT_PROBLEMS;
+}
+
+function getSelectedProblemNum(partId) {
+  const key = partId.toLowerCase();
+  return App.selectedProblem[key] || App.problems?.active?.[key] || 1;
+}
+
+function getPartData(partId) {
+  const meta = PART_META[partId] || {};
+  const key = partId.toLowerCase();
+  const num = getSelectedProblemNum(partId);
+  const content = App.problems?.sets?.[key]?.[String(num)] || {};
+  return { ...meta, ...content, problemNum: num };
+}
+
+function problemPickerHTML(partId) {
+  const key = partId.toLowerCase();
+  const selected = getSelectedProblemNum(partId);
+  const defaultNum = App.problems?.active?.[key] || 1;
+  return `
+    <div class="problem-picker mb-4" data-part="${partId}">
+      <p class="text-xs text-slate-500 mb-2">問題を選んでください${defaultNum !== selected ? '' : `（クラス既定: 問題${defaultNum}）`}</p>
+      <div class="grid grid-cols-4 gap-2">
+        ${[1, 2, 3, 4].map(n => `
+          <button type="button" class="problem-btn${n === selected ? ' problem-btn-active' : ''}"
+            data-part="${partId}" data-num="${n}">問題${n}</button>
+        `).join('')}
+      </div>
+    </div>`;
+}
+
+function wireProblemPicker(partId) {
+  document.querySelectorAll(`.problem-btn[data-part="${partId}"]`).forEach(btn => {
+    btn.onclick = async () => {
+      const num = parseInt(btn.dataset.num, 10);
+      if (!num || App.running) return;
+      App.selectedProblem[partId.toLowerCase()] = num;
+      await renderPartIdle(partId);
+    };
+  });
+}
+
+// ─── 4. 設定読み込み ─────────────────────────────────────────
 
 async function loadSettings() {
   try {
@@ -130,7 +144,7 @@ function applyBackgroundFromSettings() {
 
 function getPrepConfig(partLetter) {
   const p = partLetter.toLowerCase();
-  const fallback = GTEC_DATA[partLetter.toUpperCase()]?.prepTime ?? 30;
+  const fallback = PART_META[partLetter.toUpperCase()]?.prepTime ?? 30;
   const enabled = App.settings[`part_${p}_prep_enabled`] !== false;
   const sec = parseInt(App.settings[`part_${p}_prep_seconds`], 10);
   return {
@@ -957,7 +971,7 @@ function wireSubmitBtn() {
 // ─── 9. Part A ───────────────────────────────────────────────
 
 async function runPartA() {
-  const d = GTEC_DATA.A;
+  const d = getPartData('A');
   if (App.cancelRequested) return;
 
   await renderPartIdle('A');
@@ -1070,7 +1084,7 @@ function buildScheduleHTML(schedule) {
 }
 
 async function runPartB() {
-  const d = GTEC_DATA.B;
+  const d = getPartData('B');
   if (App.cancelRequested) return;
 
   await renderPartIdle('B');
@@ -1235,6 +1249,12 @@ function renderPartBResult(results, recordings, totalQCount = 4) {
 // ─── 11. Part C ──────────────────────────────────────────────
 
 function buildStoryComic(imageSrc) {
+  if (!imageSrc) {
+    return `
+      <div class="part-c-comic part-c-comic-placeholder mb-4">
+        <p class="text-sm text-slate-500 text-center py-8">4コマのイラストは準備中です</p>
+      </div>`;
+  }
   return `
     <div class="part-c-comic mb-4">
       <img
@@ -1242,6 +1262,7 @@ function buildStoryComic(imageSrc) {
         alt="4コマのストーリーイラスト"
         class="part-c-comic-img"
         loading="lazy"
+        onerror="this.closest('.part-c-comic').classList.add('part-c-comic-placeholder'); this.replaceWith(Object.assign(document.createElement('p'),{className:'text-sm text-slate-500 text-center py-8',textContent:'イラストを読み込めませんでした'}));"
       >
     </div>`;
 }
@@ -1261,7 +1282,7 @@ function buildPanelExamples(panels) {
 }
 
 async function runPartC() {
-  const d = GTEC_DATA.C;
+  const d = getPartData('C');
   if (App.cancelRequested) return;
 
   await renderPartIdle('C');
@@ -1360,7 +1381,7 @@ function renderPartCResult(result, text, panels) {
 // ─── 12. Part D ──────────────────────────────────────────────
 
 async function runPartD() {
-  const d = GTEC_DATA.D;
+  const d = getPartData('D');
   if (App.cancelRequested) return;
 
   await renderPartIdle('D');
@@ -1516,14 +1537,16 @@ async function stopAndReset() {
 
 async function renderPartIdle(partId) {
   await loadSettings();
+  await loadProblems();
 
   if (partId === 'A') {
-    const d = GTEC_DATA.A;
+    const d = getPartData('A');
     $root().innerHTML = cardWrap(`
       <p class="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-1">${d.title}</p>
-      <p class="text-sm text-slate-500 mb-4">${d.desc}</p>
+      <p class="text-sm text-slate-500 mb-3">${d.desc}</p>
+      ${problemPickerHTML('A')}
       <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-4 text-base leading-relaxed text-slate-800 font-medium">
-        ${d.text}
+        ${escapeHTML(d.text || '')}
       </div>
       <div class="flex gap-3 text-xs text-slate-500 mb-4">
         <span>⏱ 準備: ${prepLabel('A')}</span><span>🎤 解答: 40秒</span><span>📊 満点: 4点</span>
@@ -1531,11 +1554,12 @@ async function renderPartIdle(partId) {
       ${startBtn('練習スタート')}
     `);
   } else if (partId === 'B') {
-    const d = GTEC_DATA.B;
+    const d = getPartData('B');
     $root().innerHTML = cardWrap(`
       <p class="text-xs font-bold text-sky-600 uppercase tracking-wider mb-1">${d.title}</p>
-      <p class="text-sm text-slate-500 whitespace-pre-line mb-4">${d.desc}</p>
-      <div class="border border-sky-200 rounded-xl overflow-hidden mb-4">${buildScheduleHTML(d.schedule)}</div>
+      <p class="text-sm text-slate-500 whitespace-pre-line mb-3">${d.desc}</p>
+      ${problemPickerHTML('B')}
+      <div class="border border-sky-200 rounded-xl overflow-hidden mb-4">${buildScheduleHTML(d.schedule || [])}</div>
       <div class="flex gap-3 text-xs text-slate-500 mb-4">
         <span>⏱ 準備: ${prepLabel('B')}/問</span><span>🎤 解答: 15秒/問</span><span>📊 満点: 4点</span>
       </div>
@@ -1545,10 +1569,11 @@ async function renderPartIdle(partId) {
       ${startBtn('練習スタート')}
     `);
   } else if (partId === 'C') {
-    const d = GTEC_DATA.C;
+    const d = getPartData('C');
     $root().innerHTML = cardWrap(`
       <p class="text-xs font-bold text-violet-600 uppercase tracking-wider mb-1">${d.title}</p>
-      <p class="text-sm text-slate-500 mb-4">${d.desc}</p>
+      <p class="text-sm text-slate-500 mb-3">${d.desc}</p>
+      ${problemPickerHTML('C')}
       ${buildStoryComic(d.storyImage)}
       <div class="flex gap-3 text-xs text-slate-500 mb-4">
         <span>⏱ 準備: ${prepLabel('C')}</span><span>🎤 解答: 60秒</span><span>📊 満点: 12点</span>
@@ -1556,14 +1581,15 @@ async function renderPartIdle(partId) {
       ${startBtn('練習スタート')}
     `);
   } else if (partId === 'D') {
-    const d = GTEC_DATA.D;
+    const d = getPartData('D');
     $root().innerHTML = cardWrap(`
       <p class="text-xs font-bold text-teal-600 uppercase tracking-wider mb-1">${d.title}</p>
-      <p class="text-sm text-slate-500 mb-4">${d.desc}</p>
+      <p class="text-sm text-slate-500 mb-3">${d.desc}</p>
+      ${problemPickerHTML('D')}
       <div class="bg-teal-50 border border-teal-200 rounded-xl p-4 mb-2">
-        <p class="font-semibold text-teal-900 text-base leading-relaxed">${d.topic}</p>
+        <p class="font-semibold text-teal-900 text-base leading-relaxed">${escapeHTML(d.topic || '')}</p>
       </div>
-      <p class="text-xs text-slate-500 text-right mb-4">🇯🇵 ${d.topicJa}</p>
+      <p class="text-xs text-slate-500 text-right mb-4">🇯🇵 ${escapeHTML(d.topicJa || '')}</p>
       <div class="grid grid-cols-3 gap-2 text-xs text-slate-500 mb-4">
         <div class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-center">
           <p class="font-bold text-teal-600">GA 意見</p><p>0〜1点</p>
@@ -1581,6 +1607,7 @@ async function renderPartIdle(partId) {
       ${startBtn('練習スタート')}
     `);
   }
+  wireProblemPicker(partId);
 }
 
 // ─── 15. タブ・パート切り替え ────────────────────────────────
@@ -1631,6 +1658,10 @@ async function init() {
   }
 
   await loadSettings();
+  await loadProblems();
+  for (const p of ['a', 'b', 'c', 'd']) {
+    App.selectedProblem[p] = App.problems?.active?.[p] || 1;
+  }
 
   // ブラウザ合成音声リストを事前ロード（Part B TTS のラグを減らす）
   ensureVoicesLoaded().catch(() => {});
