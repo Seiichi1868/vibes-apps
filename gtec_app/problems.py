@@ -15,6 +15,7 @@ PROBLEMS_FILE = DATA_DIR / "gtec_problems.json"
 
 PARTS = ("a", "b", "c", "d")
 PROBLEM_NUMS = (1, 2, 3, 4)
+PROBLEMS_VERSION = 2
 
 DEFAULT_ACTIVE = {part: 1 for part in PARTS}
 
@@ -145,20 +146,20 @@ DEFAULT_SETS: dict[str, dict[str, dict]] = {
             "storyImage": "gtec/images/part-c-story-2.png",
             "panels": [
                 {
-                    "description": "A student finds a blue umbrella on a bench in the park.",
-                    "example": "One afternoon, a student was walking through the park and found a blue umbrella on a bench.",
+                    "description": "A student decides to bake a birthday cake for his mother and reads a recipe book in the kitchen.",
+                    "example": "One Saturday, a student decided to bake a birthday cake for his mother and read a recipe book in the kitchen.",
                 },
                 {
-                    "description": "The student takes the umbrella to the park office lost-and-found counter.",
-                    "example": "He picked it up and brought it to the park office lost-and-found counter.",
+                    "description": "He measures flour and eggs and mixes the batter in a bowl.",
+                    "example": "He measured flour and eggs and mixed the batter in a large bowl.",
                 },
                 {
-                    "description": "A staff member makes an announcement about the found umbrella.",
-                    "example": "A staff member made an announcement about the found umbrella over the speaker.",
+                    "description": "He takes the cake out of the oven and decorates it with cream and strawberries.",
+                    "example": "He took the cake out of the oven and decorated it with cream and strawberries.",
                 },
                 {
-                    "description": "The owner comes to the office, gets the umbrella back, and thanks the student.",
-                    "example": "The owner came to the office, got the umbrella back, and thanked the student.",
+                    "description": "His mother blows out the candles on the cake and hugs him with a big smile.",
+                    "example": "His mother blew out the candles on the cake and hugged him with a big smile.",
                 },
             ],
         },
@@ -166,20 +167,20 @@ DEFAULT_SETS: dict[str, dict[str, dict]] = {
             "storyImage": "gtec/images/part-c-story-3.png",
             "panels": [
                 {
-                    "description": "A student is waiting at a bus stop in the rain without an umbrella.",
-                    "example": "One rainy morning, a student was waiting at a bus stop without an umbrella.",
+                    "description": "Students wearing gloves gather at a city park for a tree-planting volunteer event.",
+                    "example": "On Sunday morning, students wearing gloves gathered at a city park for a tree-planting volunteer event.",
                 },
                 {
-                    "description": "A classmate arrives with an umbrella and offers to share it.",
-                    "example": "Then his classmate arrived with an umbrella and offered to share it with him.",
+                    "description": "They dig holes in the ground and plant young trees together.",
+                    "example": "They dug holes in the ground and planted young trees together.",
                 },
                 {
-                    "description": "The two students walk to school together under the umbrella.",
-                    "example": "They walked to school together under the umbrella.",
+                    "description": "They water the saplings with watering cans.",
+                    "example": "They watered the saplings with watering cans.",
                 },
                 {
-                    "description": "They arrive at school safely and smile at each other.",
-                    "example": "They arrived at school safely and smiled at each other.",
+                    "description": "The students smile proudly in front of the newly planted trees.",
+                    "example": "The students smiled proudly in front of the newly planted trees.",
                 },
             ],
         },
@@ -187,20 +188,20 @@ DEFAULT_SETS: dict[str, dict[str, dict]] = {
             "storyImage": "gtec/images/part-c-story-4.png",
             "panels": [
                 {
-                    "description": "A student realizes he forgot his lunchbox at home and looks worried.",
-                    "example": "At lunchtime, a student realized he had forgotten his lunchbox at home and looked worried.",
+                    "description": "A new transfer student stands in the school hallway holding his schedule, looking confused.",
+                    "example": "On his first day, a new transfer student stood in the school hallway holding his schedule and looking confused.",
                 },
                 {
-                    "description": "The student sits alone in the cafeteria looking sad.",
-                    "example": "He sat alone in the cafeteria looking sad.",
+                    "description": "He politely asks a teacher where Room 302 is.",
+                    "example": "He politely asked a teacher where Room 302 was.",
                 },
                 {
-                    "description": "A friend notices and offers to share her lunch.",
-                    "example": "His friend noticed and offered to share her lunch with him.",
+                    "description": "The teacher smiles and points down the corridor toward the classroom.",
+                    "example": "The teacher smiled and pointed down the corridor toward the classroom.",
                 },
                 {
-                    "description": "They eat lunch together happily in the cafeteria.",
-                    "example": "They ate lunch together happily in the cafeteria.",
+                    "description": "He enters the classroom, bows, and introduces himself to the class.",
+                    "example": "He entered the classroom, bowed, and introduced himself to the class.",
                 },
             ],
         },
@@ -330,11 +331,18 @@ def _normalize_part_set(part: str, num: int, raw: dict | None) -> dict:
 
 def _normalize(raw: dict | None) -> dict:
     data = {
+        "version": PROBLEMS_VERSION,
         "active": deepcopy(DEFAULT_ACTIVE),
         "sets": deepcopy(DEFAULT_SETS),
     }
     if not isinstance(raw, dict):
         return data
+
+    stored_version = raw.get("version", 1)
+    try:
+        stored_version = int(stored_version)
+    except (TypeError, ValueError):
+        stored_version = 1
 
     active = raw.get("active")
     if isinstance(active, dict):
@@ -351,6 +359,9 @@ def _normalize(raw: dict | None) -> dict:
             for num in PROBLEM_NUMS:
                 key = str(num)
                 if key in part_sets:
+                    # 問題1はカスタム保存を尊重。問題2〜4はバージョン更新時に新デフォルトへ。
+                    if part == "c" and num > 1 and stored_version < PROBLEMS_VERSION:
+                        continue
                     data["sets"][part][key] = _normalize_part_set(part, num, part_sets[key])
 
     return data

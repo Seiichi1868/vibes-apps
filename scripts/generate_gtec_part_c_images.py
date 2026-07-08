@@ -39,36 +39,39 @@ STORIES = {
         ),
     },
     2: {
-        "title": "Lost blue umbrella in park",
+        "title": "Birthday cake for mother",
         "prompt": (
             "Create a single horizontal 4-panel comic strip for a Japanese high school English test. "
-            "Panel 1: A student finds a blue umbrella on a park bench. "
-            "Panel 2: He brings it to a park office lost-and-found counter. "
-            "Panel 3: A staff member makes a found-item announcement. "
-            "Panel 4: The owner retrieves the umbrella and thanks the student. "
-            "Clean educational manga style, soft colors, consistent characters."
+            "Clean educational manga style, soft colors, consistent characters, white panel borders. "
+            "Panel 1: A male student in casual clothes at home reads a recipe book, planning a birthday cake. "
+            "Panel 2: He measures flour and eggs and mixes batter in a kitchen bowl. "
+            "Panel 3: He takes a baked cake from the oven and decorates it with cream and strawberries. "
+            "Panel 4: His mother blows out birthday candles on the cake and hugs him happily. "
+            "Warm family atmosphere, NOT a lost-and-found story."
         ),
     },
     3: {
-        "title": "Sharing umbrella in rain",
+        "title": "Tree planting volunteer",
         "prompt": (
             "Create a single horizontal 4-panel comic strip for a Japanese high school English test. "
-            "Panel 1: A student waits at a bus stop in the rain without an umbrella. "
-            "Panel 2: A classmate arrives with an umbrella and offers to share. "
-            "Panel 3: They walk to school together under one umbrella in the rain. "
-            "Panel 4: They arrive at school smiling. "
-            "Clean educational manga style, soft colors, consistent characters."
+            "Clean educational manga style, soft colors, consistent characters, white panel borders. "
+            "Panel 1: High school students wearing gloves gather at a city park for a tree-planting event. "
+            "Panel 2: They dig holes and plant young saplings together. "
+            "Panel 3: They water the new trees with watering cans. "
+            "Panel 4: The students smile proudly in front of the newly planted trees. "
+            "Outdoor volunteer activity, NOT a lost item or food-sharing story."
         ),
     },
     4: {
-        "title": "Sharing lunch",
+        "title": "Transfer student finds classroom",
         "prompt": (
             "Create a single horizontal 4-panel comic strip for a Japanese high school English test. "
-            "Panel 1: A student realizes he forgot his lunchbox and looks worried. "
-            "Panel 2: He sits alone in the school cafeteria looking sad. "
-            "Panel 3: A friend offers to share her lunch. "
-            "Panel 4: They eat lunch together happily in the cafeteria. "
-            "Clean educational manga style, soft colors, consistent characters."
+            "Clean educational manga style, soft colors, consistent characters, white panel borders. "
+            "Panel 1: A new male transfer student in school uniform stands in a hallway holding a schedule, looking confused. "
+            "Panel 2: He politely asks a female teacher for directions to Room 302. "
+            "Panel 3: The teacher smiles and points down the school corridor. "
+            "Panel 4: He enters a classroom, bows, and introduces himself to classmates. "
+            "First-day-at-school story, NOT a lost item or weather story."
         ),
     },
 }
