@@ -15,7 +15,7 @@ PROBLEMS_FILE = DATA_DIR / "gtec_problems.json"
 
 PARTS = ("a", "b", "c", "d")
 PROBLEM_NUMS = (1, 2, 3, 4)
-PROBLEMS_VERSION = 2
+PROBLEMS_VERSION = 3
 
 DEFAULT_ACTIVE = {part: 1 for part in PARTS}
 
@@ -167,20 +167,20 @@ DEFAULT_SETS: dict[str, dict[str, dict]] = {
             "storyImage": "gtec/images/part-c-story-3.png",
             "panels": [
                 {
-                    "description": "Students wearing gloves gather at a city park for a tree-planting volunteer event.",
-                    "example": "On Sunday morning, students wearing gloves gathered at a city park for a tree-planting volunteer event.",
+                    "description": "A young man plans a tree-planting project at his desk with a map, a brochure, and a calendar.",
+                    "example": "One day, a young man planned a tree-planting project at his desk with a map, a brochure, and a calendar.",
                 },
                 {
-                    "description": "They dig holes in the ground and plant young trees together.",
-                    "example": "They dug holes in the ground and planted young trees together.",
+                    "description": "He goes to a park and plants a young sapling in the ground with a trowel.",
+                    "example": "He went to a park and planted a young sapling in the ground with a trowel.",
                 },
                 {
-                    "description": "They water the saplings with watering cans.",
-                    "example": "They watered the saplings with watering cans.",
+                    "description": "Later, he waters the growing tree, which is supported by a wooden stake.",
+                    "example": "Later, he watered the growing tree, which was supported by a wooden stake.",
                 },
                 {
-                    "description": "The students smile proudly in front of the newly planted trees.",
-                    "example": "The students smiled proudly in front of the newly planted trees.",
+                    "description": "The tree has grown well; he gives a thumbs-up while an older man claps beside a community tree-planting sign.",
+                    "example": "The tree had grown well, and he gave a thumbs-up while an older man clapped beside a community tree-planting sign.",
                 },
             ],
         },

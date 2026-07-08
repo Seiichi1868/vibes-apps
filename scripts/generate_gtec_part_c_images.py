@@ -51,15 +51,16 @@ STORIES = {
         ),
     },
     3: {
-        "title": "Tree planting volunteer",
+        "title": "Tree planting project",
         "prompt": (
             "Create a single horizontal 4-panel comic strip for a Japanese high school English test. "
             "Clean educational manga style, soft colors, consistent characters, white panel borders. "
-            "Panel 1: High school students wearing gloves gather at a city park for a tree-planting event. "
-            "Panel 2: They dig holes and plant young saplings together. "
-            "Panel 3: They water the new trees with watering cans. "
-            "Panel 4: The students smile proudly in front of the newly planted trees. "
-            "Outdoor volunteer activity, NOT a lost item or food-sharing story."
+            "Panel 1: A young man at a desk plans a tree-planting project with a map, brochure, and calendar. "
+            "Panel 2: He kneels in a sunny park and plants a young sapling with a trowel. "
+            "Panel 3: Later he waters the growing tree, which has a wooden support stake. "
+            "Panel 4: The tree has grown; he gives a thumbs-up while an older man claps beside a "
+            "'Trees for the Future' community sign. "
+            "Personal tree-planting story over time, NOT a lost item story."
         ),
     },
     4: {
