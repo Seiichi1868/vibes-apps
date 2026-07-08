@@ -831,6 +831,8 @@ function scoreCircle(score, max, label, color = 'indigo') {
   const colors = {
     indigo: ['bg-indigo-600', 'text-indigo-700'],
     sky:    ['bg-sky-500',    'text-sky-700'],
+    violet: ['bg-violet-500', 'text-violet-700'],
+    teal:   ['bg-teal-500',   'text-teal-700'],
     emerald:['bg-emerald-500','text-emerald-700'],
     amber:  ['bg-amber-500',  'text-amber-700'],
     rose:   ['bg-rose-500',   'text-rose-700'],
@@ -1337,7 +1339,7 @@ function renderPartCResult(result, text, panels) {
   $root().innerHTML = cardWrap(`
     <p class="text-xs font-bold text-violet-600 uppercase tracking-wider mb-4">Part C 結果</p>
     <div class="flex justify-around mb-4">
-      ${scoreCircle(ga, 4, 'Goal Achievement', 'violet' in ({}) ? 'violet' : 'indigo')}
+      ${scoreCircle(ga, 4, 'Goal Achievement', 'violet')}
       ${scoreCircle(s.vocabulary_grammar ?? 0, 4, '語い・文法', 'sky')}
       ${scoreCircle(s.fluency_pronunciation ?? 0, 4, '流ちょうさ', 'emerald')}
     </div>
@@ -1372,10 +1374,10 @@ async function runPartD() {
   if (prep.enabled) {
     let timerEl;
     $root().innerHTML = cardWrap(`
-      <p class="text-xs font-bold text-rose-600 uppercase tracking-wider mb-3">${d.title} — 準備</p>
+      <p class="text-xs font-bold text-teal-600 uppercase tracking-wider mb-3">${d.title} — 準備</p>
       <div id="timer-wrap"></div>
-      <div class="bg-rose-50 border border-rose-200 rounded-xl p-4 mb-3">
-        <p class="font-semibold text-rose-800 text-base leading-relaxed">${d.topic}</p>
+      <div class="bg-teal-50 border border-teal-200 rounded-xl p-4 mb-3">
+        <p class="font-semibold text-teal-900 text-base leading-relaxed">${d.topic}</p>
       </div>
       <p class="text-xs text-slate-400 text-center">
         ① 自分の意見（賛成/反対）→ ② 客観的な理由・具体例 の順で話す練習をしてください
@@ -1390,11 +1392,11 @@ async function runPartD() {
   let timerEl;
   let transEl;
   $root().innerHTML = cardWrap(`
-    <p class="text-xs font-bold text-red-600 uppercase tracking-wider mb-3">${d.title} — 録音</p>
+    <p class="text-xs font-bold text-teal-600 uppercase tracking-wider mb-3">${d.title} — 録音</p>
     <div id="timer-wrap"></div>
     ${recIndicator(true)}
-    <div class="bg-rose-50 border border-rose-200 rounded-xl p-3 mb-3">
-      <p class="font-semibold text-rose-800 text-sm">${d.topic}</p>
+    <div class="bg-teal-50 border border-teal-200 rounded-xl p-3 mb-3">
+      <p class="font-semibold text-teal-900 text-sm">${d.topic}</p>
     </div>
     <p class="text-xs text-slate-400 mb-1">文字起こし</p>
     ${transcriptBox('transcript-el')}
@@ -1431,15 +1433,15 @@ function renderPartDResult(result, text) {
     (s.fluency_pronunciation    ?? 0);
 
   $root().innerHTML = cardWrap(`
-    <p class="text-xs font-bold text-rose-600 uppercase tracking-wider mb-4">Part D 結果</p>
+    <p class="text-xs font-bold text-teal-600 uppercase tracking-wider mb-4">Part D 結果</p>
     <div class="grid grid-cols-2 gap-4 mb-4">
-      ${scoreCircle(s.goal_achievement_opinion ?? 0, 1, 'GA①意見', 'rose')}
+      ${scoreCircle(s.goal_achievement_opinion ?? 0, 1, 'GA①意見', 'teal')}
       ${scoreCircle(s.goal_achievement_reason  ?? 0, 2, 'GA②理由', 'amber')}
       ${scoreCircle(s.vocabulary_grammar       ?? 0, 4, '語い・文法', 'sky')}
       ${scoreCircle(s.fluency_pronunciation    ?? 0, 4, '流ちょうさ', 'emerald')}
     </div>
-    <p class="text-center text-sm font-bold text-rose-700 mb-4">合計: ${total} / 11点</p>
-    <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 text-xs text-amber-800">
+    <p class="text-center text-sm font-bold text-teal-700 mb-4">合計: ${total} / 11点</p>
+    <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-4 text-xs text-slate-600">
       <strong>GA②理由の採点基準:</strong><br>
       2点: 客観的・社会的な視点からの理由と具体例あり<br>
       1点: 個人的な体験・感想のみ<br>
@@ -1556,21 +1558,21 @@ async function renderPartIdle(partId) {
   } else if (partId === 'D') {
     const d = GTEC_DATA.D;
     $root().innerHTML = cardWrap(`
-      <p class="text-xs font-bold text-rose-600 uppercase tracking-wider mb-1">${d.title}</p>
+      <p class="text-xs font-bold text-teal-600 uppercase tracking-wider mb-1">${d.title}</p>
       <p class="text-sm text-slate-500 mb-4">${d.desc}</p>
-      <div class="bg-rose-50 border border-rose-200 rounded-xl p-4 mb-2">
-        <p class="font-semibold text-rose-800 text-base leading-relaxed">${d.topic}</p>
+      <div class="bg-teal-50 border border-teal-200 rounded-xl p-4 mb-2">
+        <p class="font-semibold text-teal-900 text-base leading-relaxed">${d.topic}</p>
       </div>
       <p class="text-xs text-slate-500 text-right mb-4">🇯🇵 ${d.topicJa}</p>
       <div class="grid grid-cols-3 gap-2 text-xs text-slate-500 mb-4">
         <div class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-center">
-          <p class="font-bold text-rose-600">GA 意見</p><p>0〜1点</p>
+          <p class="font-bold text-teal-600">GA 意見</p><p>0〜1点</p>
         </div>
         <div class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-center">
-          <p class="font-bold text-rose-600">GA 理由</p><p>0〜2点</p>
+          <p class="font-bold text-teal-600">GA 理由</p><p>0〜2点</p>
         </div>
         <div class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-center">
-          <p class="font-bold text-rose-600">語い・流ちょう</p><p>各0〜4点</p>
+          <p class="font-bold text-teal-600">語い・流ちょう</p><p>各0〜4点</p>
         </div>
       </div>
       <div class="flex gap-3 text-xs text-slate-500 mb-4">
