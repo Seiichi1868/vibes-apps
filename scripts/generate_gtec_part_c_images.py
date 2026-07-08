@@ -64,15 +64,16 @@ STORIES = {
         ),
     },
     4: {
-        "title": "Transfer student finds classroom",
+        "title": "Lost student arrives late to class",
         "prompt": (
             "Create a single horizontal 4-panel comic strip for a Japanese high school English test. "
             "Clean educational manga style, soft colors, consistent characters, white panel borders. "
-            "Panel 1: A new male transfer student in school uniform stands in a hallway holding a schedule, looking confused. "
-            "Panel 2: He politely asks a female teacher for directions to Room 302. "
-            "Panel 3: The teacher smiles and points down the school corridor. "
-            "Panel 4: He enters a classroom, bows, and introduces himself to classmates. "
-            "First-day-at-school story, NOT a lost item or weather story."
+            "Panel 1: A male student in school uniform looks confused at his schedule in a hallway. "
+            "Panel 2: He asks a female staff member 'Room 302?' near a door labeled Room 201. "
+            "Panel 3: The staff member smiles and points down the school corridor. "
+            "Panel 4: He enters a classroom late and bows apologetically; a teacher stands by the "
+            "chalkboard and students are already seated. Clock shows about 1:05. "
+            "Lost-and-late-for-class story, NOT a lost wallet story."
         ),
     },
 }

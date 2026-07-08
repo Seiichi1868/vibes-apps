@@ -15,7 +15,7 @@ PROBLEMS_FILE = DATA_DIR / "gtec_problems.json"
 
 PARTS = ("a", "b", "c", "d")
 PROBLEM_NUMS = (1, 2, 3, 4)
-PROBLEMS_VERSION = 3
+PROBLEMS_VERSION = 4
 
 DEFAULT_ACTIVE = {part: 1 for part in PARTS}
 
@@ -188,20 +188,20 @@ DEFAULT_SETS: dict[str, dict[str, dict]] = {
             "storyImage": "gtec/images/part-c-story-4.png",
             "panels": [
                 {
-                    "description": "A new transfer student stands in the school hallway holding his schedule, looking confused.",
-                    "example": "On his first day, a new transfer student stood in the school hallway holding his schedule and looking confused.",
+                    "description": "A student in a school uniform stands in the hallway looking confused at his schedule.",
+                    "example": "One morning, a student in a school uniform stood in the hallway looking confused at his schedule.",
                 },
                 {
-                    "description": "He politely asks a teacher where Room 302 is.",
-                    "example": "He politely asked a teacher where Room 302 was.",
+                    "description": "He asks a staff member where Room 302 is, near a door marked Room 201.",
+                    "example": 'He asked a staff member, "Room 302?" near a door marked Room 201.',
                 },
                 {
-                    "description": "The teacher smiles and points down the corridor toward the classroom.",
-                    "example": "The teacher smiled and pointed down the corridor toward the classroom.",
+                    "description": "The staff member smiles and points down the corridor to show him the way.",
+                    "example": "The staff member smiled and pointed down the corridor to show him the way.",
                 },
                 {
-                    "description": "He enters the classroom, bows, and introduces himself to the class.",
-                    "example": "He entered the classroom, bowed, and introduced himself to the class.",
+                    "description": "He arrives late to the classroom and bows apologetically while the teacher and classmates look at him.",
+                    "example": "He arrived late to the classroom and bowed apologetically while the teacher and classmates looked at him.",
                 },
             ],
         },
