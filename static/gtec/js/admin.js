@@ -9,6 +9,8 @@ const PART_LABELS = {
 };
 const DEFAULT_SECONDS = { a: 30, b: 10, c: 30, d: 60 };
 
+const UNLOCK_STORAGE_KEY = 'gtec_admin_unlocked';
+
 const passwordInput = document.getElementById('admin-password');
 const unlockBtn = document.getElementById('unlock-btn');
 const lockMessage = document.getElementById('lock-message');
@@ -20,6 +22,34 @@ const bgPicker = document.getElementById('bg-picker');
 const problemAdmin = document.getElementById('problem-admin');
 
 let unlocked = false;
+
+function getStoredPassword() {
+  try {
+    return sessionStorage.getItem(UNLOCK_STORAGE_KEY) || '';
+  } catch (_) {
+    return '';
+  }
+}
+
+function saveUnlockState(password) {
+  try {
+    sessionStorage.setItem(UNLOCK_STORAGE_KEY, password);
+  } catch (_) {}
+}
+
+function clearUnlockState() {
+  try {
+    sessionStorage.removeItem(UNLOCK_STORAGE_KEY);
+  } catch (_) {}
+}
+
+function applyUnlockUI() {
+  unlocked = true;
+  passwordInput.disabled = true;
+  unlockBtn.disabled = true;
+  settingsPanel.classList.remove('hidden');
+}
+
 let saveTimer = null;
 let problemSaveTimer = null;
 let currentBackgroundId = null;
@@ -375,14 +405,40 @@ async function tryUnlock() {
     }
     if (!res.ok) throw new Error(data.error || '解除に失敗しました');
 
-    unlocked = true;
-    passwordInput.disabled = true;
-    unlockBtn.disabled = true;
-    settingsPanel.classList.remove('hidden');
+    saveUnlockState(password);
+    applyUnlockUI();
     await loadSettingsIntoUI();
     statusMessage.textContent = '管理設定を解除しました';
   } catch (err) {
     showLockMessage(err.message);
+  }
+}
+
+async function restoreUnlockFromStorage() {
+  const password = getStoredPassword();
+  if (!password) return;
+
+  passwordInput.value = password;
+  hideLockMessage();
+
+  try {
+    const res = await fetch('/gtec/admin/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ admin_password: password }),
+    });
+    const data = await res.json();
+    if (res.status === 403) {
+      clearUnlockState();
+      passwordInput.value = '';
+      return;
+    }
+    if (!res.ok) return;
+
+    applyUnlockUI();
+    await loadSettingsIntoUI();
+  } catch (_) {
+    // 保存済み解除の復元に失敗した場合はロック画面のまま
   }
 }
 
@@ -469,3 +525,5 @@ bgPicker?.addEventListener('click', e => {
   applyBackground(btn.dataset.bgId, btn.dataset.bgImage, btn.title);
   scheduleSave();
 });
+
+restoreUnlockFromStorage();
