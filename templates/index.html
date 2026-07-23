@@ -1287,6 +1287,7 @@
           referenceFromSample = false;
           autoResizeReferenceText();
           renderComparison();
+          setGrammarSaveReady(null);
         }
       }
 
@@ -1316,6 +1317,7 @@
         autoResizeReferenceText();
         renderComparison();
         grammarCard.classList.add("hidden");
+        setGrammarSaveReady(null);
       }
 
       function isUsingSampleText() {
@@ -1693,7 +1695,9 @@
 
       function setGrammarSaveReady(result) {
         lastGrammarResult = result;
-        if (saveGrammarHistoryBtn) saveGrammarHistoryBtn.disabled = !result;
+        if (saveGrammarHistoryBtn) {
+          saveGrammarHistoryBtn.disabled = !referenceText.value.trim();
+        }
       }
 
       function flashGrammarCard() {
@@ -1806,19 +1810,35 @@
       }
 
       function saveCurrentGrammarToHistory() {
-        if (!lastGrammarResult) {
-          setStatus(t("historyNeedGrammar"));
+        const composeText = referenceText.value.trim();
+        if (!composeText) {
+          setStatus(getStudyLangConfig().needTextStatus);
           return;
         }
+
+        const grammarMatchesCurrentText =
+          lastGrammarResult &&
+          [lastGrammarResult.sourceText, lastGrammarResult.corrected]
+            .map((text) => String(text || "").trim())
+            .includes(composeText);
+        const result = grammarMatchesCurrentText
+          ? lastGrammarResult
+          : {
+              lang: studyLang,
+              sourceText: composeText,
+              corrected: composeText,
+              tips: [],
+              hasIssues: false,
+            };
 
         const entry = {
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           savedAt: new Date().toISOString(),
-          lang: lastGrammarResult.lang || studyLang,
-          sourceText: lastGrammarResult.sourceText,
-          corrected: lastGrammarResult.corrected,
-          tips: lastGrammarResult.tips.slice(),
-          hasIssues: lastGrammarResult.hasIssues,
+          lang: result.lang || studyLang,
+          sourceText: result.sourceText,
+          corrected: result.corrected,
+          tips: Array.isArray(result.tips) ? result.tips.slice() : [],
+          hasIssues: Boolean(result.hasIssues),
         };
 
         const entries = loadGrammarHistory();
@@ -2594,6 +2614,7 @@
           autoResizeReferenceText();
           renderComparison();
           grammarCard.classList.add("hidden");
+          setGrammarSaveReady(null);
           saveWorkState();
         } else {
           referenceFromSample = false;
@@ -2616,6 +2637,7 @@
           referenceFromSample = false;
           comparisonCard.classList.add("hidden");
           grammarCard.classList.add("hidden");
+          setGrammarSaveReady(null);
         });
       });
 
@@ -2633,6 +2655,7 @@
         autoResizeReferenceText();
         renderComparison();
         grammarCard.classList.add("hidden");
+        setGrammarSaveReady(null);
         scheduleSaveWorkState();
       });
       function setOcrControlsBusy(busy, activeBtn) {
@@ -2677,6 +2700,7 @@
           sampleSelect.selectedIndex = 0;
           autoResizeReferenceText();
           grammarCard.classList.add("hidden");
+          setGrammarSaveReady(null);
           renderComparison();
           setStatus(config.ocrDone || t("ocrDone"));
           saveWorkState();
