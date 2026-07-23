@@ -533,8 +533,8 @@ label {
 .compose-word-count {
   position: absolute;
   right: 10px;
-  bottom: 7px;
-  font-size: 10px;
+  bottom: 9px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--muted);
   pointer-events: none;
@@ -545,15 +545,15 @@ label {
 textarea,
 #referenceText {
   width: 100%;
-  padding: 5px 52px 22px 8px;
+  padding: 10px 58px 28px 12px;
   border-radius: 7px;
   border: 1px solid var(--line);
   background: #ffffff;
   color: var(--text);
-  font-size: 12px;
-  line-height: 1.4;
+  font-size: clamp(1rem, 2.4vw, 1.0625rem);
+  line-height: 1.5;
   resize: none;
-  min-height: 2.75em;
+  min-height: 3.25em;
   max-height: none;
   height: auto;
   overflow: hidden;
@@ -909,8 +909,8 @@ h2 {
 .grammar-save-btn {
   width: 100%;
   margin-top: 6px;
-  font-size: 11px;
-  padding: 6px 10px;
+  font-size: 13px;
+  padding: 8px 12px;
   background: rgba(255, 255, 255, 0.62);
   border-color: rgba(148, 163, 184, 0.45);
   backdrop-filter: blur(8px);
