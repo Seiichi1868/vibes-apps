@@ -17,7 +17,7 @@ const PART_META = {
   },
   B: {
     title: 'Part B：やり取り (Interacting with Others)',
-    desc: '画面のスケジュール表を見ながら、音声で読まれる質問に答えてください。\n質問は画面に表示されません。準備時間 10 秒・解答時間 15 秒 × 4 問。',
+    desc: 'Part Bは、全部で4問あります。与えられた情報をもとに、質問に対して英語で答えてください。はじめに準備時間が10秒あり、その後質問が始まります。解答時間はそれぞれ15秒です。開始の音が鳴ってから解答を始めてください。',
     prepTime: 10,
     recTime: 15,
     maxScore: 4,
@@ -1065,11 +1065,45 @@ function renderPartAResult(result, text, duration, targetText) {
 // ─── 10. Part B ──────────────────────────────────────────────
 
 function buildScheduleHTML(schedule) {
+  if (schedule.some(r => Object.prototype.hasOwnProperty.call(r, 'date'))) {
+    let rows = '';
+    for (let i = 0; i < schedule.length; i++) {
+      const row = schedule[i];
+      const previousActivity = schedule[i - 1]?.activity;
+      const startsActivity = row.activity && row.activity !== previousActivity;
+      let rowSpan = 1;
+      if (startsActivity) {
+        while (schedule[i + rowSpan]?.activity === row.activity) rowSpan++;
+      }
+      rows += `
+        <tr class="bg-white border-b border-slate-300 last:border-b-0">
+          <td class="w-24 px-3 py-2 text-center font-bold text-slate-800 border-r border-slate-300">
+            <span class="${row.publicHoliday ? 'inline-block border-2 border-sky-600 px-2 py-0.5' : ''}">
+              ${escapeHTML(row.date || '')}
+            </span>
+          </td>
+          ${startsActivity
+            ? `<td rowspan="${rowSpan}" class="px-4 py-2 text-center align-middle font-semibold text-lg italic text-slate-800">
+                ${escapeHTML(row.activity)}
+               </td>`
+            : (!row.activity ? '<td class="px-4 py-2"></td>' : '')}
+        </tr>`;
+    }
+    return `
+      <table class="w-full border-collapse text-sm">
+        <tbody>${rows}</tbody>
+      </table>
+      <p class="px-3 py-2 text-xs text-slate-600 bg-slate-50 border-t border-slate-300">
+        <span class="inline-block w-9 h-4 border-2 border-sky-600 align-middle mr-1"></span>
+        = public holiday
+      </p>`;
+  }
+
   const rows = schedule.map((r, i) =>
     `<tr class="${i % 2 === 0 ? 'bg-sky-50' : 'bg-white'}">
-      <td class="px-3 py-2 font-mono text-xs text-sky-700 whitespace-nowrap">${r.time}</td>
-      <td class="px-3 py-2 font-semibold text-slate-800 text-sm">${r.activity}</td>
-      <td class="px-3 py-2 text-slate-500 text-xs">${r.place}</td>
+      <td class="px-3 py-2 font-mono text-xs text-sky-700 whitespace-nowrap">${escapeHTML(r.time || '')}</td>
+      <td class="px-3 py-2 font-semibold text-slate-800 text-sm">${escapeHTML(r.activity || '')}</td>
+      <td class="px-3 py-2 text-slate-500 text-xs">${escapeHTML(r.place || '')}</td>
     </tr>`
   ).join('');
   return `
@@ -1083,6 +1117,16 @@ function buildScheduleHTML(schedule) {
       </thead>
       <tbody>${rows}</tbody>
     </table>`;
+}
+
+function buildPartBInformationHTML(d) {
+  return `
+    ${d.heading ? `<p class="text-lg font-semibold text-slate-800 underline mb-3">${escapeHTML(d.heading)}</p>` : ''}
+    ${d.instructionJa ? `
+      <div class="border border-slate-300 rounded-lg px-4 py-3 mb-4 text-sm leading-relaxed text-slate-700">
+        ${escapeHTML(d.instructionJa)}
+      </div>` : ''}
+    <div class="border border-sky-200 rounded-xl overflow-hidden">${buildScheduleHTML(d.schedule || [])}</div>`;
 }
 
 async function runPartB() {
@@ -1099,32 +1143,30 @@ async function runPartB() {
   let earlySubmit = false;
   const mobile = isMobileDevice();
 
+  // Part B の準備時間は、全質問の開始前に1回だけ設ける。
+  if (prep.enabled) {
+    let timerEl;
+    $root().innerHTML = cardWrap(`
+      <p class="text-xs font-bold text-sky-600 uppercase tracking-wider mb-3">${d.title} — 準備</p>
+      <div id="timer-wrap"></div>
+      ${buildPartBInformationHTML(d)}
+      <p class="text-center text-sm text-slate-400 mt-3">予定表を確認してください</p>
+    `);
+    timerEl = document.getElementById('timer-wrap');
+    await countdown(prep.seconds, sec => { timerEl.innerHTML = timerDisplay(sec, 'prep'); });
+    if (App.cancelRequested) return;
+  }
+
   for (let qi = 0; qi < d.questions.length; qi++) {
     if (App.cancelRequested) return;
     const q = d.questions[qi];
-
-    // prep
-    if (prep.enabled) {
-      let timerEl;
-      $root().innerHTML = cardWrap(`
-        <p class="text-xs font-bold text-sky-600 uppercase tracking-wider mb-1">${d.title} — 質問 ${qi + 1} / ${d.questions.length}</p>
-        <div id="timer-wrap"></div>
-        <div class="border border-sky-200 rounded-xl overflow-hidden mb-3">${buildScheduleHTML(d.schedule)}</div>
-        <div class="bg-sky-50 border border-sky-100 rounded-xl px-4 py-3 text-center text-sky-700 font-semibold text-sm">
-          ${mobile ? '準備ができたら下のボタンをタップして質問を聞いてください' : 'スピーカーから質問が流れます。よく聞いて答えてください'}
-        </div>
-      `);
-      timerEl = document.getElementById('timer-wrap');
-      await countdown(prep.seconds, sec => { timerEl.innerHTML = timerDisplay(sec, 'prep'); });
-      if (App.cancelRequested) return;
-    }
 
     // TTS フェーズ
     if (mobile) {
       // スマホ: ユーザーがタップするまで待つ → ジェスチャー内で即座に読み上げ
       $root().innerHTML = cardWrap(`
         <p class="text-xs font-bold text-sky-600 uppercase tracking-wider mb-1">${d.title} — 質問 ${qi + 1} / ${d.questions.length}</p>
-        <div class="border border-sky-200 rounded-xl overflow-hidden mb-4">${buildScheduleHTML(d.schedule)}</div>
+        <div class="mb-4">${buildPartBInformationHTML(d)}</div>
         <button id="hear-btn"
           class="w-full py-4 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white font-bold text-base shadow-lg transition-all">
           🔊 タップして質問を聞く（Q${qi + 1}）
@@ -1147,7 +1189,7 @@ async function runPartB() {
           <span class="text-2xl">🔊</span>
           <p class="text-sky-700 font-semibold mt-1">質問を読み上げています...</p>
         </div>
-        <div class="border border-sky-200 rounded-xl overflow-hidden">${buildScheduleHTML(d.schedule)}</div>
+        ${buildPartBInformationHTML(d)}
       `);
       await speak(q.text);
     }
@@ -1161,7 +1203,7 @@ async function runPartB() {
       <p class="text-xs font-bold text-red-600 uppercase tracking-wider mb-1">${d.title} — Q${qi + 1} / ${d.questions.length} 解答</p>
       <div id="timer-wrap"></div>
       ${recIndicator(true)}
-      <div class="border border-sky-200 rounded-xl overflow-hidden mb-3">${buildScheduleHTML(d.schedule)}</div>
+      <div class="mb-3">${buildPartBInformationHTML(d)}</div>
       <p class="text-xs text-slate-400 mb-1">文字起こし</p>
       ${transcriptBox('transcript-el')}
       ${submitBtn(`Q${qi + 1} の回答でここまで提出`)}
@@ -1227,11 +1269,19 @@ function renderPartBResult(results, recordings, totalQCount = 4) {
     const badge = score === 1
       ? '<span class="text-emerald-600 font-bold">✅ 1点</span>'
       : '<span class="text-red-500 font-bold">❌ 0点</span>';
+    const examples = (recordings[i].question.examples || [])
+      .map(example => `<li>${escapeHTML(example)}</li>`)
+      .join('');
     return `
       <div class="border border-slate-200 rounded-xl p-3 mb-2">
-        <p class="text-xs font-semibold text-sky-600 mb-1">Q${i + 1}: ${recordings[i].question.text}</p>
-        <p class="text-sm text-slate-700 mb-1">回答: <em>"${recordings[i].text || '（認識できませんでした）'}"</em></p>
+        <p class="text-xs font-semibold text-sky-600 mb-1">Q${i + 1}: ${escapeHTML(recordings[i].question.text)}</p>
+        <p class="text-sm text-slate-700 mb-1">回答: <em>"${escapeHTML(recordings[i].text) || '（認識できませんでした）'}"</em></p>
         <div class="flex items-center gap-2">${badge}</div>
+        ${examples ? `
+          <div class="mt-3 bg-sky-50 border border-sky-100 rounded-lg px-3 py-2">
+            <p class="text-xs font-bold text-sky-700 mb-1">解答例</p>
+            <ul class="list-disc pl-5 text-xs text-slate-700 space-y-1">${examples}</ul>
+          </div>` : ''}
       </div>`;
   }).join('');
 
@@ -1561,9 +1611,9 @@ async function renderPartIdle(partId) {
       <p class="text-xs font-bold text-sky-600 uppercase tracking-wider mb-1">${d.title}</p>
       <p class="text-sm text-slate-500 whitespace-pre-line mb-3">${d.desc}</p>
       ${problemPickerHTML('B')}
-      <div class="border border-sky-200 rounded-xl overflow-hidden mb-4">${buildScheduleHTML(d.schedule || [])}</div>
+      <div class="mb-4">${buildPartBInformationHTML(d)}</div>
       <div class="flex gap-3 text-xs text-slate-500 mb-4">
-        <span>⏱ 準備: ${prepLabel('B')}/問</span><span>🎤 解答: 15秒/問</span><span>📊 満点: 4点</span>
+        <span>⏱ 準備: ${prepLabel('B')}</span><span>🎤 解答: 15秒/問</span><span>📊 この問題: ${d.questions?.length || 0}点</span>
       </div>
       <p class="text-xs bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-amber-700 mb-4">
         ⚠️ 質問文は<strong>画面に表示されません</strong>。スピーカーの音声をよく聞いて答えてください。

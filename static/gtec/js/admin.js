@@ -201,6 +201,8 @@ function fillProblemFields() {
     const set = getProblemSet(part, num);
 
     if (key === 'text') el.value = set.text || '';
+    else if (key === 'heading') el.value = set.heading || '';
+    else if (key === 'instructionJa') el.value = set.instructionJa || '';
     else if (key === 'topic') el.value = set.topic || '';
     else if (key === 'topicJa') el.value = set.topicJa || '';
     else if (key === 'storyImage') el.value = set.storyImage || '';
@@ -233,6 +235,10 @@ function renderProblemAdmin() {
         <textarea class="admin-problem-textarea problem-field" data-part="${part}" data-num="${editNum}" data-key="text"></textarea>`;
     } else if (part === 'b') {
       fields = `
+        <label class="block text-[10px] text-slate-600 mb-1">問題見出し</label>
+        <input class="admin-problem-input problem-field mb-2" data-part="${part}" data-num="${editNum}" data-key="heading" placeholder="Question 1 & 2" />
+        <label class="block text-[10px] text-slate-600 mb-1">問題説明（日本語）</label>
+        <textarea class="admin-problem-textarea problem-field" data-part="${part}" data-num="${editNum}" data-key="instructionJa" rows="3"></textarea>
         <label class="block text-[10px] text-slate-600 mb-1">スケジュール（JSON）</label>
         <textarea class="admin-problem-textarea problem-field" data-part="${part}" data-num="${editNum}" data-key="schedule" rows="4"></textarea>
         <label class="block text-[10px] text-slate-600 mt-2 mb-1">質問（JSON）</label>
@@ -327,6 +333,8 @@ function collectProblemFieldsFromUI() {
 
     const set = problemsData.sets[part][num];
     if (key === 'text') set.text = el.value;
+    else if (key === 'heading') set.heading = el.value;
+    else if (key === 'instructionJa') set.instructionJa = el.value;
     else if (key === 'topic') set.topic = el.value;
     else if (key === 'topicJa') set.topicJa = el.value;
     else if (key === 'storyImage') set.storyImage = el.value.trim();

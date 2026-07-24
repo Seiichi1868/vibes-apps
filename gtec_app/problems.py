@@ -15,7 +15,10 @@ PROBLEMS_FILE = DATA_DIR / "gtec_problems.json"
 
 PARTS = ("a", "b", "c", "d")
 PROBLEM_NUMS = (1, 2, 3, 4)
-PROBLEMS_VERSION = 6
+PROBLEMS_VERSION = 7
+PART_A_DEFAULTS_VERSION = 6
+PART_B_DEFAULTS_VERSION = 7
+PART_C_DEFAULTS_VERSION = 4
 
 DEFAULT_ACTIVE = {part: 1 for part in PARTS}
 
@@ -66,17 +69,47 @@ DEFAULT_SETS: dict[str, dict[str, dict]] = {
     },
     "b": {
         "1": {
+            "heading": "Question 1 & 2",
+            "instructionJa": (
+                "あなたは自分の予定について外国人の友だちと話しています。"
+                "友だちから2つ質問されますので、画面上の予定表をもとに、質問に英語で答えなさい。"
+            ),
             "schedule": [
-                {"time": "9:00 AM", "activity": "Tennis Practice", "place": "Sports Hall"},
-                {"time": "12:00 PM", "activity": "Lunch", "place": "Cafeteria"},
-                {"time": "2:00 PM – 4:00 PM", "activity": "Study Group", "place": "Library"},
-                {"time": "5:00 PM", "activity": "Movie", "place": "Cinema"},
+                {"date": "4/29", "activity": "", "publicHoliday": True},
+                {"date": "4/30", "activity": "School and music club", "publicHoliday": False},
+                {"date": "5/1", "activity": "School and music club", "publicHoliday": False},
+                {"date": "5/2", "activity": "School and music club", "publicHoliday": False},
+                {"date": "5/3", "activity": "Camping", "publicHoliday": True},
+                {"date": "5/4", "activity": "Camping", "publicHoliday": True},
+                {"date": "5/5", "activity": "Camping", "publicHoliday": True},
+                {"date": "5/6", "activity": "", "publicHoliday": True},
             ],
             "questions": [
-                {"text": "What time does Akiko start tennis practice?", "context": "Akiko's Saturday schedule"},
-                {"text": "Where will Akiko have lunch?", "context": "Akiko's Saturday schedule"},
-                {"text": "How many hours will the study group last?", "context": "Akiko's Saturday schedule"},
-                {"text": "What will Akiko do at five o'clock?", "context": "Akiko's Saturday schedule"},
+                {
+                    "text": "On which days are you going to be free?",
+                    "context": (
+                        "The schedule runs from April 29 to May 6. "
+                        "The student is free on April 29 and May 6."
+                    ),
+                    "examples": [
+                        "I'm free on April 29th and May 6th.",
+                        "I'll have two free days, which are April 29th and May 6th.",
+                    ],
+                },
+                {
+                    "text": (
+                        "What is your special activity during the public holidays, "
+                        "and on which days is it?"
+                    ),
+                    "context": (
+                        "The special activity is camping from May 3 through May 5 "
+                        "during the public holidays."
+                    ),
+                    "examples": [
+                        "I'm going to go camping from May 3rd to 5th.",
+                        "I'm planning to go on a camping trip from May 3rd to May 5th.",
+                    ],
+                },
             ],
         },
         "2": {
@@ -248,11 +281,20 @@ def _normalize_schedule(items) -> list[dict]:
     for item in items:
         if not isinstance(item, dict):
             continue
-        out.append({
-            "time": str(item.get("time", "")).strip(),
+        normalized = {
             "activity": str(item.get("activity", "")).strip(),
-            "place": str(item.get("place", "")).strip(),
-        })
+        }
+        if "date" in item:
+            normalized.update({
+                "date": str(item.get("date", "")).strip(),
+                "publicHoliday": bool(item.get("publicHoliday", False)),
+            })
+        else:
+            normalized.update({
+                "time": str(item.get("time", "")).strip(),
+                "place": str(item.get("place", "")).strip(),
+            })
+        out.append(normalized)
     return out[:8]
 
 
@@ -269,6 +311,11 @@ def _normalize_questions(items) -> list[dict]:
         out.append({
             "text": text,
             "context": str(item.get("context", "")).strip(),
+            "examples": [
+                str(example).strip()
+                for example in item.get("examples", [])
+                if str(example).strip()
+            ][:4] if isinstance(item.get("examples"), list) else [],
         })
     return out[:8]
 
@@ -309,6 +356,10 @@ def _normalize_part_set(part: str, num: int, raw: dict | None) -> dict:
         schedule = _normalize_schedule(raw.get("schedule", default.get("schedule")))
         questions = _normalize_questions(raw.get("questions", default.get("questions")))
         return {
+            "heading": str(raw.get("heading", default.get("heading", ""))).strip(),
+            "instructionJa": str(
+                raw.get("instructionJa", default.get("instructionJa", ""))
+            ).strip(),
             "schedule": schedule or default["schedule"],
             "questions": questions or default["questions"],
         }
@@ -361,10 +412,12 @@ def _normalize(raw: dict | None) -> dict:
             for num in PROBLEM_NUMS:
                 key = str(num)
                 if key in part_sets:
-                    # Part A 問題1〜2 / Part C 問題2〜4 はバージョン更新時に新デフォルトへ。
-                    if part == "a" and num in (1, 2) and stored_version < PROBLEMS_VERSION:
+                    # 更新した既定問題は、旧バージョンの保存内容より優先する。
+                    if part == "a" and num in (1, 2) and stored_version < PART_A_DEFAULTS_VERSION:
                         continue
-                    if part == "c" and num > 1 and stored_version < PROBLEMS_VERSION:
+                    if part == "b" and num == 1 and stored_version < PART_B_DEFAULTS_VERSION:
+                        continue
+                    if part == "c" and num > 1 and stored_version < PART_C_DEFAULTS_VERSION:
                         continue
                     data["sets"][part][key] = _normalize_part_set(part, num, part_sets[key])
 
