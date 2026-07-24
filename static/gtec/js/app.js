@@ -56,11 +56,13 @@ const App = {
     part_b_prep_enabled: true, part_b_prep_seconds: 10,
     part_c_prep_enabled: true, part_c_prep_seconds: 30,
     part_d_prep_enabled: true, part_d_prep_seconds: 60,
+    part_a_problem_count: 4, part_b_problem_count: 4,
+    part_c_problem_count: 4, part_d_problem_count: 4,
   },
   currentAudio: null,
   currentUtterance: null,
   problems: null,
-  selectedProblem: { a: 1, b: 1, c: 1, d: 1 },
+  selectedProblem: { a: null, b: null, c: null, d: null },
   partBRandomSelections: {},
 };
 
@@ -72,9 +74,12 @@ async function loadProblems() {
     if (res.ok) {
       App.problems = await res.json();
       for (const p of ['a', 'b', 'c', 'd']) {
-        if (!App.selectedProblem[p]) {
-          App.selectedProblem[p] = App.problems.active?.[p] || 1;
-        }
+        const count = getVisibleProblemCount(p);
+        const active = parseInt(App.problems.active?.[p], 10) || 1;
+        const current = parseInt(App.selectedProblem[p], 10);
+        App.selectedProblem[p] = current >= 1 && current <= count
+          ? current
+          : (active >= 1 && active <= count ? active : 1);
       }
       return;
     }
@@ -85,6 +90,12 @@ async function loadProblems() {
 function getSelectedProblemNum(partId) {
   const key = partId.toLowerCase();
   return App.selectedProblem[key] || App.problems?.active?.[key] || 1;
+}
+
+function getVisibleProblemCount(partId) {
+  const key = partId.toLowerCase();
+  const value = parseInt(App.settings[`part_${key}_problem_count`], 10);
+  return Number.isFinite(value) ? Math.max(1, Math.min(value, 4)) : 4;
 }
 
 function getPartData(partId) {
@@ -129,13 +140,15 @@ function problemPickerHTML(partId) {
   const key = partId.toLowerCase();
   const selected = getSelectedProblemNum(partId);
   const defaultNum = App.problems?.active?.[key] || 1;
+  const problemCount = getVisibleProblemCount(partId);
+  const problemNumbers = Array.from({ length: problemCount }, (_, index) => index + 1);
   return `
     <div class="problem-picker mb-4" data-part="${partId}">
       <p class="text-xs text-slate-500 mb-2">問題を選んでください${defaultNum !== selected ? '' : `（クラス既定: 問題${defaultNum}）`}</p>
-      <div class="grid grid-cols-4 gap-2">
-        ${[1, 2, 3, 4].map(n => `
+      <div class="grid gap-2" style="grid-template-columns: repeat(${problemCount}, minmax(0, 1fr));">
+        ${problemNumbers.map(n => `
           <button type="button" class="problem-btn${n === selected ? ' problem-btn-active' : ''}"
-            data-part="${partId}" data-num="${n}">問題${n}</button>
+            data-part="${partId}" data-num="${n}" aria-pressed="${n === selected}">問題${n}</button>
         `).join('')}
       </div>
     </div>`;

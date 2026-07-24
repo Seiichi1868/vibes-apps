@@ -13,10 +13,10 @@ DATA_DIR = Path(
 SETTINGS_FILE = DATA_DIR / "gtec_settings.json"
 
 PART_DEFAULTS = {
-    "a": {"prep_enabled": True, "prep_seconds": 30},
-    "b": {"prep_enabled": True, "prep_seconds": 10},
-    "c": {"prep_enabled": True, "prep_seconds": 30},
-    "d": {"prep_enabled": True, "prep_seconds": 60},
+    "a": {"prep_enabled": True, "prep_seconds": 30, "problem_count": 4},
+    "b": {"prep_enabled": True, "prep_seconds": 10, "problem_count": 4},
+    "c": {"prep_enabled": True, "prep_seconds": 30, "problem_count": 4},
+    "d": {"prep_enabled": True, "prep_seconds": 60, "problem_count": 4},
 }
 
 BACKGROUND_PRESETS = {
@@ -52,6 +52,9 @@ DEFAULT_SETTINGS = {
     f"part_{p}_prep_seconds": v["prep_seconds"]
     for p, v in PART_DEFAULTS.items()
 } | {
+    f"part_{p}_problem_count": v["problem_count"]
+    for p, v in PART_DEFAULTS.items()
+} | {
     "background_id": DEFAULT_BACKGROUND_ID,
     "background_opacity": DEFAULT_BACKGROUND_OPACITY,
 }
@@ -67,6 +70,14 @@ def _clamp_seconds(value, default: int) -> int:
     except (TypeError, ValueError):
         return default
     return max(0, min(n, 600))
+
+
+def _clamp_problem_count(value, default: int = 4) -> int:
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(1, min(n, 4))
 
 
 def _clamp_opacity(value, default: float = DEFAULT_BACKGROUND_OPACITY) -> float:
@@ -85,10 +96,15 @@ def _normalize(raw: dict | None) -> dict:
     for part, defaults in PART_DEFAULTS.items():
         enabled_key = f"part_{part}_prep_enabled"
         seconds_key = f"part_{part}_prep_seconds"
+        problem_count_key = f"part_{part}_problem_count"
         if enabled_key in raw:
             data[enabled_key] = bool(raw.get(enabled_key))
         if seconds_key in raw:
             data[seconds_key] = _clamp_seconds(raw.get(seconds_key), defaults["prep_seconds"])
+        if problem_count_key in raw:
+            data[problem_count_key] = _clamp_problem_count(
+                raw.get(problem_count_key), defaults["problem_count"]
+            )
 
     bg_id = raw.get("background_id") if isinstance(raw, dict) else None
     if bg_id in BACKGROUND_PRESETS:

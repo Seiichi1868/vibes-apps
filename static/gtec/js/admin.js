@@ -8,6 +8,7 @@ const PART_LABELS = {
   d: 'Part D 意見表明',
 };
 const DEFAULT_SECONDS = { a: 30, b: 10, c: 30, d: 60 };
+const DEFAULT_PROBLEM_COUNTS = { a: 4, b: 4, c: 4, d: 4 };
 
 const UNLOCK_STORAGE_KEY = 'gtec_admin_unlocked';
 
@@ -478,8 +479,11 @@ function collectPayload() {
   PARTS.forEach(part => {
     const toggle = document.querySelector(`.prep-toggle[data-part="${part}"]`);
     const secondsInput = document.querySelector(`.prep-seconds[data-part="${part}"]`);
+    const problemCountInput = document.querySelector(`.problem-count[data-part="${part}"]`);
     payload[`part_${part}_prep_enabled`] = toggle?.checked !== false;
     payload[`part_${part}_prep_seconds`] = parseInt(secondsInput?.value, 10) || DEFAULT_SECONDS[part];
+    payload[`part_${part}_problem_count`] = parseInt(problemCountInput?.value, 10)
+      || DEFAULT_PROBLEM_COUNTS[part];
   });
   if (currentBackgroundId) {
     payload.background_id = currentBackgroundId;
@@ -551,10 +555,14 @@ async function loadSettingsIntoUI() {
   PARTS.forEach(part => {
     const enabled = data[`part_${part}_prep_enabled`] !== false;
     const seconds = parseInt(data[`part_${part}_prep_seconds`], 10) || DEFAULT_SECONDS[part];
+    const problemCount = parseInt(data[`part_${part}_problem_count`], 10)
+      || DEFAULT_PROBLEM_COUNTS[part];
     const toggle = document.querySelector(`.prep-toggle[data-part="${part}"]`);
     const secondsInput = document.querySelector(`.prep-seconds[data-part="${part}"]`);
+    const problemCountInput = document.querySelector(`.problem-count[data-part="${part}"]`);
     if (toggle) toggle.checked = enabled;
     if (secondsInput) secondsInput.value = seconds;
+    if (problemCountInput) problemCountInput.value = problemCount;
     updatePartUI(part, enabled, seconds);
   });
 
@@ -589,6 +597,10 @@ function scheduleSave() {
       PARTS.forEach(part => {
         const enabled = saved[`part_${part}_prep_enabled`] !== false;
         const seconds = parseInt(saved[`part_${part}_prep_seconds`], 10) || DEFAULT_SECONDS[part];
+        const problemCount = parseInt(saved[`part_${part}_problem_count`], 10)
+          || DEFAULT_PROBLEM_COUNTS[part];
+        const problemCountInput = document.querySelector(`.problem-count[data-part="${part}"]`);
+        if (problemCountInput) problemCountInput.value = problemCount;
         updatePartUI(part, enabled, seconds);
       });
       const activeBtn = bgPicker?.querySelector(`.bg-pick-btn[data-bg-id="${saved.background_id}"]`);
@@ -622,6 +634,10 @@ document.querySelectorAll('.prep-toggle').forEach(el => {
 });
 
 document.querySelectorAll('.prep-seconds').forEach(el => {
+  el.addEventListener('input', scheduleSave);
+});
+
+document.querySelectorAll('.problem-count').forEach(el => {
   el.addEventListener('input', scheduleSave);
 });
 

@@ -28,7 +28,7 @@
     <div class="max-w-3xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
       <div class="flex items-baseline gap-2 min-w-0">
         <h1 class="text-base font-bold text-indigo-800 truncate">GTEC 管理</h1>
-        <span class="text-[10px] text-slate-500 shrink-0">準備時間・背景</span>
+        <span class="text-[10px] text-slate-500 shrink-0">生徒画面・背景</span>
       </div>
       <div class="flex items-center gap-1.5 shrink-0">
         <div id="admin-lock" class="flex items-center gap-1">
@@ -77,7 +77,7 @@
       </section>
 
       <section class="admin-card admin-card-compact">
-        <h2 class="admin-card-title admin-card-title-compact mb-2">準備時間（Part A〜D）</h2>
+        <h2 class="admin-card-title admin-card-title-compact mb-2">生徒画面設定（Part A〜D）</h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {% for part, label in parts.items() %}
           <div class="admin-part-row" data-part="{{ part }}">
@@ -92,10 +92,17 @@
               </label>
             </div>
             <div class="prep-seconds-row mt-1.5 flex items-center gap-1.5">
-              <label class="text-[10px] text-slate-600 shrink-0">秒</label>
+              <label class="text-[10px] text-slate-600 shrink-0">準備</label>
               <input class="prep-seconds admin-input admin-input-compact w-14" data-part="{{ part }}" type="number"
                 min="0" max="600" step="1" value="{{ defaults[part].prep_seconds }}" />
+              <span class="text-[10px] text-slate-500">秒</span>
               <span class="prep-status text-[10px] text-indigo-600 font-medium truncate" data-part="{{ part }}"></span>
+            </div>
+            <div class="mt-1.5 flex items-center gap-1.5">
+              <label class="text-[10px] text-slate-600 shrink-0">表示問題数</label>
+              <input class="problem-count admin-input admin-input-compact w-14" data-part="{{ part }}" type="number"
+                min="1" max="4" step="1" value="{{ defaults[part].problem_count }}" />
+              <span class="text-[10px] text-slate-500">問（1〜4）</span>
             </div>
           </div>
           {% endfor %}
