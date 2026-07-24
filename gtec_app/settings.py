@@ -34,7 +34,7 @@ PART_DEFAULTS = {
 BACKGROUND_PRESETS = {
     "meadow": {
         "label": "草原",
-        "image": "news/images/nature-bg.jpg",
+        "image": "gtec/images/bg/meadow.jpg",
     },
     "forest": {
         "label": "森",
