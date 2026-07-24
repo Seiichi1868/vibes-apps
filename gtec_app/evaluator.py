@@ -31,7 +31,9 @@ _SYSTEM = (
     "Write all feedback text in Japanese. "
     "Grammar and vocabulary corrections must be in English. "
     "Be encouraging, specific, and constructive. "
-    "Score fluency_pronunciation generously: when uncertain between two adjacent scores, choose the higher one."
+    "For Parts C and D, score generously across all criteria — these are high school learners "
+    "and browser transcriptions are imperfect. "
+    "When uncertain between two adjacent scores, choose the higher one."
 )
 
 _FLUENCY_LENIENT = """Score fluency_pronunciation generously for high school learners.
@@ -39,6 +41,31 @@ _FLUENCY_LENIENT = """Score fluency_pronunciation generously for high school lea
 - Minor pauses, slightly slow/fast pace, or browser-transcription gaps should NOT heavily reduce the score.
 - WPM outside 120–150 is acceptable if delivery is still clear.
 - When uncertain between two adjacent scores, choose the higher one."""
+
+_VOCAB_GRAMMAR_LENIENT = """Score vocabulary_grammar generously for high school learners.
+- Award 3–4 when meaning is generally clear, even with several minor grammar errors or simple vocabulary.
+- Common mistakes (articles, prepositions, verb tenses, word order) should NOT drop the score below 3 if meaning is clear.
+- Award 4 when the student communicates effectively with reasonable variety, even if not perfect.
+- Reserve 2 or below for cases where errors noticeably interfere with understanding.
+- When uncertain between two adjacent scores, choose the higher one."""
+
+_GOAL_ACHIEVEMENT_LENIENT_C = """Score goal achievement per panel generously for high school learners.
+- Award 1 if the student conveyed the gist or key action of the panel, even with simple words or incomplete sentences.
+- Partial mentions, implied actions, or loosely related descriptions count as conveying the panel.
+- Browser transcription may omit or alter words — infer the student's intent generously.
+- Only award 0 when the panel was clearly skipped or entirely unrelated."""
+
+_GOAL_ACHIEVEMENT_LENIENT_D = """Score goal achievement generously for high school learners.
+
+GA1 (Opinion):
+- Award 1 if any personal stance is expressed, even briefly or implicitly (e.g., "I think…", "I like…", "It's good/bad").
+- Simple one-sentence opinions earn full marks.
+
+GA2 (Reasoning):
+- Award 2 if the student gave any reason with a supporting detail, example, or explanation — personal or general.
+- Do NOT require a sophisticated societal perspective; a clear personal reason with an example is sufficient for 2.
+- Award 1 if only a brief reason or feeling is given without much support.
+- Award 0 only when no reason or support is attempted at all."""
 
 
 def _wpm(text: str, duration: float) -> float:
@@ -148,14 +175,16 @@ Student's narration (transcription): "{text}"
 Duration: {duration:.1f}s | WPM: {wpm} (ideal 120–150)
 
 === Goal Achievement per panel (0 or 1 each) ===
-1 – Student mentioned the key action/event of that panel
-0 – Panel was skipped or its content not conveyed
+{_GOAL_ACHIEVEMENT_LENIENT_C}
+1 – Student mentioned the key action/event of that panel (gist is enough)
+0 – Panel was clearly skipped or entirely unrelated
 
 === Vocabulary & Grammar (0–4) ===
-4 – Excellent; varied vocabulary, accurate grammar
-3 – Good; minor errors not affecting meaning
-2 – Fair; errors noticeable but meaning generally clear
-1 – Poor; frequent errors affecting comprehension
+{_VOCAB_GRAMMAR_LENIENT}
+4 – Communicates effectively with good variety; only minor errors
+3 – Meaning clear despite several minor errors or simple vocabulary
+2 – Errors noticeable but meaning generally understandable
+1 – Frequent errors that significantly affect comprehension
 0 – Incomprehensible
 
 === Fluency & Pronunciation (0–4) ===
@@ -195,20 +224,18 @@ Topic: "{topic}"
 Student's response (transcription): "{text}"
 Duration: {duration:.1f}s | WPM: {wpm} (ideal 120–150)
 
-=== Goal Achievement 1 – Opinion (0 or 1) ===
-1 – Student clearly stated a personal opinion
-0 – No clear opinion expressed
+=== Goal Achievement ===
+{_GOAL_ACHIEVEMENT_LENIENT_D}
 
-=== Goal Achievement 2 – Reasoning (0, 1, or 2) ===
-2 – Provided objective reasoning from a broader societal/general perspective with specific examples
-1 – Only gave personal experiences or feelings; no broader/objective perspective
-0 – No reasons or examples provided
+GA1 (Opinion): 1 – personal opinion expressed (brief or implicit is fine) | 0 – none at all
+GA2 (Reasoning): 2 – reason with detail/example | 1 – brief reason only | 0 – no reason attempted
 
 === Vocabulary & Grammar (0–4) ===
-4 – Excellent; varied, precise vocabulary; accurate grammar
-3 – Good; minor errors
-2 – Fair; errors noticeable but meaning clear
-1 – Poor; frequent errors affecting comprehension
+{_VOCAB_GRAMMAR_LENIENT}
+4 – Communicates effectively with good variety; only minor errors
+3 – Meaning clear despite several minor errors or simple vocabulary
+2 – Errors noticeable but meaning generally understandable
+1 – Frequent errors that significantly affect comprehension
 0 – Incomprehensible
 
 === Fluency & Pronunciation (0–4) ===
