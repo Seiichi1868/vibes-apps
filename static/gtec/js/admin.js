@@ -8,7 +8,7 @@ const PART_LABELS = {
   d: 'Part D 意見表明',
 };
 const DEFAULT_SECONDS = { a: 30, b: 10, c: 30, d: 60 };
-const DEFAULT_PROBLEM_COUNTS = { a: 4, b: 4, c: 4, d: 4 };
+const DEFAULT_SELECTABLE_PROBLEMS = [1, 2, 3, 4];
 
 const UNLOCK_STORAGE_KEY = 'gtec_admin_unlocked';
 
@@ -110,6 +110,29 @@ function updatePartUI(part, enabled, seconds) {
       ? `オン ${seconds}秒`
       : 'オフ';
   }
+}
+
+function getSelectableProblemsFromUI(part) {
+  return [...document.querySelectorAll(`.selectable-problem[data-part="${part}"]:checked`)]
+    .map(input => parseInt(input.value, 10))
+    .filter(number => number >= 1 && number <= 4);
+}
+
+function updateSelectableProblemsUI(part, selectedProblems = null) {
+  const selected = Array.isArray(selectedProblems)
+    ? selectedProblems.map(Number)
+    : getSelectableProblemsFromUI(part);
+  if (Array.isArray(selectedProblems)) {
+    document.querySelectorAll(`.selectable-problem[data-part="${part}"]`).forEach(input => {
+      input.checked = selected.includes(parseInt(input.value, 10));
+    });
+  }
+  const count = selected.length;
+  const countEl = document.querySelector(`.selectable-problem-count[data-part="${part}"]`);
+  const errorEl = document.querySelector(`.selectable-problem-error[data-part="${part}"]`);
+  if (countEl) countEl.textContent = `${count}問`;
+  if (errorEl) errorEl.classList.toggle('hidden', count > 0);
+  return count > 0;
 }
 
 async function fetchProblems() {
@@ -479,11 +502,11 @@ function collectPayload() {
   PARTS.forEach(part => {
     const toggle = document.querySelector(`.prep-toggle[data-part="${part}"]`);
     const secondsInput = document.querySelector(`.prep-seconds[data-part="${part}"]`);
-    const problemCountInput = document.querySelector(`.problem-count[data-part="${part}"]`);
+    const selectableProblems = getSelectableProblemsFromUI(part);
     payload[`part_${part}_prep_enabled`] = toggle?.checked !== false;
     payload[`part_${part}_prep_seconds`] = parseInt(secondsInput?.value, 10) || DEFAULT_SECONDS[part];
-    payload[`part_${part}_problem_count`] = parseInt(problemCountInput?.value, 10)
-      || DEFAULT_PROBLEM_COUNTS[part];
+    payload[`part_${part}_problem_count`] = selectableProblems.length;
+    payload[`part_${part}_selectable_problems`] = selectableProblems;
   });
   if (currentBackgroundId) {
     payload.background_id = currentBackgroundId;
@@ -555,14 +578,14 @@ async function loadSettingsIntoUI() {
   PARTS.forEach(part => {
     const enabled = data[`part_${part}_prep_enabled`] !== false;
     const seconds = parseInt(data[`part_${part}_prep_seconds`], 10) || DEFAULT_SECONDS[part];
-    const problemCount = parseInt(data[`part_${part}_problem_count`], 10)
-      || DEFAULT_PROBLEM_COUNTS[part];
+    const selectableProblems = Array.isArray(data[`part_${part}_selectable_problems`])
+      ? data[`part_${part}_selectable_problems`]
+      : DEFAULT_SELECTABLE_PROBLEMS;
     const toggle = document.querySelector(`.prep-toggle[data-part="${part}"]`);
     const secondsInput = document.querySelector(`.prep-seconds[data-part="${part}"]`);
-    const problemCountInput = document.querySelector(`.problem-count[data-part="${part}"]`);
     if (toggle) toggle.checked = enabled;
     if (secondsInput) secondsInput.value = seconds;
-    if (problemCountInput) problemCountInput.value = problemCount;
+    updateSelectableProblemsUI(part, selectableProblems);
     updatePartUI(part, enabled, seconds);
   });
 
@@ -597,10 +620,10 @@ function scheduleSave() {
       PARTS.forEach(part => {
         const enabled = saved[`part_${part}_prep_enabled`] !== false;
         const seconds = parseInt(saved[`part_${part}_prep_seconds`], 10) || DEFAULT_SECONDS[part];
-        const problemCount = parseInt(saved[`part_${part}_problem_count`], 10)
-          || DEFAULT_PROBLEM_COUNTS[part];
-        const problemCountInput = document.querySelector(`.problem-count[data-part="${part}"]`);
-        if (problemCountInput) problemCountInput.value = problemCount;
+        const selectableProblems = Array.isArray(saved[`part_${part}_selectable_problems`])
+          ? saved[`part_${part}_selectable_problems`]
+          : DEFAULT_SELECTABLE_PROBLEMS;
+        updateSelectableProblemsUI(part, selectableProblems);
         updatePartUI(part, enabled, seconds);
       });
       const activeBtn = bgPicker?.querySelector(`.bg-pick-btn[data-bg-id="${saved.background_id}"]`);
@@ -637,8 +660,16 @@ document.querySelectorAll('.prep-seconds').forEach(el => {
   el.addEventListener('input', scheduleSave);
 });
 
-document.querySelectorAll('.problem-count').forEach(el => {
-  el.addEventListener('input', scheduleSave);
+document.querySelectorAll('.selectable-problem').forEach(el => {
+  el.addEventListener('change', () => {
+    const part = el.dataset.part;
+    if (!updateSelectableProblemsUI(part)) {
+      el.checked = true;
+      updateSelectableProblemsUI(part);
+      return;
+    }
+    scheduleSave();
+  });
 });
 
 bgPicker?.addEventListener('click', e => {

@@ -13,10 +13,22 @@ DATA_DIR = Path(
 SETTINGS_FILE = DATA_DIR / "gtec_settings.json"
 
 PART_DEFAULTS = {
-    "a": {"prep_enabled": True, "prep_seconds": 30, "problem_count": 4},
-    "b": {"prep_enabled": True, "prep_seconds": 10, "problem_count": 4},
-    "c": {"prep_enabled": True, "prep_seconds": 30, "problem_count": 4},
-    "d": {"prep_enabled": True, "prep_seconds": 60, "problem_count": 4},
+    "a": {
+        "prep_enabled": True, "prep_seconds": 30, "problem_count": 4,
+        "selectable_problems": [1, 2, 3, 4],
+    },
+    "b": {
+        "prep_enabled": True, "prep_seconds": 10, "problem_count": 4,
+        "selectable_problems": [1, 2, 3, 4],
+    },
+    "c": {
+        "prep_enabled": True, "prep_seconds": 30, "problem_count": 4,
+        "selectable_problems": [1, 2, 3, 4],
+    },
+    "d": {
+        "prep_enabled": True, "prep_seconds": 60, "problem_count": 4,
+        "selectable_problems": [1, 2, 3, 4],
+    },
 }
 
 BACKGROUND_PRESETS = {
@@ -55,6 +67,9 @@ DEFAULT_SETTINGS = {
     f"part_{p}_problem_count": v["problem_count"]
     for p, v in PART_DEFAULTS.items()
 } | {
+    f"part_{p}_selectable_problems": v["selectable_problems"]
+    for p, v in PART_DEFAULTS.items()
+} | {
     "background_id": DEFAULT_BACKGROUND_ID,
     "background_opacity": DEFAULT_BACKGROUND_OPACITY,
 }
@@ -80,6 +95,20 @@ def _clamp_problem_count(value, default: int = 4) -> int:
     return max(1, min(n, 4))
 
 
+def _normalize_selectable_problems(value, default: list[int]) -> list[int]:
+    if not isinstance(value, list):
+        return list(default)
+    selected = []
+    for item in value:
+        try:
+            number = int(item)
+        except (TypeError, ValueError):
+            continue
+        if 1 <= number <= 4 and number not in selected:
+            selected.append(number)
+    return sorted(selected) if selected else list(default)
+
+
 def _clamp_opacity(value, default: float = DEFAULT_BACKGROUND_OPACITY) -> float:
     try:
         n = float(value)
@@ -97,6 +126,7 @@ def _normalize(raw: dict | None) -> dict:
         enabled_key = f"part_{part}_prep_enabled"
         seconds_key = f"part_{part}_prep_seconds"
         problem_count_key = f"part_{part}_problem_count"
+        selectable_key = f"part_{part}_selectable_problems"
         if enabled_key in raw:
             data[enabled_key] = bool(raw.get(enabled_key))
         if seconds_key in raw:
@@ -105,6 +135,13 @@ def _normalize(raw: dict | None) -> dict:
             data[problem_count_key] = _clamp_problem_count(
                 raw.get(problem_count_key), defaults["problem_count"]
             )
+        if selectable_key in raw:
+            data[selectable_key] = _normalize_selectable_problems(
+                raw.get(selectable_key), defaults["selectable_problems"]
+            )
+            data[problem_count_key] = len(data[selectable_key])
+        else:
+            data[selectable_key] = list(range(1, data[problem_count_key] + 1))
 
     bg_id = raw.get("background_id") if isinstance(raw, dict) else None
     if bg_id in BACKGROUND_PRESETS:

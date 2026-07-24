@@ -58,6 +58,10 @@ const App = {
     part_d_prep_enabled: true, part_d_prep_seconds: 60,
     part_a_problem_count: 4, part_b_problem_count: 4,
     part_c_problem_count: 4, part_d_problem_count: 4,
+    part_a_selectable_problems: [1, 2, 3, 4],
+    part_b_selectable_problems: [1, 2, 3, 4],
+    part_c_selectable_problems: [1, 2, 3, 4],
+    part_d_selectable_problems: [1, 2, 3, 4],
   },
   currentAudio: null,
   currentUtterance: null,
@@ -74,12 +78,12 @@ async function loadProblems() {
     if (res.ok) {
       App.problems = await res.json();
       for (const p of ['a', 'b', 'c', 'd']) {
-        const count = getVisibleProblemCount(p);
+        const selectable = getSelectableProblemNumbers(p);
         const active = parseInt(App.problems.active?.[p], 10) || 1;
         const current = parseInt(App.selectedProblem[p], 10);
-        App.selectedProblem[p] = current >= 1 && current <= count
+        App.selectedProblem[p] = selectable.includes(current)
           ? current
-          : (active >= 1 && active <= count ? active : 1);
+          : (selectable.includes(active) ? active : selectable[0]);
       }
       return;
     }
@@ -92,10 +96,18 @@ function getSelectedProblemNum(partId) {
   return App.selectedProblem[key] || App.problems?.active?.[key] || 1;
 }
 
-function getVisibleProblemCount(partId) {
+function getSelectableProblemNumbers(partId) {
   const key = partId.toLowerCase();
-  const value = parseInt(App.settings[`part_${key}_problem_count`], 10);
-  return Number.isFinite(value) ? Math.max(1, Math.min(value, 4)) : 4;
+  const configured = App.settings[`part_${key}_selectable_problems`];
+  if (Array.isArray(configured)) {
+    const selected = [...new Set(configured.map(Number))]
+      .filter(number => number >= 1 && number <= 4)
+      .sort((a, b) => a - b);
+    if (selected.length) return selected;
+  }
+  const count = parseInt(App.settings[`part_${key}_problem_count`], 10);
+  const safeCount = Number.isFinite(count) ? Math.max(1, Math.min(count, 4)) : 4;
+  return Array.from({ length: safeCount }, (_, index) => index + 1);
 }
 
 function getPartData(partId) {
@@ -140,29 +152,17 @@ function problemPickerHTML(partId) {
   const key = partId.toLowerCase();
   const selected = getSelectedProblemNum(partId);
   const defaultNum = App.problems?.active?.[key] || 1;
-  const problemCount = getVisibleProblemCount(partId);
-  const problemNumbers = Array.from({ length: problemCount }, (_, index) => index + 1);
+  const problemNumbers = getSelectableProblemNumbers(partId);
   return `
     <div class="problem-picker mb-4" data-part="${partId}">
       <p class="text-xs text-slate-500 mb-2">問題を選んでください${defaultNum !== selected ? '' : `（クラス既定: 問題${defaultNum}）`}</p>
-      <div class="grid gap-2" style="grid-template-columns: repeat(${problemCount}, minmax(0, 1fr));">
+      <div class="grid gap-2" style="grid-template-columns: repeat(${problemNumbers.length}, minmax(0, 1fr));">
         ${problemNumbers.map(n => `
           <button type="button" class="problem-btn${n === selected ? ' problem-btn-active' : ''}"
             data-part="${partId}" data-num="${n}" aria-pressed="${n === selected}">問題${n}</button>
         `).join('')}
       </div>
     </div>`;
-}
-
-function wireProblemPicker(partId) {
-  document.querySelectorAll(`.problem-btn[data-part="${partId}"]`).forEach(btn => {
-    btn.onclick = async () => {
-      const num = parseInt(btn.dataset.num, 10);
-      if (!num || App.running) return;
-      App.selectedProblem[partId.toLowerCase()] = num;
-      await renderPartIdle(partId);
-    };
-  });
 }
 
 // ─── 4. 設定読み込み ─────────────────────────────────────────
@@ -1017,12 +1017,11 @@ function wireSubmitBtn() {
 // ─── 9. Part A ───────────────────────────────────────────────
 
 async function runPartA() {
-  const d = getPartData('A');
   if (App.cancelRequested) return;
 
-  await renderPartIdle('A');
-  await waitForClick('start-btn');
+  await waitForProblemSelection('A');
   if (App.cancelRequested) return;
+  const d = getPartData('A');
   setStopButtonVisible(true);
 
   const prep = getPrepConfig('A');
@@ -1181,12 +1180,11 @@ function buildPartBInformationHTML(d) {
 }
 
 async function runPartB() {
-  const d = getPartData('B');
   if (App.cancelRequested) return;
 
-  await renderPartIdle('B');
-  await waitForClick('start-btn');
+  await waitForProblemSelection('B');
   if (App.cancelRequested) return;
+  const d = getPartData('B');
   setStopButtonVisible(true);
 
   const prep = getPrepConfig('B');
@@ -1385,12 +1383,11 @@ function buildPanelExamples(panels) {
 }
 
 async function runPartC() {
-  const d = getPartData('C');
   if (App.cancelRequested) return;
 
-  await renderPartIdle('C');
-  await waitForClick('start-btn');
+  await waitForProblemSelection('C');
   if (App.cancelRequested) return;
+  const d = getPartData('C');
   setStopButtonVisible(true);
 
   const prep = getPrepConfig('C');
@@ -1484,12 +1481,11 @@ function renderPartCResult(result, text, panels) {
 // ─── 12. Part D ──────────────────────────────────────────────
 
 async function runPartD() {
-  const d = getPartData('D');
   if (App.cancelRequested) return;
 
-  await renderPartIdle('D');
-  await waitForClick('start-btn');
+  await waitForProblemSelection('D');
   if (App.cancelRequested) return;
+  const d = getPartData('D');
   setStopButtonVisible(true);
 
   const prep = getPrepConfig('D');
@@ -1598,15 +1594,38 @@ function renderError(msg) {
 
 // ─── 14. 共通ヘルパー ────────────────────────────────────────
 
-function waitForClick(id) {
+function waitForIdleAction(partId) {
   return new Promise(resolve => {
-    const btn = document.getElementById(id);
-    if (!btn) { resolve(); return; }
-    btn.addEventListener('click', () => {
+    const startButton = document.getElementById('start-btn');
+    if (!startButton) {
+      resolve({ type: 'cancel' });
+      return;
+    }
+    startButton.addEventListener('click', () => {
       unlockAudioSync();   // ジェスチャーウィンドウ内で AudioContext を unlock
-      resolve();
+      resolve({ type: 'start' });
     }, { once: true });
+    document.querySelectorAll(`.problem-btn[data-part="${partId}"]`).forEach(button => {
+      button.addEventListener('click', () => {
+        resolve({
+          type: 'select',
+          number: parseInt(button.dataset.num, 10),
+        });
+      }, { once: true });
+    });
   });
+}
+
+async function waitForProblemSelection(partId) {
+  while (!App.cancelRequested) {
+    await renderPartIdle(partId);
+    if (App.cancelRequested) return;
+    const action = await waitForIdleAction(partId);
+    if (action.type === 'start' || action.type === 'cancel') return;
+    if (action.type === 'select' && getSelectableProblemNumbers(partId).includes(action.number)) {
+      App.selectedProblem[partId.toLowerCase()] = action.number;
+    }
+  }
 }
 
 function setStopButtonVisible(visible) {
@@ -1714,7 +1733,6 @@ async function renderPartIdle(partId) {
       ${startBtn('練習スタート')}
     `);
   }
-  wireProblemPicker(partId);
 }
 
 // ─── 15. タブ・パート切り替え ────────────────────────────────
@@ -1766,9 +1784,6 @@ async function init() {
 
   await loadSettings();
   await loadProblems();
-  for (const p of ['a', 'b', 'c', 'd']) {
-    App.selectedProblem[p] = App.problems?.active?.[p] || 1;
-  }
 
   // ブラウザ合成音声リストを事前ロード（Part B TTS のラグを減らす）
   ensureVoicesLoaded().catch(() => {});

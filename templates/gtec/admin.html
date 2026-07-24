@@ -98,11 +98,24 @@
               <span class="text-[10px] text-slate-500">秒</span>
               <span class="prep-status text-[10px] text-indigo-600 font-medium truncate" data-part="{{ part }}"></span>
             </div>
-            <div class="mt-1.5 flex items-center gap-1.5">
-              <label class="text-[10px] text-slate-600 shrink-0">表示問題数</label>
-              <input class="problem-count admin-input admin-input-compact w-14" data-part="{{ part }}" type="number"
-                min="1" max="4" step="1" value="{{ defaults[part].problem_count }}" />
-              <span class="text-[10px] text-slate-500">問（1〜4）</span>
+            <div class="mt-1.5">
+              <div class="flex items-center justify-between gap-2 mb-1">
+                <span class="text-[10px] text-slate-600">生徒が選べる問題</span>
+                <span class="selectable-problem-count text-[10px] font-medium text-indigo-600"
+                  data-part="{{ part }}">4問</span>
+              </div>
+              <div class="grid grid-cols-4 gap-1">
+                {% for number in range(1, 5) %}
+                <label class="flex items-center justify-center gap-1 rounded border border-indigo-100 bg-white/70 px-1 py-1 text-[10px]">
+                  <input class="selectable-problem" data-part="{{ part }}" type="checkbox"
+                    value="{{ number }}" checked />
+                  <span>問題{{ number }}</span>
+                </label>
+                {% endfor %}
+              </div>
+              <p class="selectable-problem-error hidden mt-1 text-[10px] text-red-600" data-part="{{ part }}">
+                1問以上選択してください
+              </p>
             </div>
           </div>
           {% endfor %}

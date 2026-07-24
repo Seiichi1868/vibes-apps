@@ -60,12 +60,15 @@ def admin_settings():
         enabled_key = f"part_{part}_prep_enabled"
         seconds_key = f"part_{part}_prep_seconds"
         problem_count_key = f"part_{part}_problem_count"
+        selectable_key = f"part_{part}_selectable_problems"
         if enabled_key in payload:
             updates[enabled_key] = bool(payload.get(enabled_key))
         if seconds_key in payload:
             updates[seconds_key] = payload.get(seconds_key)
         if problem_count_key in payload:
             updates[problem_count_key] = payload.get(problem_count_key)
+        if selectable_key in payload:
+            updates[selectable_key] = payload.get(selectable_key)
 
     if "background_id" in payload:
         bg_id = str(payload.get("background_id") or "")
