@@ -15,7 +15,7 @@ PROBLEMS_FILE = DATA_DIR / "gtec_problems.json"
 
 PARTS = ("a", "b", "c", "d")
 PROBLEM_NUMS = (1, 2, 3, 4)
-PROBLEMS_VERSION = 5
+PROBLEMS_VERSION = 6
 
 DEFAULT_ACTIVE = {part: 1 for part in PARTS}
 
@@ -23,16 +23,24 @@ DEFAULT_SETS: dict[str, dict[str, dict]] = {
     "a": {
         "1": {
             "text": (
-                "The high school basketball team won their first championship last week. "
-                "To celebrate their success, they are having a special party tonight. "
-                "Their families and friends are invited to join them and have fun."
+                "One day, a robot called Max suddenly stopped working. "
+                "No one knew how to fix him. "
+                "\"Should I wait until technology improves?\" the robot asked himself. "
+                "\"If I wait long enough, someone will be able to help me!\" "
+                "Years later, the technology to repair Max was finally ready. "
+                "He asked an engineer to fix him, but the engineer said no. "
+                "No one needed an old robot like Max anymore."
             ),
         },
         "2": {
             "text": (
-                "Our city museum is opening a new exhibition about traditional Japanese art next month. "
-                "It will feature many beautiful paintings and statues. "
-                "Please visit our website if you want to get more information."
+                "Now, let me introduce a special speaker – Nancy Watkinson. "
+                "Ms. Watkinson is well-known for two things. "
+                "She is a scientist who researches insects and a writer of exciting mystery novels. "
+                "As many of you know, her latest book, \"Never Count Down to Zero,\" was just named "
+                "Entertainment Book of the Year. "
+                "Today, she will tell us about her research and her novels. "
+                "Let's give her a big hand."
             ),
         },
         "3": {
