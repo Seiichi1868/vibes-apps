@@ -15,7 +15,7 @@ PROBLEMS_FILE = DATA_DIR / "gtec_problems.json"
 
 PARTS = ("a", "b", "c", "d")
 PROBLEM_NUMS = (1, 2, 3, 4)
-PROBLEMS_VERSION = 4
+PROBLEMS_VERSION = 5
 
 DEFAULT_ACTIVE = {part: 1 for part in PARTS}
 
@@ -23,22 +23,16 @@ DEFAULT_SETS: dict[str, dict[str, dict]] = {
     "a": {
         "1": {
             "text": (
-                "Good morning, everyone! This is your Student Council with an important announcement. "
-                "We are excited to invite all students to our annual Quiz Competition. "
-                "The event will take place this Friday afternoon at three o'clock in the school gymnasium. "
-                "Students will form teams of three and compete in categories including science, history, and popular culture. "
-                "Registration forms are available at the front office. "
-                "Please sign up by Wednesday at noon. We look forward to seeing you there!"
+                "The high school basketball team won their first championship last week. "
+                "To celebrate their success, they are having a special party tonight. "
+                "Their families and friends are invited to join them and have fun."
             ),
         },
         "2": {
             "text": (
-                "Attention, students. The school library will extend its opening hours during the exam period. "
-                "From Monday to Friday, the library will be open from eight in the morning until eight in the evening. "
-                "On Saturdays, it will close at five o'clock. "
-                "Please remember to bring your student ID card when you enter the library. "
-                "Food and drinks are not allowed inside the reading area. "
-                "We hope these extended hours will help you prepare for your exams."
+                "Our city museum is opening a new exhibition about traditional Japanese art next month. "
+                "It will feature many beautiful paintings and statues. "
+                "Please visit our website if you want to get more information."
             ),
         },
         "3": {
@@ -359,7 +353,9 @@ def _normalize(raw: dict | None) -> dict:
             for num in PROBLEM_NUMS:
                 key = str(num)
                 if key in part_sets:
-                    # 問題1はカスタム保存を尊重。問題2〜4はバージョン更新時に新デフォルトへ。
+                    # Part A 問題1〜2 / Part C 問題2〜4 はバージョン更新時に新デフォルトへ。
+                    if part == "a" and num in (1, 2) and stored_version < PROBLEMS_VERSION:
+                        continue
                     if part == "c" and num > 1 and stored_version < PROBLEMS_VERSION:
                         continue
                     data["sets"][part][key] = _normalize_part_set(part, num, part_sets[key])
