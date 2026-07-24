@@ -1151,13 +1151,20 @@ function buildScheduleHTML(schedule) {
 }
 
 function buildPartBInformationHTML(d) {
+  const information = d.informationImage
+    ? `<div class="border border-sky-200 rounded-xl overflow-hidden bg-white p-2">
+        <img src="${escapeHTML(d.informationImage)}"
+          alt="公園周辺のサイクリングマップ"
+          class="block w-full h-auto max-h-[34rem] object-contain mx-auto" />
+       </div>`
+    : `<div class="border border-sky-200 rounded-xl overflow-hidden">${buildScheduleHTML(d.schedule || [])}</div>`;
   return `
     ${d.heading ? `<p class="text-lg font-semibold text-slate-800 underline mb-3">${escapeHTML(d.heading)}</p>` : ''}
     ${d.instructionJa ? `
       <div class="border border-slate-300 rounded-lg px-4 py-3 mb-4 text-sm leading-relaxed text-slate-700">
         ${escapeHTML(d.instructionJa)}
       </div>` : ''}
-    <div class="border border-sky-200 rounded-xl overflow-hidden">${buildScheduleHTML(d.schedule || [])}</div>`;
+    ${information}`;
 }
 
 async function runPartB() {
@@ -1181,7 +1188,7 @@ async function runPartB() {
       <p class="text-xs font-bold text-sky-600 uppercase tracking-wider mb-3">${d.title} — 準備</p>
       <div id="timer-wrap"></div>
       ${buildPartBInformationHTML(d)}
-      <p class="text-center text-sm text-slate-400 mt-3">予定表を確認してください</p>
+      <p class="text-center text-sm text-slate-400 mt-3">画面の資料を確認してください</p>
     `);
     timerEl = document.getElementById('timer-wrap');
     await countdown(prep.seconds, sec => { timerEl.innerHTML = timerDisplay(sec, 'prep'); });

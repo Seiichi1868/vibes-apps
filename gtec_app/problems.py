@@ -15,9 +15,10 @@ PROBLEMS_FILE = DATA_DIR / "gtec_problems.json"
 
 PARTS = ("a", "b", "c", "d")
 PROBLEM_NUMS = (1, 2, 3, 4)
-PROBLEMS_VERSION = 8
+PROBLEMS_VERSION = 9
 PART_A_DEFAULTS_VERSION = 6
-PART_B_DEFAULTS_VERSION = 8
+PART_B_1_DEFAULTS_VERSION = 8
+PART_B_2_DEFAULTS_VERSION = 9
 PART_C_DEFAULTS_VERSION = 4
 
 DEFAULT_ACTIVE = {part: 1 for part in PARTS}
@@ -163,17 +164,104 @@ DEFAULT_SETS: dict[str, dict[str, dict]] = {
             ],
         },
         "2": {
-            "schedule": [
-                {"time": "10:00 AM", "activity": "Swimming", "place": "City Pool"},
-                {"time": "1:00 PM", "activity": "Lunch with Family", "place": "Restaurant"},
-                {"time": "3:00 PM", "activity": "Piano Lesson", "place": "Music School"},
-                {"time": "6:30 PM", "activity": "Homework", "place": "Home"},
-            ],
+            "heading": "Question 1–4",
+            "instructionJa": (
+                "あなたは留学先の街にある公園のまわりをサイクリングする計画をたてました。"
+                "友だちからその計画について4つ質問されますので、画面上のサイクリングマップを"
+                "もとに、質問に英語で答えなさい。"
+            ),
+            "informationImage": "gtec/images/part-b-park-map.png",
+            "randomQuestions": False,
+            "selectedQuestions": [1, 2, 3, 4],
+            "schedule": [],
             "questions": [
-                {"text": "Where does Ken go swimming?", "context": "Ken's Sunday schedule"},
-                {"text": "What time does Ken have lunch?", "context": "Ken's Sunday schedule"},
-                {"text": "Where does Ken take his piano lesson?", "context": "Ken's Sunday schedule"},
-                {"text": "What will Ken do at six thirty in the evening?", "context": "Ken's Sunday schedule"},
+                {
+                    "text": "What places will you stop at while cycling around the park?",
+                    "context": "The cycling plan stops at the castle and the restaurant.",
+                    "examples": [
+                        "I will stop at a castle and a restaurant.",
+                        "I'm going to go to a castle and then a restaurant.",
+                    ],
+                },
+                {
+                    "text": "Where is the bike rental shop?",
+                    "context": (
+                        "The bike rental shop is at the corner of Green Road and "
+                        "4th Street, next to a hamburger restaurant."
+                    ),
+                    "examples": [
+                        "It's on the corner of Green Road and 4th Street.",
+                        "It's on 4th Street, next to a hamburger restaurant.",
+                    ],
+                },
+                {
+                    "text": "Where is the restaurant?",
+                    "context": "The restaurant is on Park Road between two trees.",
+                    "examples": ["It is on Park Road between two trees."],
+                },
+                {
+                    "text": "Where is the bike rental shop?",
+                    "context": (
+                        "The bike rental shop is on Green Road at the corner of "
+                        "Green Road and 4th Street."
+                    ),
+                    "examples": [
+                        "It is on Green Road at the corner of Green Road and 4th Street."
+                    ],
+                },
+                {
+                    "text": "What places can you visit after renting a bike?",
+                    "context": "The route visits the castle and the restaurant.",
+                    "examples": ["I can visit the castle and the restaurant."],
+                },
+                {
+                    "text": "How do you get from the bike rental shop to the restaurant?",
+                    "context": (
+                        "Go along Green Road, go up 5th Street, and turn right "
+                        "onto Park Road."
+                    ),
+                    "examples": [
+                        "Go along Green Road, go up 5th Street, and turn right onto Park Road."
+                    ],
+                },
+                {
+                    "text": "How do you get from the restaurant to the castle?",
+                    "context": (
+                        "Go along Park Road, turn right onto 4th Street, and then "
+                        "turn right onto Green Road."
+                    ),
+                    "examples": [
+                        "Go along Park Road, turn right onto 4th Street, and then turn right onto Green Road."
+                    ],
+                },
+                {
+                    "text": "What is next to the bike rental shop?",
+                    "context": "The hamburger shop is next to the bike rental shop.",
+                    "examples": ["The hamburger shop is next to it."],
+                },
+                {
+                    "text": "How many restrooms are there on the map, and where are they?",
+                    "context": (
+                        "There are two restrooms. One is next to the restaurant, "
+                        "and the other is near 5th Street."
+                    ),
+                    "examples": [
+                        "There are two restrooms. One is next to the restaurant and the other is near 5th Street."
+                    ],
+                },
+                {
+                    "text": (
+                        "If you want to visit the castle and then have lunch, "
+                        "what route will you take from the bike rental shop?"
+                    ),
+                    "context": (
+                        "First go to the castle on Green Road. Then ride around "
+                        "the park to the restaurant on Park Road."
+                    ),
+                    "examples": [
+                        "First, I will go to the castle on Green Road. Then I will ride around the park and go to the restaurant on Park Road."
+                    ],
+                },
             ],
         },
         "3": {
@@ -413,6 +501,15 @@ def _normalize_story_image(path: str | None, fallback: str) -> str:
     return fallback
 
 
+def _normalize_part_b_image(path: str | None, fallback: str = "") -> str:
+    value = str(path or "").strip().lstrip("/")
+    if value.startswith("static/"):
+        value = value[len("static/"):]
+    if re.match(r"^gtec/images/part-b-[a-z0-9-]+\.png$", value):
+        return value
+    return fallback
+
+
 def _normalize_part_set(part: str, num: int, raw: dict | None) -> dict:
     default = deepcopy(DEFAULT_SETS[part][str(num)])
     if not isinstance(raw, dict):
@@ -431,6 +528,10 @@ def _normalize_part_set(part: str, num: int, raw: dict | None) -> dict:
             "instructionJa": str(
                 raw.get("instructionJa", default.get("instructionJa", ""))
             ).strip(),
+            "informationImage": _normalize_part_b_image(
+                raw.get("informationImage"),
+                default.get("informationImage", ""),
+            ),
             "randomQuestions": bool(
                 raw.get("randomQuestions", default.get("randomQuestions", False))
             ),
@@ -496,7 +597,9 @@ def _normalize(raw: dict | None) -> dict:
                     # 更新した既定問題は、旧バージョンの保存内容より優先する。
                     if part == "a" and num in (1, 2) and stored_version < PART_A_DEFAULTS_VERSION:
                         continue
-                    if part == "b" and num == 1 and stored_version < PART_B_DEFAULTS_VERSION:
+                    if part == "b" and num == 1 and stored_version < PART_B_1_DEFAULTS_VERSION:
+                        continue
+                    if part == "b" and num == 2 and stored_version < PART_B_2_DEFAULTS_VERSION:
                         continue
                     if part == "c" and num > 1 and stored_version < PART_C_DEFAULTS_VERSION:
                         continue
@@ -532,6 +635,9 @@ def public_problems() -> dict:
     sets = deepcopy(data["sets"])
     for num in PROBLEM_NUMS:
         key = str(num)
+        part_b = sets.get("b", {}).get(key)
+        if part_b and part_b.get("informationImage"):
+            part_b["informationImage"] = f"/static/{part_b['informationImage']}"
         part_c = sets.get("c", {}).get(key)
         if part_c and part_c.get("storyImage"):
             part_c["storyImage"] = f"/static/{part_c['storyImage']}"

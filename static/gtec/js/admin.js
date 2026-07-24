@@ -203,6 +203,7 @@ function fillProblemFields() {
     if (key === 'text') el.value = set.text || '';
     else if (key === 'heading') el.value = set.heading || '';
     else if (key === 'instructionJa') el.value = set.instructionJa || '';
+    else if (key === 'informationImage') el.value = set.informationImage || '';
     else if (key === 'randomQuestions') el.checked = set.randomQuestions === true;
     else if (key === 'selectedQuestions') {
       const selected = Array.isArray(set.selectedQuestions)
@@ -247,6 +248,9 @@ function renderProblemAdmin() {
         <input class="admin-problem-input problem-field mb-2" data-part="${part}" data-num="${editNum}" data-key="heading" placeholder="Question 1–4" />
         <label class="block text-[10px] text-slate-600 mb-1">問題説明（日本語）</label>
         <textarea class="admin-problem-textarea problem-field" data-part="${part}" data-num="${editNum}" data-key="instructionJa" rows="3"></textarea>
+        <label class="block text-[10px] text-slate-600 mt-2 mb-1">資料画像パス（画像を使う問題のみ）</label>
+        <input class="admin-problem-input problem-field mb-2" data-part="${part}" data-num="${editNum}"
+          data-key="informationImage" placeholder="gtec/images/part-b-park-map.png" />
         <label class="block text-[10px] text-slate-600 mb-1">スケジュール（JSON）</label>
         <textarea class="admin-problem-textarea problem-field" data-part="${part}" data-num="${editNum}" data-key="schedule" rows="4"></textarea>
         <label class="block text-[10px] text-slate-600 mt-2 mb-1">質問（JSON）</label>
@@ -400,6 +404,7 @@ function collectProblemFieldsFromUI() {
     if (key === 'text') set.text = el.value;
     else if (key === 'heading') set.heading = el.value;
     else if (key === 'instructionJa') set.instructionJa = el.value;
+    else if (key === 'informationImage') set.informationImage = el.value.trim();
     else if (key === 'randomQuestions') set.randomQuestions = el.checked;
     else if (key === 'selectedQuestions') {
       set.selectedQuestions = [...problemAdmin.querySelectorAll(
