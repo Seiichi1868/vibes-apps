@@ -203,6 +203,13 @@ function fillProblemFields() {
     if (key === 'text') el.value = set.text || '';
     else if (key === 'heading') el.value = set.heading || '';
     else if (key === 'instructionJa') el.value = set.instructionJa || '';
+    else if (key === 'randomQuestions') el.checked = set.randomQuestions === true;
+    else if (key === 'selectedQuestions') {
+      const selected = Array.isArray(set.selectedQuestions)
+        ? set.selectedQuestions
+        : [1, 2, 3, 4];
+      el.checked = selected.includes(parseInt(el.value, 10));
+    }
     else if (key === 'topic') el.value = set.topic || '';
     else if (key === 'topicJa') el.value = set.topicJa || '';
     else if (key === 'storyImage') el.value = set.storyImage || '';
@@ -234,15 +241,42 @@ function renderProblemAdmin() {
         <label class="block text-[10px] text-slate-600 mb-1">音読テキスト</label>
         <textarea class="admin-problem-textarea problem-field" data-part="${part}" data-num="${editNum}" data-key="text"></textarea>`;
     } else if (part === 'b') {
+      const questions = getProblemSet(part, editNum).questions || [];
       fields = `
         <label class="block text-[10px] text-slate-600 mb-1">問題見出し</label>
-        <input class="admin-problem-input problem-field mb-2" data-part="${part}" data-num="${editNum}" data-key="heading" placeholder="Question 1 & 2" />
+        <input class="admin-problem-input problem-field mb-2" data-part="${part}" data-num="${editNum}" data-key="heading" placeholder="Question 1–4" />
         <label class="block text-[10px] text-slate-600 mb-1">問題説明（日本語）</label>
         <textarea class="admin-problem-textarea problem-field" data-part="${part}" data-num="${editNum}" data-key="instructionJa" rows="3"></textarea>
         <label class="block text-[10px] text-slate-600 mb-1">スケジュール（JSON）</label>
         <textarea class="admin-problem-textarea problem-field" data-part="${part}" data-num="${editNum}" data-key="schedule" rows="4"></textarea>
         <label class="block text-[10px] text-slate-600 mt-2 mb-1">質問（JSON）</label>
-        <textarea class="admin-problem-textarea problem-field" data-part="${part}" data-num="${editNum}" data-key="questions" rows="5"></textarea>`;
+        <textarea class="admin-problem-textarea problem-field" data-part="${part}" data-num="${editNum}" data-key="questions" rows="5"></textarea>
+        <div class="mt-3 rounded-lg border border-sky-200 bg-sky-50/70 p-3">
+          <label class="flex items-center justify-between gap-3 cursor-pointer">
+            <span>
+              <span class="block text-[11px] font-bold text-sky-800">ページ更新ごとに4問をランダム出題</span>
+              <span class="block text-[10px] text-slate-500">オンの場合、下の固定選択は使用されません</span>
+            </span>
+            <input type="checkbox" class="problem-field part-b-random-toggle h-5 w-5"
+              data-part="${part}" data-num="${editNum}" data-key="randomQuestions" />
+          </label>
+          <div class="part-b-fixed-question-area mt-3 border-t border-sky-200 pt-3">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[11px] font-bold text-sky-800">通常出題する4問を選択</span>
+              <span class="part-b-question-count text-[10px] font-bold text-sky-700">0 / 4問</span>
+            </div>
+            <div class="space-y-1.5">
+              ${questions.map((question, index) => `
+                <label class="flex items-start gap-2 rounded bg-white/80 px-2 py-1.5 text-[10px] text-slate-700">
+                  <input type="checkbox" value="${index + 1}"
+                    class="problem-field part-b-question-choice mt-0.5"
+                    data-part="${part}" data-num="${editNum}" data-key="selectedQuestions" />
+                  <span><strong>Q${index + 1}</strong> ${escapeHTML(question.text || '')}</span>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+        </div>`;
     } else if (part === 'c') {
       fields = `
         <label class="block text-[10px] text-slate-600 mb-1">イラスト画像パス</label>
@@ -287,6 +321,7 @@ function renderProblemAdmin() {
 
   try {
     fillProblemFields();
+    updatePartBQuestionControls();
   } catch (err) {
     problemAdmin.insertAdjacentHTML(
       'afterbegin',
@@ -318,6 +353,36 @@ function renderProblemAdmin() {
   problemAdmin.querySelectorAll('.problem-field').forEach(el => {
     el.addEventListener('input', scheduleProblemSave);
   });
+  problemAdmin.querySelector('.part-b-random-toggle')?.addEventListener('change', () => {
+    updatePartBQuestionControls();
+  });
+  problemAdmin.querySelectorAll('.part-b-question-choice').forEach(el => {
+    el.addEventListener('change', () => {
+      const selected = problemAdmin.querySelectorAll('.part-b-question-choice:checked');
+      if (selected.length > 4) {
+        el.checked = false;
+        statusMessage.textContent = 'Part Bで選択できる固定問題は4問までです';
+      }
+      updatePartBQuestionControls();
+    });
+  });
+}
+
+function updatePartBQuestionControls() {
+  const randomToggle = problemAdmin?.querySelector('.part-b-random-toggle');
+  const choices = problemAdmin?.querySelectorAll('.part-b-question-choice') || [];
+  const fixedArea = problemAdmin?.querySelector('.part-b-fixed-question-area');
+  const count = [...choices].filter(choice => choice.checked).length;
+  choices.forEach(choice => { choice.disabled = randomToggle?.checked === true; });
+  if (fixedArea) fixedArea.style.opacity = randomToggle?.checked ? '0.45' : '1';
+  const countEl = problemAdmin?.querySelector('.part-b-question-count');
+  if (countEl) countEl.textContent = `${count} / 4問`;
+}
+
+function hasValidPartBQuestionSelection() {
+  const randomToggle = problemAdmin?.querySelector('.part-b-random-toggle');
+  if (!randomToggle || randomToggle.checked) return true;
+  return problemAdmin.querySelectorAll('.part-b-question-choice:checked').length === 4;
 }
 
 function collectProblemFieldsFromUI() {
@@ -335,6 +400,12 @@ function collectProblemFieldsFromUI() {
     if (key === 'text') set.text = el.value;
     else if (key === 'heading') set.heading = el.value;
     else if (key === 'instructionJa') set.instructionJa = el.value;
+    else if (key === 'randomQuestions') set.randomQuestions = el.checked;
+    else if (key === 'selectedQuestions') {
+      set.selectedQuestions = [...problemAdmin.querySelectorAll(
+        `.part-b-question-choice[data-part="${part}"][data-num="${num}"]:checked`,
+      )].map(choice => parseInt(choice.value, 10));
+    }
     else if (key === 'topic') set.topic = el.value;
     else if (key === 'topicJa') set.topicJa = el.value;
     else if (key === 'storyImage') set.storyImage = el.value.trim();
@@ -361,6 +432,10 @@ function scheduleProblemSave() {
   clearTimeout(problemSaveTimer);
   problemSaveTimer = setTimeout(async () => {
     try {
+      if (!hasValidPartBQuestionSelection()) {
+        statusMessage.textContent = 'Part Bの固定問題を4問選択してください';
+        return;
+      }
       collectProblemFieldsFromUI();
       const saved = await saveProblems({
         admin_password: passwordInput.value.trim(),

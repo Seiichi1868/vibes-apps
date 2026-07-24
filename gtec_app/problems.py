@@ -15,9 +15,9 @@ PROBLEMS_FILE = DATA_DIR / "gtec_problems.json"
 
 PARTS = ("a", "b", "c", "d")
 PROBLEM_NUMS = (1, 2, 3, 4)
-PROBLEMS_VERSION = 7
+PROBLEMS_VERSION = 8
 PART_A_DEFAULTS_VERSION = 6
-PART_B_DEFAULTS_VERSION = 7
+PART_B_DEFAULTS_VERSION = 8
 PART_C_DEFAULTS_VERSION = 4
 
 DEFAULT_ACTIVE = {part: 1 for part in PARTS}
@@ -69,11 +69,13 @@ DEFAULT_SETS: dict[str, dict[str, dict]] = {
     },
     "b": {
         "1": {
-            "heading": "Question 1 & 2",
+            "heading": "Question 1–4",
             "instructionJa": (
                 "あなたは自分の予定について外国人の友だちと話しています。"
-                "友だちから2つ質問されますので、画面上の予定表をもとに、質問に英語で答えなさい。"
+                "友だちから4つ質問されますので、画面上の予定表をもとに、質問に英語で答えなさい。"
             ),
+            "randomQuestions": False,
+            "selectedQuestions": [1, 2, 3, 4],
             "schedule": [
                 {"date": "4/29", "activity": "", "publicHoliday": True},
                 {"date": "4/30", "activity": "School and music club", "publicHoliday": False},
@@ -108,6 +110,54 @@ DEFAULT_SETS: dict[str, dict[str, dict]] = {
                     "examples": [
                         "I'm going to go camping from May 3rd to 5th.",
                         "I'm planning to go on a camping trip from May 3rd to May 5th.",
+                    ],
+                },
+                {
+                    "text": "How many days are you going to go camping?",
+                    "context": "The camping trip lasts for three days, from May 3 through May 5.",
+                    "examples": ["I'm going to go camping for three days."],
+                },
+                {
+                    "text": "What are you going to do on May 1st?",
+                    "context": "The schedule shows school and music club on May 1.",
+                    "examples": [
+                        "I'm going to go to school and join my music club on May 1st."
+                    ],
+                },
+                {
+                    "text": "When are you going to start your camping trip?",
+                    "context": "The camping trip starts on May 3.",
+                    "examples": ["My camping trip starts on May 3rd."],
+                },
+                {
+                    "text": "Which days on your schedule are public holidays?",
+                    "context": "The public holidays are April 29 and May 3, 4, 5, and 6.",
+                    "examples": [
+                        "April 29th, May 3rd, 4th, 5th, and 6th are public holidays."
+                    ],
+                },
+                {
+                    "text": "On which days do you have school and music club?",
+                    "context": "School and music club run from April 30 through May 2.",
+                    "examples": [
+                        "I have school and music club from April 30th to May 2nd."
+                    ],
+                },
+                {
+                    "text": "Are you busy on May 6th?",
+                    "context": "The student is free on May 6.",
+                    "examples": ["No, I'm free on May 6th."],
+                },
+                {
+                    "text": "Do you have school on any public holidays?",
+                    "context": "The student does not have school on any public holiday.",
+                    "examples": ["No, I don't have school on any public holidays."],
+                },
+                {
+                    "text": "What is your last day of school before the camping trip?",
+                    "context": "The last school day before camping is May 2.",
+                    "examples": [
+                        "My last day of school before the camping trip is May 2nd."
                     ],
                 },
             ],
@@ -298,6 +348,26 @@ def _normalize_schedule(items) -> list[dict]:
     return out[:8]
 
 
+def _normalize_selected_questions(items, question_count: int) -> list[int]:
+    selected = []
+    if isinstance(items, list):
+        for item in items:
+            try:
+                number = int(item)
+            except (TypeError, ValueError):
+                continue
+            if 1 <= number <= question_count and number not in selected:
+                selected.append(number)
+            if len(selected) == 4:
+                break
+    for number in range(1, question_count + 1):
+        if len(selected) == min(4, question_count):
+            break
+        if number not in selected:
+            selected.append(number)
+    return selected
+
+
 def _normalize_questions(items) -> list[dict]:
     if not isinstance(items, list):
         return []
@@ -317,7 +387,7 @@ def _normalize_questions(items) -> list[dict]:
                 if str(example).strip()
             ][:4] if isinstance(item.get("examples"), list) else [],
         })
-    return out[:8]
+    return out[:20]
 
 
 def _normalize_panels(items) -> list[dict]:
@@ -355,13 +425,24 @@ def _normalize_part_set(part: str, num: int, raw: dict | None) -> dict:
     if part == "b":
         schedule = _normalize_schedule(raw.get("schedule", default.get("schedule")))
         questions = _normalize_questions(raw.get("questions", default.get("questions")))
+        questions = questions or default["questions"]
         return {
             "heading": str(raw.get("heading", default.get("heading", ""))).strip(),
             "instructionJa": str(
                 raw.get("instructionJa", default.get("instructionJa", ""))
             ).strip(),
+            "randomQuestions": bool(
+                raw.get("randomQuestions", default.get("randomQuestions", False))
+            ),
+            "selectedQuestions": _normalize_selected_questions(
+                raw.get(
+                    "selectedQuestions",
+                    default.get("selectedQuestions", [1, 2, 3, 4]),
+                ),
+                len(questions),
+            ),
             "schedule": schedule or default["schedule"],
-            "questions": questions or default["questions"],
+            "questions": questions,
         }
 
     if part == "c":

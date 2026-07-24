@@ -61,6 +61,7 @@ const App = {
   currentUtterance: null,
   problems: null,
   selectedProblem: { a: 1, b: 1, c: 1, d: 1 },
+  partBRandomSelections: {},
 };
 
 // ─── 3. 設定・問題読み込み ───────────────────────────────────
@@ -91,6 +92,36 @@ function getPartData(partId) {
   const key = partId.toLowerCase();
   const num = getSelectedProblemNum(partId);
   const content = App.problems?.sets?.[key]?.[String(num)] || {};
+  if (partId === 'B') {
+    const pool = Array.isArray(content.questions) ? content.questions : [];
+    let questionNumbers;
+    if (content.randomQuestions) {
+      const cacheKey = `${num}:${pool.length}`;
+      if (!App.partBRandomSelections[cacheKey]) {
+        const shuffled = pool.map((_, index) => index + 1);
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        App.partBRandomSelections[cacheKey] = shuffled.slice(0, 4);
+      }
+      questionNumbers = App.partBRandomSelections[cacheKey];
+    } else {
+      questionNumbers = Array.isArray(content.selectedQuestions)
+        ? content.selectedQuestions.slice(0, 4)
+        : [1, 2, 3, 4];
+    }
+    const questions = questionNumbers
+      .map(number => pool[number - 1])
+      .filter(Boolean);
+    return {
+      ...meta,
+      ...content,
+      questions,
+      questionPoolSize: pool.length,
+      problemNum: num,
+    };
+  }
   return { ...meta, ...content, problemNum: num };
 }
 
@@ -1612,6 +1643,10 @@ async function renderPartIdle(partId) {
       <p class="text-sm text-slate-500 whitespace-pre-line mb-3">${d.desc}</p>
       ${problemPickerHTML('B')}
       <div class="mb-4">${buildPartBInformationHTML(d)}</div>
+      <p class="text-xs text-sky-700 bg-sky-50 border border-sky-100 rounded-lg px-3 py-2 mb-3">
+        問題バンク: ${d.questionPoolSize || d.questions?.length || 0}問 ／ 今回の出題: ${d.questions?.length || 0}問
+        ${d.randomQuestions ? '（ページ更新時にランダム選択）' : '（管理者指定）'}
+      </p>
       <div class="flex gap-3 text-xs text-slate-500 mb-4">
         <span>⏱ 準備: ${prepLabel('B')}</span><span>🎤 解答: 15秒/問</span><span>📊 この問題: ${d.questions?.length || 0}点</span>
       </div>
