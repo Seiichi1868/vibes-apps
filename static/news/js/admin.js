@@ -53,6 +53,11 @@
   const rosterMessage = document.getElementById("roster-message");
   const scriptTranslateBtn = document.getElementById("script-translate-btn");
   const scriptTranslateStatus = document.getElementById("script-translate-status");
+  const scriptTranslatePanel = document.getElementById("script-translate-panel");
+  const scriptTranslateList = document.getElementById("script-translate-list");
+  const scriptTranslatePanelStatus = document.getElementById("script-translate-panel-status");
+  const scriptTranslateCloseBtn = document.getElementById("script-translate-close-btn");
+  const scriptTranslateRetryBtn = document.getElementById("script-translate-retry-btn");
   const vocabScaffoldingEnabledEl = document.getElementById("vocab-scaffolding-enabled");
   const vocabExtractBtn = document.getElementById("vocab-extract-btn");
   const vocabExtractStatus = document.getElementById("vocab-extract-status");
@@ -1523,6 +1528,154 @@
     if (el) el.value = value || "";
   }
 
+  function splitScriptChunks(text) {
+    const trimmed = String(text || "").trim();
+    if (!trimmed) return [];
+    const paragraphs = trimmed.split(/\n\s*\n/).map((part) => part.trim()).filter(Boolean);
+    if (paragraphs.length > 1) return paragraphs;
+    const lines = trimmed.split(/\n/).map((part) => part.trim()).filter(Boolean);
+    return lines.length ? lines : [trimmed];
+  }
+
+  function showScriptTranslatePanelStatus(message, isError) {
+    if (!scriptTranslatePanelStatus) return;
+    if (!message) {
+      scriptTranslatePanelStatus.classList.add("hidden");
+      scriptTranslatePanelStatus.textContent = "";
+      return;
+    }
+    scriptTranslatePanelStatus.textContent = message;
+    scriptTranslatePanelStatus.classList.toggle("border-red-100", Boolean(isError));
+    scriptTranslatePanelStatus.classList.toggle("bg-red-50", Boolean(isError));
+    scriptTranslatePanelStatus.classList.toggle("text-red-800", Boolean(isError));
+    scriptTranslatePanelStatus.classList.toggle("border-amber-100", !isError);
+    scriptTranslatePanelStatus.classList.toggle("bg-amber-50", !isError);
+    scriptTranslatePanelStatus.classList.toggle("text-amber-800", !isError);
+    scriptTranslatePanelStatus.classList.remove("hidden");
+  }
+
+  function renderScriptTranslationList(script, translation) {
+    if (!scriptTranslateList) return;
+    scriptTranslateList.innerHTML = "";
+    const englishChunks = splitScriptChunks(script);
+    const japaneseChunks = splitScriptChunks(translation);
+    const paired = englishChunks.length > 0 && englishChunks.length === japaneseChunks.length;
+    const rows = paired
+      ? englishChunks.map((en, index) => ({ en, ja: japaneseChunks[index] }))
+      : [{ en: String(script || "").trim(), ja: String(translation || "").trim() }];
+
+    const table = document.createElement("div");
+    table.className = "overflow-hidden rounded-lg border border-teal-100/80 bg-white/80";
+
+    const head = document.createElement("div");
+    head.className = "grid grid-cols-1 gap-2 border-b border-teal-100 bg-teal-50/70 px-2.5 py-1.5 sm:grid-cols-2";
+    head.innerHTML = `
+      <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">原文</p>
+      <p class="text-[10px] font-semibold uppercase tracking-wider text-amber-800/80">和訳</p>`;
+    table.appendChild(head);
+
+    rows.forEach((row, index) => {
+      const item = document.createElement("div");
+      item.className =
+        "grid grid-cols-1 gap-2 px-2.5 py-2 sm:grid-cols-2 " +
+        (index < rows.length - 1 ? "border-b border-teal-50" : "");
+      const en = document.createElement("p");
+      en.className = "whitespace-pre-wrap leading-relaxed text-slate-800";
+      en.textContent = row.en || "（原文なし）";
+      const ja = document.createElement("p");
+      ja.className = "whitespace-pre-wrap leading-relaxed text-slate-700";
+      ja.textContent = row.ja || "（和訳なし）";
+      item.append(en, ja);
+      table.appendChild(item);
+    });
+
+    scriptTranslateList.appendChild(table);
+  }
+
+  function showScriptTranslatePanel() {
+    if (!scriptTranslatePanel) return;
+    scriptTranslatePanel.classList.remove("hidden");
+    scriptTranslatePanel.classList.add("flex");
+  }
+
+  function hideScriptTranslatePanel() {
+    if (!scriptTranslatePanel) return;
+    scriptTranslatePanel.classList.add("hidden");
+    scriptTranslatePanel.classList.remove("flex");
+  }
+
+  async function generateLessonScriptTranslation({ force = false } = {}) {
+    const classId = getSelectedClassId() || (lessonClassId && lessonClassId.value);
+    if (!classId) {
+      throw new Error("クラスを選択または作成してください。");
+    }
+    const script = document.getElementById("lesson-script")?.value.trim() || "";
+    if (!script) {
+      throw new Error("文字起こし（スクリプト）を入力してから和訳を作成してください。");
+    }
+    if (!force && getLessonScriptJa()) {
+      return getLessonScriptJa();
+    }
+
+    const res = await fetch("/news/admin/api/class/lesson/translate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ class_id: classId, script }),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "和訳の作成に失敗しました");
+    setLessonScriptJa(data.script_ja || "");
+    return data.script_ja || "";
+  }
+
+  async function openScriptTranslationPopup({ force = false } = {}) {
+    const script = document.getElementById("lesson-script")?.value.trim() || "";
+    if (!script) {
+      showMessage(lessonMessage, "文字起こし（スクリプト）を入力してから和訳を作成してください。", true);
+      return;
+    }
+
+    showScriptTranslatePanel();
+    renderScriptTranslationList(script, getLessonScriptJa());
+    const needsGenerate = force || !getLessonScriptJa();
+    if (scriptTranslateBtn) {
+      scriptTranslateBtn.disabled = true;
+      scriptTranslateBtn.textContent = needsGenerate ? "作成中…" : "原文と和訳";
+    }
+    if (scriptTranslateRetryBtn) scriptTranslateRetryBtn.disabled = true;
+    if (scriptTranslateStatus) {
+      scriptTranslateStatus.textContent = needsGenerate ? "AI が和訳を作成中です…" : "";
+      scriptTranslateStatus.classList.toggle("hidden", !needsGenerate);
+    }
+    showScriptTranslatePanelStatus(
+      needsGenerate ? "AI が和訳を作成中です（数秒かかります）…" : "",
+      false
+    );
+
+    try {
+      const translation = await generateLessonScriptTranslation({ force });
+      renderScriptTranslationList(script, translation);
+      showScriptTranslatePanelStatus("", false);
+      if (needsGenerate) {
+        showMessage(lessonMessage, "和訳を作成しました。", false);
+      }
+      if (scriptTranslateStatus) scriptTranslateStatus.classList.add("hidden");
+    } catch (err) {
+      showScriptTranslatePanelStatus(err.message || "和訳の作成に失敗しました。", true);
+      showMessage(lessonMessage, err.message, true);
+      if (scriptTranslateStatus) {
+        scriptTranslateStatus.textContent = "⚠ 和訳の作成に失敗しました。";
+        scriptTranslateStatus.classList.remove("hidden");
+      }
+    } finally {
+      if (scriptTranslateBtn) {
+        scriptTranslateBtn.disabled = false;
+        scriptTranslateBtn.textContent = "原文と和訳";
+      }
+      if (scriptTranslateRetryBtn) scriptTranslateRetryBtn.disabled = false;
+    }
+  }
+
   function esc(str) {
     return String(str || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
@@ -2040,48 +2193,21 @@
   }
 
   if (scriptTranslateBtn) {
-    scriptTranslateBtn.addEventListener("click", async () => {
-      const classId = getSelectedClassId() || (lessonClassId && lessonClassId.value);
-      if (!classId) {
-        showMessage(lessonMessage, "クラスを選択または作成してください。", true);
-        return;
-      }
-      const script = document.getElementById("lesson-script")?.value.trim() || "";
-      if (!script) {
-        showMessage(lessonMessage, "文字起こし（スクリプト）を入力してから和訳を作成してください。", true);
-        return;
-      }
-
-      scriptTranslateBtn.disabled = true;
-      scriptTranslateBtn.textContent = "作成中…";
-      if (scriptTranslateStatus) {
-        scriptTranslateStatus.textContent = "AI が和訳を作成中です（数秒かかります）…";
-        scriptTranslateStatus.classList.remove("hidden");
-      }
-
-      try {
-        const res = await fetch("/news/admin/api/class/lesson/translate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ class_id: classId, script }),
-        });
-        const data = await res.json();
-        if (!data.ok) throw new Error(data.error || "和訳の作成に失敗しました");
-        setLessonScriptJa(data.script_ja || "");
-        const jaEl = document.getElementById("lesson-script-ja");
-        jaEl?.focus();
-        jaEl?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        showMessage(lessonMessage, data.message || "和訳を作成しました。", false);
-        if (scriptTranslateStatus) scriptTranslateStatus.classList.add("hidden");
-      } catch (err) {
-        showMessage(lessonMessage, err.message, true);
-        if (scriptTranslateStatus) {
-          scriptTranslateStatus.textContent = "⚠ 和訳の作成に失敗しました。";
-        }
-      } finally {
-        scriptTranslateBtn.disabled = false;
-        scriptTranslateBtn.textContent = "和訳を作成";
-      }
+    scriptTranslateBtn.addEventListener("click", () => {
+      openScriptTranslationPopup({ force: false });
+    });
+  }
+  if (scriptTranslateRetryBtn) {
+    scriptTranslateRetryBtn.addEventListener("click", () => {
+      openScriptTranslationPopup({ force: true });
+    });
+  }
+  if (scriptTranslateCloseBtn) {
+    scriptTranslateCloseBtn.addEventListener("click", hideScriptTranslatePanel);
+  }
+  if (scriptTranslatePanel) {
+    scriptTranslatePanel.addEventListener("click", (e) => {
+      if (e.target === scriptTranslatePanel) hideScriptTranslatePanel();
     });
   }
 

@@ -285,6 +285,30 @@
     </div>
   </div>
 
+  <div id="script-translate-panel"
+    class="fixed inset-0 z-[80] hidden items-start justify-center bg-slate-900/20 p-4 pt-16 backdrop-blur-sm">
+    <div class="flex max-h-[85vh] w-full max-w-4xl flex-col rounded-2xl border border-teal-100 bg-white/95 p-4 shadow-xl">
+      <div class="mb-3 flex shrink-0 items-start justify-between gap-3">
+        <div>
+          <h2 class="text-sm font-bold text-slate-800">原文と和訳</h2>
+          <p class="mt-0.5 text-[11px] text-slate-500">指定した文字起こし部分と、その日本語訳です</p>
+        </div>
+        <div class="flex shrink-0 items-center gap-1.5">
+          <button type="button" id="script-translate-retry-btn"
+            class="rounded border border-sky-100 bg-sky-50 px-2 py-1 text-[10px] font-semibold text-sky-700 hover:bg-sky-100 disabled:opacity-50">
+            再作成
+          </button>
+          <button type="button" id="script-translate-close-btn"
+            class="rounded border border-slate-100 bg-white px-2 py-1 text-[10px] font-semibold text-slate-500 hover:bg-slate-50">
+            閉じる
+          </button>
+        </div>
+      </div>
+      <p id="script-translate-panel-status" class="mb-2 hidden rounded border border-amber-100 bg-amber-50 px-2 py-1 text-[11px] text-amber-800"></p>
+      <div id="script-translate-list" class="min-h-0 flex-1 overflow-y-auto text-xs"></div>
+    </div>
+  </div>
+
   <main class="mx-auto grid w-full max-w-6xl flex-1 min-h-0 grid-cols-1 grid-rows-[auto_1fr] gap-2 overflow-y-auto p-2 lg:grid-cols-2 lg:gap-2 lg:overflow-hidden">
     <!-- タブ切り替え -->
     <div class="tab-bar col-span-full mb-1 flex shrink-0">
@@ -442,7 +466,7 @@
             <div class="flex flex-wrap items-center gap-1.5">
               <button type="button" id="script-translate-btn"
                 class="compact-btn shrink-0 border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] text-sky-700 hover:bg-sky-100 disabled:opacity-50">
-                和訳を作成
+                原文と和訳
               </button>
               <span id="script-translate-status" class="hidden text-[10px] text-slate-500 italic"></span>
             </div>
@@ -451,12 +475,7 @@
           <textarea id="lesson-script" name="script" required rows="8"
             class="min-h-[8rem] w-full flex-1 resize-y rounded-lg border border-teal-100 bg-white/90 px-2 py-1.5 text-xs leading-relaxed text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-400 shadow-inner lg:min-h-[10rem]"
             placeholder="英文スクリプトをここに貼り付け…">{{ current.script }}</textarea>
-          <label class="mb-0.5 mt-2 block text-[11px] font-medium text-slate-600" for="lesson-script-ja">
-            和訳
-          </label>
-          <textarea id="lesson-script-ja" name="script_ja" rows="6"
-            class="min-h-[6rem] w-full resize-y rounded-lg border border-amber-100 bg-amber-50/40 px-2 py-1.5 text-xs leading-relaxed text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-300 shadow-inner"
-            placeholder="「和訳を作成」を押すと、上の指定文字起こし部分の日本語訳がここに入ります…">{{ current.script_ja or "" }}</textarea>
+          <input type="hidden" id="lesson-script-ja" name="script_ja" value="{{ current.script_ja or '' }}">
         </div>
 
         <details class="compact-details shrink-0">
@@ -690,5 +709,5 @@
   window.ADMIN_WARMUP_QUESTIONS = {{ (current.warmup_questions or [])|tojson }};
 </script>
 <script src="{{ url_for('static', filename='news/js/youtube-transcript.js', v='20260904i') }}"></script>
-<script src="{{ url_for('static', filename='news/js/admin.js', v='20260907a') }}"></script>
+<script src="{{ url_for('static', filename='news/js/admin.js', v='20260907b') }}"></script>
 {% endblock %}
