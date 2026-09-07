@@ -14,6 +14,7 @@ from news_app.config import (
     get_openai_api_key,
     resolve_ai_model,
     resolve_cefr_level,
+    resolve_display_language,
 )
 from news_app.services.audio_convert import prepare_for_whisper
 from news_app.services.openai_eval import evaluate_summary
@@ -27,6 +28,7 @@ from news_app.services.storage import (
     load_state,
     save_submission,
     vocabulary_for_student,
+    script_translation_for_lang,
     appearance_context,
 )
 from news_app.services.youtube import build_youtube_embed_url
@@ -155,21 +157,24 @@ def web_app_manifest():
     return response
 
 
-def _class_public_payload(class_id: str, origin: str) -> dict | None:
+def _class_public_payload(class_id: str, origin: str, display_language: str = "ja") -> dict | None:
     cls = get_class(class_id)
     if not cls:
         return None
     current = cls.get("current") or {}
+    lang = resolve_display_language(display_language)
+    show_assistive = lang != "en"
     video_id = (current.get("video_id") or "").strip()
     start_sec = int(current.get("start_seconds") or 0)
     end_sec = int(current.get("end_seconds") or 0)
     subtitles_enabled = bool(current.get("subtitles_enabled", False))
-    vocabulary_scaffolding_enabled = bool(current.get("vocabulary_scaffolding_enabled", False))
+    vocabulary_scaffolding_enabled = bool(current.get("vocabulary_scaffolding_enabled", False)) and show_assistive
     vocabulary_data = current.get("vocabulary_data") if isinstance(current.get("vocabulary_data"), list) else []
     if vocabulary_scaffolding_enabled:
-        vocabulary_data = vocabulary_for_student(vocabulary_data)
+        vocabulary_data = vocabulary_for_student(vocabulary_data, lang)
     else:
         vocabulary_data = []
+    translation = script_translation_for_lang(current, lang) if show_assistive else {"enabled": False, "text": "", "pairs": []}
     embed_url = (
         build_youtube_embed_url(
             video_id,
@@ -218,24 +223,34 @@ def _class_public_payload(class_id: str, origin: str) -> dict | None:
         },
         "vocabulary_scaffolding_enabled": vocabulary_scaffolding_enabled,
         "vocabulary_data": vocabulary_data,
+        "translation_enabled": bool(translation.get("enabled")),
+        "translation_pairs": translation.get("pairs") or [],
+        "translation_text": translation.get("text") or "",
         "warmup_scaffolding_enabled": warmup_scaffolding_enabled,
         "warmup_image_url": warmup_image_url,
         "warmup_questions": warmup_questions,
     }
 
 
-def _class_screen_payload(class_id: str, origin: str) -> dict | None:
+def _class_screen_payload(class_id: str, origin: str, display_language: str = "ja") -> dict | None:
     """教室スクリーン投影向け。管理画面で選択した語彙・導入質問をそのまま返す。"""
     cls = get_class(class_id)
     if not cls:
         return None
     current = cls.get("current") or {}
+    lang = resolve_display_language(display_language)
+    show_assistive = lang != "en"
     video_id = (current.get("video_id") or "").strip()
     start_sec = int(current.get("start_seconds") or 0)
     end_sec = int(current.get("end_seconds") or 0)
     subtitles_enabled = bool(current.get("subtitles_enabled", False))
-    vocabulary_data = vocabulary_for_student(
-        current.get("vocabulary_data") if isinstance(current.get("vocabulary_data"), list) else []
+    vocabulary_data = (
+        vocabulary_for_student(
+            current.get("vocabulary_data") if isinstance(current.get("vocabulary_data"), list) else [],
+            lang,
+        )
+        if show_assistive
+        else []
     )
     warmup_image_url = str(current.get("warmup_image_url") or "").strip()
     raw_warmup_questions = current.get("warmup_questions") if isinstance(current.get("warmup_questions"), list) else []
@@ -286,12 +301,15 @@ def index():
     classes = list_classes()
     cls = get_class(class_id) if class_id else None
     current = (cls or {}).get("current") or {}
-    vocabulary_scaffolding_enabled = bool(current.get("vocabulary_scaffolding_enabled", False))
+    lang = resolve_display_language(state.get("display_language"))
+    show_assistive = lang != "en"
+    vocabulary_scaffolding_enabled = bool(current.get("vocabulary_scaffolding_enabled", False)) and show_assistive
     vocabulary_data = current.get("vocabulary_data") if isinstance(current.get("vocabulary_data"), list) else []
     if not vocabulary_scaffolding_enabled:
         vocabulary_data = []
     else:
-        vocabulary_data = vocabulary_for_student(vocabulary_data)
+        vocabulary_data = vocabulary_for_student(vocabulary_data, lang)
+    translation = script_translation_for_lang(current, lang) if show_assistive else {"enabled": False, "text": "", "pairs": []}
 
     return render_template(
         "news/index.html",
@@ -303,6 +321,8 @@ def index():
         page_origin=request.host_url.rstrip("/"),
         vocabulary_scaffolding_enabled=vocabulary_scaffolding_enabled,
         vocabulary_data=vocabulary_data,
+        translation_enabled=bool(translation.get("enabled")),
+        translation_pairs=translation.get("pairs") or [],
         **appearance_context(state),
     )
 
@@ -332,11 +352,20 @@ def screen_config():
         return jsonify({"ok": False, "error": "クラス ID が必要です。"}), 400
 
     origin = request.host_url.rstrip("/")
-    payload = _class_screen_payload(class_id, origin)
+    state = load_state()
+    display_language = resolve_display_language(state.get("display_language"))
+    payload = _class_screen_payload(class_id, origin, display_language)
     if not payload:
         return jsonify({"ok": False, "error": "クラスが見つかりません。"}), 404
 
-    return jsonify({"ok": True, "page_origin": origin, "class": payload})
+    return jsonify(
+        {
+            "ok": True,
+            "display_language": display_language,
+            "page_origin": origin,
+            "class": payload,
+        }
+    )
 
 
 @main_bp.route("/api/config")
@@ -346,15 +375,16 @@ def public_config():
         return jsonify({"ok": False, "error": "クラス ID が必要です。"}), 400
 
     origin = request.host_url.rstrip("/")
-    payload = _class_public_payload(class_id, origin)
+    state = load_state()
+    display_language = resolve_display_language(state.get("display_language"))
+    payload = _class_public_payload(class_id, origin, display_language)
     if not payload:
         return jsonify({"ok": False, "error": "クラスが見つかりません。"}), 404
 
-    state = load_state()
     return jsonify(
         {
             "ok": True,
-            "display_language": state.get("display_language", "ja"),
+            "display_language": display_language,
             "page_origin": origin,
             "class": payload,
         }

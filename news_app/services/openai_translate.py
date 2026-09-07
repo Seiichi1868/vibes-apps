@@ -1,4 +1,4 @@
-"""英語ニューススクリプトを日本語に翻訳する。"""
+"""英語ニューススクリプトを日本語またはスペイン語に翻訳する。"""
 from __future__ import annotations
 
 import json
@@ -9,7 +9,7 @@ from urllib.request import Request, urlopen
 
 import certifi
 
-from news_app.config import DEFAULT_AI_MODEL
+from news_app.config import DEFAULT_AI_MODEL, resolve_display_language
 from news_app.services.openai_utils import (
     PREMIUM_MAX_COMPLETION_TOKENS,
     is_reasoning_chat_model,
@@ -22,7 +22,9 @@ OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
 TRANSLATE_TIMEOUT_SEC = 90
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
 
-_SYSTEM_PROMPT = """\
+_TARGET_PROMPTS = {
+    "ja": {
+        "system": """\
 あなたは、日本の高校の英語授業向けにニュース原稿を訳す翻訳者です。
 番号付きの英語ユニットを、同じ順番・同じ件数で日本語に翻訳してください。
 
@@ -34,7 +36,42 @@ _SYSTEM_PROMPT = """\
 - ニュースとして自然な日本語にする（直訳調にしない）。
 - 固有名詞は、一般的な日本語表記があればそれを使い、なければ英語のまま残す。
 - 数字・日付・肩書は原文の情報を落とさない。
-"""
+""",
+        "user": (
+            "次の英語ユニットを日本語に翻訳してください。\n"
+            "translations 配列は必ず {count} 件にしてください。\n\n"
+            '形式: {{"translations": ["日本語1", "日本語2"]}}\n\n'
+            "--- English units ---\n{numbered}\n--- End ---\n"
+        ),
+        "empty_error": "スクリプトが空です。和訳するには英語スクリプトが必要です。",
+        "count_error": "AI が原文と同じ件数の和訳を返しませんでした。再試行してください。",
+        "retry_note": "前回は {got} 件でした。必ず {need} 件にしてください。",
+    },
+    "es": {
+        "system": """\
+Eres traductor de noticias en inglés para clases de inglés de secundaria con alumnado hispanohablante.
+Traduce las unidades numeradas al español, en el mismo orden y con el mismo número de elementos.
+
+Reglas:
+- No añadas prefacios, explicaciones ni notas.
+- La salida es solo un objeto JSON con la clave translations.
+- translations es un array de cadenas con exactamente el mismo número y orden que las unidades de entrada.
+- Una unidad en inglés corresponde a una sola traducción al español.
+- Usa un español natural de noticias, no una traducción palabra por palabra.
+- Si hay una forma habitual en español de un nombre propio, úsala; si no, deja el inglés.
+- Conserva números, fechas y cargos del original.
+""",
+        "user": (
+            "Traduce las siguientes unidades en inglés al español.\n"
+            "El array translations debe tener exactamente {count} elementos.\n\n"
+            'Formato: {{"translations": ["español1", "español2"]}}\n\n'
+            "--- English units ---\n{numbered}\n--- End ---\n"
+        ),
+        "empty_error": "スクリプトが空です。翻訳するには英語スクリプトが必要です。",
+        "count_error": "AI が原文と同じ件数の翻訳を返しませんでした。再試行してください。",
+        "retry_note": "La respuesta anterior tenía {got} elementos. Debe tener {need}.",
+    },
+}
 
 
 def split_script_units(script: str) -> list[str]:
@@ -49,18 +86,16 @@ def split_script_units(script: str) -> list[str]:
     return parts or [text]
 
 
-def _build_user_prompt(units: list[str]) -> str:
+def _target_spec(target_lang: str) -> tuple[str, dict]:
+    lang = resolve_display_language(target_lang)
+    if lang != "es":
+        lang = "ja"
+    return lang, _TARGET_PROMPTS[lang]
+
+
+def _build_user_prompt(units: list[str], spec: dict) -> str:
     numbered = "\n".join(f"{index}. {unit}" for index, unit in enumerate(units, start=1))
-    return f"""\
-次の英語ユニットを日本語に翻訳してください。
-translations 配列は必ず {len(units)} 件にしてください。
-
-形式: {{"translations": ["日本語1", "日本語2"]}}
-
---- English units ---
-{numbered}
---- End ---
-"""
+    return spec["user"].format(count=len(units), numbered=numbered)
 
 
 def _extract_message_text(payload: dict) -> str:
@@ -119,15 +154,22 @@ def _create_chat_completion(*, api_key: str, model: str, messages: list[dict]) -
     return data
 
 
-def _request_translations(*, api_key: str, model: str, units: list[str], extra_note: str = "") -> list[str]:
-    user_prompt = _build_user_prompt(units)
+def _request_translations(
+    *,
+    api_key: str,
+    model: str,
+    units: list[str],
+    spec: dict,
+    extra_note: str = "",
+) -> list[str]:
+    user_prompt = _build_user_prompt(units, spec)
     if extra_note:
         user_prompt += f"\n\n{extra_note}"
     payload = _create_chat_completion(
         api_key=api_key,
         model=model,
         messages=[
-            {"role": "system", "content": _SYSTEM_PROMPT},
+            {"role": "system", "content": spec["system"]},
             {"role": "user", "content": user_prompt},
         ],
     )
@@ -138,16 +180,18 @@ def _request_translations(*, api_key: str, model: str, units: list[str], extra_n
     return [str(item or "").strip() for item in raw_items]
 
 
-def translate_script_to_japanese(
+def translate_script(
     script: str,
     *,
     api_key: str,
     model: str = TRANSLATION_MODEL,
+    target_lang: str = "ja",
 ) -> dict:
-    """英語スクリプトを日本語訳し、左右対訳ペアも返す。"""
+    """英語スクリプトを指定言語へ訳し、左右対訳ペアも返す。"""
+    lang, spec = _target_spec(target_lang)
     script = str(script or "").strip()
     if not script:
-        raise ValueError("スクリプトが空です。和訳するには英語スクリプトが必要です。")
+        raise ValueError(spec["empty_error"])
     if not api_key:
         raise ValueError(
             "OpenAI API キーが未設定です。"
@@ -155,19 +199,33 @@ def translate_script_to_japanese(
         )
 
     units = split_script_units(script)
-    translations = _request_translations(api_key=api_key, model=model, units=units)
+    translations = _request_translations(api_key=api_key, model=model, units=units, spec=spec)
     if len(translations) != len(units):
         translations = _request_translations(
             api_key=api_key,
             model=model,
             units=units,
-            extra_note=f"前回は {len(translations)} 件でした。必ず {len(units)} 件にしてください。",
+            spec=spec,
+            extra_note=spec["retry_note"].format(got=len(translations), need=len(units)),
         )
     if len(translations) != len(units) or not any(translations):
-        raise ValueError("AI が原文と同じ件数の和訳を返しませんでした。再試行してください。")
+        raise ValueError(spec["count_error"])
 
-    pairs = [{"en": en, "ja": ja} for en, ja in zip(units, translations)]
+    pairs = [{"en": en, "ja": translated} for en, translated in zip(units, translations)]
+    text = "\n".join(item["ja"] for item in pairs).strip()
     return {
-        "script_ja": "\n".join(item["ja"] for item in pairs).strip(),
+        "target_lang": lang,
+        "script_translation": text,
+        "script_ja": text if lang == "ja" else "",
         "pairs": pairs,
     }
+
+
+def translate_script_to_japanese(
+    script: str,
+    *,
+    api_key: str,
+    model: str = TRANSLATION_MODEL,
+) -> dict:
+    """英語スクリプトを日本語訳し、左右対訳ペアも返す。"""
+    return translate_script(script, api_key=api_key, model=model, target_lang="ja")

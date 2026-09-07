@@ -14,13 +14,14 @@ from news_app.config import (
     mask_api_key,
     resolve_ai_model,
     resolve_cefr_level,
+    resolve_display_language,
     save_openai_api_key,
 )
 from news_app.services.cnn10 import fetch_cnn10_episodes
 from news_app.services.cnn10_highlight import find_title_segment_in_transcript
 from news_app.services.network import get_public_base_url
 from news_app.services.docx_translate import build_script_translation_docx, translation_rows
-from news_app.services.openai_translate import translate_script_to_japanese
+from news_app.services.openai_translate import translate_script
 from news_app.services.openai_vocab import extract_vocabulary_from_script
 from news_app.services.openai_warmup import extract_warmup_from_script
 from news_app.services.storage import (
@@ -164,7 +165,7 @@ def save_settings():
 
         default_criteria = data.get("default_evaluation_criteria")
         kwargs = {
-            "display_language": str(data.get("display_language", "ja")),
+            "display_language": resolve_display_language(data.get("display_language")),
             "ai_model": resolve_ai_model(data.get("ai_model")),
             "default_cefr_level": resolve_cefr_level(data.get("default_cefr_level")),
             "openai_api_key": openai_api_key,
@@ -279,6 +280,11 @@ def api_save_lesson():
             script_ja_pairs = data.get("script_ja_pairs")
         else:
             script_ja_pairs = existing.get("script_ja_pairs") or []
+        script_es = str(data.get("script_es") if "script_es" in data else existing.get("script_es") or "").strip()
+        if "script_es_pairs" in data:
+            script_es_pairs = data.get("script_es_pairs")
+        else:
+            script_es_pairs = existing.get("script_es_pairs") or []
         title = str(data.get("title") or "").strip()
         if not title:
             title = fetch_youtube_title(url or video_id)
@@ -291,6 +297,8 @@ def api_save_lesson():
             "script": script,
             "script_ja": script_ja,
             "script_ja_pairs": script_ja_pairs,
+            "script_es": script_es,
+            "script_es_pairs": script_es_pairs,
             "evaluation_criteria": criteria,
             "prep_timer_seconds": prep_sec,
             "record_timer_seconds": record_sec,
@@ -303,6 +311,9 @@ def api_save_lesson():
             if "script_ja" not in data:
                 lesson_payload["script_ja"] = ""
                 lesson_payload["script_ja_pairs"] = []
+            if "script_es" not in data:
+                lesson_payload["script_es"] = ""
+                lesson_payload["script_es_pairs"] = []
 
         cls = update_class_current(
             class_id,
@@ -330,7 +341,7 @@ def api_save_lesson():
 
 @admin_bp.route("/api/class/lesson/translate", methods=["POST"])
 def api_translate_lesson_script():
-    """指定した英語スクリプトの和訳を生成し、授業レコードに保存する。"""
+    """指定した英語スクリプトの対訳を生成し、授業レコードに保存する。"""
     data = request.get_json(silent=True) or {}
     class_id = str(data.get("class_id") or get_active_class_id()).strip()
     if not class_id:
@@ -356,31 +367,44 @@ def api_translate_lesson_script():
 
     state = load_state()
     model = resolve_ai_model(state.get("ai_model"))
+    target_lang = resolve_display_language(data.get("target_lang") or state.get("display_language"))
+    if target_lang == "en":
+        target_lang = "ja"
     try:
-        translated = translate_script_to_japanese(script, api_key=api_key, model=model)
-        script_ja = str(translated.get("script_ja") or "").strip()
-        script_ja_pairs = translated.get("pairs") or []
-        cls = update_class_current(
-            class_id,
-            {
+        translated = translate_script(script, api_key=api_key, model=model, target_lang=target_lang)
+        script_translation = str(translated.get("script_translation") or "").strip()
+        pairs = translated.get("pairs") or []
+        if target_lang == "es":
+            update_fields = {
                 "script": script,
-                "script_ja": script_ja,
-                "script_ja_pairs": script_ja_pairs,
-            },
-        )
+                "script_es": script_translation,
+                "script_es_pairs": pairs,
+            }
+        else:
+            update_fields = {
+                "script": script,
+                "script_ja": script_translation,
+                "script_ja_pairs": pairs,
+            }
+        cls = update_class_current(class_id, update_fields)
         return jsonify(
             {
                 "ok": True,
                 "class": cls,
-                "script_ja": script_ja,
-                "script_ja_pairs": script_ja_pairs,
-                "message": f"和訳を作成して保存しました（{len(script_ja)} 文字）。",
+                "target_lang": target_lang,
+                "script_ja": script_translation if target_lang != "es" else str((cls.get("current") or {}).get("script_ja") or ""),
+                "script_ja_pairs": pairs if target_lang != "es" else (cls.get("current") or {}).get("script_ja_pairs") or [],
+                "script_es": script_translation if target_lang == "es" else str((cls.get("current") or {}).get("script_es") or ""),
+                "script_es_pairs": pairs if target_lang == "es" else (cls.get("current") or {}).get("script_es_pairs") or [],
+                "script_translation": script_translation,
+                "pairs": pairs,
+                "message": f"対訳を作成して保存しました（{len(script_translation)} 文字）。",
             }
         )
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:
-        return jsonify({"ok": False, "error": f"和訳の作成に失敗しました: {exc}"}), 500
+        return jsonify({"ok": False, "error": f"対訳の作成に失敗しました: {exc}"}), 500
 
 
 @admin_bp.route("/api/class/lesson/translate/docx", methods=["POST"])

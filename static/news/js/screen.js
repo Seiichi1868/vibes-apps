@@ -1,4 +1,14 @@
 (function () {
+  function t(key, vars) {
+    return window.NewsI18n ? window.NewsI18n.t(key, vars) : key;
+  }
+  function mapPos(pos) {
+    return window.NewsI18n ? window.NewsI18n.mapPos(pos) : pos || "";
+  }
+  function showAssistive() {
+    return window.NewsI18n ? window.NewsI18n.showAssistive() : true;
+  }
+
   const screenApp = document.getElementById("screen-app");
   const classLabel = document.getElementById("screen-class-label");
   const loadingEl = document.getElementById("screen-loading");
@@ -229,7 +239,7 @@
       destroyYouTubePlayer();
       if (videoPlaceholder) {
         videoPlaceholder.classList.remove("hidden");
-        videoPlaceholder.textContent = "動画が未設定です。管理画面で URL を登録してください。";
+        videoPlaceholder.textContent = t("screenVideoUnset");
       }
       return;
     }
@@ -259,18 +269,18 @@
     if (!vocabContent) return;
     if (!items || !items.length) {
       vocabContent.innerHTML =
-        '<p class="text-center text-lg text-slate-500">表示する単語がありません。管理画面で語彙を選択してください。</p>';
+        '<p class="text-center text-lg text-slate-500">' + t("screenNoVocab") + "</p>";
       return;
     }
     let html =
       '<table class="screen-vocab-table"><thead><tr>' +
-      '<th>単語・熟語</th><th>品詞</th><th>意味（文脈）</th>' +
+      "<th>" + t("vocabWord") + "</th><th>" + t("pos") + "</th><th>" + t("vocabMeaning") + "</th>" +
       "</tr></thead><tbody>";
     items.forEach(function (item) {
       html +=
         "<tr>" +
         '<td class="screen-vocab-word">' + escHtml(item.word) + "</td>" +
-        '<td class="screen-vocab-pos">' + escHtml(item.part_of_speech) + "</td>" +
+        '<td class="screen-vocab-pos">' + escHtml(mapPos(item.part_of_speech)) + "</td>" +
         "<td>" + escHtml(item.meaning) + "</td>" +
         "</tr>";
     });
@@ -302,7 +312,7 @@
     if (!warmupContent) return;
     if (!imageUrl && (!questions || !questions.length)) {
       warmupContent.innerHTML =
-        '<p class="text-center text-lg text-slate-500">表示する導入質問がありません。管理画面で質問を選択してください。</p>';
+        '<p class="text-center text-lg text-slate-500">' + t("screenNoWarmup") + "</p>";
       return;
     }
     const qCount = questions ? questions.length : 0;
@@ -318,7 +328,7 @@
         "</div>";
     }
     if (questions && questions.length) {
-      html += '<p class="screen-warmup-heading">動画を見る前に考えてみよう</p>';
+      html += '<p class="screen-warmup-heading">' + t("screenWarmupHeading") + "</p>";
       html += '<ol class="screen-warmup-list">';
       questions.forEach(function (q, i) {
         html +=
@@ -347,7 +357,7 @@
     if (!controlsEl) return;
     const availability = {
       video: payload.has_video,
-      vocab: payload.has_vocab,
+      vocab: payload.has_vocab && showAssistive(),
       warmup: payload.has_warmup,
     };
 
@@ -370,7 +380,7 @@
 
   async function loadScreen(classId) {
     if (!classId) {
-      showError("クラスが指定されていません。管理画面から教室スクリーンを開いてください。");
+      showError(t("screenNoClass"));
       return;
     }
 
@@ -383,7 +393,11 @@
     try {
       const res = await fetch("/news/api/screen?class_id=" + encodeURIComponent(classId));
       const data = await res.json();
-      if (!data.ok) throw new Error(data.error || "読み込みに失敗しました");
+      if (!data.ok) throw new Error(data.error || t("screenLoadFail"));
+
+      if (data.display_language && window.NewsI18n) {
+        window.NewsI18n.setLang(data.display_language);
+      }
 
       const cls = data.class;
       if (classLabel) classLabel.textContent = cls.name || "";
@@ -394,7 +408,7 @@
       configureControls(cls);
       showLoading(false);
     } catch (err) {
-      showError(err.message || "読み込みに失敗しました");
+      showError(err.message || t("screenLoadFail"));
     }
   }
 
@@ -419,7 +433,7 @@
   document.addEventListener("fullscreenchange", function () {
     if (!fullscreenBtn) return;
     fullscreenBtn.textContent = document.fullscreenElement ? "⛶" : "⛶";
-    fullscreenBtn.title = document.fullscreenElement ? "全画面解除" : "全画面";
+    fullscreenBtn.title = document.fullscreenElement ? t("exitFullscreen") : t("fullscreen");
   });
 
   const urlParams = new URLSearchParams(window.location.search);

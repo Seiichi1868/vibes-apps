@@ -1,6 +1,19 @@
 (function () {
   const STORAGE_KEY = "vibe_speak_selected_class_id";
 
+  function t(key, vars) {
+    return window.NewsI18n ? window.NewsI18n.t(key, vars) : key;
+  }
+  function mapPos(pos) {
+    return window.NewsI18n ? window.NewsI18n.mapPos(pos) : pos || "";
+  }
+  function showAssistive() {
+    return window.NewsI18n ? window.NewsI18n.showAssistive() : true;
+  }
+  function assistiveLang() {
+    return window.NewsI18n ? window.NewsI18n.assistiveLang() : "ja";
+  }
+
   const openingOverlay = document.getElementById("opening-overlay");
   const classPickerOverlay = document.getElementById("class-picker-overlay");
   const classPickerSelect = document.getElementById("class-picker-select");
@@ -51,6 +64,13 @@
   const vocabTableWrap = document.getElementById("vocab-table-wrap");
   const vocabAccordionLabel = document.getElementById("vocab-accordion-label");
 
+  const translationAccordion = document.getElementById("translation-accordion");
+  const translationToggleBtn = document.getElementById("translation-toggle-btn");
+  const translationToggleLabel = document.getElementById("translation-toggle-label");
+  const translationBody = document.getElementById("translation-body");
+  const translationListWrap = document.getElementById("translation-list-wrap");
+  const translationAccordionLabel = document.getElementById("translation-accordion-label");
+
   const warmupAccordion = document.getElementById("warmup-accordion");
   const warmupToggleBtn = document.getElementById("warmup-toggle-btn");
   const warmupToggleLabel = document.getElementById("warmup-toggle-label");
@@ -58,6 +78,7 @@
   const warmupContentWrap = document.getElementById("warmup-content-wrap");
 
   let vocabOpen = false;
+  let translationOpen = false;
   let warmupOpen = false;
 
   let selectedClassId = "";
@@ -179,11 +200,11 @@
 
   async function extractAudioByDecode(file) {
     const ctx = unlockAudioContext();
-    if (!ctx) throw new Error("このブラウザでは音声の取り出しに対応していません");
+    if (!ctx) throw new Error(t("cannotExtractAudio"));
     const data = await file.arrayBuffer();
     const decoded = await ctx.decodeAudioData(data.slice(0));
     if (decoded.duration > MAX_SPEECH_SECONDS) {
-      throw new Error(`音声が長すぎます（${MAX_SPEECH_SECONDS}秒以内にしてください）。`);
+      throw new Error(t("audioTooLong", { n: MAX_SPEECH_SECONDS }));
     }
     return audioBufferToWavFile(decoded);
   }
@@ -198,7 +219,7 @@
     return new Promise((resolve, reject) => {
       const ctx = unlockAudioContext();
       if (!ctx || !window.MediaRecorder) {
-        reject(new Error("このブラウザでは動画からの音声抽出に対応していません"));
+        reject(new Error(t("cannotExtractFromVideo")));
         return;
       }
       const url = URL.createObjectURL(file);
@@ -222,12 +243,12 @@
         cleanup();
         reject(new Error(message));
       };
-      const timer = window.setTimeout(() => fail("動画の読み込みがタイムアウトしました"), 20000);
+      const timer = window.setTimeout(() => fail(t("videoLoadTimeout")), 20000);
 
       media.onloadedmetadata = () => {
         if (media.duration && media.duration > MAX_SPEECH_SECONDS) {
           window.clearTimeout(timer);
-          fail(`音声が長すぎます（${MAX_SPEECH_SECONDS}秒以内にしてください）。`);
+          fail(t("audioTooLong", { n: MAX_SPEECH_SECONDS }));
         }
       };
 
@@ -268,27 +289,27 @@
           }, limitMs);
           const playPromise = media.play();
           if (playPromise && playPromise.catch) {
-            playPromise.catch(() => fail("動画を再生できませんでした"));
+            playPromise.catch(() => fail(t("cannotPlayVideo")));
           }
           media.onended = () => {
             try {
               if (recorder.state !== "inactive") recorder.stop();
             } catch (_) {
-              fail("音声の取り出しに失敗しました");
+              fail(t("extractAudioFail"));
             }
           };
         } catch (err) {
-          fail(err.message || "音声の取り出しに失敗しました");
+          fail(err.message || t("extractAudioFail"));
         }
       };
-      media.onerror = () => fail("動画を読み込めませんでした");
+      media.onerror = () => fail(t("cannotLoadVideo"));
     });
   }
 
   async function prepareUploadFile(file) {
-    if (!file) throw new Error("ファイルを選択してください。");
+    if (!file) throw new Error(t("selectFile"));
     if (file.size > MAX_UPLOAD_BYTES) {
-      throw new Error("ファイルが大きすぎます（60MBまで）。ボイスメモか短い動画にしてください。");
+      throw new Error(t("fileTooLarge"));
     }
     if (!isVideoFile(file)) return file;
     try {
@@ -307,11 +328,11 @@
 
   async function parseJsonResponse(res) {
     if (res.status === 413) {
-      throw new Error("ファイルが大きすぎます。ボイスメモか、より短い動画にしてください。");
+      throw new Error(t("fileTooLargeShort"));
     }
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data.ok === false) {
-      throw new Error(data.error || `通信に失敗しました（${res.status}）`);
+      throw new Error(data.error || t("requestFail", { n: res.status }));
     }
     return data;
   }
@@ -334,23 +355,23 @@
     });
     if (!items.length) {
       vocabTableWrap.innerHTML =
-        '<p class="py-1 text-[10px] text-slate-400">語彙データがありません。</p>';
+        '<p class="py-1 text-[10px] text-slate-400">' + t("noVocabData") + "</p>";
       return;
     }
     let html =
       '<table class="w-full border-collapse text-[10px]">' +
       '<thead><tr class="border-b border-teal-100 text-[9px] uppercase tracking-wide text-slate-400">' +
-      '<th class="pb-1 pr-3 text-left font-medium">単語・熟語</th>' +
-      '<th class="pb-1 pr-3 text-left font-medium hidden sm:table-cell">品詞</th>' +
-      '<th class="pb-1 text-left font-medium">意味（文脈）</th>' +
-      '</tr></thead><tbody>';
+      '<th class="pb-1 pr-3 text-left font-medium">' + t("vocabWord") + "</th>" +
+      '<th class="pb-1 pr-3 text-left font-medium hidden sm:table-cell">' + t("pos") + "</th>" +
+      '<th class="pb-1 text-left font-medium">' + t("vocabMeaning") + "</th>" +
+      "</tr></thead><tbody>";
     items.forEach(function (item) {
       html +=
         '<tr class="border-b border-slate-50 hover:bg-amber-50/40 transition-colors">' +
         '<td class="py-1 pr-3 font-semibold text-slate-800 whitespace-nowrap leading-snug">' +
         escHtml(item.word) + "</td>" +
         '<td class="py-1 pr-3 text-slate-400 leading-snug hidden sm:table-cell">' +
-        escHtml(item.part_of_speech) + "</td>" +
+        escHtml(mapPos(item.part_of_speech)) + "</td>" +
         '<td class="py-1 text-slate-700 leading-relaxed">' + escHtml(item.meaning) + "</td>" +
         "</tr>";
     });
@@ -363,20 +384,79 @@
     const visibleItems = (items || []).filter(function (item) {
       return item && item.selected !== false;
     });
-    if (!enabled || !visibleItems.length) {
+    if (!showAssistive() || !enabled || !visibleItems.length) {
       vocabAccordion.classList.add("hidden");
       return;
     }
     renderVocabTable(visibleItems);
     if (vocabAccordionLabel) {
-      vocabAccordionLabel.textContent =
-        "動画を見る前に：重要ボキャブラリーをチェック（" + visibleItems.length + "語）";
+      vocabAccordionLabel.textContent = t("vocabAccordionCount", { n: visibleItems.length });
     }
     vocabAccordion.classList.remove("hidden");
-    // 毎回クラス切り替え時は折りたたんだ状態にリセット
     vocabOpen = false;
     if (vocabBody) vocabBody.style.maxHeight = "0";
-    if (vocabToggleLabel) vocabToggleLabel.textContent = "開く ▼";
+    if (vocabToggleLabel) vocabToggleLabel.textContent = t("open");
+  }
+
+  function renderTranslation(pairs, enabled) {
+    if (!translationAccordion) return;
+    const rows = (pairs || []).filter(function (row) {
+      return row && (String(row.en || "").trim() || String(row.ja || "").trim());
+    });
+    if (!showAssistive() || !enabled || !rows.length) {
+      translationAccordion.classList.add("hidden");
+      return;
+    }
+    if (translationAccordionLabel) {
+      translationAccordionLabel.textContent =
+        assistiveLang() === "es" ? t("translationAccordionEs") : t("translationAccordion");
+    }
+    if (translationListWrap) {
+      let html =
+        '<div class="overflow-hidden rounded-lg border border-emerald-100/80 bg-white/80">';
+      html +=
+        '<div class="grid grid-cols-2 border-b border-emerald-100 bg-emerald-50/70">' +
+        '<p class="px-2 py-1 text-[9px] font-semibold tracking-wider text-slate-500">' +
+        t("original") +
+        "</p>" +
+        '<p class="px-2 py-1 text-[9px] font-semibold tracking-wider text-emerald-800/80">' +
+        (assistiveLang() === "es" ? t("translationColEs") : t("translationCol")) +
+        "</p></div>";
+      rows.forEach(function (row, index) {
+        html +=
+          '<div class="grid grid-cols-2 items-stretch' +
+          (index < rows.length - 1 ? " border-b border-emerald-50" : "") +
+          '">' +
+          '<p class="border-r border-emerald-50 px-2 py-1.5 leading-relaxed text-slate-800">' +
+          escHtml(row.en || t("noOriginal")) +
+          "</p>" +
+          '<p class="px-2 py-1.5 leading-relaxed text-slate-700">' +
+          escHtml(row.ja || (assistiveLang() === "es" ? t("noTranslationEs") : t("noTranslation"))) +
+          "</p></div>";
+      });
+      html += "</div>";
+      translationListWrap.innerHTML = html;
+    }
+    translationAccordion.classList.remove("hidden");
+    translationOpen = false;
+    if (translationBody) translationBody.style.maxHeight = "0";
+    if (translationToggleLabel) translationToggleLabel.textContent = t("open");
+  }
+
+  if (translationToggleBtn) {
+    translationToggleBtn.addEventListener("click", function () {
+      translationOpen = !translationOpen;
+      if (translationOpen) {
+        var h = Math.min(translationBody.scrollHeight, 220);
+        translationBody.style.maxHeight = h + "px";
+        translationBody.style.overflowY = translationBody.scrollHeight > 220 ? "auto" : "hidden";
+        if (translationToggleLabel) translationToggleLabel.textContent = t("closeAccordion");
+      } else {
+        translationBody.style.maxHeight = "0";
+        translationBody.style.overflowY = "hidden";
+        if (translationToggleLabel) translationToggleLabel.textContent = t("open");
+      }
+    });
   }
 
   if (vocabToggleBtn) {
@@ -386,11 +466,11 @@
         var h = Math.min(vocabBody.scrollHeight, 220);
         vocabBody.style.maxHeight = h + "px";
         vocabBody.style.overflowY = vocabBody.scrollHeight > 220 ? "auto" : "hidden";
-        if (vocabToggleLabel) vocabToggleLabel.textContent = "閉じる ▲";
+        if (vocabToggleLabel) vocabToggleLabel.textContent = t("closeAccordion");
       } else {
         vocabBody.style.maxHeight = "0";
         vocabBody.style.overflowY = "hidden";
-        if (vocabToggleLabel) vocabToggleLabel.textContent = "開く ▼";
+        if (vocabToggleLabel) vocabToggleLabel.textContent = t("open");
       }
     });
   }
@@ -413,7 +493,7 @@
         ' class="w-full max-h-40 rounded-lg object-contain border border-sky-100 bg-slate-50"></div>';
     }
     if (visibleQuestions.length) {
-      html += '<p class="mb-1 text-[10px] font-semibold text-sky-800">動画を見る前に考えてみよう：</p>';
+      html += '<p class="mb-1 text-[10px] font-semibold text-sky-800">' + t("warmupPrompt") + "</p>";
       html += '<ol class="space-y-1 list-none">';
       visibleQuestions.forEach(function (q, i) {
         html += '<li class="flex items-start gap-1.5 text-[11px] text-slate-700">' +
@@ -427,7 +507,7 @@
     warmupAccordion.classList.remove("hidden");
     warmupOpen = false;
     if (warmupBody) warmupBody.style.maxHeight = "0";
-    if (warmupToggleLabel) warmupToggleLabel.textContent = "開く ▼";
+    if (warmupToggleLabel) warmupToggleLabel.textContent = t("open");
   }
 
   if (warmupToggleBtn) {
@@ -437,11 +517,11 @@
         var h = Math.min(warmupBody.scrollHeight, 320);
         warmupBody.style.maxHeight = h + "px";
         warmupBody.style.overflowY = warmupBody.scrollHeight > 320 ? "auto" : "hidden";
-        if (warmupToggleLabel) warmupToggleLabel.textContent = "閉じる ▲";
+        if (warmupToggleLabel) warmupToggleLabel.textContent = t("closeAccordion");
       } else {
         warmupBody.style.maxHeight = "0";
         warmupBody.style.overflowY = "hidden";
-        if (warmupToggleLabel) warmupToggleLabel.textContent = "開く ▼";
+        if (warmupToggleLabel) warmupToggleLabel.textContent = t("open");
       }
     });
   }
@@ -453,11 +533,11 @@
       .split("\n")
       .map((line) => {
         if (line === "項目別評価点") {
-          return '<div class="mt-3 mb-1 font-bold text-teal-700">項目別評価点</div>';
+          return '<div class="mt-3 mb-1 font-bold text-teal-700">' + t("scoreHeading") + "</div>";
         }
         const total = line.match(/^合計:\s*(\d+\/\d+)/);
         if (total) {
-          return `<div class="my-1 rounded-md bg-teal-50 px-2 py-1 font-bold text-teal-800">合計: ${total[1]}</div>`;
+          return `<div class="my-1 rounded-md bg-teal-50 px-2 py-1 font-bold text-teal-800">${t("scoreTotal")} ${total[1]}</div>`;
         }
         const score = line.match(/^- ([^:]+):\s*(\d+\/\d+)(.*)$/);
         if (score) {
@@ -494,7 +574,7 @@
     recordRemaining = recordSeconds;
     updatePrepDisplay();
     updateRecordDisplay();
-    if (prepStartBtn) prepStartBtn.textContent = prepSeconds > 0 ? "準備開始" : "準備なし";
+    if (prepStartBtn) prepStartBtn.textContent = prepSeconds > 0 ? t("startPrep") : t("noPrep");
 
     const visible = timers.visible !== false;
     const showPrepTimer = visible && prepSeconds > 0;
@@ -689,7 +769,7 @@
       destroyYouTubePlayer();
       if (videoPlaceholder) {
         videoPlaceholder.classList.remove("hidden");
-        videoPlaceholder.textContent = "このクラスには動画が未設定です。管理画面で URL を登録してください。";
+        videoPlaceholder.textContent = t("noVideo");
       }
       return;
     }
@@ -763,7 +843,7 @@
     if (studentNumberInput) studentNumberInput.value = "";
     if (studentNameInput) studentNameInput.value = "";
     if (rosterSelectWrap) rosterSelectWrap.classList.add("hidden");
-    if (rosterSelect) rosterSelect.innerHTML = '<option value="">— 名前を選択 —</option>';
+    if (rosterSelect) rosterSelect.innerHTML = '<option value="">' + t("pickName") + "</option>";
 
     let requireStudentInfo = false;
     try {
@@ -806,14 +886,18 @@
       await loadClassSession(classId);
     } catch (err) {
       appMain.classList.remove("hidden");
-      feedbackArea.textContent = err.message || "クラス設定の読み込みに失敗しました。";
+      feedbackArea.textContent = err.message || t("classLoadFail");
     }
   }
 
   async function loadClassSession(classId) {
     const res = await fetch(`/news/api/config?class_id=${encodeURIComponent(classId)}`);
     const data = await res.json();
-    if (!data.ok) throw new Error(data.error || "クラス設定の読み込みに失敗しました");
+    if (!data.ok) throw new Error(data.error || t("classLoadFail"));
+
+    if (data.display_language && window.NewsI18n) {
+      window.NewsI18n.setLang(data.display_language);
+    }
 
     const cls = data.class;
     selectedClassId = cls.id;
@@ -826,6 +910,10 @@
       cls.vocabulary_data || [],
       cls.vocabulary_scaffolding_enabled === true
     );
+    renderTranslation(
+      cls.translation_pairs || [],
+      cls.translation_enabled === true
+    );
     renderWarmup(
       cls.warmup_image_url || "",
       cls.warmup_questions || [],
@@ -835,9 +923,9 @@
 
     if (!cls.video.has_script) {
       feedbackArea.textContent =
-        "参照スクリプトが未設定です。管理画面でスクリプトを保存してください。評価はスクリプト設定後に可能です。";
+        t("noScript");
     } else {
-      feedbackArea.textContent = "要約を提出すると、ここに CEFR レベル別の評価が表示されます。";
+      feedbackArea.textContent = t("feedbackPlaceholder");
     }
 
     hideClassPicker();
@@ -858,12 +946,12 @@
       updatePrepDisplay();
       if (prepRemaining <= 0) {
         clearInterval(prepInterval);
-        prepStartBtn.textContent = "完了";
+        prepStartBtn.textContent = t("done");
         prepStartBtn.disabled = false;
         if (!isRecording) showRecordModePicker();
       }
     }, 1000);
-    prepStartBtn.textContent = "計測中…";
+    prepStartBtn.textContent = t("measuring");
   }
 
   function startRecordTimer() {
@@ -926,14 +1014,14 @@
   function showRecordModePicker() {
     if (isUploading || isRecording) return;
     if (recordModePopover) recordModePopover.classList.remove("hidden");
-    if (recordStatus) recordStatus.textContent = "方式を選んでください";
+    if (recordStatus) recordStatus.textContent = t("pickMode");
   }
 
   function prepareRecordingUi(statusText) {
     clearInterval(prepInterval);
     if (prepStartBtn) {
       prepStartBtn.disabled = false;
-      prepStartBtn.textContent = prepSeconds > 0 ? "準備開始" : "準備なし";
+      prepStartBtn.textContent = prepSeconds > 0 ? t("startPrep") : t("noPrep");
     }
     if (hasRecordingEnded) {
       transcriptArea.value = "";
@@ -944,7 +1032,7 @@
       finalTranscript = transcriptArea.value.trim() ? transcriptArea.value + " " : "";
     }
     isRecording = true;
-    recordBtn.textContent = "録音停止";
+    recordBtn.textContent = t("stopRecord");
     recordBtn.classList.replace("from-teal-600", "from-slate-500");
     recordBtn.classList.replace("to-emerald-600", "to-slate-600");
     recordStatus.textContent = statusText;
@@ -953,7 +1041,7 @@
   }
 
   function resetRecordButton() {
-    recordBtn.textContent = "録音開始";
+    recordBtn.textContent = t("startRecord");
     recordBtn.classList.replace("from-slate-500", "from-teal-600");
     recordBtn.classList.replace("to-slate-600", "to-emerald-600");
   }
@@ -973,7 +1061,7 @@
   function startLiveRecording() {
     if (isUploading) return;
     if (!speechSupported) {
-      recordStatus.textContent = "このブラウザは同時読み込みに非対応です。録音後読み込みを選んでください。";
+      recordStatus.textContent = t("liveUnsupported");
       return;
     }
     hideRecordModePicker();
@@ -981,7 +1069,7 @@
     if (!recognition) return;
 
     recordMode = "live";
-    prepareRecordingUi("同時読み込み中…");
+    prepareRecordingUi(t("liveLoading"));
     try {
       recognition.start();
     } catch (_) {
@@ -992,7 +1080,7 @@
   async function startDeferredRecording() {
     if (isUploading) return;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
-      recordStatus.textContent = "このブラウザは録音後読み込みに非対応です。";
+      recordStatus.textContent = t("deferredUnsupported");
       return;
     }
     hideRecordModePicker();
@@ -1000,7 +1088,7 @@
     try {
       mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (_) {
-      recordStatus.textContent = "マイクの許可が必要です。ブラウザの設定を確認してください。";
+      recordStatus.textContent = t("micNeeded");
       return;
     }
 
@@ -1016,7 +1104,7 @@
       const ext = type.includes("mp4") ? "m4a" : type.includes("wav") ? "wav" : "webm";
       mediaRecorder = null;
       if (!recordedChunks.length) {
-        recordStatus.textContent = "音声を録音できませんでした。";
+        recordStatus.textContent = t("recordFail");
         return;
       }
       const file = new File(recordedChunks, `speech.${ext}`, { type });
@@ -1025,7 +1113,7 @@
     });
 
     recordMode = "deferred";
-    prepareRecordingUi("録音中…（停止後に読み込みます）");
+    prepareRecordingUi(t("recordingNow"));
     try {
       mediaRecorder.start();
     } catch (err) {
@@ -1033,7 +1121,7 @@
       mediaRecorder = null;
       isRecording = false;
       resetRecordButton();
-      recordStatus.textContent = err.message || "録音を開始できませんでした。";
+      recordStatus.textContent = err.message || t("cannotStartRecord");
       updateSubmitState();
     }
   }
@@ -1064,7 +1152,7 @@
       stopMediaTracks();
     }
     resetRecordButton();
-    recordStatus.textContent = mode === "deferred" ? "読み込み中…" : "停止";
+    recordStatus.textContent = mode === "deferred" ? t("loading") : t("stopped");
     hasRecordingEnded = true;
     updateSubmitState();
   }
@@ -1080,8 +1168,8 @@
     }
     if (recordModePopover && !recordModePopover.classList.contains("hidden")) {
       hideRecordModePicker();
-      if (recordStatus && recordStatus.textContent === "方式を選んでください") {
-        recordStatus.textContent = "待機中";
+      if (recordStatus && recordStatus.textContent === t("pickMode")) {
+        recordStatus.textContent = t("waiting");
       }
       return;
     }
@@ -1105,8 +1193,8 @@
     const wrap = recordBtn && recordBtn.parentElement;
     if (wrap && wrap.contains(event.target)) return;
     hideRecordModePicker();
-    if (!isRecording && recordStatus && recordStatus.textContent === "方式を選んでください") {
-      recordStatus.textContent = "待機中";
+    if (!isRecording && recordStatus && recordStatus.textContent === t("pickMode")) {
+      recordStatus.textContent = t("waiting");
     }
   });
 
@@ -1118,9 +1206,9 @@
 
     submitBtn.disabled = true;
     submitMessage.classList.remove("hidden", "text-red-600", "text-emerald-600", "text-slate-500");
-    submitMessage.textContent = "AI が評価中…";
+    submitMessage.textContent = t("evaluating");
     submitMessage.classList.add("text-slate-500");
-    feedbackArea.textContent = "評価を生成しています…";
+    feedbackArea.textContent = t("generatingEval");
 
     try {
       const res = await fetch("/news/api/evaluate", {
@@ -1138,7 +1226,7 @@
       const data = await parseJsonResponse(res);
       renderFeedback(data.feedback);
       feedbackArea.scrollTop = 0;
-      submitMessage.textContent = "評価が完了しました。";
+      submitMessage.textContent = t("evalDone");
       submitMessage.classList.replace("text-slate-500", "text-emerald-600");
       return true;
     } catch (err) {
@@ -1157,30 +1245,30 @@
 
     isUploading = true;
     updateSubmitState();
-    setUploadStatus(`${file.name} を読み込み中…`, "info");
+    setUploadStatus(`${file.name} ${t("loadingMedia")}`, "info");
     submitMessage.classList.remove("hidden", "text-red-600", "text-emerald-600", "text-slate-500");
-    submitMessage.textContent = "読み込み中…";
+    submitMessage.textContent = t("loading");
     submitMessage.classList.add("text-slate-500");
-    feedbackArea.textContent = "動画・音声を読み込み中…";
+    feedbackArea.textContent = t("loadingAv");
 
     try {
       const payload = await prepareUploadFile(file);
-      setUploadStatus("読み込み中…", "info");
+      setUploadStatus(t("loadingThenEval"), "info");
       const form = new FormData();
       form.append("audio", payload, payload.name || file.name || "speech.wav");
       form.append("class_id", selectedClassId);
       const res = await fetch("/news/api/transcribe", { method: "POST", body: form });
       const data = await parseJsonResponse(res);
       const transcript = (data.transcript || "").trim();
-      if (!transcript) throw new Error("音声を認識できませんでした。");
+      if (!transcript) throw new Error(t("cannotRecognize"));
 
       transcriptArea.value = transcript;
       finalTranscript = transcript;
       hasRecordingEnded = true;
       updateSubmitState();
-      setUploadStatus("読み込み完了。評価しています…", "info");
+      setUploadStatus(t("loadedEvaluating"), "info");
       const ok = await submitSummary();
-      if (ok) setUploadStatus("アップロードした音声の評価が完了しました。", "ok");
+      if (ok) setUploadStatus(t("uploadEvalDone"), "ok");
     } catch (err) {
       setUploadStatus(err.message, "error");
       submitMessage.textContent = err.message;
@@ -1224,7 +1312,7 @@
       clearPickerError();
       const classId = classPickerSelect ? classPickerSelect.value.trim() : "";
       if (!classId) {
-        showPickerError("クラスを選択してください。");
+        showPickerError(t("selectClass"));
         return;
       }
       classPickerStart.disabled = true;
@@ -1264,7 +1352,7 @@
       const name = studentNameInput ? studentNameInput.value.trim() : "";
       if (!number && !name) {
         if (studentInfoError) {
-          studentInfoError.textContent = "番号または名前を入力してください。";
+          studentInfoError.textContent = t("enterNameOrNumber");
           studentInfoError.classList.remove("hidden");
         }
         return;
@@ -1279,7 +1367,7 @@
         await loadClassSession(pendingClassId);
       } catch (err) {
         appMain.classList.remove("hidden");
-        feedbackArea.textContent = err.message || "クラス設定の読み込みに失敗しました。";
+        feedbackArea.textContent = err.message || t("classLoadFail");
       }
     });
   }
@@ -1301,7 +1389,7 @@
   function startInitialSession() {
     if (!initialClass) {
       appMain.classList.remove("hidden");
-      feedbackArea.textContent = "クラスが未設定です。先生に共有リンクを確認してください。";
+      feedbackArea.textContent = t("noClassSet");
       return;
     }
     prepareStudentInfo(initialClass);

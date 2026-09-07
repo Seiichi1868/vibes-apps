@@ -33,7 +33,31 @@ VOCAB_EXTRACTION_MIN = 25
 VOCAB_EXTRACTION_MAX = 30
 VOCAB_STORAGE_MAX = 50
 VOCABULARY_EXTRACTION_MODEL = "gpt-5.6-luna"
-DISPLAY_LANGUAGES = ("ja", "en")
+DISPLAY_LANGUAGES = ("ja", "en", "es")
+_DISPLAY_LANGUAGE_ALIASES = {
+    "ja": "ja",
+    "jp": "ja",
+    "japanese": "ja",
+    "日本語": "ja",
+    "en": "en",
+    "english": "en",
+    "es": "es",
+    "spanish": "es",
+    "español": "es",
+    "espanol": "es",
+}
+
+
+def resolve_display_language(value: str | None = None, *, fallback: str = "ja") -> str:
+    """管理設定の表示言語。未対応値は fallback（既定は日本語）へ寄せる。"""
+    raw = str(value or "").strip().lower()
+    lang = _DISPLAY_LANGUAGE_ALIASES.get(raw)
+    if lang in DISPLAY_LANGUAGES:
+        return lang
+    fb = _DISPLAY_LANGUAGE_ALIASES.get(str(fallback or "").strip().lower(), "ja")
+    return fb if fb in DISPLAY_LANGUAGES else "ja"
+
+
 AI_MODELS = (
     "gpt-5.6-luna",
     "gpt-5.6-terra",

@@ -26,6 +26,10 @@ class VocabularyItem(BaseModel):
         description="品詞（名詞、動詞、形容詞、副詞、熟語、句動詞 など）"
     )
     meaning: str = Field(description="スクリプト内の文脈に合致した日本語の意味")
+    meaning_es: str = Field(
+        default="",
+        description="同じ文脈でのスペイン語の意味",
+    )
 
 
 class VocabularyExtractionResult(BaseModel):
@@ -90,9 +94,11 @@ C1: articulate, facilitate, formidable, inherent, pervasive, unprecedented, \
 exacerbate, scrutinize, rhetoric, in response to
 C2: ameliorate, commensurate, inexorable, ubiquitous, propitious
 
-==== RULE 3 — 日本語の意味（meaning）の基準 ====
+==== RULE 3 — 意味（meaning / meaning_es）の基準 ====
 辞書的な第一義を機械的にあてるのではなく、「そのニューススクリプトの文脈（Context）」\
-において最も自然で、高校生が理解しやすい日本語訳を提供すること。
+において最も自然で、高校生が理解しやすい訳を提供すること。
+- meaning: 日本語
+- meaning_es: 同じ意味のスペイン語（自然なスペイン語。直訳調にしない）
 
 ==== RULE 4 — Few-Shot Example（判定基準の統一） ====
 
@@ -107,37 +113,43 @@ opposition parties in Brussels."
     "word": "unprecedented",
     "cefr": "C1",
     "part_of_speech": "形容詞",
-    "meaning": "前例のない、かつてない"
+    "meaning": "前例のない、かつてない",
+    "meaning_es": "sin precedentes, nunca visto"
   }},
   {{
     "word": "infrastructure",
     "cefr": "B2",
     "part_of_speech": "名詞",
-    "meaning": "（道路や通信などの）インフラ、社会基盤"
+    "meaning": "（道路や通信などの）インフラ、社会基盤",
+    "meaning_es": "infraestructura (carreteras, comunicaciones, etc.)"
   }},
   {{
     "word": "bolster",
     "cefr": "B2",
     "part_of_speech": "動詞",
-    "meaning": "〜を強化する、補強する"
+    "meaning": "〜を強化する、補強する",
+    "meaning_es": "reforzar, fortalecer"
   }},
   {{
     "word": "economic policy",
     "cefr": "B2",
     "part_of_speech": "熟語",
-    "meaning": "経済政策"
+    "meaning": "経済政策",
+    "meaning_es": "política económica"
   }},
   {{
     "word": "implement",
     "cefr": "B2",
     "part_of_speech": "動詞",
-    "meaning": "（政策や計画などを）実行する、実施する"
+    "meaning": "（政策や計画などを）実行する、実施する",
+    "meaning_es": "poner en práctica, implementar"
   }},
   {{
     "word": "criticism",
     "cefr": "B1",
     "part_of_speech": "名詞",
-    "meaning": "批判、非難"
+    "meaning": "批判、非難",
+    "meaning_es": "crítica, condena"
   }}
 ]
 ※ "government" は高校生にとって既知のため除外。"Brussels" は固有名詞のため除外。\
@@ -153,6 +165,7 @@ def _build_user_prompt(script: str) -> str:
 - 抽出対象は B1, B2, C1, C2 レベルのみ（A1/A2 は除外）
 - 固有名詞・現代略語・基本語の単純派生形は除外
 - 日本語の意味はこのスクリプトの文脈に合った自然な訳を使うこと
+- スペイン語の意味（meaning_es）も同じ文脈で自然な訳を必ず付けること
 
 --- English script ---
 {script}
@@ -165,7 +178,8 @@ def _build_user_prompt(script: str) -> str:
       "word": "単語・熟語・句動詞（小文字・原形推奨）",
       "cefr": "B1 | B2 | C1 | C2 のいずれか",
       "part_of_speech": "品詞（名詞 / 動詞 / 形容詞 / 副詞 / 熟語 / 句動詞 など）",
-      "meaning": "このスクリプトの文脈に合った日本語の意味"
+      "meaning": "このスクリプトの文脈に合った日本語の意味",
+      "meaning_es": "同じ文脈のスペイン語の意味"
     }}
   ]
 }}
@@ -209,10 +223,11 @@ def _items_to_dicts(items: list[VocabularyItem]) -> list[dict]:
             "cefr": item.cefr,
             "part_of_speech": item.part_of_speech.strip(),
             "meaning": item.meaning.strip(),
+            "meaning_es": (item.meaning_es or "").strip(),
             "selected": True,
         }
         for item in items
-        if item.word.strip() and item.meaning.strip()
+        if item.word.strip() and (item.meaning.strip() or (item.meaning_es or "").strip())
     ]
 
 

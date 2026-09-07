@@ -16,6 +16,7 @@ from news_app.config import (
     VOCAB_CEFR_LEVELS,
     VOCAB_STORAGE_MAX,
     resolve_cefr_level,
+    resolve_display_language,
 )
 
 _lock = threading.Lock()
@@ -51,6 +52,8 @@ DEFAULT_CLASS_CURRENT = {
     "script": "",
     "script_ja": "",
     "script_ja_pairs": [],
+    "script_es": "",
+    "script_es_pairs": [],
     "evaluation_criteria": {level: "" for level in CEFR_LEVELS},
     "prep_timer_seconds": 60,
     "record_timer_seconds": 60,
@@ -117,6 +120,7 @@ def _apply_appearance(data: dict | None, merged: dict) -> dict:
 def appearance_context(state: dict | None = None) -> dict:
     current = state if isinstance(state, dict) else load_state()
     return {
+        "display_language": resolve_display_language(current.get("display_language")),
         **resolve_background(current.get("background_id")),
         "background_opacity": _clamp_opacity(
             current.get("background_opacity"), DEFAULT_BACKGROUND_OPACITY
@@ -229,7 +233,8 @@ def _normalize_vocabulary_item(raw) -> dict | None:
     cefr = str(raw.get("cefr") or "").strip().upper()
     part_of_speech = str(raw.get("part_of_speech") or "").strip()
     meaning = str(raw.get("meaning") or "").strip()
-    if not word or not meaning or cefr not in VOCAB_CEFR_LEVELS:
+    meaning_es = str(raw.get("meaning_es") or "").strip()
+    if not word or not (meaning or meaning_es) or cefr not in VOCAB_CEFR_LEVELS:
         return None
     selected_raw = raw.get("selected", True)
     if isinstance(selected_raw, str):
@@ -241,6 +246,7 @@ def _normalize_vocabulary_item(raw) -> dict | None:
         "cefr": cefr,
         "part_of_speech": part_of_speech,
         "meaning": meaning,
+        "meaning_es": meaning_es,
         "selected": selected,
     }
 
@@ -256,23 +262,43 @@ def _normalize_vocabulary_data(raw) -> list[dict]:
     return items[:VOCAB_STORAGE_MAX]
 
 
-def vocabulary_for_student(items: list[dict] | None) -> list[dict]:
-    """生徒画面向けに、選択済み語彙のみを返す。"""
+def vocabulary_for_student(items: list[dict] | None, display_language: str = "ja") -> list[dict]:
+    """生徒画面向けに、選択済み語彙のみを返す。表示言語がスペイン語ならスペイン語の意味を使う。"""
     if not isinstance(items, list):
         return []
+    lang = resolve_display_language(display_language)
     visible: list[dict] = []
     for item in items:
         if not isinstance(item, dict) or not item.get("selected", True):
             continue
+        meaning_ja = str(item.get("meaning") or "").strip()
+        meaning_es = str(item.get("meaning_es") or "").strip()
+        meaning = meaning_es if lang == "es" and meaning_es else meaning_ja or meaning_es
         visible.append(
             {
                 "word": str(item.get("word") or "").strip(),
                 "cefr": str(item.get("cefr") or "").strip(),
                 "part_of_speech": str(item.get("part_of_speech") or "").strip(),
-                "meaning": str(item.get("meaning") or "").strip(),
+                "meaning": meaning,
+                "meaning_es": meaning_es,
             }
         )
     return [entry for entry in visible if entry["word"] and entry["meaning"]]
+
+
+def script_translation_for_lang(current: dict | None, display_language: str = "ja") -> dict:
+    """表示言語に合わせたスクリプト対訳。英語表示では出さない。"""
+    lang = resolve_display_language(display_language)
+    data = current if isinstance(current, dict) else {}
+    if lang == "es":
+        text = str(data.get("script_es") or "").strip()
+        pairs = _normalize_script_ja_pairs(data.get("script_es_pairs"))
+    elif lang == "ja":
+        text = str(data.get("script_ja") or "").strip()
+        pairs = _normalize_script_ja_pairs(data.get("script_ja_pairs"))
+    else:
+        return {"enabled": False, "text": "", "pairs": []}
+    return {"enabled": bool(text or pairs), "text": text, "pairs": pairs}
 
 
 def _normalize_script_ja_pairs(raw) -> list[dict]:
@@ -283,7 +309,7 @@ def _normalize_script_ja_pairs(raw) -> list[dict]:
         if not isinstance(item, dict):
             continue
         en = str(item.get("en") or "").strip()
-        ja = str(item.get("ja") or "").strip()
+        ja = str(item.get("ja") or item.get("es") or item.get("text") or "").strip()
         if not en and not ja:
             continue
         pairs.append({"en": en, "ja": ja})
@@ -304,6 +330,8 @@ def _normalize_current(raw: dict | None) -> dict:
             "script": str(raw.get("script") or "").strip(),
             "script_ja": str(raw.get("script_ja") or "").strip(),
             "script_ja_pairs": _normalize_script_ja_pairs(raw.get("script_ja_pairs")),
+            "script_es": str(raw.get("script_es") or "").strip(),
+            "script_es_pairs": _normalize_script_ja_pairs(raw.get("script_es_pairs")),
             "evaluation_criteria": _normalize_criteria(raw.get("evaluation_criteria")),
             "prep_timer_seconds": _coerce_nonnegative_int(raw.get("prep_timer_seconds"), 0),
             "record_timer_seconds": _coerce_nonnegative_int(raw.get("record_timer_seconds"), 60),
@@ -336,6 +364,8 @@ def _normalize_class(class_id: str, raw: dict) -> dict:
                 "script": str(item.get("script") or "").strip(),
                 "script_ja": str(item.get("script_ja") or "").strip(),
                 "script_ja_pairs": _normalize_script_ja_pairs(item.get("script_ja_pairs")),
+                "script_es": str(item.get("script_es") or "").strip(),
+                "script_es_pairs": _normalize_script_ja_pairs(item.get("script_es_pairs")),
                 "evaluation_criteria": _normalize_criteria(item.get("evaluation_criteria")),
                 "prep_timer_seconds": _coerce_nonnegative_int(item.get("prep_timer_seconds"), 0),
                 "record_timer_seconds": _coerce_nonnegative_int(item.get("record_timer_seconds"), 60),
@@ -365,6 +395,7 @@ def _migrate_legacy_state(data: dict) -> dict:
     for key in ("display_language", "ai_model", "openai_api_key", "active_class_id"):
         if key in data and data[key] is not None:
             state[key] = data[key]
+    state["display_language"] = resolve_display_language(state.get("display_language"))
     state["default_cefr_level"] = resolve_cefr_level(data.get("default_cefr_level"))
     _apply_appearance(data, state)
 
@@ -408,6 +439,7 @@ def _normalize_state(data: dict | None) -> dict:
         for key in ("display_language", "ai_model", "openai_api_key", "active_class_id"):
             if key in data and data[key] is not None:
                 merged[key] = data[key]
+        merged["display_language"] = resolve_display_language(merged.get("display_language"))
         merged["default_cefr_level"] = resolve_cefr_level(data.get("default_cefr_level"))
         if isinstance(data.get("default_evaluation_criteria"), dict):
             merged["default_evaluation_criteria"] = _normalize_criteria(data["default_evaluation_criteria"])
@@ -427,6 +459,7 @@ def _normalize_state(data: dict | None) -> dict:
 
     merged = deepcopy(DEFAULT_STATE)
     merged.update({k: v for k, v in data.items() if k in merged and k != "classes"})
+    merged["display_language"] = resolve_display_language(merged.get("display_language"))
     merged["default_cefr_level"] = resolve_cefr_level(merged.get("default_cefr_level"))
     if isinstance(data.get("classes"), dict):
         for cid, cls in data["classes"].items():
@@ -472,9 +505,11 @@ def save_state(state: dict) -> dict:
 
 def update_settings(**kwargs) -> dict:
     state = load_state()
-    for key in ("display_language", "ai_model", "openai_api_key"):
+    for key in ("ai_model", "openai_api_key"):
         if key in kwargs:
             state[key] = kwargs[key]
+    if "display_language" in kwargs:
+        state["display_language"] = resolve_display_language(kwargs.get("display_language"))
     if "default_cefr_level" in kwargs:
         state["default_cefr_level"] = resolve_cefr_level(kwargs.get("default_cefr_level"))
     if "default_evaluation_criteria" in kwargs and isinstance(kwargs["default_evaluation_criteria"], dict):

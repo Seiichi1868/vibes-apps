@@ -90,26 +90,27 @@
   <div class="relative w-full max-w-md rounded-3xl border border-white/80 bg-white/90 p-5 shadow-[0_18px_50px_rgba(14,116,144,0.14)]">
     <div class="mb-4 text-center">
       <p class="text-[10px] font-semibold uppercase tracking-[0.28em] text-teal-600/75">Start Session</p>
-      <h2 class="mt-1 text-xl font-bold text-slate-800">クラスを選択</h2>
-      <p class="mt-1 text-xs text-slate-500">授業用の動画とスピーキング設定を読み込みます。</p>
+      <h2 class="mt-1 text-xl font-bold text-slate-800" data-i18n="classPickerTitle">クラスを選択</h2>
+      <p class="mt-1 text-xs text-slate-500" data-i18n="classPickerLead">授業用の動画とスピーキング設定を読み込みます。</p>
     </div>
 
     {% if classes %}
-    <label class="mb-1 block text-[11px] font-semibold text-slate-600" for="class-picker-select">クラス一覧</label>
+    <label class="mb-1 block text-[11px] font-semibold text-slate-600" for="class-picker-select" data-i18n="classList">クラス一覧</label>
     <select id="class-picker-select" class="w-full rounded-xl border border-teal-100 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-inner outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100">
-      <option value="">— 選択してください —</option>
+      <option value="" data-i18n="pleaseSelect">— 選択してください —</option>
       {% for c in classes %}
       <option value="{{ c.id }}" {% if c.id == initial_class_id %}selected{% endif %}>{{ c.name }}</option>
       {% endfor %}
     </select>
     {% else %}
-    <p class="mt-4 rounded-lg border border-amber-200 bg-amber-50/90 p-3 text-xs text-amber-900">
+    <p class="mt-4 rounded-lg border border-amber-200 bg-amber-50/90 p-3 text-xs text-amber-900" data-i18n="noClasses">
       クラスがまだ登録されていません。管理画面でクラスを作成し、授業設定を保存してください。
     </p>
     {% endif %}
 
     <button type="button" id="class-picker-start"
       class="mt-4 w-full rounded-xl bg-gradient-to-r from-sky-600 via-teal-600 to-emerald-600 py-2.5 text-sm font-semibold text-white shadow-lg shadow-teal-700/10 transition hover:from-sky-500 hover:via-teal-500 hover:to-emerald-500 disabled:opacity-40"
+      data-i18n="startLearning"
       {% if not classes %}disabled{% endif %}>
       学習を始める
     </button>
@@ -125,44 +126,45 @@
   <div class="relative w-full max-w-md rounded-3xl border border-white/80 bg-white/90 p-5 shadow-[0_18px_50px_rgba(14,116,144,0.14)]">
     <div class="mb-4 text-center">
       <p class="text-[10px] font-semibold uppercase tracking-[0.28em] text-teal-600/75">Student Info</p>
-      <h2 class="mt-1 text-xl font-bold text-slate-800">学習者情報入力</h2>
+      <h2 class="mt-1 text-xl font-bold text-slate-800" data-i18n="studentInfoTitle">学習者情報入力</h2>
       <p class="mt-1 text-xs text-slate-500">
-        授業クラス: <span id="lesson-class-display" class="font-semibold text-teal-700"></span>
+        <span data-i18n="lessonClassLabel">授業クラス:</span> <span id="lesson-class-display" class="font-semibold text-teal-700"></span>
       </p>
     </div>
 
     <div id="roster-select-wrap" class="hidden mb-3">
-      <label class="mb-1 block text-[11px] font-semibold text-slate-600">名簿から選択</label>
+      <label class="mb-1 block text-[11px] font-semibold text-slate-600" data-i18n="pickFromRoster">名簿から選択</label>
       <select id="roster-select"
         class="w-full rounded-xl border border-teal-100 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-inner outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100">
-        <option value="">— 名前を選択 —</option>
+        <option value="" data-i18n="pickName">— 名前を選択 —</option>
       </select>
-      <p class="mt-1 text-[10px] text-slate-400">または下のフォームで直接入力</p>
+      <p class="mt-1 text-[10px] text-slate-400" data-i18n="orTypeBelow">または下のフォームで直接入力</p>
     </div>
 
     <div class="space-y-2">
       <div>
-        <label class="mb-0.5 block text-[11px] font-semibold text-slate-600" for="student-class-name">HRクラス</label>
+        <label class="mb-0.5 block text-[11px] font-semibold text-slate-600" for="student-class-name" data-i18n="studentHrClass">HRクラス</label>
         <input type="text" id="student-class-name"
           class="w-full rounded-xl border border-teal-100 bg-white px-3 py-2 text-sm text-slate-700 shadow-inner outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
-          placeholder="例: 3年A組">
+          placeholder="例: 3年A組" data-i18n-placeholder="placeholderHr">
       </div>
       <div>
-        <label class="mb-0.5 block text-[11px] font-semibold text-slate-600" for="student-number">出席番号</label>
+        <label class="mb-0.5 block text-[11px] font-semibold text-slate-600" for="student-number" data-i18n="studentNumber">出席番号</label>
         <input type="text" id="student-number" inputmode="numeric"
           class="w-full rounded-xl border border-teal-100 bg-white px-3 py-2 text-sm text-slate-700 shadow-inner outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
-          placeholder="例: 12">
+          placeholder="例: 12" data-i18n-placeholder="placeholderNumber">
       </div>
       <div>
-        <label class="mb-0.5 block text-[11px] font-semibold text-slate-600" for="student-name">名前</label>
+        <label class="mb-0.5 block text-[11px] font-semibold text-slate-600" for="student-name" data-i18n="studentName">名前</label>
         <input type="text" id="student-name"
           class="w-full rounded-xl border border-teal-100 bg-white px-3 py-2 text-sm text-slate-700 shadow-inner outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
-          placeholder="例: 山田 太郎">
+          placeholder="例: 山田 太郎" data-i18n-placeholder="placeholderName">
       </div>
     </div>
 
     <button type="button" id="student-info-start"
-      class="mt-4 w-full rounded-xl bg-gradient-to-r from-sky-600 via-teal-600 to-emerald-600 py-2.5 text-sm font-semibold text-white shadow-lg shadow-teal-700/10 transition hover:from-sky-500 hover:via-teal-500 hover:to-emerald-500">
+      class="mt-4 w-full rounded-xl bg-gradient-to-r from-sky-600 via-teal-600 to-emerald-600 py-2.5 text-sm font-semibold text-white shadow-lg shadow-teal-700/10 transition hover:from-sky-500 hover:via-teal-500 hover:to-emerald-500"
+      data-i18n="startLearning">
       学習を始める
     </button>
     <p id="student-info-error" class="mt-2 hidden text-center text-[11px] text-red-600"></p>
@@ -192,11 +194,12 @@
       <div id="warmup-accordion" class="mb-1 shrink-0 hidden">
         <button type="button" id="warmup-toggle-btn"
           class="flex w-full items-center justify-between rounded-lg border border-sky-200/70 bg-sky-50/80 px-2.5 py-1.5 text-left transition-colors hover:bg-sky-50">
-          <span class="text-[11px] font-semibold text-sky-900">
+          <span class="text-[11px] font-semibold text-sky-900" data-i18n="beforeWatching">
             🎨 動画を見る前に考えよう
           </span>
           <span id="warmup-toggle-label"
-            class="ml-2 shrink-0 text-[10px] font-semibold text-sky-700 transition-transform duration-200">
+            class="ml-2 shrink-0 text-[10px] font-semibold text-sky-700 transition-transform duration-200"
+            data-i18n="open">
             開く ▼
           </span>
         </button>
@@ -209,15 +212,38 @@
         </div>
       </div>
 
+      <!-- 和訳アコーディオン（表示言語が ja / es のとき） -->
+      <div id="translation-accordion" class="mb-1 shrink-0 hidden" data-assistive-lang>
+        <button type="button" id="translation-toggle-btn"
+          class="flex w-full items-center justify-between rounded-lg border border-emerald-200/70 bg-emerald-50/80 px-2.5 py-1.5 text-left transition-colors hover:bg-emerald-50">
+          <span class="text-[11px] font-semibold text-emerald-900">
+            🌐 <span id="translation-accordion-label" data-i18n="translationAccordion">和訳</span>
+          </span>
+          <span id="translation-toggle-label"
+            class="ml-2 shrink-0 text-[10px] font-semibold text-emerald-700 transition-transform duration-200"
+            data-i18n="open">
+            開く ▼
+          </span>
+        </button>
+        <div id="translation-body"
+          class="overflow-hidden transition-[max-height] duration-300 ease-in-out"
+          style="max-height:0;overflow:hidden;">
+          <div class="overflow-x-auto rounded-b-lg border-x border-b border-emerald-100/80 bg-white/70 p-2">
+            <div id="translation-list-wrap"></div>
+          </div>
+        </div>
+      </div>
+
       <!-- 語彙補助アコーディオン（vocabulary_scaffolding_enabled が true のとき表示） -->
-      <div id="vocab-accordion" class="mb-1 shrink-0 hidden">
+      <div id="vocab-accordion" class="mb-1 shrink-0 hidden" data-assistive-lang>
         <button type="button" id="vocab-toggle-btn"
           class="flex w-full items-center justify-between rounded-lg border border-amber-200/70 bg-amber-50/80 px-2.5 py-1.5 text-left transition-colors hover:bg-amber-50">
           <span class="text-[11px] font-semibold text-amber-900">
             💡 <span id="vocab-accordion-label">動画を見る前に：重要ボキャブラリーをチェック</span>
           </span>
           <span id="vocab-toggle-label"
-            class="ml-2 shrink-0 text-[10px] font-semibold text-amber-700 transition-transform duration-200">
+            class="ml-2 shrink-0 text-[10px] font-semibold text-amber-700 transition-transform duration-200"
+            data-i18n="open">
             開く ▼
           </span>
         </button>
@@ -231,7 +257,7 @@
       </div>
 
       <div id="video-container" class="relative aspect-video w-full shrink-0 overflow-hidden rounded-lg bg-slate-900/5 ring-1 ring-teal-100 sm:aspect-auto sm:min-h-0 sm:flex-1">
-        <p id="video-placeholder" class="absolute inset-0 flex items-center justify-center p-2 text-center text-[10px] text-slate-400">
+        <p id="video-placeholder" class="absolute inset-0 flex items-center justify-center p-2 text-center text-[10px] text-slate-400" data-i18n="loadingVideo">
           動画を読み込み中…
         </p>
         <div id="youtube-player"
@@ -244,43 +270,45 @@
       <div id="timers-row" class="flex shrink-0 flex-wrap items-stretch gap-1 sm:flex-nowrap">
         <div id="prep-timer-wrap" class="glass-inset flex min-w-[calc(50%-2px)] flex-1 items-center gap-1 rounded-lg px-1 py-0.5 sm:min-w-0">
           <div class="min-w-0 flex-1 text-center leading-none">
-            <p class="text-[9px] font-medium uppercase tracking-wide text-slate-500">準備</p>
+            <p class="text-[9px] font-medium uppercase tracking-wide text-slate-500" data-i18n="prep">準備</p>
             <p id="prep-timer" class="text-base font-bold tabular-nums leading-none text-sky-600">01:00</p>
           </div>
           <button type="button" id="prep-start-btn"
-            class="shrink-0 rounded-lg bg-gradient-to-r from-sky-600 to-teal-600 px-2 py-1 text-[11px] font-semibold text-white shadow-sm transition hover:from-sky-500 hover:to-teal-500 disabled:cursor-not-allowed disabled:opacity-40">
+            class="shrink-0 rounded-lg bg-gradient-to-r from-sky-600 to-teal-600 px-2 py-1 text-[11px] font-semibold text-white shadow-sm transition hover:from-sky-500 hover:to-teal-500 disabled:cursor-not-allowed disabled:opacity-40"
+            data-i18n="startPrep">
             準備開始
           </button>
         </div>
         <div id="record-timer-wrap" class="glass-inset min-w-[calc(50%-2px)] flex-1 rounded-lg px-1 py-0.5 text-center leading-none sm:min-w-0">
-          <p class="text-[9px] font-medium uppercase tracking-wide text-slate-500">録音</p>
+          <p class="text-[9px] font-medium uppercase tracking-wide text-slate-500" data-i18n="recording">録音</p>
           <p id="record-timer" class="text-base font-bold tabular-nums leading-none text-emerald-600">01:00</p>
         </div>
         <div class="glass-inset flex min-w-[calc(50%-2px)] flex-col items-center justify-center rounded-lg px-2 py-0 text-center leading-none sm:min-w-0 sm:flex-none">
-          <p class="text-[9px] font-medium text-slate-500">レベル</p>
+          <p class="text-[9px] font-medium text-slate-500" data-i18n="level">レベル</p>
           <p id="level-display" class="text-xs font-semibold text-slate-800">{{ initial_level }}</p>
           <input type="hidden" id="level-select" value="{{ initial_level }}">
         </div>
         <div class="relative flex min-w-[calc(50%-2px)] flex-1 flex-col justify-center gap-0 sm:min-w-0">
           <div id="record-mode-popover"
             class="absolute bottom-full left-1/2 z-30 mb-1 hidden w-[12.5rem] -translate-x-1/2 overflow-hidden rounded-lg border border-teal-100 bg-white/95 shadow-lg">
-            <p class="px-2.5 pt-1.5 text-[9px] font-medium text-slate-500">読み込み方式</p>
+            <p class="px-2.5 pt-1.5 text-[9px] font-medium text-slate-500" data-i18n="recordMode">読み込み方式</p>
             <button type="button" id="record-mode-live"
               class="block w-full px-2.5 py-1.5 text-left transition hover:bg-teal-50">
-              <span class="block text-[11px] font-semibold text-slate-800">同時読み込み</span>
-              <span class="block text-[9px] leading-tight text-slate-500">話しながら文字が出ます</span>
+              <span class="block text-[11px] font-semibold text-slate-800" data-i18n="liveMode">同時読み込み</span>
+              <span class="block text-[9px] leading-tight text-slate-500" data-i18n="liveModeHint">話しながら文字が出ます</span>
             </button>
             <button type="button" id="record-mode-deferred"
               class="block w-full px-2.5 py-1.5 text-left transition hover:bg-sky-50">
-              <span class="block text-[11px] font-semibold text-slate-800">録音後読み込み</span>
-              <span class="block text-[9px] leading-tight text-slate-500">録ってから読み込みます</span>
+              <span class="block text-[11px] font-semibold text-slate-800" data-i18n="deferredMode">録音後読み込み</span>
+              <span class="block text-[9px] leading-tight text-slate-500" data-i18n="deferredModeHint">録ってから読み込みます</span>
             </button>
           </div>
           <button type="button" id="record-btn"
-            class="w-full rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 px-2 py-1 text-[11px] font-semibold text-white shadow-sm hover:from-teal-500 hover:to-emerald-500 transition disabled:cursor-not-allowed disabled:opacity-40">
+            class="w-full rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 px-2 py-1 text-[11px] font-semibold text-white shadow-sm hover:from-teal-500 hover:to-emerald-500 transition disabled:cursor-not-allowed disabled:opacity-40"
+            data-i18n="startRecord">
             録音開始
           </button>
-          <span id="record-status" class="text-center text-[9px] leading-tight text-slate-500">待機中</span>
+          <span id="record-status" class="text-center text-[9px] leading-tight text-slate-500" data-i18n="waiting">待機中</span>
         </div>
       </div>
 
@@ -288,26 +316,28 @@
         <input id="upload-video-input" type="file" accept="video/*,.mp4,.mov,.m4v,.webm,.3gp" class="hidden" />
         <input id="upload-audio-input" type="file" accept="audio/*,.m4a,.mp3,.wav,.aac,.caf,.ogg,.webm" class="hidden" />
         <button type="button" id="upload-video-btn"
-          class="flex-1 rounded-lg border border-teal-200 bg-white/70 px-2 py-1 text-[11px] font-semibold text-teal-800 shadow-sm transition hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-40">
+          class="flex-1 rounded-lg border border-teal-200 bg-white/70 px-2 py-1 text-[11px] font-semibold text-teal-800 shadow-sm transition hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-40"
+          data-i18n="pickVideo">
           動画を選ぶ
         </button>
         <button type="button" id="upload-audio-btn"
-          class="flex-1 rounded-lg border border-sky-200 bg-white/70 px-2 py-1 text-[11px] font-semibold text-sky-800 shadow-sm transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-40">
+          class="flex-1 rounded-lg border border-sky-200 bg-white/70 px-2 py-1 text-[11px] font-semibold text-sky-800 shadow-sm transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-40"
+          data-i18n="pickVoiceMemo">
           ボイスメモを選ぶ
         </button>
       </div>
       <p id="upload-status" class="hidden shrink-0 text-center text-[9px] leading-tight text-slate-500"></p>
 
       <div class="flex min-h-0 flex-1 flex-col">
-        <label class="mb-0 shrink-0 block text-[9px] font-medium text-slate-600">要約スピーチ（英語）</label>
+        <label class="mb-0 shrink-0 block text-[9px] font-medium text-slate-600" data-i18n="summaryLabel">要約スピーチ（英語）</label>
         <textarea id="transcript-area"
           class="min-h-0 flex-1 w-full resize-none rounded-lg border border-teal-100 bg-white/60 px-2 py-1 text-xs leading-snug text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-300 shadow-inner"
-          placeholder="録音、貼り付け、または動画・ボイスメモをアップロード…"></textarea>
+          placeholder="録音、貼り付け、または動画・ボイスメモをアップロード…" data-i18n-placeholder="transcriptPlaceholderStudent"></textarea>
       </div>
 
       <button type="button" id="submit-btn"
         class="shrink-0 w-full rounded-lg bg-gradient-to-r from-sky-600 to-blue-600 py-1 text-xs font-semibold text-white shadow-sm hover:from-sky-500 hover:to-blue-500 transition disabled:cursor-not-allowed disabled:opacity-40"
-        disabled>
+        data-i18n="submitSummary" disabled>
         要約を AI に提出
       </button>
       <p id="submit-message" class="hidden shrink-0 text-center text-[10px]"></p>
@@ -315,9 +345,10 @@
 
     <section id="feedback-section"
       class="glass flex flex-col rounded-xl p-2 shadow-lg sm:col-start-2 sm:row-start-1 sm:row-span-2 sm:min-h-0 sm:overflow-hidden sm:p-3">
-      <h2 class="mb-1 shrink-0 text-xs font-semibold uppercase tracking-wider text-teal-700/80">AI 評価フィードバック</h2>
+      <h2 class="mb-1 shrink-0 text-xs font-semibold uppercase tracking-wider text-teal-700/80" data-i18n="feedbackHeading">AI 評価フィードバック</h2>
       <div id="feedback-area"
-        class="min-h-[12rem] rounded-lg border border-teal-100 bg-white/55 px-3 py-2.5 text-xs leading-relaxed text-slate-700 whitespace-pre-wrap shadow-inner sm:min-h-0 sm:flex-1 sm:overflow-y-auto">
+        class="min-h-[12rem] rounded-lg border border-teal-100 bg-white/55 px-3 py-2.5 text-xs leading-relaxed text-slate-700 whitespace-pre-wrap shadow-inner sm:min-h-0 sm:flex-1 sm:overflow-y-auto"
+        data-i18n="feedbackPlaceholder">
         要約を提出すると、ここに CEFR レベル別の評価が表示されます。
       </div>
     </section>
@@ -327,15 +358,19 @@
 
 {% block scripts %}
 <script>
+  window.DISPLAY_LANGUAGE = {{ (display_language or 'ja')|tojson }};
   window.INITIAL_LEVEL = "{{ initial_level }}";
   window.INITIAL_CLASS_ID = "{{ initial_class_id }}";
   window.HAS_CLASSES = {{ 'true' if classes else 'false' }};
   window.CEFR_LEVELS = {{ cefr_levels|list|tojson }};
   window.VOCABULARY_SCAFFOLDING_ENABLED = {{ 'true' if vocabulary_scaffolding_enabled else 'false' }};
   window.INITIAL_VOCABULARY_DATA = {{ vocabulary_data|tojson }};
+  window.INITIAL_TRANSLATION_ENABLED = {{ 'true' if translation_enabled else 'false' }};
+  window.INITIAL_TRANSLATION_PAIRS = {{ (translation_pairs or [])|tojson }};
   window.WARMUP_SCAFFOLDING_ENABLED = false;
   window.INITIAL_WARMUP_IMAGE_URL = "";
   window.INITIAL_WARMUP_QUESTIONS = [];
 </script>
-<script src="{{ url_for('static', filename='news/js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='news/js/i18n.js', v='20260907a') }}"></script>
+<script src="{{ url_for('static', filename='news/js/main.js', v='20260907a') }}"></script>
 {% endblock %}
