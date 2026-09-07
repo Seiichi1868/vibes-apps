@@ -434,10 +434,10 @@
           '<div class="grid grid-cols-2 items-stretch' +
           (index < rows.length - 1 ? " border-b border-emerald-50" : "") +
           '">' +
-          '<p class="border-r border-emerald-50 px-2 py-1.5 leading-relaxed text-slate-800">' +
+          '<p class="border-r border-emerald-50 px-2 py-1.5 text-[11px] leading-snug text-slate-800">' +
           escHtml(row.en || t("noOriginal")) +
           "</p>" +
-          '<p class="px-2 py-1.5 leading-relaxed text-slate-700">' +
+          '<p class="px-2 py-1.5 text-[11px] leading-snug text-slate-700">' +
           escHtml(row.ja || (assistiveLang() === "es" ? t("noTranslationEs") : t("noTranslation"))) +
           "</p></div>";
       });
