@@ -256,6 +256,7 @@
       scriptEl.value = data.script || "";
       scriptEl.placeholder = "英文スクリプトをここに貼り付け…";
       setLessonScriptJa("");
+      setLessonScriptJaPairs([]);
       scriptAutoManaged = true;
       if (lessonMessage) {
         showMessage(
@@ -318,6 +319,7 @@
         : "開始・終了時間を入力すると自動入力されます…";
     }
     setLessonScriptJa("");
+    setLessonScriptJaPairs([]);
     suppressAutoScriptFill = false;
     scriptAutoManaged = true;
 
@@ -887,6 +889,7 @@
     document.getElementById("end-time").value = formatTime(c.end_seconds || 0);
     document.getElementById("lesson-script").value = c.script || "";
     setLessonScriptJa(c.script_ja || "");
+    setLessonScriptJaPairs(c.script_ja_pairs || []);
     document.getElementById("prep-timer-seconds").value = c.prep_timer_seconds ?? 60;
     document.getElementById("record-timer-seconds").value = c.record_timer_seconds ?? 60;
     document.getElementById("timers-visible").checked = c.timers_visible !== false;
@@ -1175,6 +1178,7 @@
         end_time: document.getElementById("end-time").value.trim(),
         script: document.getElementById("lesson-script").value.trim(),
         script_ja: getLessonScriptJa(),
+        script_ja_pairs: getLessonScriptJaPairs(),
         evaluation_criteria: collectClassCriteria(),
         prep_timer_seconds: parseTimerValue(document.getElementById("prep-timer-seconds"), 0),
         record_timer_seconds: parseTimerValue(document.getElementById("record-timer-seconds"), 60),
@@ -1528,13 +1532,45 @@
     if (el) el.value = value || "";
   }
 
+  function getLessonScriptJaPairs() {
+    const el = document.getElementById("lesson-script-ja-pairs");
+    if (!el || !el.value.trim()) return [];
+    try {
+      const parsed = JSON.parse(el.value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_err) {
+      return [];
+    }
+  }
+
+  function setLessonScriptJaPairs(pairs) {
+    const el = document.getElementById("lesson-script-ja-pairs");
+    if (!el) return;
+    const normalized = Array.isArray(pairs)
+      ? pairs
+          .map((item) => ({
+            en: String(item?.en || "").trim(),
+            ja: String(item?.ja || "").trim(),
+          }))
+          .filter((item) => item.en || item.ja)
+      : [];
+    el.value = JSON.stringify(normalized);
+  }
+
   function splitScriptChunks(text) {
     const trimmed = String(text || "").trim();
     if (!trimmed) return [];
-    const paragraphs = trimmed.split(/\n\s*\n/).map((part) => part.trim()).filter(Boolean);
-    if (paragraphs.length > 1) return paragraphs;
     const lines = trimmed.split(/\n/).map((part) => part.trim()).filter(Boolean);
-    return lines.length ? lines : [trimmed];
+    if (lines.length > 1) return lines;
+    const sentences = trimmed.split(/(?<=[.!?])\s+/).map((part) => part.trim()).filter(Boolean);
+    return sentences.length ? sentences : [trimmed];
+  }
+
+  function translationNeedsRealign(script) {
+    const units = splitScriptChunks(script);
+    const pairs = getLessonScriptJaPairs();
+    if (!units.length || !pairs.length || pairs.length !== units.length) return true;
+    return pairs.some((pair, index) => String(pair.en || "").trim() !== units[index]);
   }
 
   function showScriptTranslatePanelStatus(message, isError) {
@@ -1554,36 +1590,40 @@
     scriptTranslatePanelStatus.classList.remove("hidden");
   }
 
-  function renderScriptTranslationList(script, translation) {
+  function renderScriptTranslationList(script, translation, pairs) {
     if (!scriptTranslateList) return;
     scriptTranslateList.innerHTML = "";
-    const englishChunks = splitScriptChunks(script);
-    const japaneseChunks = splitScriptChunks(translation);
-    const paired = englishChunks.length > 0 && englishChunks.length === japaneseChunks.length;
-    const rows = paired
-      ? englishChunks.map((en, index) => ({ en, ja: japaneseChunks[index] }))
-      : [{ en: String(script || "").trim(), ja: String(translation || "").trim() }];
+    const rows =
+      Array.isArray(pairs) && pairs.length
+        ? pairs
+        : splitScriptChunks(script).map((en, index, units) => {
+            const jaChunks = splitScriptChunks(translation);
+            return {
+              en,
+              ja: jaChunks.length === units.length ? jaChunks[index] : index === 0 ? translation : "",
+            };
+          });
 
     const table = document.createElement("div");
     table.className = "overflow-hidden rounded-lg border border-teal-100/80 bg-white/80";
 
     const head = document.createElement("div");
-    head.className = "grid grid-cols-1 gap-2 border-b border-teal-100 bg-teal-50/70 px-2.5 py-1.5 sm:grid-cols-2";
+    head.className = "grid grid-cols-2 border-b border-teal-100 bg-teal-50/70";
     head.innerHTML = `
-      <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">原文</p>
-      <p class="text-[10px] font-semibold uppercase tracking-wider text-amber-800/80">和訳</p>`;
+      <p class="px-2.5 py-1.5 text-[10px] font-semibold tracking-wider text-slate-500">原文</p>
+      <p class="px-2.5 py-1.5 text-[10px] font-semibold tracking-wider text-amber-800/80">和訳</p>`;
     table.appendChild(head);
 
     rows.forEach((row, index) => {
       const item = document.createElement("div");
       item.className =
-        "grid grid-cols-1 gap-2 px-2.5 py-2 sm:grid-cols-2 " +
+        "grid grid-cols-2 items-stretch " +
         (index < rows.length - 1 ? "border-b border-teal-50" : "");
       const en = document.createElement("p");
-      en.className = "whitespace-pre-wrap leading-relaxed text-slate-800";
+      en.className = "border-r border-teal-50 px-2.5 py-2 leading-relaxed text-slate-800";
       en.textContent = row.en || "（原文なし）";
       const ja = document.createElement("p");
-      ja.className = "whitespace-pre-wrap leading-relaxed text-slate-700";
+      ja.className = "px-2.5 py-2 leading-relaxed text-slate-700";
       ja.textContent = row.ja || "（和訳なし）";
       item.append(en, ja);
       table.appendChild(item);
@@ -1613,8 +1653,8 @@
     if (!script) {
       throw new Error("文字起こし（スクリプト）を入力してから和訳を作成してください。");
     }
-    if (!force && getLessonScriptJa()) {
-      return getLessonScriptJa();
+    if (!force && !translationNeedsRealign(script)) {
+      return { script_ja: getLessonScriptJa(), pairs: getLessonScriptJaPairs() };
     }
 
     const res = await fetch("/news/admin/api/class/lesson/translate", {
@@ -1625,7 +1665,8 @@
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || "和訳の作成に失敗しました");
     setLessonScriptJa(data.script_ja || "");
-    return data.script_ja || "";
+    setLessonScriptJaPairs(data.script_ja_pairs || []);
+    return { script_ja: data.script_ja || "", pairs: data.script_ja_pairs || [] };
   }
 
   async function openScriptTranslationPopup({ force = false } = {}) {
@@ -1636,8 +1677,8 @@
     }
 
     showScriptTranslatePanel();
-    renderScriptTranslationList(script, getLessonScriptJa());
-    const needsGenerate = force || !getLessonScriptJa();
+    renderScriptTranslationList(script, getLessonScriptJa(), getLessonScriptJaPairs());
+    const needsGenerate = force || translationNeedsRealign(script);
     if (scriptTranslateBtn) {
       scriptTranslateBtn.disabled = true;
       scriptTranslateBtn.textContent = needsGenerate ? "作成中…" : "原文と和訳";
@@ -1654,7 +1695,7 @@
 
     try {
       const translation = await generateLessonScriptTranslation({ force });
-      renderScriptTranslationList(script, translation);
+      renderScriptTranslationList(script, translation.script_ja, translation.pairs);
       showScriptTranslatePanelStatus("", false);
       if (needsGenerate) {
         showMessage(lessonMessage, "和訳を作成しました。", false);

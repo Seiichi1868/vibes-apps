@@ -273,6 +273,10 @@ def api_save_lesson():
         existing = (get_class(class_id) or {}).get("current") or {}
         existing_script = str(existing.get("script") or "").strip()
         script_ja = str(data.get("script_ja") if "script_ja" in data else existing.get("script_ja") or "").strip()
+        if "script_ja_pairs" in data:
+            script_ja_pairs = data.get("script_ja_pairs")
+        else:
+            script_ja_pairs = existing.get("script_ja_pairs") or []
         title = str(data.get("title") or "").strip()
         if not title:
             title = fetch_youtube_title(url or video_id)
@@ -284,6 +288,7 @@ def api_save_lesson():
             "end_seconds": end_sec,
             "script": script,
             "script_ja": script_ja,
+            "script_ja_pairs": script_ja_pairs,
             "evaluation_criteria": criteria,
             "prep_timer_seconds": prep_sec,
             "record_timer_seconds": record_sec,
@@ -295,6 +300,7 @@ def api_save_lesson():
             lesson_payload["vocabulary_data"] = []
             if "script_ja" not in data:
                 lesson_payload["script_ja"] = ""
+                lesson_payload["script_ja_pairs"] = []
 
         cls = update_class_current(
             class_id,
@@ -349,12 +355,15 @@ def api_translate_lesson_script():
     state = load_state()
     model = resolve_ai_model(state.get("ai_model"))
     try:
-        script_ja = translate_script_to_japanese(script, api_key=api_key, model=model)
+        translated = translate_script_to_japanese(script, api_key=api_key, model=model)
+        script_ja = str(translated.get("script_ja") or "").strip()
+        script_ja_pairs = translated.get("pairs") or []
         cls = update_class_current(
             class_id,
             {
                 "script": script,
                 "script_ja": script_ja,
+                "script_ja_pairs": script_ja_pairs,
             },
         )
         return jsonify(
@@ -362,6 +371,7 @@ def api_translate_lesson_script():
                 "ok": True,
                 "class": cls,
                 "script_ja": script_ja,
+                "script_ja_pairs": script_ja_pairs,
                 "message": f"和訳を作成して保存しました（{len(script_ja)} 文字）。",
             }
         )

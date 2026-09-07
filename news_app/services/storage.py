@@ -50,6 +50,7 @@ DEFAULT_CLASS_CURRENT = {
     "end_seconds": 0,
     "script": "",
     "script_ja": "",
+    "script_ja_pairs": [],
     "evaluation_criteria": {level: "" for level in CEFR_LEVELS},
     "prep_timer_seconds": 60,
     "record_timer_seconds": 60,
@@ -274,6 +275,21 @@ def vocabulary_for_student(items: list[dict] | None) -> list[dict]:
     return [entry for entry in visible if entry["word"] and entry["meaning"]]
 
 
+def _normalize_script_ja_pairs(raw) -> list[dict]:
+    if not isinstance(raw, list):
+        return []
+    pairs: list[dict] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        en = str(item.get("en") or "").strip()
+        ja = str(item.get("ja") or "").strip()
+        if not en and not ja:
+            continue
+        pairs.append({"en": en, "ja": ja})
+    return pairs
+
+
 def _normalize_current(raw: dict | None) -> dict:
     current = deepcopy(DEFAULT_CLASS_CURRENT)
     if not isinstance(raw, dict):
@@ -287,6 +303,7 @@ def _normalize_current(raw: dict | None) -> dict:
             "end_seconds": _coerce_nonnegative_int(raw.get("end_seconds"), 0),
             "script": str(raw.get("script") or "").strip(),
             "script_ja": str(raw.get("script_ja") or "").strip(),
+            "script_ja_pairs": _normalize_script_ja_pairs(raw.get("script_ja_pairs")),
             "evaluation_criteria": _normalize_criteria(raw.get("evaluation_criteria")),
             "prep_timer_seconds": _coerce_nonnegative_int(raw.get("prep_timer_seconds"), 0),
             "record_timer_seconds": _coerce_nonnegative_int(raw.get("record_timer_seconds"), 60),
@@ -318,6 +335,7 @@ def _normalize_class(class_id: str, raw: dict) -> dict:
                 "end_seconds": _coerce_nonnegative_int(item.get("end_seconds"), 0),
                 "script": str(item.get("script") or "").strip(),
                 "script_ja": str(item.get("script_ja") or "").strip(),
+                "script_ja_pairs": _normalize_script_ja_pairs(item.get("script_ja_pairs")),
                 "evaluation_criteria": _normalize_criteria(item.get("evaluation_criteria")),
                 "prep_timer_seconds": _coerce_nonnegative_int(item.get("prep_timer_seconds"), 0),
                 "record_timer_seconds": _coerce_nonnegative_int(item.get("record_timer_seconds"), 60),

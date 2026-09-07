@@ -476,6 +476,7 @@
             class="min-h-[8rem] w-full flex-1 resize-y rounded-lg border border-teal-100 bg-white/90 px-2 py-1.5 text-xs leading-relaxed text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-400 shadow-inner lg:min-h-[10rem]"
             placeholder="英文スクリプトをここに貼り付け…">{{ current.script }}</textarea>
           <input type="hidden" id="lesson-script-ja" name="script_ja" value="{{ current.script_ja or '' }}">
+          <input type="hidden" id="lesson-script-ja-pairs" value="[]">
         </div>
 
         <details class="compact-details shrink-0">
@@ -709,5 +710,5 @@
   window.ADMIN_WARMUP_QUESTIONS = {{ (current.warmup_questions or [])|tojson }};
 </script>
 <script src="{{ url_for('static', filename='news/js/youtube-transcript.js', v='20260904i') }}"></script>
-<script src="{{ url_for('static', filename='news/js/admin.js', v='20260907b') }}"></script>
+<script src="{{ url_for('static', filename='news/js/admin.js', v='20260907c') }}"></script>
 {% endblock %}
