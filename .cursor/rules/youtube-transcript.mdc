@@ -1,0 +1,34 @@
+---
+description: YouTube字幕取得は最優先で壊すな（全アプリ共通）
+alwaysApply: true
+---
+
+# YouTube 字幕取得は最優先・壊すな
+
+CNN10 / 授業設定で YouTube からスクリプトを取る機能は、**このリポジトリで最も壊してはいけない機能**。他機能の整理・リファクタ・共通化より優先する。ユーザーが明示しない限り、経路の削除・統合・並べ替え・URL 変更をしない。
+
+## 保護対象
+
+- `static/news/js/youtube-transcript.js`（取得本体・フォールバック順）
+- `static/news/js/admin.js`（呼び出し）
+- `news_app/routes/main.py`（`/api/youtube-transcript`, `/api/youtube-transcript-worker`, `/api/youtube-timedtext`）
+- `news_app/services/youtube_transcript.py`
+- `flask_app/__init__.py` の News 登録（`url_prefix="/news"` / `"/news/admin"`）
+
+## 現行の取得順（維持）
+
+1. Cloudflare Worker 直接（`vibe-speak-proxy.kishineseiichi.workers.dev`）
+2. 同一オリジン中継 `/news/api/youtube-transcript-worker`
+3. Render InnerTube `/news/api/youtube-transcript`
+4. 埋め込みプレイヤーのキャプショントラック
+5. timedtext 本文 `/news/api/youtube-timedtext`
+
+## news/ 以外でも壊せる
+
+単一 Render サービスのため、次を変えると News 字幕が落ちる。
+
+- `/news` プレフィックス、blueprint 登録順、`/news/api/*` を隠す catch-all
+- `static/` 配信・キャッシュ・CSP / CORS（`workers.dev`・YouTube embed を遮断しない）
+- 共有の `wsgi.py` / gevent / 依存関係で、サーバーから YouTube・Worker への HTTPS を壊す変更
+
+音読・debate・他アプリの修正でも、上記に触れるなら字幕経路を維持したままにする。関連変更後は CNN10 → 区間指定 → スクリプト自動入力が動くことを確認する。

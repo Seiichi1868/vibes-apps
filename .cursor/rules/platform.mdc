@@ -14,6 +14,10 @@ alwaysApply: true
 | 音読 VibeSpeak | `flask_app/`, `templates/`（`news/` 除く）, `static/`（`news/` 除く） |
 | Vibe Speak News | `news_app/`, `templates/news/`, `static/news/` |
 
+## 最優先（壊すな）
+
+YouTube から授業スクリプト（字幕）を取る機能。詳細は `youtube-transcript.mdc`。`news/` 以外の変更でも `/news` の載せ方・`static/` 配信・共有 WSGI を触ると壊れる。
+
 ## 禁止
 
 - `flask_app/` ↔ `news_app/` の相互 import
