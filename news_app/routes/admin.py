@@ -19,6 +19,7 @@ from news_app.config import (
 from news_app.services.cnn10 import fetch_cnn10_episodes
 from news_app.services.cnn10_highlight import find_title_segment_in_transcript
 from news_app.services.network import get_public_base_url
+from news_app.services.openai_translate import translate_script_to_japanese
 from news_app.services.openai_vocab import extract_vocabulary_from_script
 from news_app.services.openai_warmup import extract_warmup_from_script
 from news_app.services.storage import (
@@ -271,6 +272,7 @@ def api_save_lesson():
 
         existing = (get_class(class_id) or {}).get("current") or {}
         existing_script = str(existing.get("script") or "").strip()
+        script_ja = str(data.get("script_ja") if "script_ja" in data else existing.get("script_ja") or "").strip()
         title = str(data.get("title") or "").strip()
         if not title:
             title = fetch_youtube_title(url or video_id)
@@ -281,6 +283,7 @@ def api_save_lesson():
             "start_seconds": start_sec,
             "end_seconds": end_sec,
             "script": script,
+            "script_ja": script_ja,
             "evaluation_criteria": criteria,
             "prep_timer_seconds": prep_sec,
             "record_timer_seconds": record_sec,
@@ -290,6 +293,8 @@ def api_save_lesson():
         }
         if existing_script and existing_script != script:
             lesson_payload["vocabulary_data"] = []
+            if "script_ja" not in data:
+                lesson_payload["script_ja"] = ""
 
         cls = update_class_current(
             class_id,
@@ -313,6 +318,57 @@ def api_save_lesson():
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:
         return jsonify({"ok": False, "error": f"保存に失敗しました: {exc}"}), 500
+
+
+@admin_bp.route("/api/class/lesson/translate", methods=["POST"])
+def api_translate_lesson_script():
+    """指定した英語スクリプトの和訳を生成し、授業レコードに保存する。"""
+    data = request.get_json(silent=True) or {}
+    class_id = str(data.get("class_id") or get_active_class_id()).strip()
+    if not class_id:
+        return jsonify({"ok": False, "error": "クラスを選択または作成してください。"}), 400
+
+    cls = get_class(class_id)
+    if not cls:
+        return jsonify({"ok": False, "error": "クラスが見つかりません。"}), 404
+
+    current = cls.get("current") or {}
+    script = str(data.get("script") or current.get("script") or "").strip()
+    if not script:
+        return jsonify({"ok": False, "error": "文字起こし（スクリプト）を入力してください。"}), 400
+
+    api_key = get_openai_api_key()
+    if not api_key:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "OpenAI API キーが未設定です。管理画面の設定からキーを保存してください。",
+            }
+        ), 400
+
+    state = load_state()
+    model = resolve_ai_model(state.get("ai_model"))
+    try:
+        script_ja = translate_script_to_japanese(script, api_key=api_key, model=model)
+        cls = update_class_current(
+            class_id,
+            {
+                "script": script,
+                "script_ja": script_ja,
+            },
+        )
+        return jsonify(
+            {
+                "ok": True,
+                "class": cls,
+                "script_ja": script_ja,
+                "message": f"和訳を作成して保存しました（{len(script_ja)} 文字）。",
+            }
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"和訳の作成に失敗しました: {exc}"}), 500
 
 
 @admin_bp.route("/api/class/lesson/vocabulary", methods=["POST"])

@@ -51,6 +51,8 @@
   const rosterFileInput = document.getElementById("roster-file-input");
   const rosterUploadBtn = document.getElementById("roster-upload-btn");
   const rosterMessage = document.getElementById("roster-message");
+  const scriptTranslateBtn = document.getElementById("script-translate-btn");
+  const scriptTranslateStatus = document.getElementById("script-translate-status");
   const vocabScaffoldingEnabledEl = document.getElementById("vocab-scaffolding-enabled");
   const vocabExtractBtn = document.getElementById("vocab-extract-btn");
   const vocabExtractStatus = document.getElementById("vocab-extract-status");
@@ -248,6 +250,7 @@
 
       scriptEl.value = data.script || "";
       scriptEl.placeholder = "英文スクリプトをここに貼り付け…";
+      setLessonScriptJa("");
       scriptAutoManaged = true;
       if (lessonMessage) {
         showMessage(
@@ -309,6 +312,7 @@
         ? "開始・終了時間を確認するとスクリプトが自動入力されます…"
         : "開始・終了時間を入力すると自動入力されます…";
     }
+    setLessonScriptJa("");
     suppressAutoScriptFill = false;
     scriptAutoManaged = true;
 
@@ -877,6 +881,7 @@
     document.getElementById("start-time").value = formatTime(c.start_seconds || 0);
     document.getElementById("end-time").value = formatTime(c.end_seconds || 0);
     document.getElementById("lesson-script").value = c.script || "";
+    setLessonScriptJa(c.script_ja || "");
     document.getElementById("prep-timer-seconds").value = c.prep_timer_seconds ?? 60;
     document.getElementById("record-timer-seconds").value = c.record_timer_seconds ?? 60;
     document.getElementById("timers-visible").checked = c.timers_visible !== false;
@@ -1164,6 +1169,7 @@
         start_time: document.getElementById("start-time").value.trim(),
         end_time: document.getElementById("end-time").value.trim(),
         script: document.getElementById("lesson-script").value.trim(),
+        script_ja: getLessonScriptJa(),
         evaluation_criteria: collectClassCriteria(),
         prep_timer_seconds: parseTimerValue(document.getElementById("prep-timer-seconds"), 0),
         record_timer_seconds: parseTimerValue(document.getElementById("record-timer-seconds"), 60),
@@ -1505,6 +1511,16 @@
     lessonScriptEl.addEventListener("input", () => {
       scriptAutoManaged = false;
     });
+  }
+
+  function getLessonScriptJa() {
+    const el = document.getElementById("lesson-script-ja");
+    return el ? el.value.trim() : "";
+  }
+
+  function setLessonScriptJa(value) {
+    const el = document.getElementById("lesson-script-ja");
+    if (el) el.value = value || "";
   }
 
   function esc(str) {
@@ -2019,6 +2035,52 @@
       } catch (err) {
         showMessage(lessonMessage, err.message, true);
         vocabScaffoldingEnabledEl.checked = !enabled;
+      }
+    });
+  }
+
+  if (scriptTranslateBtn) {
+    scriptTranslateBtn.addEventListener("click", async () => {
+      const classId = getSelectedClassId() || (lessonClassId && lessonClassId.value);
+      if (!classId) {
+        showMessage(lessonMessage, "クラスを選択または作成してください。", true);
+        return;
+      }
+      const script = document.getElementById("lesson-script")?.value.trim() || "";
+      if (!script) {
+        showMessage(lessonMessage, "文字起こし（スクリプト）を入力してから和訳を作成してください。", true);
+        return;
+      }
+
+      scriptTranslateBtn.disabled = true;
+      scriptTranslateBtn.textContent = "作成中…";
+      if (scriptTranslateStatus) {
+        scriptTranslateStatus.textContent = "AI が和訳を作成中です（数秒かかります）…";
+        scriptTranslateStatus.classList.remove("hidden");
+      }
+
+      try {
+        const res = await fetch("/news/admin/api/class/lesson/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ class_id: classId, script }),
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "和訳の作成に失敗しました");
+        setLessonScriptJa(data.script_ja || "");
+        const jaEl = document.getElementById("lesson-script-ja");
+        jaEl?.focus();
+        jaEl?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        showMessage(lessonMessage, data.message || "和訳を作成しました。", false);
+        if (scriptTranslateStatus) scriptTranslateStatus.classList.add("hidden");
+      } catch (err) {
+        showMessage(lessonMessage, err.message, true);
+        if (scriptTranslateStatus) {
+          scriptTranslateStatus.textContent = "⚠ 和訳の作成に失敗しました。";
+        }
+      } finally {
+        scriptTranslateBtn.disabled = false;
+        scriptTranslateBtn.textContent = "和訳を作成";
       }
     });
   }

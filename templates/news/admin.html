@@ -435,13 +435,28 @@
         </div>
 
         <div>
-          <label class="mb-0.5 block text-[11px] font-medium text-slate-600" for="lesson-script">
-            文字起こし（スクリプト） <span class="text-red-500">*</span>
-          </label>
+          <div class="mb-0.5 flex flex-wrap items-center justify-between gap-1.5">
+            <label class="block text-[11px] font-medium text-slate-600" for="lesson-script">
+              文字起こし（スクリプト） <span class="text-red-500">*</span>
+            </label>
+            <div class="flex flex-wrap items-center gap-1.5">
+              <button type="button" id="script-translate-btn"
+                class="compact-btn shrink-0 border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] text-sky-700 hover:bg-sky-100 disabled:opacity-50">
+                和訳を作成
+              </button>
+              <span id="script-translate-status" class="hidden text-[10px] text-slate-500 italic"></span>
+            </div>
+          </div>
           <p class="mb-1 text-[10px] text-slate-500">CNN10 から動画を選び、開始・終了時間を入力すると該当部分のスクリプトが自動入力されます。</p>
           <textarea id="lesson-script" name="script" required rows="8"
             class="min-h-[8rem] w-full flex-1 resize-y rounded-lg border border-teal-100 bg-white/90 px-2 py-1.5 text-xs leading-relaxed text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-400 shadow-inner lg:min-h-[10rem]"
             placeholder="英文スクリプトをここに貼り付け…">{{ current.script }}</textarea>
+          <label class="mb-0.5 mt-2 block text-[11px] font-medium text-slate-600" for="lesson-script-ja">
+            和訳
+          </label>
+          <textarea id="lesson-script-ja" name="script_ja" rows="6"
+            class="min-h-[6rem] w-full resize-y rounded-lg border border-amber-100 bg-amber-50/40 px-2 py-1.5 text-xs leading-relaxed text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-300 shadow-inner"
+            placeholder="「和訳を作成」を押すと、上の指定文字起こし部分の日本語訳がここに入ります…">{{ current.script_ja or "" }}</textarea>
         </div>
 
         <details class="compact-details shrink-0">
@@ -675,5 +690,5 @@
   window.ADMIN_WARMUP_QUESTIONS = {{ (current.warmup_questions or [])|tojson }};
 </script>
 <script src="{{ url_for('static', filename='news/js/youtube-transcript.js', v='20260904i') }}"></script>
-<script src="{{ url_for('static', filename='news/js/admin.js', v='20260904h') }}"></script>
+<script src="{{ url_for('static', filename='news/js/admin.js', v='20260907a') }}"></script>
 {% endblock %}
