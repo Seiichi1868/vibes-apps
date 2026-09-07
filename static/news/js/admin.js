@@ -979,6 +979,48 @@
     return Number.isFinite(value) ? Math.max(0, value) : fallback;
   }
 
+  function formatArchivedAt(value) {
+    if (!value) return "—";
+    const dt = new Date(value);
+    if (Number.isNaN(dt.getTime())) {
+      const raw = String(value);
+      return raw.length >= 16 ? raw.slice(0, 16).replace("T", " ") : raw.slice(0, 10);
+    }
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, "0");
+    const d = String(dt.getDate()).padStart(2, "0");
+    const h = String(dt.getHours()).padStart(2, "0");
+    const min = String(dt.getMinutes()).padStart(2, "0");
+    return `${y}-${m}-${d} ${h}:${min}`;
+  }
+
+  function archiveHasVocab(item) {
+    return Array.isArray(item.vocabulary_data) && item.vocabulary_data.length > 0;
+  }
+
+  function archiveHasIntro(item) {
+    const hasImage = Boolean(item && item.warmup_image_url);
+    const hasQuestions = Array.isArray(item.warmup_questions) && item.warmup_questions.length > 0;
+    return hasImage || hasQuestions;
+  }
+
+  function archiveHasPostview(item) {
+    return Array.isArray(item.postview_questions) && item.postview_questions.length > 0;
+  }
+
+  function createAssistFlag(letter, present, label) {
+    const span = document.createElement("span");
+    const color = {
+      V: present ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-300",
+      I: present ? "bg-sky-100 text-sky-700" : "bg-slate-100 text-slate-300",
+      P: present ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-300",
+    }[letter] || (present ? "bg-slate-200 text-slate-700" : "bg-slate-100 text-slate-300");
+    span.className = `inline-flex h-3.5 min-w-[0.875rem] items-center justify-center rounded px-0.5 text-[9px] font-bold leading-none ${color}`;
+    span.textContent = letter;
+    span.title = present ? t("archiveFlagOn", { label }) : t("archiveFlagOff", { label });
+    return span;
+  }
+
   function renderArchiveList(cls) {
     if (!archiveList || !archiveSummary || !archiveEmptyMessage) return;
     const archive = cls && Array.isArray(cls.archive) ? cls.archive : [];
@@ -999,17 +1041,29 @@
       const textWrap = document.createElement("div");
       textWrap.className = "min-w-0 flex-1";
 
+      const titleRow = document.createElement("div");
+      titleRow.className = "flex min-w-0 items-center gap-1";
+
       const title = document.createElement("p");
-      title.className = "truncate font-semibold leading-tight text-slate-700";
+      title.className = "min-w-0 flex-1 truncate font-semibold leading-tight text-slate-700";
       title.textContent = item.title || item.video_id || "無題のアーカイブ";
+
+      const flags = document.createElement("span");
+      flags.className = "inline-flex shrink-0 items-center gap-0.5";
+      flags.append(
+        createAssistFlag("V", archiveHasVocab(item), t("archiveAssistVocab")),
+        createAssistFlag("I", archiveHasIntro(item), t("archiveAssistIntro")),
+        createAssistFlag("P", archiveHasPostview(item), t("archiveAssistPostview")),
+      );
+      titleRow.append(title, flags);
 
       const meta = document.createElement("p");
       meta.className = "truncate leading-tight";
-      const archivedAt = item.archived_at ? String(item.archived_at).slice(0, 10) : "—";
+      const archivedAt = formatArchivedAt(item.archived_at);
       const scriptLength = (item.script || "").length;
       meta.textContent = `${archivedAt} · ${item.video_id || "—"} · ${item.start_seconds || 0}s–${item.end_seconds || 0}s · ${scriptLength}字`;
 
-      textWrap.append(title, meta);
+      textWrap.append(titleRow, meta);
       row.appendChild(textWrap);
 
       const actions = document.createElement("div");
