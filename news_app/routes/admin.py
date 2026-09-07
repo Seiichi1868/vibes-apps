@@ -10,6 +10,7 @@ from news_app.config import (
     AI_MODELS,
     CEFR_LEVELS,
     DISPLAY_LANGUAGES,
+    VOCAB_MIN_CEFR_LEVELS,
     get_openai_api_key,
     mask_api_key,
     resolve_ai_model,
@@ -17,15 +18,21 @@ from news_app.config import (
     resolve_display_language,
     resolve_eval_ai_model,
     resolve_transcript_ai_model,
+    resolve_vocab_min_cefr,
     save_openai_api_key,
 )
 from news_app.services.cnn10 import fetch_cnn10_episodes
 from news_app.services.cnn10_highlight import find_title_segment_in_transcript
 from news_app.services.network import get_public_base_url
-from news_app.services.docx_translate import build_script_translation_docx, translation_rows
+from news_app.services.docx_translate import (
+    build_lesson_materials_docx,
+    build_script_translation_docx,
+    translation_rows,
+)
 from news_app.services.openai_translate import translate_script
 from news_app.services.openai_vocab import extract_vocabulary_from_script
 from news_app.services.openai_warmup import extract_warmup_from_script
+from news_app.services.openai_postview import extract_postview_from_script
 from news_app.services.storage import (
     DEFAULT_EVALUATION_CRITERIA,
     archive_class_current,
@@ -56,6 +63,7 @@ from news_app.services.storage import (
     _normalize_vocabulary_data,
     _normalize_warmup_questions,
     appearance_context,
+    selected_display_questions,
 )
 from news_app.services.pdf_report import build_submissions_pdf
 from news_app.services.youtube import extract_video_id, fetch_youtube_title, parse_time_to_seconds, seconds_to_display
@@ -146,6 +154,7 @@ def admin_index():
         active_class=cls,
         current=current,
         cefr_levels=CEFR_LEVELS,
+        vocab_min_cefr_levels=VOCAB_MIN_CEFR_LEVELS,
         display_languages=DISPLAY_LANGUAGES,
         ai_models=AI_MODELS,
         default_criteria=state.get("default_evaluation_criteria") or DEFAULT_EVALUATION_CRITERIA,
@@ -284,6 +293,7 @@ def api_save_lesson():
         subtitles_enabled = bool(data.get("subtitles_enabled", False))
         require_student_info = bool(data.get("require_student_info", False))
         vocabulary_scaffolding_enabled = bool(data.get("vocabulary_scaffolding_enabled", False))
+        vocabulary_min_cefr = resolve_vocab_min_cefr(data.get("vocabulary_min_cefr"))
 
         existing = (get_class(class_id) or {}).get("current") or {}
         existing_script = str(existing.get("script") or "").strip()
@@ -317,6 +327,7 @@ def api_save_lesson():
             "timers_visible": timers_visible,
             "subtitles_enabled": subtitles_enabled,
             "vocabulary_scaffolding_enabled": vocabulary_scaffolding_enabled,
+            "vocabulary_min_cefr": vocabulary_min_cefr,
         }
         if existing_script and existing_script != script:
             lesson_payload["vocabulary_data"] = []
@@ -486,13 +497,17 @@ def api_extract_lesson_vocabulary():
 
     state = load_state()
     model = resolve_ai_model(state.get("ai_model"))
+    min_cefr = resolve_vocab_min_cefr(data.get("min_cefr") or current.get("vocabulary_min_cefr"))
     try:
-        vocabulary_data = extract_vocabulary_from_script(script, api_key=api_key, model=model)
+        vocabulary_data = extract_vocabulary_from_script(
+            script, api_key=api_key, model=model, min_cefr=min_cefr
+        )
         cls = update_class_current(
             class_id,
             {
                 "script": script,
                 "vocabulary_data": vocabulary_data,
+                "vocabulary_min_cefr": min_cefr,
             },
         )
         return jsonify(
@@ -500,7 +515,8 @@ def api_extract_lesson_vocabulary():
                 "ok": True,
                 "class": cls,
                 "vocabulary_data": vocabulary_data,
-                "message": f"語彙 {len(vocabulary_data)} 件を抽出して保存しました。",
+                "vocabulary_min_cefr": min_cefr,
+                "message": f"語彙 {len(vocabulary_data)} 件を抽出して保存しました（{min_cefr}以上）。",
             }
         )
     except ValueError as exc:
@@ -690,6 +706,192 @@ def api_toggle_warmup_scaffolding():
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:
         return jsonify({"ok": False, "error": f"設定の保存に失敗しました: {exc}"}), 500
+
+
+@admin_bp.route("/api/class/lesson/postview", methods=["POST"])
+def api_generate_postview():
+    """スクリプトから視聴後の理解・会話質問5問を生成して保存する。"""
+    data = request.get_json(silent=True) or {}
+    class_id = str(data.get("class_id") or get_active_class_id()).strip()
+    if not class_id:
+        return jsonify({"ok": False, "error": "クラスを選択または作成してください。"}), 400
+
+    cls = get_class(class_id)
+    if not cls:
+        return jsonify({"ok": False, "error": "クラスが見つかりません。"}), 404
+
+    current = cls.get("current") or {}
+    script = str(data.get("script") or current.get("script") or "").strip()
+    if not script:
+        return jsonify({"ok": False, "error": "文字起こし（スクリプト）を入力してください。"}), 400
+
+    api_key = get_openai_api_key()
+    if not api_key:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "OpenAI API キーが未設定です。管理画面の設定からキーを保存してください。",
+            }
+        ), 400
+
+    state = load_state()
+    model = resolve_ai_model(state.get("ai_model"))
+    try:
+        result = extract_postview_from_script(script, api_key=api_key, model=model)
+        existing_manual = [
+            q
+            for q in _normalize_warmup_questions(current.get("postview_questions"))
+            if q.get("manual")
+        ]
+        questions = result["questions"] + existing_manual
+        cls = update_class_current(class_id, {"postview_questions": questions})
+        q_count = len(result["questions"])
+        return jsonify(
+            {
+                "ok": True,
+                "class": cls,
+                "postview_questions": questions,
+                "message": f"事後質問 {q_count} 問を生成しました。",
+            }
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"事後質問の生成に失敗しました: {exc}"}), 500
+
+
+@admin_bp.route("/api/class/lesson/postview/selection", methods=["POST"])
+def api_update_postview_selection():
+    """事後質問の表示/非表示（選択状態）を保存する。"""
+    data = request.get_json(silent=True) or {}
+    class_id = str(data.get("class_id") or get_active_class_id()).strip()
+    if not class_id:
+        return jsonify({"ok": False, "error": "クラスを選択または作成してください。"}), 400
+
+    raw_questions = data.get("postview_questions")
+    if not isinstance(raw_questions, list):
+        return jsonify({"ok": False, "error": "質問データが不正です。"}), 400
+
+    if not get_class(class_id):
+        return jsonify({"ok": False, "error": "クラスが見つかりません。"}), 404
+
+    postview_questions = _normalize_warmup_questions(raw_questions)
+    try:
+        cls = update_class_current(class_id, {"postview_questions": postview_questions})
+        selected_count = sum(1 for q in postview_questions if q.get("selected", True))
+        return jsonify(
+            {
+                "ok": True,
+                "class": cls,
+                "postview_questions": postview_questions,
+                "message": f"事後質問の表示設定を保存しました（表示 {selected_count} / {len(postview_questions)} 問）。",
+            }
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"保存に失敗しました: {exc}"}), 500
+
+
+@admin_bp.route("/api/class/lesson/postview/toggle", methods=["POST"])
+def api_toggle_postview_scaffolding():
+    """生徒画面への事後質問表示の on/off を切り替える。"""
+    data = request.get_json(silent=True) or {}
+    class_id = str(data.get("class_id") or get_active_class_id()).strip()
+    if not class_id:
+        return jsonify({"ok": False, "error": "クラスを選択または作成してください。"}), 400
+
+    enabled = bool(data.get("postview_scaffolding_enabled", False))
+    try:
+        cls = update_class_current(
+            class_id,
+            {"postview_scaffolding_enabled": enabled},
+        )
+        return jsonify(
+            {
+                "ok": True,
+                "class": cls,
+                "postview_scaffolding_enabled": enabled,
+                "message": "事後質問を有効にしました。" if enabled else "事後質問を無効にしました。",
+            }
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"設定の保存に失敗しました: {exc}"}), 500
+
+
+@admin_bp.route("/api/class/lesson/materials/docx", methods=["POST"])
+def api_export_lesson_materials_docx():
+    """文字起こし・和訳・語彙・事前/事後質問を選んで Word 出力する。"""
+    data = request.get_json(silent=True) or {}
+    class_id = str(data.get("class_id") or get_active_class_id()).strip()
+    include = data.get("include") if isinstance(data.get("include"), dict) else {}
+    title = str(data.get("title") or "").strip()
+    script = str(data.get("script") or "").strip()
+    script_ja = str(data.get("script_ja") or "").strip()
+    pairs = _normalize_script_ja_pairs(data.get("pairs"))
+
+    cls = get_class(class_id) if class_id else None
+    current = (cls or {}).get("current") or {}
+    if not title:
+        title = str(current.get("title") or "").strip()
+    if not script:
+        script = str(current.get("script") or "").strip()
+    if not script_ja:
+        script_ja = str(current.get("script_ja") or "").strip()
+    if not pairs:
+        pairs = translation_rows(script, script_ja, current.get("script_ja_pairs"))
+
+    raw_vocab = data.get("vocabulary_data")
+    if isinstance(raw_vocab, list):
+        vocabulary = [
+            item
+            for item in _normalize_vocabulary_data(raw_vocab)
+            if item.get("selected", True)
+        ]
+    else:
+        vocabulary = [
+            item
+            for item in _normalize_vocabulary_data(current.get("vocabulary_data"))
+            if item.get("selected", True)
+        ]
+
+    raw_warmup = data.get("warmup_questions")
+    if isinstance(raw_warmup, list):
+        warmup_questions = selected_display_questions(raw_warmup)
+    else:
+        warmup_questions = selected_display_questions(current.get("warmup_questions"))
+
+    raw_postview = data.get("postview_questions")
+    if isinstance(raw_postview, list):
+        postview_questions = selected_display_questions(raw_postview)
+    else:
+        postview_questions = selected_display_questions(current.get("postview_questions"))
+
+    try:
+        buf = io.BytesIO(
+            build_lesson_materials_docx(
+                title=title,
+                script=script,
+                pairs=pairs,
+                vocabulary=vocabulary,
+                warmup_questions=warmup_questions,
+                postview_questions=postview_questions,
+                include=include,
+            )
+        )
+        buf.seek(0)
+        return send_file(
+            buf,
+            as_attachment=True,
+            download_name="lesson_materials.docx",
+            mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"Word の作成に失敗しました: {exc}"}), 500
 
 
 @admin_bp.route("/api/class/archive", methods=["POST"])

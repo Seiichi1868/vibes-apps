@@ -12,11 +12,13 @@ from news_app.config import (
     CEFR_LEVELS,
     DATA_DIR,
     DEFAULT_CEFR_LEVEL,
+    DEFAULT_VOCAB_MIN_CEFR,
     STATE_FILE,
     VOCAB_CEFR_LEVELS,
     VOCAB_STORAGE_MAX,
     resolve_cefr_level,
     resolve_display_language,
+    resolve_vocab_min_cefr,
 )
 
 _lock = threading.Lock()
@@ -61,9 +63,12 @@ DEFAULT_CLASS_CURRENT = {
     "subtitles_enabled": False,
     "vocabulary_data": [],
     "vocabulary_scaffolding_enabled": False,
+    "vocabulary_min_cefr": DEFAULT_VOCAB_MIN_CEFR,
     "warmup_image_url": "",
     "warmup_questions": [],
     "warmup_scaffolding_enabled": False,
+    "postview_questions": [],
+    "postview_scaffolding_enabled": False,
 }
 
 DEFAULT_STATE = {
@@ -228,6 +233,17 @@ def _normalize_warmup_questions(raw) -> list[dict]:
     return items
 
 
+def selected_display_questions(raw) -> list[dict]:
+    """選択済みの質問だけを、表示用の連番付きリストにする。"""
+    items: list[dict] = []
+    for q in _normalize_warmup_questions(raw):
+        text = str(q.get("text") or "").strip()
+        if not text or not q.get("selected", True):
+            continue
+        items.append({"id": len(items) + 1, "text": text})
+    return items
+
+
 def _normalize_vocabulary_item(raw) -> dict | None:
     if not isinstance(raw, dict):
         return None
@@ -341,9 +357,12 @@ def _normalize_current(raw: dict | None) -> dict:
             "subtitles_enabled": bool(raw.get("subtitles_enabled", False)),
             "vocabulary_data": _normalize_vocabulary_data(raw.get("vocabulary_data")),
             "vocabulary_scaffolding_enabled": bool(raw.get("vocabulary_scaffolding_enabled", False)),
+            "vocabulary_min_cefr": resolve_vocab_min_cefr(raw.get("vocabulary_min_cefr")),
             "warmup_image_url": str(raw.get("warmup_image_url") or "").strip(),
             "warmup_questions": _normalize_warmup_questions(raw.get("warmup_questions")),
             "warmup_scaffolding_enabled": bool(raw.get("warmup_scaffolding_enabled", False)),
+            "postview_questions": _normalize_warmup_questions(raw.get("postview_questions")),
+            "postview_scaffolding_enabled": bool(raw.get("postview_scaffolding_enabled", False)),
         }
     )
     return current
@@ -375,9 +394,12 @@ def _normalize_class(class_id: str, raw: dict) -> dict:
                 "subtitles_enabled": bool(item.get("subtitles_enabled", False)),
                 "vocabulary_data": _normalize_vocabulary_data(item.get("vocabulary_data")),
                 "vocabulary_scaffolding_enabled": bool(item.get("vocabulary_scaffolding_enabled", False)),
+                "vocabulary_min_cefr": resolve_vocab_min_cefr(item.get("vocabulary_min_cefr")),
                 "warmup_image_url": str(item.get("warmup_image_url") or "").strip(),
                 "warmup_questions": _normalize_warmup_questions(item.get("warmup_questions")),
                 "warmup_scaffolding_enabled": bool(item.get("warmup_scaffolding_enabled", False)),
+                "postview_questions": _normalize_warmup_questions(item.get("postview_questions")),
+                "postview_scaffolding_enabled": bool(item.get("postview_scaffolding_enabled", False)),
             }
         )
     return {

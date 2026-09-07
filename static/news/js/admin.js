@@ -81,6 +81,7 @@
   const vocabManualMeaning = document.getElementById("vocab-manual-meaning");
   const vocabManualCefr = document.getElementById("vocab-manual-cefr");
   const vocabManualAddBtn = document.getElementById("vocab-manual-add-btn");
+  const vocabMinCefrEl = document.getElementById("vocab-min-cefr");
   let adminVocabItems = [];
   const warmupScaffoldingEnabledEl = document.getElementById("warmup-scaffolding-enabled");
   const warmupGenerateBtn = document.getElementById("warmup-generate-btn");
@@ -94,6 +95,17 @@
   let warmupSelectionSaving = false;
   let warmupManualSaveTimer = null;
   let vocabSelectionSaving = false;
+  const postviewScaffoldingEnabledEl = document.getElementById("postview-scaffolding-enabled");
+  const postviewGenerateBtn = document.getElementById("postview-generate-btn");
+  const postviewGenerateStatus = document.getElementById("postview-generate-status");
+  const postviewPreview = document.getElementById("postview-preview");
+  const postviewManualRows = document.getElementById("postview-manual-rows");
+  const postviewAddQuestionBtn = document.getElementById("postview-add-question-btn");
+  const exportMaterialsDocxBtn = document.getElementById("export-materials-docx-btn");
+  const exportMaterialsStatus = document.getElementById("export-materials-status");
+  let adminPostviewQuestions = [];
+  let postviewSelectionSaving = false;
+  let postviewManualSaveTimer = null;
   const ADMIN_SETTINGS_PASSWORD = "2479";
   const ADMIN_SETTINGS_UNLOCK_KEY = "news-admin-settings-unlocked";
   let adminClasses = window.ADMIN_CLASSES || [];
@@ -915,9 +927,12 @@
     const requireStudentInfoEl = document.getElementById("require-student-info");
     if (requireStudentInfoEl) requireStudentInfoEl.checked = cls.require_student_info === true;
     if (vocabScaffoldingEnabledEl) vocabScaffoldingEnabledEl.checked = c.vocabulary_scaffolding_enabled === true;
+    if (vocabMinCefrEl && c.vocabulary_min_cefr) vocabMinCefrEl.value = c.vocabulary_min_cefr;
     renderAdminVocabPreview(c.vocabulary_data || []);
     if (warmupScaffoldingEnabledEl) warmupScaffoldingEnabledEl.checked = c.warmup_scaffolding_enabled === true;
     renderAdminWarmupPreview(c.warmup_image_url || "", c.warmup_questions || []);
+    if (postviewScaffoldingEnabledEl) postviewScaffoldingEnabledEl.checked = c.postview_scaffolding_enabled === true;
+    renderAdminPostviewPreview(c.postview_questions || []);
     scriptAutoManaged = false;
     suppressAutoScriptFill = false;
     if (lessonClassId) lessonClassId.value = cls.id;
@@ -1248,6 +1263,7 @@
         subtitles_enabled: document.getElementById("subtitles-enabled").checked,
         require_student_info: document.getElementById("require-student-info")?.checked ?? false,
         vocabulary_scaffolding_enabled: vocabScaffoldingEnabledEl?.checked ?? false,
+        vocabulary_min_cefr: vocabMinCefrEl?.value || "B1",
       };
 
       try {
@@ -2355,6 +2371,7 @@
         <input type="checkbox" class="vocab-select-cb shrink-0 mt-0.5 h-3.5 w-3.5 rounded border-violet-200 text-violet-600"
           data-index="${i}" ${item.selected ? "checked" : ""}>
         <span class="shrink-0 w-28 font-semibold text-slate-800 leading-snug">${esc(item.word)}</span>
+        <span class="shrink-0 w-8 text-violet-500 leading-snug">${esc(item.cefr)}</span>
         <span class="shrink-0 w-12 text-slate-400 leading-snug">${esc(mapPos(item.part_of_speech))}</span>
         <span class="text-slate-600 leading-snug">${esc(meaning)}</span>
       </label>`;
@@ -2497,7 +2514,11 @@
         const res = await fetch("/news/admin/api/class/lesson/vocabulary", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ class_id: classId, script }),
+          body: JSON.stringify({
+            class_id: classId,
+            script,
+            min_cefr: vocabMinCefrEl?.value || "B1",
+          }),
         });
         const data = await res.json();
         if (!data.ok) throw new Error(data.error || "語彙抽出に失敗しました");
@@ -2807,6 +2828,364 @@
     });
   }
 
+  // ── 事後質問（視聴後） ──────────────────────────────────────────
+
+  function nextPostviewQuestionId() {
+    const ids = adminPostviewQuestions.map((q) => Number(q.id)).filter((id) => Number.isFinite(id));
+    return ids.length ? Math.max(...ids) + 1 : 1;
+  }
+
+  function getManualPostviewQuestions() {
+    return adminPostviewQuestions.filter((q) => q.manual);
+  }
+
+  function getAiPostviewQuestions() {
+    return adminPostviewQuestions.filter((q) => !q.manual);
+  }
+
+  function ensureManualPostviewRow() {
+    if (!getManualPostviewQuestions().length) {
+      adminPostviewQuestions.push({
+        id: nextPostviewQuestionId(),
+        text: "",
+        selected: true,
+        manual: true,
+      });
+    }
+  }
+
+  function schedulePostviewManualSave() {
+    if (postviewManualSaveTimer) clearTimeout(postviewManualSaveTimer);
+    postviewManualSaveTimer = setTimeout(() => {
+      postviewManualSaveTimer = null;
+      savePostviewSelection({ silent: true });
+    }, 700);
+  }
+
+  function renderPostviewManualRows() {
+    if (!postviewManualRows) return;
+    ensureManualPostviewRow();
+    const manualQuestions = getManualPostviewQuestions();
+    let html = "";
+    manualQuestions.forEach((q) => {
+      const index = adminPostviewQuestions.indexOf(q);
+      const dimClass = q.selected ? "" : " opacity-50";
+      html += `<label class="flex items-center gap-1 rounded px-1 py-0.5 bg-white/70${dimClass} cursor-pointer">
+        <input type="checkbox" class="postview-manual-select-cb shrink-0 h-3.5 w-3.5 rounded border-amber-200 text-amber-600"
+          data-index="${index}" ${q.selected ? "checked" : ""}>
+        <span class="shrink-0 text-[9px] font-bold text-amber-700">Q${q.id}</span>
+        <input type="text" class="postview-manual-input compact-input min-w-0 flex-1 text-[10px] py-0.5"
+          data-index="${index}" value="${esc(q.text)}" placeholder="質問（英語）">
+      </label>`;
+    });
+    postviewManualRows.innerHTML = html;
+    postviewManualRows.querySelectorAll(".postview-manual-select-cb").forEach((cb) => {
+      cb.addEventListener("change", onPostviewSelectionChange);
+    });
+    postviewManualRows.querySelectorAll(".postview-manual-input").forEach((input) => {
+      input.addEventListener("input", onPostviewManualInputChange);
+      input.addEventListener("blur", () => savePostviewSelection({ silent: true }));
+    });
+  }
+
+  function onPostviewManualInputChange(event) {
+    const index = Number(event.target.dataset.index);
+    if (!Number.isInteger(index) || !adminPostviewQuestions[index]) return;
+    adminPostviewQuestions[index].text = event.target.value;
+    schedulePostviewManualSave();
+  }
+
+  function addManualPostviewRow() {
+    adminPostviewQuestions.push({
+      id: nextPostviewQuestionId(),
+      text: "",
+      selected: true,
+      manual: true,
+    });
+    renderPostviewManualRows();
+    const inputs = postviewManualRows?.querySelectorAll(".postview-manual-input") || [];
+    const lastInput = inputs[inputs.length - 1];
+    if (lastInput) lastInput.focus();
+  }
+
+  if (postviewAddQuestionBtn) {
+    postviewAddQuestionBtn.addEventListener("click", addManualPostviewRow);
+  }
+
+  function renderAdminPostviewPreview(questions) {
+    const incoming = (questions || []).map(function (q) {
+      return {
+        id: q.id,
+        text: q.text || "",
+        selected: q.selected !== false,
+        manual: q.manual === true,
+      };
+    });
+    const manualFromState = incoming.length
+      ? incoming.filter((q) => q.manual)
+      : getManualPostviewQuestions();
+    const aiFromState = incoming.filter((q) => !q.manual);
+    adminPostviewQuestions = [...aiFromState, ...manualFromState];
+
+    const aiQuestions = getAiPostviewQuestions();
+    if (!postviewPreview) {
+      renderPostviewManualRows();
+      return;
+    }
+    if (!aiQuestions.length) {
+      postviewPreview.classList.add("hidden");
+      renderPostviewManualRows();
+      return;
+    }
+    const selectedCount = aiQuestions.filter(function (q) { return q.selected; }).length;
+    let html = `<p class="mb-1 font-semibold text-slate-600">${t("postviewPreview", { selected: selectedCount, total: aiQuestions.length })}</p>`;
+    html += `<p class="mb-1 text-[9px] text-slate-500">${t("postviewPreviewHint")}</p>`;
+    html += `<div class="space-y-1">`;
+    aiQuestions.forEach(function (q) {
+      const index = adminPostviewQuestions.indexOf(q);
+      const dimClass = q.selected ? "" : " opacity-50";
+      html += `<label class="flex items-start gap-2 rounded px-1.5 py-1 ${index % 2 === 0 ? "bg-white/70" : ""}${dimClass} cursor-pointer">
+        <input type="checkbox" class="postview-select-cb shrink-0 mt-0.5 h-3.5 w-3.5 rounded border-amber-200 text-amber-600"
+          data-index="${index}" ${q.selected ? "checked" : ""}>
+        <span class="shrink-0 mr-1 text-amber-700 font-bold">Q${q.id}.</span>
+        <span class="text-slate-700 leading-snug">${esc(q.text)}</span>
+      </label>`;
+    });
+    html += `</div>`;
+    postviewPreview.innerHTML = html;
+    postviewPreview.classList.remove("hidden");
+    postviewPreview.querySelectorAll(".postview-select-cb").forEach(function (cb) {
+      cb.addEventListener("change", onPostviewSelectionChange);
+    });
+    renderPostviewManualRows();
+  }
+
+  async function savePostviewSelection(options) {
+    const silent = options && options.silent;
+    const classId = getSelectedClassId() || (lessonClassId && lessonClassId.value);
+    if (!classId) return true;
+    const questionsToSave = adminPostviewQuestions.filter((q) => (q.text || "").trim());
+    if (!questionsToSave.length) return true;
+    postviewSelectionSaving = true;
+    try {
+      const res = await fetch("/news/admin/api/class/lesson/postview/selection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ class_id: classId, postview_questions: questionsToSave }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "保存に失敗しました");
+      const savedManual = getManualPostviewQuestions();
+      const savedFromServer = (data.postview_questions || questionsToSave).map(function (q) {
+        return {
+          id: q.id,
+          text: q.text || "",
+          selected: q.selected !== false,
+          manual: q.manual === true,
+        };
+      });
+      const serverManual = savedFromServer.filter((q) => q.manual);
+      const serverAi = savedFromServer.filter((q) => !q.manual);
+      const draftManual = savedManual.filter((q) => !(q.text || "").trim());
+      adminPostviewQuestions = [...serverAi, ...serverManual, ...draftManual];
+      if (!silent) {
+        renderAdminPostviewPreview(adminPostviewQuestions);
+        showMessage(lessonMessage, data.message || "事後質問の表示設定を保存しました。", false);
+      }
+      return true;
+    } catch (err) {
+      if (!silent) showMessage(lessonMessage, err.message, true);
+      return false;
+    } finally {
+      postviewSelectionSaving = false;
+    }
+  }
+
+  async function onPostviewSelectionChange(event) {
+    if (postviewSelectionSaving) {
+      event.target.checked = !event.target.checked;
+      return;
+    }
+    const index = Number(event.target.dataset.index);
+    if (!Number.isInteger(index) || !adminPostviewQuestions[index]) return;
+    const previous = adminPostviewQuestions[index].selected;
+    adminPostviewQuestions[index].selected = event.target.checked;
+    renderAdminPostviewPreview(adminPostviewQuestions);
+    const ok = await savePostviewSelection({ silent: true });
+    if (!ok) {
+      adminPostviewQuestions[index].selected = previous;
+      renderAdminPostviewPreview(adminPostviewQuestions);
+      showMessage(lessonMessage, "事後質問の表示設定の保存に失敗しました。", true);
+    }
+  }
+
+  if (postviewScaffoldingEnabledEl) {
+    postviewScaffoldingEnabledEl.addEventListener("change", async function () {
+      const classId = getSelectedClassId() || (lessonClassId && lessonClassId.value);
+      if (!classId) {
+        showMessage(lessonMessage, "クラスを選択してから操作してください。", true);
+        postviewScaffoldingEnabledEl.checked = !postviewScaffoldingEnabledEl.checked;
+        return;
+      }
+      const enabled = postviewScaffoldingEnabledEl.checked;
+      try {
+        const res = await fetch("/news/admin/api/class/lesson/postview/toggle", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ class_id: classId, postview_scaffolding_enabled: enabled }),
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "保存に失敗しました");
+        showMessage(lessonMessage, data.message || "事後質問の設定を保存しました。", false);
+      } catch (err) {
+        showMessage(lessonMessage, err.message, true);
+        postviewScaffoldingEnabledEl.checked = !enabled;
+      }
+    });
+  }
+
+  if (postviewGenerateBtn) {
+    postviewGenerateBtn.addEventListener("click", async function () {
+      const classId = getSelectedClassId() || (lessonClassId && lessonClassId.value);
+      if (!classId) {
+        showMessage(lessonMessage, "クラスを選択または作成してください。", true);
+        return;
+      }
+      const script = document.getElementById("lesson-script") ? document.getElementById("lesson-script").value.trim() : "";
+      if (!script) {
+        showMessage(lessonMessage, "スクリプトを入力してから生成してください。", true);
+        return;
+      }
+      postviewGenerateBtn.disabled = true;
+      postviewGenerateBtn.textContent = t("generatingQuestions");
+      if (postviewGenerateStatus) {
+        postviewGenerateStatus.textContent = t("generatingPostview");
+        postviewGenerateStatus.classList.remove("hidden");
+      }
+      if (postviewPreview) postviewPreview.classList.add("hidden");
+      try {
+        const res = await fetch("/news/admin/api/class/lesson/postview", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ class_id: classId, script }),
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "生成に失敗しました");
+        renderAdminPostviewPreview(data.postview_questions || []);
+        showMessage(lessonMessage, data.message || "事後質問を生成しました。", false);
+        if (postviewGenerateStatus) postviewGenerateStatus.classList.add("hidden");
+      } catch (err) {
+        showMessage(lessonMessage, err.message, true);
+        if (postviewGenerateStatus) {
+          postviewGenerateStatus.textContent = t("generateFail");
+        }
+      } finally {
+        postviewGenerateBtn.disabled = false;
+        postviewGenerateBtn.textContent = t("aiGeneratePostview");
+      }
+    });
+  }
+
+  function materialsDocxFilename(title) {
+    const safe = String(title || "")
+      .replace(/[\\/:*?"<>|]/g, "")
+      .replace(/\s+/g, "_")
+      .slice(0, 40);
+    return safe ? `授業教材_${safe}.docx` : "授業教材.docx";
+  }
+
+  function showExportMaterialsStatus(message, isError) {
+    if (!exportMaterialsStatus) return;
+    if (!message) {
+      exportMaterialsStatus.classList.add("hidden");
+      exportMaterialsStatus.textContent = "";
+      return;
+    }
+    exportMaterialsStatus.textContent = message;
+    exportMaterialsStatus.classList.toggle("text-red-600", Boolean(isError));
+    exportMaterialsStatus.classList.toggle("text-slate-500", !isError);
+    exportMaterialsStatus.classList.remove("hidden");
+  }
+
+  async function downloadLessonMaterialsWord() {
+    const include = {
+      transcript: document.getElementById("export-include-transcript")?.checked === true,
+      translation: document.getElementById("export-include-translation")?.checked === true,
+      vocabulary: document.getElementById("export-include-vocab")?.checked === true,
+      warmup: document.getElementById("export-include-warmup")?.checked === true,
+      postview: document.getElementById("export-include-postview")?.checked === true,
+    };
+    if (!Object.values(include).some(Boolean)) {
+      showExportMaterialsStatus(t("selectExportSection"), true);
+      return;
+    }
+
+    const classId = getSelectedClassId() || (lessonClassId && lessonClassId.value) || "";
+    const title = document.getElementById("lesson-title")?.value.trim() || "";
+    const script = document.getElementById("lesson-script")?.value.trim() || "";
+    const translationText = getLessonTranslationText();
+    const pairs = getScriptTranslationRows(script, translationText, getLessonTranslationPairs());
+    const warmupToExport = adminWarmupQuestions.filter((q) => (q.text || "").trim() && q.selected !== false);
+    const postviewToExport = adminPostviewQuestions.filter((q) => (q.text || "").trim() && q.selected !== false);
+    const vocabToExport = adminVocabItems.filter((item) => item.selected !== false);
+
+    if (exportMaterialsDocxBtn) {
+      exportMaterialsDocxBtn.disabled = true;
+      exportMaterialsDocxBtn.textContent = t("exporting");
+    }
+    showExportMaterialsStatus(t("creatingWord"), false);
+
+    try {
+      const res = await fetch("/news/admin/api/class/lesson/materials/docx", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          class_id: classId,
+          title,
+          script,
+          script_ja: translationText,
+          pairs,
+          vocabulary_data: vocabToExport,
+          warmup_questions: warmupToExport,
+          postview_questions: postviewToExport,
+          include,
+        }),
+      });
+      const contentType = res.headers.get("content-type") || "";
+      if (!res.ok || contentType.includes("application/json")) {
+        let message = "Word の作成に失敗しました。";
+        try {
+          const data = await res.json();
+          if (data && data.error) message = data.error;
+        } catch (_err) {
+          /* ignore */
+        }
+        throw new Error(message);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = materialsDocxFilename(title);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      showExportMaterialsStatus("", false);
+    } catch (err) {
+      showExportMaterialsStatus(err.message || "Word の作成に失敗しました。", true);
+    } finally {
+      if (exportMaterialsDocxBtn) {
+        exportMaterialsDocxBtn.disabled = false;
+        exportMaterialsDocxBtn.textContent = t("exportWordMaterials");
+      }
+    }
+  }
+
+  if (exportMaterialsDocxBtn) {
+    exportMaterialsDocxBtn.addEventListener("click", downloadLessonMaterialsWord);
+  }
+
   if (window.NewsI18n) {
     if (assistiveLang() === "es") {
       const panelHint = document.getElementById("script-translate-panel-hint");
@@ -2820,8 +3199,12 @@
     fillLessonForm(window.ADMIN_ACTIVE_CLASS);
   } else {
     renderAdminWarmupPreview("", []);
+    renderAdminPostviewPreview([]);
   }
   if (!window.ADMIN_ACTIVE_CLASS && (window.ADMIN_WARMUP_IMAGE_URL || (window.ADMIN_WARMUP_QUESTIONS && window.ADMIN_WARMUP_QUESTIONS.length))) {
     renderAdminWarmupPreview(window.ADMIN_WARMUP_IMAGE_URL || "", window.ADMIN_WARMUP_QUESTIONS || []);
+  }
+  if (!window.ADMIN_ACTIVE_CLASS && window.ADMIN_POSTVIEW_QUESTIONS && window.ADMIN_POSTVIEW_QUESTIONS.length) {
+    renderAdminPostviewPreview(window.ADMIN_POSTVIEW_QUESTIONS);
   }
 })();

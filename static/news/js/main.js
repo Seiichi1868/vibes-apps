@@ -77,9 +77,16 @@
   const warmupBody = document.getElementById("warmup-body");
   const warmupContentWrap = document.getElementById("warmup-content-wrap");
 
+  const postviewAccordion = document.getElementById("postview-accordion");
+  const postviewToggleBtn = document.getElementById("postview-toggle-btn");
+  const postviewToggleLabel = document.getElementById("postview-toggle-label");
+  const postviewBody = document.getElementById("postview-body");
+  const postviewContentWrap = document.getElementById("postview-content-wrap");
+
   let vocabOpen = false;
   let translationOpen = false;
   let warmupOpen = false;
+  let postviewOpen = false;
 
   let selectedClassId = "";
   let prepSeconds = 60;
@@ -526,6 +533,50 @@
     });
   }
 
+  // ── 事後質問（視聴後の会話練習） ────────────────────────────────
+
+  function renderPostview(questions, enabled) {
+    if (!postviewAccordion) return;
+    var visibleQuestions = (questions || []).filter(function (q) {
+      return q && q.text;
+    });
+    if (!enabled || !visibleQuestions.length) {
+      postviewAccordion.classList.add("hidden");
+      return;
+    }
+    if (!postviewContentWrap) return;
+    var html = '<p class="mb-1 text-[10px] font-semibold text-amber-800">' + t("postviewPrompt") + "</p>";
+    html += '<ol class="space-y-1 list-none">';
+    visibleQuestions.forEach(function (q, i) {
+      html += '<li class="flex items-start gap-1.5 text-[11px] text-slate-700">' +
+        '<span class="shrink-0 text-[10px] font-bold text-amber-700">Q' + (i + 1) + '.</span>' +
+        '<span class="leading-snug">' + escHtml(q.text) + '</span>' +
+        '</li>';
+    });
+    html += '</ol>';
+    postviewContentWrap.innerHTML = html;
+    postviewAccordion.classList.remove("hidden");
+    postviewOpen = false;
+    if (postviewBody) postviewBody.style.maxHeight = "0";
+    if (postviewToggleLabel) postviewToggleLabel.textContent = t("open");
+  }
+
+  if (postviewToggleBtn) {
+    postviewToggleBtn.addEventListener("click", function () {
+      postviewOpen = !postviewOpen;
+      if (postviewOpen) {
+        var h = Math.min(postviewBody.scrollHeight, 320);
+        postviewBody.style.maxHeight = h + "px";
+        postviewBody.style.overflowY = postviewBody.scrollHeight > 320 ? "auto" : "hidden";
+        if (postviewToggleLabel) postviewToggleLabel.textContent = t("closeAccordion");
+      } else {
+        postviewBody.style.maxHeight = "0";
+        postviewBody.style.overflowY = "hidden";
+        if (postviewToggleLabel) postviewToggleLabel.textContent = t("open");
+      }
+    });
+  }
+
   // ──────────────────────────────────────────────────────────────
 
   function renderFeedback(text) {
@@ -918,6 +969,10 @@
       cls.warmup_image_url || "",
       cls.warmup_questions || [],
       cls.warmup_scaffolding_enabled === true
+    );
+    renderPostview(
+      cls.postview_questions || [],
+      cls.postview_scaffolding_enabled === true
     );
     setVideoPlayer(cls.video);
 

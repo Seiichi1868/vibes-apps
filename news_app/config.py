@@ -29,7 +29,9 @@ DEFAULT_EVAL_AI_MODEL = os.environ.get("NEWS_EVAL_AI_MODEL", "gpt-5.6-luna")
 
 CEFR_LEVELS = ("A1", "A2", "B1", "B2")
 DEFAULT_CEFR_LEVEL = "A2"
-VOCAB_CEFR_LEVELS = ("C2", "C1", "B2", "B1")
+VOCAB_CEFR_LEVELS = ("C2", "C1", "B2", "B1", "A2")
+VOCAB_MIN_CEFR_LEVELS = ("A2", "B1", "B2")
+DEFAULT_VOCAB_MIN_CEFR = "B1"
 VOCAB_EXTRACTION_TARGET = 30
 VOCAB_EXTRACTION_MIN = 25
 VOCAB_EXTRACTION_MAX = 30
@@ -123,6 +125,17 @@ def resolve_cefr_level(level: str | None = None, *, fallback: str | None = None)
     if fb in CEFR_LEVELS:
         return fb
     return DEFAULT_CEFR_LEVEL
+
+
+def resolve_vocab_min_cefr(level: str | None = None, *, fallback: str | None = None) -> str:
+    """語彙抽出の最低 CEFR。選んだレベル以上（例: B2 → B2/C1/C2）を出す。"""
+    name = (level or "").strip().upper()
+    if name in VOCAB_MIN_CEFR_LEVELS:
+        return name
+    fb = (fallback or "").strip().upper()
+    if fb in VOCAB_MIN_CEFR_LEVELS:
+        return fb
+    return DEFAULT_VOCAB_MIN_CEFR
 
 
 def get_openai_api_key() -> str:

@@ -19,12 +19,14 @@
   const viewVideo = document.getElementById("view-video");
   const viewVocab = document.getElementById("view-vocab");
   const viewWarmup = document.getElementById("view-warmup");
+  const viewPostview = document.getElementById("view-postview");
   const youtubePlayer = document.getElementById("youtube-player-screen");
   const videoPlaceholder = document.getElementById("video-placeholder-screen");
   const vocabContent = document.getElementById("vocab-content-screen");
   const warmupContent = document.getElementById("warmup-content-screen");
+  const postviewContent = document.getElementById("postview-content-screen");
 
-  const viewMap = { video: viewVideo, vocab: viewVocab, warmup: viewWarmup };
+  const viewMap = { video: viewVideo, vocab: viewVocab, warmup: viewWarmup, postview: viewPostview };
   const viewButtons = controlsEl ? controlsEl.querySelectorAll("[data-view]") : [];
 
   let currentView = "video";
@@ -342,6 +344,28 @@
     warmupContent.innerHTML = html;
   }
 
+  function renderPostview(questions) {
+    if (!postviewContent) return;
+    const list = (questions || []).filter(function (q) { return q && q.text; });
+    if (!list.length) {
+      postviewContent.innerHTML =
+        '<p class="text-center text-slate-400">' + t("screenNoPostview") + "</p>";
+      return;
+    }
+    postviewContent.style.setProperty("--warmup-q-size", warmupQuestionFontSize(list.length, false));
+    let html = '<p class="screen-warmup-heading">' + t("screenPostviewHeading") + "</p>";
+    html += '<ol class="screen-warmup-list">';
+    list.forEach(function (q, i) {
+      html +=
+        '<li class="screen-warmup-q flex items-start gap-[0.35em]">' +
+        '<span class="screen-warmup-num">Q' + (i + 1) + ".</span>" +
+        '<span class="screen-warmup-text">' + escHtml(q.text) + "</span>" +
+        "</li>";
+    });
+    html += "</ol>";
+    postviewContent.innerHTML = html;
+  }
+
   function setActiveView(view) {
     currentView = view;
     Object.entries(viewMap).forEach(function ([key, el]) {
@@ -359,6 +383,7 @@
       video: payload.has_video,
       vocab: payload.has_vocab && showAssistive(),
       warmup: payload.has_warmup,
+      postview: payload.has_postview,
     };
 
     viewButtons.forEach(function (btn) {
@@ -405,6 +430,7 @@
       await setVideoPlayer(cls.video);
       renderVocab(cls.vocabulary_data || []);
       renderWarmup(cls.warmup_image_url || "", cls.warmup_questions || []);
+      renderPostview(cls.postview_questions || []);
       configureControls(cls);
       showLoading(false);
     } catch (err) {

@@ -31,6 +31,7 @@ from news_app.services.storage import (
     vocabulary_for_student,
     script_translation_for_lang,
     appearance_context,
+    selected_display_questions,
 )
 from news_app.services.youtube import build_youtube_embed_url
 from news_app.services.youtube_transcript import (
@@ -190,19 +191,17 @@ def _class_public_payload(class_id: str, origin: str, display_language: str = "j
 
     warmup_scaffolding_enabled = bool(current.get("warmup_scaffolding_enabled", False))
     warmup_image_url = str(current.get("warmup_image_url") or "").strip()
-    raw_warmup_questions = current.get("warmup_questions") if isinstance(current.get("warmup_questions"), list) else []
     if warmup_scaffolding_enabled:
-        warmup_questions = [
-            {"id": i + 1, "text": str(q.get("text") or "").strip()}
-            for i, q in enumerate(
-                q
-                for q in raw_warmup_questions
-                if isinstance(q, dict) and q.get("selected", True) and str(q.get("text") or "").strip()
-            )
-        ]
+        warmup_questions = selected_display_questions(current.get("warmup_questions"))
     else:
         warmup_questions = []
         warmup_image_url = ""
+
+    postview_scaffolding_enabled = bool(current.get("postview_scaffolding_enabled", False))
+    if postview_scaffolding_enabled:
+        postview_questions = selected_display_questions(current.get("postview_questions"))
+    else:
+        postview_questions = []
 
     return {
         "id": cls["id"],
@@ -230,6 +229,8 @@ def _class_public_payload(class_id: str, origin: str, display_language: str = "j
         "warmup_scaffolding_enabled": warmup_scaffolding_enabled,
         "warmup_image_url": warmup_image_url,
         "warmup_questions": warmup_questions,
+        "postview_scaffolding_enabled": postview_scaffolding_enabled,
+        "postview_questions": postview_questions,
     }
 
 
@@ -254,15 +255,8 @@ def _class_screen_payload(class_id: str, origin: str, display_language: str = "j
         else []
     )
     warmup_image_url = str(current.get("warmup_image_url") or "").strip()
-    raw_warmup_questions = current.get("warmup_questions") if isinstance(current.get("warmup_questions"), list) else []
-    warmup_questions = [
-        {"id": i + 1, "text": str(q.get("text") or "").strip()}
-        for i, q in enumerate(
-            q
-            for q in raw_warmup_questions
-            if isinstance(q, dict) and q.get("selected", True) and str(q.get("text") or "").strip()
-        )
-    ]
+    warmup_questions = selected_display_questions(current.get("warmup_questions"))
+    postview_questions = selected_display_questions(current.get("postview_questions"))
     embed_url = (
         build_youtube_embed_url(
             video_id,
@@ -287,9 +281,11 @@ def _class_screen_payload(class_id: str, origin: str, display_language: str = "j
         "vocabulary_data": vocabulary_data,
         "warmup_image_url": warmup_image_url,
         "warmup_questions": warmup_questions,
+        "postview_questions": postview_questions,
         "has_video": bool(video_id),
         "has_vocab": bool(vocabulary_data),
         "has_warmup": bool(warmup_image_url or warmup_questions),
+        "has_postview": bool(postview_questions),
     }
 
 

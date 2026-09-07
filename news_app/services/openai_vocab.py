@@ -1,4 +1,4 @@
-"""英語スクリプトから CEFR B1〜C2 の重要語彙を抽出する。"""
+"""英語スクリプトから指定 CEFR 以上の重要語彙を抽出する。"""
 
 from __future__ import annotations
 
@@ -8,20 +8,34 @@ from openai import OpenAI
 from pydantic import BaseModel, Field
 
 from news_app.config import (
+    DEFAULT_VOCAB_MIN_CEFR,
     VOCABULARY_EXTRACTION_MODEL,
     VOCAB_CEFR_LEVELS,
     VOCAB_EXTRACTION_MAX,
     VOCAB_EXTRACTION_MIN,
     VOCAB_EXTRACTION_TARGET,
+    resolve_vocab_min_cefr,
 )
 from news_app.services.openai_utils import create_parsed_chat_completion
 
 VOCAB_CEFR_ORDER = {level: index for index, level in enumerate(VOCAB_CEFR_LEVELS)}
+VOCAB_CEFR_RANK = {"A2": 0, "B1": 1, "B2": 2, "C1": 3, "C2": 4}
+ALL_EXTRACTABLE_CEFR = ("A2", "B1", "B2", "C1", "C2")
+
+
+def allowed_cefr_levels(min_level: str) -> tuple[str, ...]:
+    min_rank = VOCAB_CEFR_RANK[resolve_vocab_min_cefr(min_level)]
+    return tuple(level for level in ALL_EXTRACTABLE_CEFR if VOCAB_CEFR_RANK[level] >= min_rank)
+
+
+def _level_range_label(min_level: str) -> str:
+    allowed = allowed_cefr_levels(min_level)
+    return "、".join(allowed) + f"（{resolve_vocab_min_cefr(min_level)}以上）"
 
 
 class VocabularyItem(BaseModel):
     word: str = Field(description="単語、熟語、句動詞、またはコロケーション")
-    cefr: Literal["B1", "B2", "C1", "C2"] = Field(description="CEFR 難易度レベル")
+    cefr: Literal["A2", "B1", "B2", "C1", "C2"] = Field(description="CEFR 難易度レベル")
     part_of_speech: str = Field(
         description="品詞（名詞、動詞、形容詞、副詞、熟語、句動詞 など）"
     )
@@ -35,7 +49,7 @@ class VocabularyItem(BaseModel):
 class VocabularyExtractionResult(BaseModel):
     vocabulary: list[VocabularyItem] = Field(
         description=(
-            f"難しい順（C2→C1→B2→B1）に並べた重要語彙。"
+            f"難しい順（C2→C1→B2→B1→A2）に並べた重要語彙。"
             f"目標{VOCAB_EXTRACTION_TARGET}語（最低{VOCAB_EXTRACTION_MIN}語）"
         ),
         min_length=1,
@@ -51,13 +65,24 @@ class VocabularySupplementResult(BaseModel):
     )
 
 
-def _build_system_prompt() -> str:
+def _build_system_prompt(min_level: str) -> str:
+    min_level = resolve_vocab_min_cefr(min_level)
+    allowed = allowed_cefr_levels(min_level)
+    allowed_csv = " / ".join(allowed)
+    range_label = _level_range_label(min_level)
+    below_note = {
+        "A2": "A1 レベルの平易語（wear, get, big, small, people, today, go, make など）",
+        "B1": "A1/A2 レベルの平易語（wear, get, prepare, describe, report, major, government, country, important など）",
+        "B2": "A1〜B1 レベルの語（prepare, describe, significant, government, policy, impact, concern など、B1以下は除外）",
+    }[min_level]
     return f"""\
 あなたは、日本の高校生（主に英検準2級〜2級程度、CEFR A2〜B1レベル）を指導する \
 優秀な英語教師であり、言語学のエキスパートです。
 与えられた英語のニューススクリプトから、生徒が動画を視聴する前の足場かけ \
 （Scaffolding）として最適な重要語句を【必ず{VOCAB_EXTRACTION_MIN}〜{VOCAB_EXTRACTION_MAX}語】 \
-抽出し、CEFRレベルの高い順（C2 → C1 → B2 → B1）にソートしてJSON形式で出力してください。
+抽出し、CEFRレベルの高い順（C2 → C1 → B2 → B1 → A2）にソートしてJSON形式で出力してください。
+
+今回の抽出対象は **{range_label}** です。これより易しい語は出さないこと。
 
 ==== RULE 0 — 出力件数（最優先） ====
 - 「最大{VOCAB_EXTRACTION_MAX}語」ではなく、**毎回 {VOCAB_EXTRACTION_MIN}〜{VOCAB_EXTRACTION_MAX} 語を必ず出力**すること。
@@ -80,11 +105,12 @@ take action, face criticism, economic policy, opposition party など（スク�
 3. 認知度の高すぎる現代用語・略語（AI, COVID-19, SNS など）。
 4. 基本語の単純な派生形 \
 （basically, teachers など、意味が容易に類推できるもの。意味が大きく変わる場合は除く）。
-5. A1/A2 レベルの平易語 \
-（wear, get, prepare, describe, report, major, government, country, important など）。
+5. {below_note}
 
-==== RULE 2 — CEFR 判定基準（B1〜C2 のみ対象） ====
+==== RULE 2 — CEFR 判定基準（{allowed_csv} のみ対象） ====
 
+A2: prepare, describe, report, major, country, important, agree, decide, problem, \
+reason, change, happen, support, continue, according to
 B1: despite, policy, demonstrate, significant, contribute, establish, criticism, \
 impact, conflict, crisis, reform, economy, threat, investigation, concern
 B2: advocate, analyze, implement, infrastructure, reinforce, substantial, trigger, \
@@ -93,6 +119,8 @@ deal with
 C1: articulate, facilitate, formidable, inherent, pervasive, unprecedented, \
 exacerbate, scrutinize, rhetoric, in response to
 C2: ameliorate, commensurate, inexorable, ubiquitous, propitious
+
+※ 今回は {min_level} 未満のレベルは絶対に出力しない。
 
 ==== RULE 3 — 意味（meaning / meaning_es）の基準 ====
 辞書的な第一義を機械的にあてるのではなく、「そのニューススクリプトの文脈（Context）」\
@@ -153,16 +181,20 @@ opposition parties in Brussels."
   }}
 ]
 ※ "government" は高校生にとって既知のため除外。"Brussels" は固有名詞のため除外。\
+※ 最低レベルが B2 の場合、criticism（B1）は出さない。\
 """
 
 
-def _build_user_prompt(script: str) -> str:
+def _build_user_prompt(script: str, min_level: str) -> str:
+    min_level = resolve_vocab_min_cefr(min_level)
+    allowed = " | ".join(allowed_cefr_levels(min_level))
+    range_label = _level_range_label(min_level)
     return f"""\
 以下の英語ニューススクリプトから、**必ず{VOCAB_EXTRACTION_MIN}〜{VOCAB_EXTRACTION_MAX}語** \
 の重要語彙を抽出してください。20語以下の出力は不可です。
 
 - 単語に加え、句動詞・コロケーション・熟語表現を8語以上含めること
-- 抽出対象は B1, B2, C1, C2 レベルのみ（A1/A2 は除外）
+- 抽出対象は {range_label} のみ（{min_level} 未満は除外）
 - 固有名詞・現代略語・基本語の単純派生形は除外
 - 日本語の意味はこのスクリプトの文脈に合った自然な訳を使うこと
 - スペイン語の意味（meaning_es）も同じ文脈で自然な訳を必ず付けること
@@ -176,7 +208,7 @@ def _build_user_prompt(script: str) -> str:
   "vocabulary": [
     {{
       "word": "単語・熟語・句動詞（小文字・原形推奨）",
-      "cefr": "B1 | B2 | C1 | C2 のいずれか",
+      "cefr": "{allowed} のいずれか",
       "part_of_speech": "品詞（名詞 / 動詞 / 形容詞 / 副詞 / 熟語 / 句動詞 など）",
       "meaning": "このスクリプトの文脈に合った日本語の意味",
       "meaning_es": "同じ文脈のスペイン語の意味"
@@ -184,19 +216,23 @@ def _build_user_prompt(script: str) -> str:
   ]
 }}
 
-難しい順（C2 → C1 → B2 → B1）にソートし、件数が{VOCAB_EXTRACTION_MIN}未満にならないよう十分に抽出すること。\
+難しい順（C2 → C1 → B2 → B1 → A2）にソートし、件数が{VOCAB_EXTRACTION_MIN}未満にならないよう十分に抽出すること。\
 """
 
 
-def _build_supplement_user_prompt(script: str, existing_words: list[str], need: int) -> str:
+def _build_supplement_user_prompt(
+    script: str, existing_words: list[str], need: int, min_level: str
+) -> str:
+    min_level = resolve_vocab_min_cefr(min_level)
     existing_block = "\n".join(f"- {word}" for word in existing_words) or "（なし）"
+    range_label = _level_range_label(min_level)
     return f"""\
 前回の抽出では語数が不足しています。以下のスクリプトから、**あと{need}語以上** \
 の追加語彙を抽出してください（合計{VOCAB_EXTRACTION_TARGET}語前後を目標）。
 
 - 既に抽出済みの語句は絶対に含めない
 - 句動詞・コロケーション・熟語表現を優先的に探す
-- B1〜C2 のみ。固有名詞・A1/A2 語は除外
+- {range_label} のみ。固有名詞と {min_level} 未満の語は除外
 
 【既出語句（重複禁止）】
 {existing_block}
@@ -214,6 +250,11 @@ def _sort_vocabulary_items(items: list[VocabularyItem]) -> list[VocabularyItem]:
         items,
         key=lambda item: (VOCAB_CEFR_ORDER.get(item.cefr, 99), item.word.lower()),
     )
+
+
+def _filter_items_by_min_cefr(items: list[VocabularyItem], min_level: str) -> list[VocabularyItem]:
+    allowed = set(allowed_cefr_levels(min_level))
+    return [item for item in items if item.cefr in allowed]
 
 
 def _items_to_dicts(items: list[VocabularyItem]) -> list[dict]:
@@ -253,6 +294,7 @@ def _request_vocabulary(
     *,
     response_model: type[BaseModel],
     temperature: float,
+    min_level: str,
 ) -> list[VocabularyItem]:
     parsed = create_parsed_chat_completion(
         client,
@@ -261,7 +303,7 @@ def _request_vocabulary(
         response_model,
         temperature=temperature,
     )
-    return _sort_vocabulary_items(parsed.vocabulary)
+    return _sort_vocabulary_items(_filter_items_by_min_cefr(parsed.vocabulary, min_level))
 
 
 def extract_vocabulary_from_script(
@@ -269,9 +311,11 @@ def extract_vocabulary_from_script(
     *,
     api_key: str,
     model: str = VOCABULARY_EXTRACTION_MODEL,
+    min_cefr: str = DEFAULT_VOCAB_MIN_CEFR,
 ) -> list[dict]:
-    """英語スクリプトから語彙リスト（25〜30件）を抽出する。"""
+    """英語スクリプトから語彙リスト（25〜30件）を抽出する。min_cefr 以上の難しさの語のみ。"""
     script = str(script or "").strip()
+    min_cefr = resolve_vocab_min_cefr(min_cefr)
     if not script:
         raise ValueError("スクリプトが空です。語彙を抽出するには英語スクリプトが必要です。")
     if not api_key:
@@ -281,17 +325,18 @@ def extract_vocabulary_from_script(
         )
 
     client = OpenAI(api_key=api_key)
-    system_prompt = _build_system_prompt()
+    system_prompt = _build_system_prompt(min_cefr)
 
     initial_items = _request_vocabulary(
         client,
         model,
         [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": _build_user_prompt(script)},
+            {"role": "user", "content": _build_user_prompt(script, min_cefr)},
         ],
         response_model=VocabularyExtractionResult,
         temperature=0.1,
+        min_level=min_cefr,
     )
     items = _items_to_dicts(initial_items)
 
@@ -306,11 +351,12 @@ def extract_vocabulary_from_script(
                 {"role": "system", "content": system_prompt},
                 {
                     "role": "user",
-                    "content": _build_supplement_user_prompt(script, existing_words, need),
+                    "content": _build_supplement_user_prompt(script, existing_words, need, min_cefr),
                 },
             ],
             response_model=VocabularySupplementResult,
             temperature=0.15,
+            min_level=min_cefr,
         )
         items = _merge_vocab_dicts(items, _items_to_dicts(supplement_items))
         supplement_attempts += 1

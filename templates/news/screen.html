@@ -201,10 +201,15 @@
     <div id="warmup-content-screen" class="screen-warmup-inner"></div>
   </div>
 
+  <div id="view-postview" class="screen-view screen-view--warmup">
+    <div id="postview-content-screen" class="screen-warmup-inner"></div>
+  </div>
+
   <div id="screen-controls" class="screen-controls bottom-2 right-2 sm:bottom-3 sm:right-3 hidden">
     <button type="button" class="screen-ctrl-btn" data-view="video" title="動画" data-i18n="screenVideo" data-i18n-title="screenVideo">動画</button>
     <button type="button" class="screen-ctrl-btn" data-view="vocab" title="単語" data-i18n="screenVocab" data-i18n-title="screenVocab" data-assistive-lang>単語</button>
     <button type="button" class="screen-ctrl-btn" data-view="warmup" title="導入質問" data-i18n="screenWarmup" data-i18n-title="screenWarmup">導入</button>
+    <button type="button" class="screen-ctrl-btn" data-view="postview" title="事後質問" data-i18n="screenPostview" data-i18n-title="screenPostview">事後</button>
     <button type="button" id="screen-fullscreen-btn" class="screen-ctrl-btn" title="全画面" data-i18n-title="fullscreen">⛶</button>
   </div>
 </div>
@@ -216,6 +221,6 @@
   window.SCREEN_INITIAL_CLASS_ID = {{ initial_class_id|tojson }};
   window.SCREEN_CLASSES = {{ classes|tojson }};
 </script>
-<script src="{{ url_for('static', filename='news/js/i18n.js', v='20260907c') }}"></script>
-<script src="{{ url_for('static', filename='news/js/screen.js', v='20260907a') }}"></script>
+<script src="{{ url_for('static', filename='news/js/i18n.js', v='20260907d') }}"></script>
+<script src="{{ url_for('static', filename='news/js/screen.js', v='20260907b') }}"></script>
 {% endblock %}

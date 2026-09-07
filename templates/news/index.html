@@ -264,6 +264,28 @@
           class="absolute inset-0 hidden [&>iframe]:h-full [&>iframe]:w-full [&>iframe]:border-0"
           aria-label="News video player"></div>
       </div>
+
+      <!-- 事後質問アコーディオン（postview_scaffolding_enabled が true のとき表示） -->
+      <div id="postview-accordion" class="mt-1 shrink-0 hidden">
+        <button type="button" id="postview-toggle-btn"
+          class="flex w-full items-center justify-between rounded-lg border border-amber-200/70 bg-amber-50/80 px-2.5 py-1.5 text-left transition-colors hover:bg-amber-50">
+          <span class="text-[11px] font-semibold text-amber-900" data-i18n="afterWatching">
+            💬 動画を見た後に話し合おう
+          </span>
+          <span id="postview-toggle-label"
+            class="ml-2 shrink-0 text-[10px] font-semibold text-amber-700 transition-transform duration-200"
+            data-i18n="open">
+            開く ▼
+          </span>
+        </button>
+        <div id="postview-body"
+          class="overflow-hidden transition-[max-height] duration-300 ease-in-out"
+          style="max-height:0;overflow:hidden;">
+          <div class="overflow-x-auto rounded-b-lg border-x border-b border-amber-100/80 bg-white/70 p-2">
+            <div id="postview-content-wrap"></div>
+          </div>
+        </div>
+      </div>
     </section>
 
     <section class="glass flex min-h-0 flex-col gap-1 rounded-xl p-1.5 shadow-lg sm:col-start-1 sm:row-start-2">
@@ -371,6 +393,6 @@
   window.INITIAL_WARMUP_IMAGE_URL = "";
   window.INITIAL_WARMUP_QUESTIONS = [];
 </script>
-<script src="{{ url_for('static', filename='news/js/i18n.js', v='20260907c') }}"></script>
-<script src="{{ url_for('static', filename='news/js/main.js', v='20260907a') }}"></script>
+<script src="{{ url_for('static', filename='news/js/i18n.js', v='20260907d') }}"></script>
+<script src="{{ url_for('static', filename='news/js/main.js', v='20260907b') }}"></script>
 {% endblock %}
