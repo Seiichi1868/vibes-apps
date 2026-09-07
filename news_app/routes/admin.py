@@ -15,6 +15,7 @@ from news_app.config import (
     resolve_ai_model,
     resolve_cefr_level,
     resolve_display_language,
+    resolve_transcript_ai_model,
     save_openai_api_key,
 )
 from news_app.services.cnn10 import fetch_cnn10_episodes
@@ -102,7 +103,7 @@ def youtube_highlight():
         )
 
     state = load_state()
-    model = resolve_ai_model(state.get("ai_model"))
+    model = resolve_transcript_ai_model(state.get("ai_transcript_model"))
     try:
         highlight = find_title_segment_in_transcript(
             title,
@@ -124,6 +125,7 @@ def admin_index():
     state = {
         **state,
         "ai_model": resolve_ai_model(state.get("ai_model")),
+        "ai_transcript_model": resolve_transcript_ai_model(state.get("ai_transcript_model")),
         "default_cefr_level": resolve_cefr_level(state.get("default_cefr_level")),
     }
     class_id, cls = _active_class_or_none()
@@ -167,6 +169,7 @@ def save_settings():
         kwargs = {
             "display_language": resolve_display_language(data.get("display_language")),
             "ai_model": resolve_ai_model(data.get("ai_model")),
+            "ai_transcript_model": resolve_transcript_ai_model(data.get("ai_transcript_model")),
             "default_cefr_level": resolve_cefr_level(data.get("default_cefr_level")),
             "openai_api_key": openai_api_key,
         }
@@ -472,8 +475,10 @@ def api_extract_lesson_vocabulary():
             }
         ), 400
 
+    state = load_state()
+    model = resolve_ai_model(state.get("ai_model"))
     try:
-        vocabulary_data = extract_vocabulary_from_script(script, api_key=api_key)
+        vocabulary_data = extract_vocabulary_from_script(script, api_key=api_key, model=model)
         cls = update_class_current(
             class_id,
             {
@@ -582,8 +587,10 @@ def api_generate_warmup():
             }
         ), 400
 
+    state = load_state()
+    model = resolve_ai_model(state.get("ai_model"))
     try:
-        result = extract_warmup_from_script(script, api_key=api_key)
+        result = extract_warmup_from_script(script, api_key=api_key, model=model)
         cls = update_class_current(
             class_id,
             {

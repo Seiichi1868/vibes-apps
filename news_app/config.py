@@ -24,6 +24,7 @@ def load_environment() -> None:
 load_environment()
 
 DEFAULT_AI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-5.6-luna")
+DEFAULT_TRANSCRIPT_AI_MODEL = os.environ.get("NEWS_TRANSCRIPT_AI_MODEL", "gpt-5.6-sol")
 
 CEFR_LEVELS = ("A1", "A2", "B1", "B2")
 DEFAULT_CEFR_LEVEL = "A2"
@@ -59,8 +60,9 @@ def resolve_display_language(value: str | None = None, *, fallback: str = "ja") 
 
 
 AI_MODELS = (
-    "gpt-5.6-luna",
+    "gpt-5.6-sol",
     "gpt-5.6-terra",
+    "gpt-5.6-luna",
     "gpt-5.4-mini",
     "gpt-4o-mini",
     "gpt-5.4-nano",
@@ -90,12 +92,20 @@ ALLOWED_MEDIA_EXTENSIONS = {
 }
 
 
-def resolve_ai_model(model: str | None = None) -> str:
-    """未対応・旧モデル名はデフォルト（Luna）へ寄せる。"""
+def resolve_ai_model(model: str | None = None, *, fallback: str | None = None) -> str:
+    """未対応・旧モデル名は fallback（未指定時は Luna）へ寄せる。"""
     name = (model or "").strip()
     if name in AI_MODELS:
         return name
+    fb = (fallback or "").strip()
+    if fb in AI_MODELS:
+        return fb
     return DEFAULT_AI_MODEL
+
+
+def resolve_transcript_ai_model(model: str | None = None) -> str:
+    """CNN10 のタイトル→文字起こし区間推定用。未設定は Sol。"""
+    return resolve_ai_model(model, fallback=DEFAULT_TRANSCRIPT_AI_MODEL)
 
 
 def resolve_cefr_level(level: str | None = None, *, fallback: str | None = None) -> str:

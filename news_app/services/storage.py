@@ -69,6 +69,7 @@ DEFAULT_CLASS_CURRENT = {
 DEFAULT_STATE = {
     "display_language": "ja",
     "ai_model": "gpt-5.6-luna",
+    "ai_transcript_model": "gpt-5.6-sol",
     "default_cefr_level": DEFAULT_CEFR_LEVEL,
     "openai_api_key": "",
     "default_evaluation_criteria": deepcopy(DEFAULT_EVALUATION_CRITERIA),
@@ -392,7 +393,7 @@ def _migrate_legacy_state(data: dict) -> dict:
     """旧形式（単一 video / class_code）→ 複数クラス形式へ変換。"""
     state = deepcopy(DEFAULT_STATE)
 
-    for key in ("display_language", "ai_model", "openai_api_key", "active_class_id"):
+    for key in ("display_language", "ai_model", "ai_transcript_model", "openai_api_key", "active_class_id"):
         if key in data and data[key] is not None:
             state[key] = data[key]
     state["display_language"] = resolve_display_language(state.get("display_language"))
@@ -436,7 +437,7 @@ def _normalize_state(data: dict | None) -> dict:
     classes_raw = data.get("classes")
     if isinstance(classes_raw, dict) and classes_raw:
         merged = deepcopy(DEFAULT_STATE)
-        for key in ("display_language", "ai_model", "openai_api_key", "active_class_id"):
+        for key in ("display_language", "ai_model", "ai_transcript_model", "openai_api_key", "active_class_id"):
             if key in data and data[key] is not None:
                 merged[key] = data[key]
         merged["display_language"] = resolve_display_language(merged.get("display_language"))
@@ -505,7 +506,7 @@ def save_state(state: dict) -> dict:
 
 def update_settings(**kwargs) -> dict:
     state = load_state()
-    for key in ("ai_model", "openai_api_key"):
+    for key in ("ai_model", "ai_transcript_model", "openai_api_key"):
         if key in kwargs:
             state[key] = kwargs[key]
     if "display_language" in kwargs:
