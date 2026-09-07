@@ -19,6 +19,7 @@ from news_app.config import (
 from news_app.services.cnn10 import fetch_cnn10_episodes
 from news_app.services.cnn10_highlight import find_title_segment_in_transcript
 from news_app.services.network import get_public_base_url
+from news_app.services.docx_translate import build_script_translation_docx, translation_rows
 from news_app.services.openai_translate import translate_script_to_japanese
 from news_app.services.openai_vocab import extract_vocabulary_from_script
 from news_app.services.openai_warmup import extract_warmup_from_script
@@ -48,6 +49,7 @@ from news_app.services.storage import (
     update_class_current,
     update_settings,
     update_submission_lesson_title,
+    _normalize_script_ja_pairs,
     _normalize_vocabulary_data,
     _normalize_warmup_questions,
     appearance_context,
@@ -379,6 +381,45 @@ def api_translate_lesson_script():
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:
         return jsonify({"ok": False, "error": f"和訳の作成に失敗しました: {exc}"}), 500
+
+
+@admin_bp.route("/api/class/lesson/translate/docx", methods=["POST"])
+def api_export_lesson_script_translation_docx():
+    """原文と和訳を Word（.docx）でダウンロードする。"""
+    data = request.get_json(silent=True) or {}
+    class_id = str(data.get("class_id") or get_active_class_id()).strip()
+    title = str(data.get("title") or "").strip()
+    pairs = _normalize_script_ja_pairs(data.get("pairs"))
+    script = str(data.get("script") or "").strip()
+    script_ja = str(data.get("script_ja") or "").strip()
+
+    cls = get_class(class_id) if class_id else None
+    current = (cls or {}).get("current") or {}
+    if not title:
+        title = str(current.get("title") or "").strip()
+    if not pairs:
+        pairs = translation_rows(
+            script or str(current.get("script") or ""),
+            script_ja or str(current.get("script_ja") or ""),
+            current.get("script_ja_pairs"),
+        )
+
+    if not pairs:
+        return jsonify({"ok": False, "error": "原文と和訳がありません。先に和訳を作成してください。"}), 400
+
+    try:
+        buf = io.BytesIO(build_script_translation_docx(title=title, pairs=pairs))
+        buf.seek(0)
+        return send_file(
+            buf,
+            as_attachment=True,
+            download_name="original_and_translation.docx",
+            mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"Word の作成に失敗しました: {exc}"}), 500
 
 
 @admin_bp.route("/api/class/lesson/vocabulary", methods=["POST"])

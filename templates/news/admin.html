@@ -294,6 +294,10 @@
           <p class="mt-0.5 text-[11px] text-slate-500">指定した文字起こし部分と、その日本語訳です</p>
         </div>
         <div class="flex shrink-0 items-center gap-1.5">
+          <button type="button" id="script-translate-docx-btn"
+            class="rounded border border-teal-100 bg-teal-50 px-2 py-1 text-[10px] font-semibold text-teal-800 hover:bg-teal-100 disabled:opacity-50">
+            Wordで出力
+          </button>
           <button type="button" id="script-translate-retry-btn"
             class="rounded border border-sky-100 bg-sky-50 px-2 py-1 text-[10px] font-semibold text-sky-700 hover:bg-sky-100 disabled:opacity-50">
             再作成
@@ -710,5 +714,5 @@
   window.ADMIN_WARMUP_QUESTIONS = {{ (current.warmup_questions or [])|tojson }};
 </script>
 <script src="{{ url_for('static', filename='news/js/youtube-transcript.js', v='20260904i') }}"></script>
-<script src="{{ url_for('static', filename='news/js/admin.js', v='20260907c') }}"></script>
+<script src="{{ url_for('static', filename='news/js/admin.js', v='20260907d') }}"></script>
 {% endblock %}

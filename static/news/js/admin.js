@@ -58,6 +58,7 @@
   const scriptTranslatePanelStatus = document.getElementById("script-translate-panel-status");
   const scriptTranslateCloseBtn = document.getElementById("script-translate-close-btn");
   const scriptTranslateRetryBtn = document.getElementById("script-translate-retry-btn");
+  const scriptTranslateDocxBtn = document.getElementById("script-translate-docx-btn");
   const vocabScaffoldingEnabledEl = document.getElementById("vocab-scaffolding-enabled");
   const vocabExtractBtn = document.getElementById("vocab-extract-btn");
   const vocabExtractStatus = document.getElementById("vocab-extract-status");
@@ -1590,19 +1591,95 @@
     scriptTranslatePanelStatus.classList.remove("hidden");
   }
 
+  function getScriptTranslationRows(script, translation, pairs) {
+    if (Array.isArray(pairs) && pairs.length) {
+      return pairs
+        .map((item) => ({
+          en: String(item?.en || "").trim(),
+          ja: String(item?.ja || "").trim(),
+        }))
+        .filter((item) => item.en || item.ja);
+    }
+    const units = splitScriptChunks(script);
+    const jaChunks = splitScriptChunks(translation);
+    return units.map((en, index) => ({
+      en,
+      ja: jaChunks.length === units.length ? jaChunks[index] : index === 0 ? translation : "",
+    }));
+  }
+
+  function translationDocxFilename(title) {
+    const safe = String(title || "")
+      .replace(/[\\/:*?"<>|]/g, "")
+      .replace(/\s+/g, "_")
+      .slice(0, 40);
+    return safe ? `原文と和訳_${safe}.docx` : "原文と和訳.docx";
+  }
+
+  async function downloadScriptTranslationWord() {
+    const rows = getScriptTranslationRows(
+      document.getElementById("lesson-script")?.value.trim() || "",
+      getLessonScriptJa(),
+      getLessonScriptJaPairs()
+    );
+    if (!rows.length) {
+      showScriptTranslatePanelStatus("原文と和訳がありません。先に和訳を作成してください。", true);
+      return;
+    }
+
+    const classId = getSelectedClassId() || (lessonClassId && lessonClassId.value) || "";
+    const title = document.getElementById("lesson-title")?.value.trim() || "";
+    if (scriptTranslateDocxBtn) {
+      scriptTranslateDocxBtn.disabled = true;
+      scriptTranslateDocxBtn.textContent = "出力中…";
+    }
+    showScriptTranslatePanelStatus("Word ファイルを作成しています…", false);
+
+    try {
+      const res = await fetch("/news/admin/api/class/lesson/translate/docx", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          class_id: classId,
+          title,
+          pairs: rows,
+        }),
+      });
+      const contentType = res.headers.get("content-type") || "";
+      if (!res.ok || contentType.includes("application/json")) {
+        let message = "Word の作成に失敗しました。";
+        try {
+          const data = await res.json();
+          if (data && data.error) message = data.error;
+        } catch (_err) {
+          /* ignore */
+        }
+        throw new Error(message);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = translationDocxFilename(title);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      showScriptTranslatePanelStatus("", false);
+    } catch (err) {
+      showScriptTranslatePanelStatus(err.message || "Word の作成に失敗しました。", true);
+    } finally {
+      if (scriptTranslateDocxBtn) {
+        scriptTranslateDocxBtn.disabled = false;
+        scriptTranslateDocxBtn.textContent = "Wordで出力";
+      }
+    }
+  }
+
   function renderScriptTranslationList(script, translation, pairs) {
     if (!scriptTranslateList) return;
     scriptTranslateList.innerHTML = "";
-    const rows =
-      Array.isArray(pairs) && pairs.length
-        ? pairs
-        : splitScriptChunks(script).map((en, index, units) => {
-            const jaChunks = splitScriptChunks(translation);
-            return {
-              en,
-              ja: jaChunks.length === units.length ? jaChunks[index] : index === 0 ? translation : "",
-            };
-          });
+    const rows = getScriptTranslationRows(script, translation, pairs);
 
     const table = document.createElement("div");
     table.className = "overflow-hidden rounded-lg border border-teal-100/80 bg-white/80";
@@ -1684,6 +1761,7 @@
       scriptTranslateBtn.textContent = needsGenerate ? "作成中…" : "原文と和訳";
     }
     if (scriptTranslateRetryBtn) scriptTranslateRetryBtn.disabled = true;
+    if (scriptTranslateDocxBtn) scriptTranslateDocxBtn.disabled = needsGenerate;
     if (scriptTranslateStatus) {
       scriptTranslateStatus.textContent = needsGenerate ? "AI が和訳を作成中です…" : "";
       scriptTranslateStatus.classList.toggle("hidden", !needsGenerate);
@@ -1714,6 +1792,7 @@
         scriptTranslateBtn.textContent = "原文と和訳";
       }
       if (scriptTranslateRetryBtn) scriptTranslateRetryBtn.disabled = false;
+      if (scriptTranslateDocxBtn) scriptTranslateDocxBtn.disabled = false;
     }
   }
 
@@ -2241,6 +2320,11 @@
   if (scriptTranslateRetryBtn) {
     scriptTranslateRetryBtn.addEventListener("click", () => {
       openScriptTranslationPopup({ force: true });
+    });
+  }
+  if (scriptTranslateDocxBtn) {
+    scriptTranslateDocxBtn.addEventListener("click", () => {
+      downloadScriptTranslationWord();
     });
   }
   if (scriptTranslateCloseBtn) {
