@@ -94,6 +94,8 @@
   let warmupSelectionSaving = false;
   let warmupManualSaveTimer = null;
   let vocabSelectionSaving = false;
+  const ADMIN_SETTINGS_PASSWORD = "2479";
+  const ADMIN_SETTINGS_UNLOCK_KEY = "news-admin-settings-unlocked";
   let adminClasses = window.ADMIN_CLASSES || [];
   let adminSettingsPasswordValue = "";
   let latestSubmissions = [];
@@ -1121,6 +1123,45 @@
     return settingsForm && !settingsForm.classList.contains("hidden");
   }
 
+  function readAdminSettingsUnlock() {
+    try {
+      return sessionStorage.getItem(ADMIN_SETTINGS_UNLOCK_KEY) === "1";
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function persistAdminSettingsUnlock() {
+    try {
+      sessionStorage.setItem(ADMIN_SETTINGS_UNLOCK_KEY, "1");
+    } catch (err) {
+      // Ignore storage failures; in-memory unlock still works for this page.
+    }
+  }
+
+  function syncAdminSettingsLockUi() {
+    if (!adminSettingsPassword) return;
+    if (adminSettingsPasswordValue) {
+      adminSettingsPassword.classList.add("hidden");
+      adminSettingsPassword.value = "";
+    } else {
+      adminSettingsPassword.classList.remove("hidden");
+    }
+  }
+
+  function rememberAdminSettingsUnlock(password) {
+    adminSettingsPasswordValue = password;
+    persistAdminSettingsUnlock();
+    syncAdminSettingsLockUi();
+  }
+
+  function restoreAdminSettingsUnlock() {
+    if (readAdminSettingsUnlock()) {
+      adminSettingsPasswordValue = ADMIN_SETTINGS_PASSWORD;
+    }
+    syncAdminSettingsLockUi();
+  }
+
   function openAdminSettingsPanel() {
     if (settingsForm) settingsForm.classList.remove("hidden");
     if (adminSettingsLock) adminSettingsLock.classList.add("hidden");
@@ -1131,6 +1172,7 @@
     if (settingsForm) settingsForm.classList.add("hidden");
     if (adminSettingsLock) adminSettingsLock.classList.remove("hidden");
     if (settingsMessage) settingsMessage.classList.add("hidden");
+    syncAdminSettingsLockUi();
   }
 
   function unlockAdminSettings() {
@@ -1140,7 +1182,7 @@
     }
 
     const password = adminSettingsPassword ? adminSettingsPassword.value.trim() : "";
-    if (password !== "2479") {
+    if (password !== ADMIN_SETTINGS_PASSWORD) {
       if (adminSettingsLockMessage) {
         adminSettingsLockMessage.textContent = "パスワードが違います。";
         adminSettingsLockMessage.classList.remove("hidden");
@@ -1148,9 +1190,11 @@
       return;
     }
 
-    adminSettingsPasswordValue = password;
+    rememberAdminSettingsUnlock(password);
     openAdminSettingsPanel();
   }
+
+  restoreAdminSettingsUnlock();
 
   if (adminSettingsUnlock) {
     adminSettingsUnlock.addEventListener("click", unlockAdminSettings);
