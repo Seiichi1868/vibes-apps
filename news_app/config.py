@@ -25,6 +25,7 @@ load_environment()
 
 DEFAULT_AI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-5.6-luna")
 DEFAULT_TRANSCRIPT_AI_MODEL = os.environ.get("NEWS_TRANSCRIPT_AI_MODEL", "gpt-5.6-sol")
+DEFAULT_EVAL_AI_MODEL = os.environ.get("NEWS_EVAL_AI_MODEL", "gpt-5.6-luna")
 
 CEFR_LEVELS = ("A1", "A2", "B1", "B2")
 DEFAULT_CEFR_LEVEL = "A2"
@@ -106,6 +107,11 @@ def resolve_ai_model(model: str | None = None, *, fallback: str | None = None) -
 def resolve_transcript_ai_model(model: str | None = None) -> str:
     """CNN10 のタイトル→文字起こし区間推定用。未設定は Sol。"""
     return resolve_ai_model(model, fallback=DEFAULT_TRANSCRIPT_AI_MODEL)
+
+
+def resolve_eval_ai_model(model: str | None = None, *, fallback: str | None = None) -> str:
+    """生徒画面の要約評価用。未設定は fallback（その他のAI）または Luna。"""
+    return resolve_ai_model(model, fallback=fallback or DEFAULT_EVAL_AI_MODEL)
 
 
 def resolve_cefr_level(level: str | None = None, *, fallback: str | None = None) -> str:

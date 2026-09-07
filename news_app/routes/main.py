@@ -15,6 +15,7 @@ from news_app.config import (
     resolve_ai_model,
     resolve_cefr_level,
     resolve_display_language,
+    resolve_eval_ai_model,
 )
 from news_app.services.audio_convert import prepare_for_whisper
 from news_app.services.openai_eval import evaluate_summary
@@ -419,7 +420,10 @@ def evaluate():
             {"ok": False, "error": "このクラスには参照スクリプトが未設定です。管理画面で設定してください。"},
         ), 400
 
-    model = resolve_ai_model(state.get("ai_model"))
+    model = resolve_eval_ai_model(
+        state.get("ai_eval_model"),
+        fallback=resolve_ai_model(state.get("ai_model")),
+    )
     api_key = get_openai_api_key()
     rubric = get_evaluation_rubric(class_id, level)
 

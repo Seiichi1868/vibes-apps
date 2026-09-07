@@ -15,6 +15,7 @@ from news_app.config import (
     resolve_ai_model,
     resolve_cefr_level,
     resolve_display_language,
+    resolve_eval_ai_model,
     resolve_transcript_ai_model,
     save_openai_api_key,
 )
@@ -126,6 +127,10 @@ def admin_index():
         **state,
         "ai_model": resolve_ai_model(state.get("ai_model")),
         "ai_transcript_model": resolve_transcript_ai_model(state.get("ai_transcript_model")),
+        "ai_eval_model": resolve_eval_ai_model(
+            state.get("ai_eval_model"),
+            fallback=resolve_ai_model(state.get("ai_model")),
+        ),
         "default_cefr_level": resolve_cefr_level(state.get("default_cefr_level")),
     }
     class_id, cls = _active_class_or_none()
@@ -170,6 +175,10 @@ def save_settings():
             "display_language": resolve_display_language(data.get("display_language")),
             "ai_model": resolve_ai_model(data.get("ai_model")),
             "ai_transcript_model": resolve_transcript_ai_model(data.get("ai_transcript_model")),
+            "ai_eval_model": resolve_eval_ai_model(
+                data.get("ai_eval_model"),
+                fallback=resolve_ai_model(data.get("ai_model")),
+            ),
             "default_cefr_level": resolve_cefr_level(data.get("default_cefr_level")),
             "openai_api_key": openai_api_key,
         }
