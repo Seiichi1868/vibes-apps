@@ -294,6 +294,7 @@ def api_save_lesson():
         require_student_info = bool(data.get("require_student_info", False))
         vocabulary_scaffolding_enabled = bool(data.get("vocabulary_scaffolding_enabled", False))
         vocabulary_min_cefr = resolve_vocab_min_cefr(data.get("vocabulary_min_cefr"))
+        translation_scaffolding_enabled = bool(data.get("translation_scaffolding_enabled", False))
 
         existing = (get_class(class_id) or {}).get("current") or {}
         existing_script = str(existing.get("script") or "").strip()
@@ -328,6 +329,7 @@ def api_save_lesson():
             "subtitles_enabled": subtitles_enabled,
             "vocabulary_scaffolding_enabled": vocabulary_scaffolding_enabled,
             "vocabulary_min_cefr": vocabulary_min_cefr,
+            "translation_scaffolding_enabled": translation_scaffolding_enabled,
         }
         if existing_script and existing_script != script:
             lesson_payload["vocabulary_data"] = []
@@ -578,6 +580,34 @@ def api_toggle_vocabulary_scaffolding():
                 "class": cls,
                 "vocabulary_scaffolding_enabled": enabled,
                 "message": "語彙補助を有効にしました。" if enabled else "語彙補助を無効にしました。",
+            }
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"設定の保存に失敗しました: {exc}"}), 500
+
+
+@admin_bp.route("/api/class/lesson/translation/toggle", methods=["POST"])
+def api_toggle_translation_scaffolding():
+    """生徒画面への和訳表示の on/off を切り替える。"""
+    data = request.get_json(silent=True) or {}
+    class_id = str(data.get("class_id") or get_active_class_id()).strip()
+    if not class_id:
+        return jsonify({"ok": False, "error": "クラスを選択または作成してください。"}), 400
+
+    enabled = bool(data.get("translation_scaffolding_enabled", False))
+    try:
+        cls = update_class_current(
+            class_id,
+            {"translation_scaffolding_enabled": enabled},
+        )
+        return jsonify(
+            {
+                "ok": True,
+                "class": cls,
+                "translation_scaffolding_enabled": enabled,
+                "message": "和訳を生徒画面に表示します。" if enabled else "和訳を生徒画面から非表示にしました。",
             }
         )
     except ValueError as exc:

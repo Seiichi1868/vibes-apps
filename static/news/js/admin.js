@@ -72,6 +72,7 @@
   const scriptTranslateCloseBtn = document.getElementById("script-translate-close-btn");
   const scriptTranslateRetryBtn = document.getElementById("script-translate-retry-btn");
   const scriptTranslateDocxBtn = document.getElementById("script-translate-docx-btn");
+  const translationScaffoldingEnabledEl = document.getElementById("translation-scaffolding-enabled");
   const vocabScaffoldingEnabledEl = document.getElementById("vocab-scaffolding-enabled");
   const vocabExtractBtn = document.getElementById("vocab-extract-btn");
   const vocabExtractStatus = document.getElementById("vocab-extract-status");
@@ -926,6 +927,7 @@
     document.getElementById("subtitles-enabled").checked = c.subtitles_enabled === true;
     const requireStudentInfoEl = document.getElementById("require-student-info");
     if (requireStudentInfoEl) requireStudentInfoEl.checked = cls.require_student_info === true;
+    if (translationScaffoldingEnabledEl) translationScaffoldingEnabledEl.checked = c.translation_scaffolding_enabled === true;
     if (vocabScaffoldingEnabledEl) vocabScaffoldingEnabledEl.checked = c.vocabulary_scaffolding_enabled === true;
     if (vocabMinCefrEl && c.vocabulary_min_cefr) vocabMinCefrEl.value = c.vocabulary_min_cefr;
     renderAdminVocabPreview(c.vocabulary_data || []);
@@ -1262,6 +1264,7 @@
         timers_visible: document.getElementById("timers-visible").checked,
         subtitles_enabled: document.getElementById("subtitles-enabled").checked,
         require_student_info: document.getElementById("require-student-info")?.checked ?? false,
+        translation_scaffolding_enabled: translationScaffoldingEnabledEl?.checked ?? false,
         vocabulary_scaffolding_enabled: vocabScaffoldingEnabledEl?.checked ?? false,
         vocabulary_min_cefr: vocabMinCefrEl?.value || "B1",
       };
@@ -2461,6 +2464,31 @@
       } catch (err) {
         showMessage(lessonMessage, err.message, true);
         vocabScaffoldingEnabledEl.checked = !enabled;
+      }
+    });
+  }
+
+  if (translationScaffoldingEnabledEl) {
+    translationScaffoldingEnabledEl.addEventListener("change", async () => {
+      const classId = getSelectedClassId() || (lessonClassId && lessonClassId.value);
+      if (!classId) {
+        showMessage(lessonMessage, "クラスを選択してから操作してください。", true);
+        translationScaffoldingEnabledEl.checked = !translationScaffoldingEnabledEl.checked;
+        return;
+      }
+      const enabled = translationScaffoldingEnabledEl.checked;
+      try {
+        const res = await fetch("/news/admin/api/class/lesson/translation/toggle", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ class_id: classId, translation_scaffolding_enabled: enabled }),
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "保存に失敗しました");
+        showMessage(lessonMessage, data.message || "和訳の表示設定を保存しました。", false);
+      } catch (err) {
+        showMessage(lessonMessage, err.message, true);
+        translationScaffoldingEnabledEl.checked = !enabled;
       }
     });
   }

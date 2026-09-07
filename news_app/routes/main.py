@@ -176,7 +176,12 @@ def _class_public_payload(class_id: str, origin: str, display_language: str = "j
         vocabulary_data = vocabulary_for_student(vocabulary_data, lang)
     else:
         vocabulary_data = []
-    translation = script_translation_for_lang(current, lang) if show_assistive else {"enabled": False, "text": "", "pairs": []}
+    translation_scaffolding_enabled = bool(current.get("translation_scaffolding_enabled", False)) and show_assistive
+    translation = (
+        script_translation_for_lang(current, lang)
+        if translation_scaffolding_enabled
+        else {"enabled": False, "text": "", "pairs": []}
+    )
     embed_url = (
         build_youtube_embed_url(
             video_id,
@@ -306,7 +311,12 @@ def index():
         vocabulary_data = []
     else:
         vocabulary_data = vocabulary_for_student(vocabulary_data, lang)
-    translation = script_translation_for_lang(current, lang) if show_assistive else {"enabled": False, "text": "", "pairs": []}
+    translation_scaffolding_enabled = bool(current.get("translation_scaffolding_enabled", False)) and show_assistive
+    translation = (
+        script_translation_for_lang(current, lang)
+        if translation_scaffolding_enabled
+        else {"enabled": False, "text": "", "pairs": []}
+    )
 
     return render_template(
         "news/index.html",

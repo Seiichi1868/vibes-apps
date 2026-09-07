@@ -498,6 +498,12 @@
               <span data-i18n="transcriptLabel">文字起こし（スクリプト）</span> <span class="text-red-500">*</span>
             </label>
             <div class="flex flex-wrap items-center gap-1.5" data-assistive-lang>
+              <label class="flex shrink-0 items-center gap-1.5 cursor-pointer text-[11px] text-slate-700">
+                <input type="checkbox" id="translation-scaffolding-enabled"
+                  class="h-3.5 w-3.5 rounded border-emerald-200 text-emerald-600"
+                  {% if current.translation_scaffolding_enabled %}checked{% endif %}>
+                <span data-i18n="showOnStudent">生徒画面に表示</span>
+              </label>
               <button type="button" id="script-translate-btn"
                 class="compact-btn shrink-0 border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] text-sky-700 hover:bg-sky-100 disabled:opacity-50"
                 data-i18n="scriptAndTranslation">
@@ -830,5 +836,5 @@
 </script>
 <script src="{{ url_for('static', filename='news/js/i18n.js', v='20260907d') }}"></script>
 <script src="{{ url_for('static', filename='news/js/youtube-transcript.js', v='20260904i') }}"></script>
-<script src="{{ url_for('static', filename='news/js/admin.js', v='20260907i') }}"></script>
+<script src="{{ url_for('static', filename='news/js/admin.js', v='20260907j') }}"></script>
 {% endblock %}
