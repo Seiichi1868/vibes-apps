@@ -10,7 +10,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 
-from news_app.services.openai_translate import split_script_units
+from news_app.services.openai_translate import expand_sentence_aligned_rows, split_script_units
 from news_app.services.storage import _normalize_script_ja_pairs
 
 FONT_NAME = "Yu Gothic"
@@ -25,20 +25,21 @@ def translation_rows(script: str, translation: str, pairs) -> list[dict]:
     """画面表示と同じルールで原文・和訳の行を揃える。"""
     normalized = _normalize_script_ja_pairs(pairs)
     if normalized:
-        return normalized
+        return expand_sentence_aligned_rows(normalized)
     units = split_script_units(script)
     ja_units = split_script_units(translation)
     if not units:
         if not str(translation or "").strip():
             return []
         return [{"en": "", "ja": str(translation).strip()}]
-    return [
+    rows = [
         {
             "en": en,
             "ja": ja_units[index] if len(ja_units) == len(units) else (translation if index == 0 else ""),
         }
         for index, en in enumerate(units)
     ]
+    return expand_sentence_aligned_rows(rows)
 
 
 def _set_run_font(run, *, size_pt: float, bold: bool = False, color: RGBColor | None = None) -> None:
@@ -95,7 +96,7 @@ def _fill_cell(cell, text: str, *, header: bool = False, japanese: bool = False)
 
 def build_script_translation_docx(*, title: str = "", pairs: list[dict]) -> bytes:
     """原文と和訳の2列表を含む .docx バイナリを返す。"""
-    rows = _normalize_script_ja_pairs(pairs)
+    rows = expand_sentence_aligned_rows(_normalize_script_ja_pairs(pairs))
     if not rows:
         raise ValueError("原文と和訳がありません。")
 
@@ -252,7 +253,7 @@ def build_lesson_materials_docx(
     want_warmup = bool(flags.get("warmup"))
     want_postview = bool(flags.get("postview"))
 
-    rows = _normalize_script_ja_pairs(pairs)
+    rows = expand_sentence_aligned_rows(_normalize_script_ja_pairs(pairs))
     vocab_items = [
         item
         for item in (vocabulary or [])

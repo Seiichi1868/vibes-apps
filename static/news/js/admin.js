@@ -1755,20 +1755,120 @@
     }
   }
 
+  const TRANSLATION_ABBREVS = new Set([
+    "mr", "mrs", "ms", "dr", "prof", "sr", "jr", "st", "vs", "etc",
+    "inc", "ltd", "co", "corp", "mt", "gen", "gov", "sen", "rep",
+    "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept",
+    "oct", "nov", "dec", "a.m", "p.m", "e.g", "i.e",
+    "u.s", "u.k", "u.n", "e.u", "u.s.a",
+  ]);
+  const LATIN_TERMINAL = ".!?";
+  const CJK_TERMINAL = "。！？";
+  const CLOSING_QUOTES = "\"'”’」』)";
+
+  function isTranslationAbbrev(buffer) {
+    const core = String(buffer || "").replace(/[\"'”’」』)]+$/g, "").trimEnd();
+    if (!core.endsWith(".")) return false;
+    const match = core.match(/([A-Za-z][A-Za-z.]*)\.$/);
+    if (!match) return false;
+    const token = match[1].toLowerCase().replace(/\.+$/, "");
+    if (TRANSLATION_ABBREVS.has(token) || TRANSLATION_ABBREVS.has(match[1].toLowerCase())) return true;
+    return /^[A-Za-z]$/.test(token);
+  }
+
+  function splitSentences(text) {
+    const source = String(text || "");
+    if (!source) return [];
+    const units = [];
+    let buf = "";
+    let index = 0;
+    while (index < source.length) {
+      const char = source[index];
+      buf += char;
+      if (LATIN_TERMINAL.includes(char) || CJK_TERMINAL.includes(char)) {
+        if (char === "." && source[index + 1] === ".") {
+          index += 1;
+          continue;
+        }
+        let cursor = index + 1;
+        while (cursor < source.length && CLOSING_QUOTES.includes(source[cursor])) {
+          buf += source[cursor];
+          cursor += 1;
+        }
+        const atEnd = cursor >= source.length;
+        const nextIsSpace = cursor < source.length && /\s/.test(source[cursor]);
+        const isCjk = CJK_TERMINAL.includes(char);
+        if (isCjk || atEnd || nextIsSpace) {
+          if (LATIN_TERMINAL.includes(char) && isTranslationAbbrev(buf)) {
+            index = cursor;
+            continue;
+          }
+          if (LATIN_TERMINAL.includes(char) && !atEnd) {
+            let look = cursor;
+            while (look < source.length && /\s/.test(source[look])) look += 1;
+            if (look < source.length && /[a-z]/.test(source[look])) {
+              index = cursor;
+              continue;
+            }
+          }
+          const candidate = buf.trim();
+          if (candidate) units.push(candidate);
+          buf = "";
+          index = cursor;
+          while (index < source.length && /\s/.test(source[index])) index += 1;
+          continue;
+        }
+      }
+      index += 1;
+    }
+    const tail = buf.trim();
+    if (tail) units.push(tail);
+    return units;
+  }
+
   function splitScriptChunks(text) {
     const trimmed = String(text || "").trim();
     if (!trimmed) return [];
+    const collapsed = trimmed.replace(/\s+/g, " ");
+    const parts = splitSentences(collapsed);
+    if (parts.length > 1) return parts;
     const lines = trimmed.split(/\n/).map((part) => part.trim()).filter(Boolean);
-    if (lines.length > 1) return lines;
-    const sentences = trimmed.split(/(?<=[.!?])\s+/).map((part) => part.trim()).filter(Boolean);
-    return sentences.length ? sentences : [trimmed];
+    if (lines.length > 1) {
+      return lines.flatMap((line) => {
+        const sentences = splitSentences(line);
+        return sentences.length ? sentences : [line];
+      });
+    }
+    return parts.length ? parts : [trimmed];
+  }
+
+  function expandSentenceAlignedRows(rows) {
+    const expanded = [];
+    (rows || []).forEach((row) => {
+      const en = String(row?.en || "").trim();
+      const ja = String(row?.ja || "").trim();
+      const enParts = en ? splitScriptChunks(en) : [];
+      const jaParts = ja ? splitScriptChunks(ja) : [];
+      if (enParts.length > 1 && enParts.length === jaParts.length) {
+        enParts.forEach((part, index) => expanded.push({ en: part, ja: jaParts[index] }));
+      } else if (en || ja) {
+        expanded.push({ en, ja });
+      }
+    });
+    return expanded;
+  }
+
+  function normalizeScriptForCompare(text) {
+    return String(text || "").replace(/\s+/g, " ").trim();
   }
 
   function translationNeedsRealign(script) {
-    const units = splitScriptChunks(script);
     const pairs = getLessonTranslationPairs();
-    if (!units.length || !pairs.length || pairs.length !== units.length) return true;
-    return pairs.some((pair, index) => String(pair.en || "").trim() !== units[index]);
+    if (!pairs.length) return true;
+    const pairEn = normalizeScriptForCompare(
+      pairs.map((pair) => String(pair.en || "").trim()).filter(Boolean).join(" ")
+    );
+    return !pairEn || pairEn !== normalizeScriptForCompare(script);
   }
 
   function showScriptTranslatePanelStatus(message, isError) {
@@ -1790,19 +1890,23 @@
 
   function getScriptTranslationRows(script, translation, pairs) {
     if (Array.isArray(pairs) && pairs.length) {
-      return pairs
-        .map((item) => ({
-          en: String(item?.en || "").trim(),
-          ja: String(item?.ja || "").trim(),
-        }))
-        .filter((item) => item.en || item.ja);
+      return expandSentenceAlignedRows(
+        pairs
+          .map((item) => ({
+            en: String(item?.en || "").trim(),
+            ja: String(item?.ja || "").trim(),
+          }))
+          .filter((item) => item.en || item.ja)
+      );
     }
     const units = splitScriptChunks(script);
     const jaChunks = splitScriptChunks(translation);
-    return units.map((en, index) => ({
-      en,
-      ja: jaChunks.length === units.length ? jaChunks[index] : index === 0 ? translation : "",
-    }));
+    return expandSentenceAlignedRows(
+      units.map((en, index) => ({
+        en,
+        ja: jaChunks.length === units.length ? jaChunks[index] : index === 0 ? translation : "",
+      }))
+    );
   }
 
   function translationDocxFilename(title) {
@@ -1893,13 +1997,14 @@
     rows.forEach((row, index) => {
       const item = document.createElement("div");
       item.className =
-        "grid grid-cols-2 items-stretch " +
-        (index < rows.length - 1 ? "border-b border-teal-50" : "");
+        "grid grid-cols-2 items-start " +
+        (index % 2 === 0 ? "bg-white/90" : "bg-teal-50/35") +
+        (index < rows.length - 1 ? " border-b border-teal-50" : "");
       const en = document.createElement("p");
-      en.className = "border-r border-teal-50 px-2.5 py-2 leading-relaxed text-slate-800";
+      en.className = "border-r border-teal-50 px-2.5 py-2 leading-relaxed break-words text-slate-800";
       en.textContent = row.en || t("noOriginal");
       const ja = document.createElement("p");
-      ja.className = "px-2.5 py-2 leading-relaxed text-slate-700";
+      ja.className = "px-2.5 py-2 leading-relaxed break-words text-slate-700";
       ja.textContent = row.ja || (currentTranslationLang() === "es" ? t("noTranslationEs") : t("noTranslation"));
       item.append(en, ja);
       table.appendChild(item);
