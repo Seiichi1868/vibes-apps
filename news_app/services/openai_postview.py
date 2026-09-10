@@ -70,7 +70,7 @@ def extract_postview_from_script(
             "管理画面の「OpenAI API キー」欄にキーを入力して保存してください。"
         )
 
-    client = OpenAI(api_key=api_key)
+    client = OpenAI(api_key=api_key, timeout=60.0)
     extraction: PostviewExtraction = create_parsed_chat_completion(
         client,
         model,

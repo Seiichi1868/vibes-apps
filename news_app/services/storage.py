@@ -8,6 +8,11 @@ from datetime import datetime, timezone
 
 import openpyxl
 
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - Windows 等 fcntl が無い環境向けフォールバック
+    fcntl = None
+
 from news_app.config import (
     CEFR_LEVELS,
     DATA_DIR,
@@ -789,18 +794,55 @@ def get_roster(class_id: str) -> list[dict]:
     return normalized
 
 
+def _read_submissions_unlocked() -> list[dict]:
+    """共有ロックで submissions.json を読む。呼び出し元で _lock を保持すること。"""
+    if not SUBMISSIONS_FILE.exists():
+        return []
+    try:
+        with SUBMISSIONS_FILE.open(encoding="utf-8") as handle:
+            if fcntl is not None:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_SH)
+            try:
+                data = json.load(handle)
+            finally:
+                if fcntl is not None:
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        return data if isinstance(data, list) else []
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def _mutate_submissions(mutator):
+    """排他ロック下で読み込み→変更→書き戻し。呼び出し元で _lock を保持すること。"""
+    SUBMISSIONS_FILE.touch(exist_ok=True)
+    with SUBMISSIONS_FILE.open("r+", encoding="utf-8") as handle:
+        if fcntl is not None:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            handle.seek(0)
+            raw = handle.read()
+            try:
+                submissions = json.loads(raw) if raw.strip() else []
+            except json.JSONDecodeError:
+                submissions = []
+            if not isinstance(submissions, list):
+                submissions = []
+            result = mutator(submissions)
+            handle.seek(0)
+            handle.truncate()
+            json.dump(submissions, handle, ensure_ascii=False, indent=2)
+            handle.flush()
+            return result
+        finally:
+            if fcntl is not None:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
 def load_submissions() -> list[dict]:
     """全提出データを返す。"""
     _ensure_data_dir()
     with _lock:
-        if not SUBMISSIONS_FILE.exists():
-            return []
-        try:
-            with SUBMISSIONS_FILE.open(encoding="utf-8") as f:
-                data = json.load(f)
-        except (json.JSONDecodeError, OSError):
-            return []
-    return data if isinstance(data, list) else []
+        return _read_submissions_unlocked()
 
 
 def save_submission(
@@ -838,17 +880,10 @@ def save_submission(
         "feedback": str(feedback).strip(),
     }
     with _lock:
-        submissions = []
-        if SUBMISSIONS_FILE.exists():
-            try:
-                with SUBMISSIONS_FILE.open(encoding="utf-8") as f:
-                    data = json.load(f)
-                    submissions = data if isinstance(data, list) else []
-            except (json.JSONDecodeError, OSError):
-                submissions = []
-        submissions.append(entry)
-        with SUBMISSIONS_FILE.open("w", encoding="utf-8") as f:
-            json.dump(submissions, f, ensure_ascii=False, indent=2)
+        def _append(submissions: list) -> None:
+            submissions.append(entry)
+
+        _mutate_submissions(_append)
     return entry
 
 
@@ -856,26 +891,19 @@ def update_submission_lesson_title(class_id: str, lesson_key_value: str, lesson_
     if not class_id or not lesson_key_value or not lesson_title:
         return 0
     _ensure_data_dir()
-    updated = 0
     with _lock:
-        submissions = []
-        if SUBMISSIONS_FILE.exists():
-            try:
-                with SUBMISSIONS_FILE.open(encoding="utf-8") as f:
-                    data = json.load(f)
-                    submissions = data if isinstance(data, list) else []
-            except (json.JSONDecodeError, OSError):
-                submissions = []
-        for submission in submissions:
-            if not isinstance(submission, dict):
-                continue
-            if submission.get("class_id") == class_id and submission.get("lesson_key") == lesson_key_value:
-                if submission.get("lesson_title") != lesson_title:
-                    submission["lesson_title"] = lesson_title
-                    updated += 1
-        if updated:
-            with SUBMISSIONS_FILE.open("w", encoding="utf-8") as f:
-                json.dump(submissions, f, ensure_ascii=False, indent=2)
+        def _rename(submissions: list) -> int:
+            count = 0
+            for submission in submissions:
+                if not isinstance(submission, dict):
+                    continue
+                if submission.get("class_id") == class_id and submission.get("lesson_key") == lesson_key_value:
+                    if submission.get("lesson_title") != lesson_title:
+                        submission["lesson_title"] = lesson_title
+                        count += 1
+            return count
+
+        updated = _mutate_submissions(_rename)
     return updated
 
 
@@ -932,17 +960,11 @@ def delete_submission(submission_id: str) -> bool:
     """指定IDの提出データを削除。成功したら True。"""
     _ensure_data_dir()
     with _lock:
-        submissions = []
-        if SUBMISSIONS_FILE.exists():
-            try:
-                with SUBMISSIONS_FILE.open(encoding="utf-8") as f:
-                    data = json.load(f)
-                    submissions = data if isinstance(data, list) else []
-            except (json.JSONDecodeError, OSError):
-                submissions = []
-        new_list = [s for s in submissions if s.get("id") != submission_id]
-        if len(new_list) == len(submissions):
-            return False
-        with SUBMISSIONS_FILE.open("w", encoding="utf-8") as f:
-            json.dump(new_list, f, ensure_ascii=False, indent=2)
-    return True
+        def _delete(submissions: list) -> bool:
+            new_list = [s for s in submissions if s.get("id") != submission_id]
+            if len(new_list) == len(submissions):
+                return False
+            submissions[:] = new_list
+            return True
+
+        return _mutate_submissions(_delete)

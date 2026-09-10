@@ -21,7 +21,7 @@ class TTSService:
         api_key = os.getenv("OPENAI_API_KEY", "").strip()
         if not api_key:
             return None
-        return OpenAI(api_key=api_key)
+        return OpenAI(api_key=api_key, timeout=60.0)
 
     def synthesize(self, text: str, lang: str, voice: str) -> bytes:
         if not self.client:

@@ -17,6 +17,7 @@ from news_app.config import (
     resolve_display_language,
     resolve_eval_ai_model,
 )
+from news_app.jobs import EVAL_TIMEOUT_MESSAGE, is_timeout_error, run_blocking
 from news_app.services.audio_convert import prepare_for_whisper
 from news_app.services.openai_eval import evaluate_summary
 from news_app.services.transcription import transcribe_audio
@@ -78,6 +79,15 @@ def _media_extension(filename: str, mimetype: str | None) -> str:
     if guessed == "qt":
         guessed = "mov"
     return guessed if guessed in ALLOWED_MEDIA_EXTENSIONS else ""
+
+
+def _transcribe_upload_bytes(payload: bytes, ext: str) -> str:
+    """ffmpeg 変換と Whisper をリクエストスレッドの外で実行する。"""
+    with tempfile.TemporaryDirectory(prefix="news-stt-") as tmp:
+        src_path = Path(tmp) / f"upload.{ext}"
+        src_path.write_bytes(payload)
+        prepared = prepare_for_whisper(src_path, TRANSCRIBE_MAX_SECONDS)
+        return transcribe_audio(prepared)
 
 
 @main_bp.route("/health")
@@ -434,8 +444,14 @@ def evaluate():
     rubric = get_evaluation_rubric(class_id, level)
 
     try:
-        evaluation = evaluate_summary(
-            level, reference_script, summary, model, api_key, rubric_override=rubric
+        evaluation = run_blocking(
+            evaluate_summary,
+            level,
+            reference_script,
+            summary,
+            model,
+            api_key,
+            rubric_override=rubric,
         )
         feedback = evaluation["feedback"]
         score_feedback = evaluation["score_feedback"]
@@ -460,6 +476,8 @@ def evaluate():
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:
+        if is_timeout_error(exc):
+            return jsonify({"ok": False, "error": EVAL_TIMEOUT_MESSAGE}), 500
         return jsonify({"ok": False, "error": f"評価に失敗しました: {exc}"}), 500
 
 
@@ -492,15 +510,16 @@ def transcribe_media():
         ), 400
 
     try:
-        with tempfile.TemporaryDirectory(prefix="news-stt-") as tmp:
-            src_path = Path(tmp) / f"upload.{ext}"
-            uploaded.save(src_path)
-            prepared = prepare_for_whisper(src_path, TRANSCRIBE_MAX_SECONDS)
-            transcript = transcribe_audio(prepared)
+        payload = uploaded.read()
+        if not payload:
+            return jsonify({"ok": False, "error": "ファイルが空です。別のファイルを選んでください。"}), 400
+        transcript = run_blocking(_transcribe_upload_bytes, payload, ext)
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:
         logger.exception("news transcription failed")
+        if is_timeout_error(exc):
+            return jsonify({"ok": False, "error": EVAL_TIMEOUT_MESSAGE}), 500
         return jsonify({"ok": False, "error": f"文字起こしに失敗しました: {exc}"}), 500
 
     if not transcript:

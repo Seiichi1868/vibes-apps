@@ -3,6 +3,7 @@ import logging
 
 from flask import Blueprint, jsonify, request
 
+from flask_app.jobs import EVAL_TIMEOUT_MESSAGE, is_timeout_error, run_blocking
 from flask_app.services.ai_service import AIService
 from flask_app.services.gate_service import gate_access_allowed, gate_auth_error
 
@@ -24,11 +25,13 @@ def check_grammar():
         return jsonify({"error": "text is required"}), 400
 
     try:
-        return jsonify(ai_service.check_grammar(text, lang_raw))
+        return jsonify(run_blocking(ai_service.check_grammar, text, lang_raw))
     except json.JSONDecodeError:
         return jsonify({"error": "Invalid JSON from grammar model"}), 502
     except RuntimeError as exc:
         return jsonify({"error": str(exc)}), 500
     except Exception as exc:
         logger.error("Grammar check failed: %s", exc)
+        if is_timeout_error(exc):
+            return jsonify({"error": EVAL_TIMEOUT_MESSAGE}), 502
         return jsonify({"error": f"Grammar check failed: {exc}"}), 502

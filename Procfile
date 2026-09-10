@@ -1,1 +1,1 @@
-web: gunicorn wsgi:application --bind 0.0.0.0:$PORT --worker-class gevent --workers 2 --worker-connections 100 --timeout 120
+web: gunicorn wsgi:application --bind 0.0.0.0:$PORT --worker-class gthread --threads 8 --workers 2 --timeout 180

@@ -34,7 +34,7 @@ class AIService:
         api_key = os.getenv("OPENAI_API_KEY", "").strip()
         if not api_key:
             return None
-        return OpenAI(api_key=api_key)
+        return OpenAI(api_key=api_key, timeout=60.0)
 
     def check_grammar(self, text: str, lang_raw: str) -> dict:
         if not self.client:

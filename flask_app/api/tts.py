@@ -2,6 +2,7 @@ import logging
 
 from flask import Blueprint, Response, jsonify, request
 
+from flask_app.jobs import EVAL_TIMEOUT_MESSAGE, is_timeout_error, run_blocking
 from flask_app.services.gate_service import gate_access_allowed, gate_auth_error
 from flask_app.services.tts_service import TTSService
 from flask_app.utils.language_utils import is_tts_enabled, normalize_study_lang
@@ -30,9 +31,11 @@ def generate_tts():
         return jsonify({"error": "text is too long"}), 400
 
     try:
-        url, cached = tts_service.resolve_audio(text, lang, voice)
+        url, cached = run_blocking(tts_service.resolve_audio, text, lang, voice)
     except Exception as exc:
         logger.error("TTS generation failed: %s", exc)
+        if is_timeout_error(exc):
+            return jsonify({"error": EVAL_TIMEOUT_MESSAGE}), 502
         return jsonify({"error": f"TTS generation failed: {exc}"}), 502
 
     return jsonify({"url": url, "cached": cached, "lang": lang, "voice": voice})
@@ -71,12 +74,14 @@ def tts():
 
     try:
         if use_cache:
-            url, cached = tts_service.resolve_audio(text, lang, voice)
+            url, cached = run_blocking(tts_service.resolve_audio, text, lang, voice)
             return jsonify({"url": url, "cached": cached, "lang": lang, "voice": voice})
 
-        audio_bytes = tts_service.synthesize(text, lang, voice)
+        audio_bytes = run_blocking(tts_service.synthesize, text, lang, voice)
     except Exception as exc:
         logger.error("TTS failed: %s", exc)
+        if is_timeout_error(exc):
+            return jsonify({"error": EVAL_TIMEOUT_MESSAGE}), 502
         return jsonify({"error": f"TTS generation failed: {exc}"}), 502
 
     return Response(

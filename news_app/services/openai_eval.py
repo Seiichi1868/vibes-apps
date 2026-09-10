@@ -2,6 +2,7 @@ import re
 
 from openai import OpenAI
 
+from news_app.jobs import EVAL_TIMEOUT_MESSAGE, OPENAI_TIMEOUT_SEC, is_timeout_error
 from news_app.services.openai_utils import create_json_chat_completion
 
 # 総評末尾に付きやすい、内容と無関係な汎用励まし（後処理で除去）
@@ -573,16 +574,21 @@ def evaluate_summary(
     if not student_summary.strip():
         raise ValueError("要約テキストが空です。")
 
-    client = OpenAI(api_key=api_key)
-    data = create_json_chat_completion(
-        client,
-        model,
-        [
-            {"role": "system", "content": evaluation_system_prompt(level, model, rubric_override)},
-            {"role": "user", "content": evaluation_user_message(level, reference_script, student_summary)},
-        ],
-        temperature=0.35,
-    )
+    client = OpenAI(api_key=api_key, timeout=OPENAI_TIMEOUT_SEC)
+    try:
+        data = create_json_chat_completion(
+            client,
+            model,
+            [
+                {"role": "system", "content": evaluation_system_prompt(level, model, rubric_override)},
+                {"role": "user", "content": evaluation_user_message(level, reference_script, student_summary)},
+            ],
+            temperature=0.35,
+        )
+    except Exception as exc:
+        if is_timeout_error(exc):
+            raise ValueError(EVAL_TIMEOUT_MESSAGE) from exc
+        raise
     return {
         "feedback": format_evaluation_response(data, level, student_summary),
         "score_feedback": format_score_only_response(data, level, student_summary),

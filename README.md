@@ -46,7 +46,7 @@ python run.py
 | News（生徒） | http://127.0.0.1:5001/news/ |
 | News（管理） | http://127.0.0.1:5001/news/admin/ |
 
-本番: `gunicorn wsgi:application`
+本番: `gunicorn wsgi:application --worker-class gthread --threads 8 --workers 2 --timeout 180`
 
 ## 環境変数（.env）
 

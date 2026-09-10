@@ -3,6 +3,7 @@ import logging
 from flask import Blueprint, jsonify, request
 
 from flask_app.config import Config
+from flask_app.jobs import EVAL_TIMEOUT_MESSAGE, is_timeout_error, run_blocking
 from flask_app.services.ai_service import AIService
 from flask_app.services.gate_service import gate_access_allowed, gate_auth_error
 from flask_app.utils.language_utils import normalize_study_lang
@@ -36,11 +37,13 @@ def ocr():
     lang = normalize_study_lang(request.form.get("lang") or request.args.get("lang") or "")
 
     try:
-        return jsonify(ai_service.extract_text_from_image(image_bytes, mime, lang))
+        return jsonify(run_blocking(ai_service.extract_text_from_image, image_bytes, mime, lang))
     except RuntimeError as exc:
         return jsonify({"error": str(exc)}), 500
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 422
     except Exception as exc:
         logger.error("OCR failed: %s", exc)
+        if is_timeout_error(exc):
+            return jsonify({"error": EVAL_TIMEOUT_MESSAGE}), 502
         return jsonify({"error": f"OCR failed: {exc}"}), 502

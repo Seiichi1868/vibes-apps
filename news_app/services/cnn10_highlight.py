@@ -197,7 +197,7 @@ def find_title_segment_in_transcript(
             "Return the FIRST full story after the opening headlines, not the entire video."
         )
 
-    client = OpenAI(api_key=api_key)
+    client = OpenAI(api_key=api_key, timeout=60.0)
     payload = create_json_chat_completion(
         client,
         model,

@@ -7,6 +7,7 @@ from flask import Blueprint, current_app, jsonify, request, session
 from werkzeug.utils import secure_filename
 
 from flask_app.config import Config
+from flask_app.jobs import EVAL_TIMEOUT_MESSAGE, is_timeout_error, run_blocking
 from flask_app.services.ai_service import AIService
 from flask_app.services.analysis_service import AnalysisService
 from flask_app.services.gate_service import gate_access_allowed, gate_auth_error
@@ -46,8 +47,12 @@ def pronunciation_advice():
 
     try:
         return jsonify(
-            ai_service.generate_pronunciation_advice(
-                reference, spoken, lang_raw, accuracy_percent
+            run_blocking(
+                ai_service.generate_pronunciation_advice,
+                reference,
+                spoken,
+                lang_raw,
+                accuracy_percent,
             )
         )
     except json.JSONDecodeError:
@@ -56,6 +61,8 @@ def pronunciation_advice():
         return jsonify({"error": str(exc)}), 500
     except Exception as exc:
         logger.error("Pronunciation advice failed: %s", exc)
+        if is_timeout_error(exc):
+            return jsonify({"error": EVAL_TIMEOUT_MESSAGE}), 502
         return jsonify({"error": f"Pronunciation advice failed: {exc}"}), 502
 
 

@@ -324,7 +324,7 @@ def extract_vocabulary_from_script(
             "管理画面（/news/admin/）の「OpenAI API キー」欄にキーを入力して保存してください。"
         )
 
-    client = OpenAI(api_key=api_key)
+    client = OpenAI(api_key=api_key, timeout=60.0)
     system_prompt = _build_system_prompt(min_cefr)
 
     initial_items = _request_vocabulary(
