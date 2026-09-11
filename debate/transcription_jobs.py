@@ -1,7 +1,8 @@
 """Whisper 文字起こしのバックグラウンド実行。
 
-本番は gunicorn + gevent（monkey.patch_all）のため、通常の threading.Thread では
-Whisper の同期 HTTP がワーカー全体を塞ぐ。gevent.threadpool（OS スレッド）で実行する。
+gevent ワーカー（monkey.patch 済み）では gevent.threadpool を使う。
+gthread では別 OS スレッドから spawn すると InvalidThreadUseError になるため
+ThreadPoolExecutor にフォールバックする。
 """
 import logging
 import threading
@@ -14,21 +15,38 @@ logger = logging.getLogger(__name__)
 
 _pool = None
 _pool_lock = threading.Lock()
+_use_gevent = False
+
+
+def _socket_is_patched() -> bool:
+    try:
+        from gevent import monkey
+
+        return bool(monkey.is_module_patched("socket"))
+    except Exception:
+        return False
 
 
 def _get_pool():
-    global _pool
+    global _pool, _use_gevent
     with _pool_lock:
         if _pool is not None:
             return _pool
-        try:
-            from gevent.threadpool import ThreadPool
+        if _socket_is_patched():
+            try:
+                from gevent.threadpool import ThreadPool
 
-            _pool = ThreadPool(4)
-            logger.info("debate transcription: using gevent.threadpool.ThreadPool")
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("debate transcription: gevent threadpool unavailable (%s)", exc)
-            _pool = False  # sentinel: use threading fallback
+                _pool = ThreadPool(4)
+                _use_gevent = True
+                logger.info("debate transcription: using gevent.threadpool.ThreadPool")
+                return _pool
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("debate transcription: gevent threadpool unavailable (%s)", exc)
+        from concurrent.futures import ThreadPoolExecutor
+
+        _pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="debate-transcribe")
+        _use_gevent = False
+        logger.info("debate transcription: using ThreadPoolExecutor")
         return _pool
 
 
@@ -82,8 +100,14 @@ def run_transcription_job(session_id: str, part: str, file_path: Path) -> None:
 def start_transcription_job(session_id: str, part: str, file_path: Path) -> None:
     """非ブロッキングで文字起こしジョブを起動する。"""
     pool = _get_pool()
-    if pool and pool is not False:
-        pool.spawn(run_transcription_job, session_id, part, file_path)
+    if _use_gevent:
+        try:
+            pool.spawn(run_transcription_job, session_id, part, file_path)
+            return
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("debate transcription: gevent spawn failed (%s); using thread", exc)
+    if hasattr(pool, "submit"):
+        pool.submit(run_transcription_job, session_id, part, file_path)
         return
     thread = threading.Thread(
         target=run_transcription_job,

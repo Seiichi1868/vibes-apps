@@ -1,7 +1,8 @@
 """録音アップロード後のバックグラウンド処理（文字起こし→採点）。
 
-本番は gunicorn + gevent（monkey.patch_all）のため、通常の threading.Thread では
-OpenAI 呼び出しの同期 HTTP がワーカー全体を塞ぐ。gevent.threadpool（OS スレッド）で実行する。
+gevent ワーカー（monkey.patch 済み）では gevent.threadpool を使う。
+gthread では別 OS スレッドから spawn すると InvalidThreadUseError になるため
+ThreadPoolExecutor にフォールバックする。
 """
 import logging
 import threading
@@ -25,21 +26,38 @@ logger = logging.getLogger(__name__)
 
 _pool = None
 _pool_lock = threading.Lock()
+_use_gevent = False
+
+
+def _socket_is_patched() -> bool:
+    try:
+        from gevent import monkey
+
+        return bool(monkey.is_module_patched("socket"))
+    except Exception:
+        return False
 
 
 def _get_pool():
-    global _pool
+    global _pool, _use_gevent
     with _pool_lock:
         if _pool is not None:
             return _pool
-        try:
-            from gevent.threadpool import ThreadPool
+        if _socket_is_patched():
+            try:
+                from gevent.threadpool import ThreadPool
 
-            _pool = ThreadPool(4)
-            logger.info("level_check jobs: using gevent.threadpool.ThreadPool")
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("level_check jobs: gevent threadpool unavailable (%s)", exc)
-            _pool = False
+                _pool = ThreadPool(4)
+                _use_gevent = True
+                logger.info("level_check jobs: using gevent.threadpool.ThreadPool")
+                return _pool
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("level_check jobs: gevent threadpool unavailable (%s)", exc)
+        from concurrent.futures import ThreadPoolExecutor
+
+        _pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="level-check-jobs")
+        _use_gevent = False
+        logger.info("level_check jobs: using ThreadPoolExecutor")
         return _pool
 
 
@@ -235,8 +253,14 @@ def run_process_part_job(session_id: str, part_id: str, file_path: Path) -> None
 
 def start_process_part_job(session_id: str, part_id: str, file_path: Path) -> None:
     pool = _get_pool()
-    if pool and pool is not False:
-        pool.spawn(run_process_part_job, session_id, part_id, file_path)
+    if _use_gevent:
+        try:
+            pool.spawn(run_process_part_job, session_id, part_id, file_path)
+            return
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("level_check jobs: gevent spawn failed (%s); using thread", exc)
+    if hasattr(pool, "submit"):
+        pool.submit(run_process_part_job, session_id, part_id, file_path)
         return
     thread = threading.Thread(
         target=run_process_part_job,

@@ -5,8 +5,8 @@ from flask_app import create_app
 
 application = create_app()
 
-# debate の Whisper 文字起こし用 OS スレッドプールをワーカー起動時に初期化。
-# gevent.threadpool が使えない場合は既存コード側で threading.Thread にフォールバックする。
+# debate の文字起こし用 OS スレッドプールをワーカー起動時に初期化。
+# gthread では ThreadPoolExecutor、gevent+monkey.patch 時は gevent.threadpool。
 try:
     from debate.transcription_jobs import _get_pool
 

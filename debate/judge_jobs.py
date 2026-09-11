@@ -10,21 +10,38 @@ logger = logging.getLogger(__name__)
 
 _pool = None
 _pool_lock = threading.Lock()
+_use_gevent = False
+
+
+def _socket_is_patched() -> bool:
+    try:
+        from gevent import monkey
+
+        return bool(monkey.is_module_patched("socket"))
+    except Exception:
+        return False
 
 
 def _get_pool():
-    global _pool
+    global _pool, _use_gevent
     with _pool_lock:
         if _pool is not None:
             return _pool
-        try:
-            from gevent.threadpool import ThreadPool
+        if _socket_is_patched():
+            try:
+                from gevent.threadpool import ThreadPool
 
-            _pool = ThreadPool(2)
-            logger.info("debate judge: using gevent.threadpool.ThreadPool")
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("debate judge: gevent threadpool unavailable (%s)", exc)
-            _pool = False  # sentinel: use threading fallback
+                _pool = ThreadPool(2)
+                _use_gevent = True
+                logger.info("debate judge: using gevent.threadpool.ThreadPool")
+                return _pool
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("debate judge: gevent threadpool unavailable (%s)", exc)
+        from concurrent.futures import ThreadPoolExecutor
+
+        _pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="debate-judge")
+        _use_gevent = False
+        logger.info("debate judge: using ThreadPoolExecutor")
         return _pool
 
 
@@ -76,8 +93,14 @@ def run_judge_job(session_id: str) -> None:
 def start_judge_job(session_id: str) -> None:
     """非ブロッキングでジャッジジョブを起動する。"""
     pool = _get_pool()
-    if pool and pool is not False:
-        pool.spawn(run_judge_job, session_id)
+    if _use_gevent:
+        try:
+            pool.spawn(run_judge_job, session_id)
+            return
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("debate judge: gevent spawn failed (%s); using thread", exc)
+    if hasattr(pool, "submit"):
+        pool.submit(run_judge_job, session_id)
         return
     thread = threading.Thread(
         target=run_judge_job,
