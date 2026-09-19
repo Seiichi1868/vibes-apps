@@ -13,10 +13,11 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from flask import Blueprint, jsonify, render_template, request, send_from_directory, url_for
+from flask import Blueprint, jsonify, redirect, render_template, request, send_file, send_from_directory, url_for
 from werkzeug.utils import secure_filename
 
 from debate.config import (
+    AI_TEXT_VISIBLE_DEFAULT,
     ALLOWED_AUDIO_EXTENSIONS,
     AUDIO_DIR,
     DEFAULT_MOTIONS,
@@ -32,8 +33,21 @@ from debate.config import (
 from debate.judge_jobs import start_judge_job
 from debate.models import new_judge_result, new_session, now_iso
 from debate.settings import load_settings, resolve_background
+from debate.solo import (
+    CONFLICT,
+    generation_guard,
+    generation_view,
+    initial_generation_part,
+    next_generation_targets,
+    normalize_difficulty,
+    normalize_user_side,
+    part_is_ai,
+    recording_guard,
+    session_mode,
+)
 from debate.storage import get_part, get_session_lock, load_session, lookup_sessions, save_session, summarize_transcription_mode
 from debate.transcription_jobs import start_transcription_job
+from debate.tts import tts_path
 
 logger = logging.getLogger(__name__)
 
@@ -174,14 +188,37 @@ def create_session():
     payload = request.get_json(silent=True) or {}
     motion = str(payload.get("motion") or "").strip()
     speaker_name = str(payload.get("speaker_name") or "").strip()
+    mode = session_mode({"mode": payload.get("mode")})
 
     if not motion:
         return jsonify({"error": "論題（motion）を入力してください。"}), 400
     if len(motion) > 500:
         return jsonify({"error": "論題は500文字以内で入力してください。"}), 400
 
-    session = new_session(motion, speaker_name=speaker_name)
+    user_side = None
+    ai_difficulty = None
+    if mode == "solo":
+        user_side = normalize_user_side(payload.get("user_side"), allow_random=True)
+        if not user_side:
+            return jsonify({"error": "陣営は Gov / Opp / ランダムから選んでください。"}), 400
+        ai_difficulty = normalize_difficulty(payload.get("ai_difficulty"))
+
+    session = new_session(
+        motion,
+        speaker_name=speaker_name,
+        mode=mode,
+        user_side=user_side,
+        ai_difficulty=ai_difficulty,
+    )
     save_session(session)
+
+    if mode == "solo":
+        from debate.solo_jobs import start_generation_job
+
+        first_ai = initial_generation_part(session)
+        if first_ai:
+            start_generation_job(session["session_id"], first_ai)
+
     return jsonify(session), 201
 
 
@@ -219,6 +256,7 @@ def progress_screen(session_id):
         part_meta=_part_meta(),
         part_order=PART_ORDER,
         status_labels=STATUS_LABELS,
+        ai_text_visible_default=AI_TEXT_VISIBLE_DEFAULT,
         **_background_context(),
     )
 
@@ -232,6 +270,9 @@ def start_part(session_id, part):
         part_data = get_part(session, part)
         if not part_data:
             return jsonify({"error": f"不明なパート: {part}"}), 400
+        allowed, message = recording_guard(session, part)
+        if not allowed:
+            return jsonify({"error": message}), CONFLICT
 
         part_data["start_time"] = datetime.now(JST).isoformat(timespec="seconds")
         part_data["end_time"] = None
@@ -288,6 +329,9 @@ def upload_part_audio(session_id, part):
         part_data = get_part(session, part)
         if not part_data:
             return jsonify({"error": f"不明なパート: {part}"}), 400
+        allowed, message = recording_guard(session, part)
+        if not allowed:
+            return jsonify({"error": message}), CONFLICT
         if "audio" not in request.files:
             return jsonify({"error": "音声ファイルがありません。"}), 400
 
@@ -345,6 +389,9 @@ def submit_part_transcript(session_id, part):
         part_data = get_part(session, part)
         if not part_data:
             return jsonify({"error": f"不明なパート: {part}"}), 400
+        allowed, message = recording_guard(session, part)
+        if not allowed:
+            return jsonify({"error": message}), CONFLICT
 
         end_time = datetime.now(JST)
         part_data["end_time"] = end_time.isoformat(timespec="seconds")
@@ -420,6 +467,8 @@ def review_screen(session_id, part):
         return render_template(
             "debate/not_found.html", session_id=session_id, **_background_context()
         ), 404
+    if part_is_ai(part_data):
+        return redirect(url_for("debate.progress_screen", session_id=session_id))
     return render_template(
         "debate/review.html",
         session=session,
@@ -439,12 +488,22 @@ def confirm_part(session_id, part):
         part_data = get_part(session, part)
         if not part_data:
             return jsonify({"error": f"不明なパート: {part}"}), 400
+        if part_is_ai(part_data):
+            return jsonify({"error": "相手AIのパートは確認画面から確定できません。"}), CONFLICT
 
         edited = str(payload.get("transcript_edited", part_data.get("transcript_edited", "")))
         part_data["transcript_edited"] = edited
         part_data["status"] = "confirmed"
         save_session(session)
-        return jsonify(part_data)
+        targets = next_generation_targets(session, part)
+        response_data = dict(part_data)
+
+    if targets:
+        from debate.solo_jobs import start_generation_job
+
+        for target in targets:
+            start_generation_job(session_id, target)
+    return jsonify(response_data)
 
 
 @debate_bp.route("/api/sessions/<session_id>/parts/<part>/reset", methods=["POST"])
@@ -457,6 +516,8 @@ def reset_part(session_id, part):
         part_data = get_part(session, part)
         if not part_data:
             return jsonify({"error": f"不明なパート: {part}"}), 400
+        if part_is_ai(part_data):
+            return jsonify({"error": "相手AIのパートはリセットできません。"}), CONFLICT
 
         part_data.update(
             {
@@ -474,6 +535,78 @@ def reset_part(session_id, part):
         )
         save_session(session)
         return jsonify(part_data)
+
+
+@debate_bp.route("/api/sessions/<session_id>/parts/<part>/generate", methods=["POST"])
+def start_part_generation(session_id, part):
+    session = load_session(session_id)
+    if not session:
+        return jsonify({"error": "セッションが見つかりません。"}), 404
+    allowed, message = generation_guard(session, part)
+    if not allowed:
+        return jsonify({"error": message}), CONFLICT
+
+    from debate.solo_jobs import start_generation_job
+
+    part_data = start_generation_job(session_id, part)
+    if not part_data:
+        return jsonify({"error": "生成を開始できませんでした。"}), 400
+    return jsonify(generation_view(part_data)), 202
+
+
+@debate_bp.route("/api/sessions/<session_id>/parts/<part>/generation", methods=["GET"])
+def get_part_generation(session_id, part):
+    session = load_session(session_id)
+    if not session:
+        return jsonify({"error": "セッションが見つかりません。"}), 404
+    part_data = get_part(session, part)
+    if not part_data:
+        return jsonify({"error": f"不明なパート: {part}"}), 400
+    if part_is_ai(part_data):
+        from debate.solo_jobs import recover_stuck_generation
+
+        part_data = recover_stuck_generation(session_id, part, part_data)
+    return jsonify(generation_view(part_data))
+
+
+@debate_bp.route("/api/sessions/<session_id>/parts/<part>/tts", methods=["GET"])
+def serve_part_tts(session_id, part):
+    session = load_session(session_id)
+    if not session:
+        return jsonify({"error": "セッションが見つかりません。"}), 404
+    part_data = get_part(session, part)
+    if not part_data or not part_is_ai(part_data):
+        return jsonify({"error": "音声が見つかりません。"}), 404
+    filename = part_data.get("tts_audio_file") or ""
+    path = tts_path(session_id, filename)
+    if not path:
+        return jsonify({"error": "音声ファイルがまだありません。"}), 404
+    response = send_file(
+        path,
+        mimetype="audio/mpeg",
+        as_attachment=False,
+        download_name=path.name,
+        conditional=True,
+    )
+    response.headers["Accept-Ranges"] = "bytes"
+    return response
+
+
+@debate_bp.route("/api/sessions/<session_id>/parts/<part>/tts/retry", methods=["POST"])
+def retry_part_tts(session_id, part):
+    session = load_session(session_id)
+    if not session:
+        return jsonify({"error": "セッションが見つかりません。"}), 404
+    part_data = get_part(session, part)
+    if not part_data or not part_is_ai(part_data):
+        return jsonify({"error": "このパートは音声再生成の対象ではありません。"}), CONFLICT
+    if part_data.get("generation_status") != "done":
+        return jsonify({"error": "テキストの生成が完了してから音声を再試行できます。"}), CONFLICT
+
+    from debate.solo_jobs import start_tts_job
+
+    updated = start_tts_job(session_id, part, force=True)
+    return jsonify(generation_view(updated)), 202
 
 
 # ── ④ジャッジ結果画面 ──────────────────────────────────────

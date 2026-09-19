@@ -55,8 +55,11 @@
     const mode = session.transcription_mode
       ? ` · 文字起こし: ${MODE_LABELS[session.transcription_mode] || session.transcription_mode}`
       : "";
+    const solo = session.mode === "solo"
+      ? ` · Solo Practice ${session.user_side || ""} / ${session.ai_difficulty || ""}`
+      : "";
     const meta = savedAt
-      ? `<p class="text-[0.68rem] text-slate-400 mt-0.5">${escapeHtml(savedAt)}${escapeHtml(mode)}</p>`
+      ? `<p class="text-[0.68rem] text-slate-400 mt-0.5">${escapeHtml(savedAt)}${escapeHtml(mode)}${escapeHtml(solo)}</p>`
       : "";
     return `
       <li>

@@ -12,6 +12,7 @@ from debate.settings import (
     load_settings,
     resolve_background,
     resolve_judge_model,
+    resolve_opponent_model,
     update_settings,
 )
 from debate.storage import copy_session, delete_session, list_sessions, update_session_notes
@@ -21,7 +22,7 @@ debate_admin_bp = Blueprint("debate_admin", __name__, url_prefix="/debate/admin"
 ADMIN_PASSWORD = os.environ.get("DEBATE_ADMIN_PASSWORD", "2479")
 
 # パスワードが必要な設定キー（AIモデル・文字起こし方式）
-_SENSITIVE_SETTING_KEYS = ("transcription_mode", "judge_model_mode")
+_SENSITIVE_SETTING_KEYS = ("transcription_mode", "judge_model_mode", "opponent_model_mode")
 
 
 def _password_ok(payload: dict) -> bool:
@@ -30,12 +31,15 @@ def _password_ok(payload: dict) -> bool:
 
 def _settings_response(settings: dict) -> dict:
     judge_mode = resolve_judge_model_mode(settings.get("judge_model_mode"))
+    opponent_mode = resolve_judge_model_mode(settings.get("opponent_model_mode"))
     return {
         "ok": True,
         **settings,
         **resolve_background(settings.get("background_id")),
         "judge_model": resolve_judge_model(judge_mode),
         "judge_model_modes": public_judge_model_modes(),
+        "opponent_model": resolve_opponent_model(opponent_mode),
+        "opponent_model_mode": opponent_mode,
     }
 
 
@@ -76,6 +80,10 @@ def admin_settings():
         judge_mode = str(payload.get("judge_model_mode") or "")
         if judge_mode in {mode["id"] for mode in public_judge_model_modes()}:
             updates["judge_model_mode"] = judge_mode
+    if "opponent_model_mode" in payload:
+        opponent_mode = str(payload.get("opponent_model_mode") or "")
+        if opponent_mode in {mode["id"] for mode in public_judge_model_modes()}:
+            updates["opponent_model_mode"] = opponent_mode
 
     if not updates:
         # パスワード確認のみ（管理設定の解除）

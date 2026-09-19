@@ -350,12 +350,14 @@
   function updateRecordButtonStates() {
     cards.forEach((card) => {
       const btn = card.querySelector(".btn-record");
-      if (!btn || card.dataset.status !== "not_started") return;
-      const locked = activeRecordingPart !== null;
+      if (!btn || card.dataset.status !== "not_started" || card.dataset.speaker === "ai") return;
+      const soloLocked = Boolean(window.DebateSolo?.isPartLocked?.(card.dataset.part));
+      const locked = activeRecordingPart !== null || soloLocked;
       btn.disabled = locked;
       btn.classList.toggle("opacity-40", locked);
       btn.classList.toggle("cursor-not-allowed", locked);
     });
+    window.DebateSolo?.refreshLocks?.();
   }
 
   function refreshOverallProgress() {
@@ -381,6 +383,10 @@
   }
 
   function renderCard(card) {
+    if (card.dataset.speaker === "ai") {
+      refreshOverallProgress();
+      return;
+    }
     const status = card.dataset.status;
     const part = card.dataset.part;
     const timeLimit = Number(card.dataset.timeLimit || 0);
@@ -584,7 +590,8 @@
       const res = await fetch(`/debate/api/sessions/${SESSION_ID}/parts/${part}/start`, {
         method: "POST",
       });
-      if (!res.ok) throw new Error("録音開始の記録に失敗しました。");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "録音開始の記録に失敗しました。");
     } catch (err) {
       setError(card, err.message);
       stream.getTracks().forEach((t) => t.stop());
@@ -1019,7 +1026,8 @@
   }
 
   cards.forEach((card) => {
-    card.querySelector(".btn-record").addEventListener("click", () => handleRecordClick(card));
+    if (card.dataset.speaker === "ai") return;
+    card.querySelector(".btn-record")?.addEventListener("click", () => handleRecordClick(card));
     card.querySelector(".btn-pause")?.addEventListener("click", () => handlePauseClick(card));
     card.querySelector(".btn-stop").addEventListener("click", () => handleStopClick(card));
     card.querySelector(".btn-reset").addEventListener("click", () => handleResetClick(card));

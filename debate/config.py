@@ -32,6 +32,34 @@ JUDGE_MAX_RETRIES = int(os.environ.get("DEBATE_JUDGE_MAX_RETRIES", "1"))
 # ジャッジが "judging" のまま長時間止まっている場合にエラー扱いへ復旧するまでの秒数
 JUDGE_STUCK_SEC = int(os.environ.get("DEBATE_JUDGE_STUCK_SEC", "180"))
 
+# Solo Practice: 対戦AI（ジャッジとは別系統。既定モデルはジャッジと同じ luna）
+OPPONENT_TIMEOUT_SEC = float(os.environ.get("DEBATE_OPPONENT_TIMEOUT_SEC", "90"))
+OPPONENT_MAX_RETRIES = int(os.environ.get("DEBATE_OPPONENT_MAX_RETRIES", "1"))
+GENERATION_STUCK_SEC = int(os.environ.get("DEBATE_GENERATION_STUCK_SEC", "60"))
+
+# Solo Practice: サーバーTTS（ブラウザ speechSynthesis は使わない）
+TTS_MODEL = os.environ.get("DEBATE_TTS_MODEL", "gpt-4o-mini-tts").strip() or "gpt-4o-mini-tts"
+TTS_VOICE = os.environ.get("DEBATE_TTS_VOICE", "coral").strip() or "coral"
+TTS_INSTRUCTIONS = (
+    "Speak in clear, calm, natural English at a measured parliamentary debate pace. "
+    "Do not rush, and do not sound flat or monotonic."
+)
+TTS_FORMAT = "mp3"
+TTS_MAX_INPUT_CHARS = 4000
+TTS_TIMEOUT_SEC = float(os.environ.get("DEBATE_TTS_TIMEOUT_SEC", "90"))
+TTS_MAX_RETRIES = int(os.environ.get("DEBATE_TTS_MAX_RETRIES", "1"))
+TTS_STUCK_SEC = int(os.environ.get("DEBATE_TTS_STUCK_SEC", "60"))
+
+# AIスピーチ本文の表示既定（運用で切り替えられるよう1箇所に置く）
+AI_TEXT_VISIBLE_DEFAULT = True
+
+VALID_SESSION_MODES = ("duo", "solo")
+VALID_SIDES = ("Gov", "Opp")
+VALID_DIFFICULTIES = ("easy", "normal", "hard")
+DEFAULT_AI_DIFFICULTY = "normal"
+GOV_PARTS = ("PM", "MG", "PMR")
+OPP_PARTS = ("LO", "MO", "LOR")
+
 MAX_AUDIO_BYTES = 25 * 1024 * 1024  # Whisper API の上限に合わせる
 ALLOWED_AUDIO_EXTENSIONS = {"webm", "wav", "mp3", "m4a", "ogg", "mp4", "mpeg", "mpga"}
 

@@ -84,6 +84,14 @@ Point 2 の理由・具体例は、GovはPM+MG、OppはLO+MOをセットで見�
 # タイムマネジメント (Time Management)
 システム側で計算済みのelapsed_sec / time_limit_secが渡されるので、判定不要です。
 超過が著しい場合のみ、part_feedbackで軽く言及してください。
+speaker が "ai" のパートはタイムマネジメントの対象外です（elapsed_sec は null）。
+
+# 話者について
+一部のパートは練習用AIが担当しています。payload の各パートに speaker ("human" または "ai") が付きます。
+argument_flow の standing / knocked_down / extended と勝敗判定は、話者によって基準を変えないでください。
+part_feedback では human パートに生徒への改善提案を書き、ai パートは相手の発話として簡潔に触れるに留めてください。
+生徒側へのフィードバックが「相手の発話の改善案」にならないようにしてください。
+AIが使ったモデル名には触れないでください。
 
 # 出力フォーマット（このJSON形式のみで出力し、前置き・Markdown装飾は不要）
 
@@ -170,12 +178,15 @@ def build_judge_payload(session: dict) -> dict:
     parts_payload = []
     for part_name in PART_ORDER:
         part_data = parts_by_name.get(part_name) or {}
+        speaker = part_data.get("speaker") or "human"
+        elapsed = None if speaker == "ai" else part_data.get("elapsed_sec")
         parts_payload.append(
             {
                 "part": part_name,
                 "side": part_data.get("side", ""),
+                "speaker": speaker,
                 "transcript_edited": part_data.get("transcript_edited", ""),
-                "elapsed_sec": part_data.get("elapsed_sec"),
+                "elapsed_sec": elapsed,
                 "time_limit_sec": part_data.get("time_limit_sec"),
             }
         )

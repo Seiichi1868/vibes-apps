@@ -13,6 +13,8 @@ const bgOpacitySlider = document.getElementById("bg-opacity-slider");
 const bgOpacityValue = document.getElementById("bg-opacity-value");
 const judgeModelPicker = document.getElementById("judge-model-picker");
 const judgeModelCurrent = document.getElementById("judge-model-current");
+const opponentModelPicker = document.getElementById("opponent-model-picker");
+const opponentModelCurrent = document.getElementById("opponent-model-current");
 const sessionsList = document.getElementById("sessions-list");
 const sessionsCount = document.getElementById("sessions-count");
 const sessionsRefreshBtn = document.getElementById("sessions-refresh-btn");
@@ -23,6 +25,7 @@ let saveTimer = null;
 let notesSaveTimers = new Map();
 let currentBackgroundId = null;
 let currentJudgeModelMode = "5.6-luna";
+let currentOpponentModelMode = "5.6-luna";
 
 function getStoredPassword() {
   try {
@@ -106,14 +109,22 @@ function renderJudgeModelRatingRow(label, level) {
 }
 
 function renderJudgeModelOptions(modes, selectedMode) {
-  if (!judgeModelPicker || !Array.isArray(modes) || !modes.length) return;
-  judgeModelPicker.innerHTML = modes
+  renderModelOptions(judgeModelPicker, "judge_model_mode", modes, selectedMode);
+}
+
+function renderOpponentModelOptions(modes, selectedMode) {
+  renderModelOptions(opponentModelPicker, "opponent_model_mode", modes, selectedMode);
+}
+
+function renderModelOptions(picker, inputName, modes, selectedMode) {
+  if (!picker || !Array.isArray(modes) || !modes.length) return;
+  picker.innerHTML = modes
     .map((mode) => {
       const id = escapeHtml(mode.id || "");
       const title = escapeHtml(mode.model || mode.label || id);
       const checked = id === selectedMode ? " checked" : "";
       return `<label class="debate-mode-option debate-mode-option--compact debate-mode-option--rated">
-        <input type="radio" name="judge_model_mode" value="${id}"${checked} />
+        <input type="radio" name="${inputName}" value="${id}"${checked} />
         <span class="debate-mode-option-body">
           <span class="debate-mode-option-title">${title}</span>
           <span class="debate-mode-ratings">
@@ -136,9 +147,24 @@ function applyJudgeModelMode(mode, activeModel) {
   });
 }
 
+function applyOpponentModelMode(mode, activeModel) {
+  currentOpponentModelMode = mode || "5.6-luna";
+  if (opponentModelCurrent) {
+    opponentModelCurrent.textContent = activeModel || "—";
+  }
+  opponentModelPicker?.querySelectorAll('input[name="opponent_model_mode"]').forEach((input) => {
+    input.checked = input.value === currentOpponentModelMode;
+  });
+}
+
 function getSelectedJudgeModelMode() {
   const checked = judgeModelPicker?.querySelector('input[name="judge_model_mode"]:checked');
   return checked?.value || currentJudgeModelMode || "5.6-luna";
+}
+
+function getSelectedOpponentModelMode() {
+  const checked = opponentModelPicker?.querySelector('input[name="opponent_model_mode"]:checked');
+  return checked?.value || currentOpponentModelMode || "5.6-luna";
 }
 
 async function fetchSettings() {
@@ -182,6 +208,8 @@ async function loadSettingsIntoUI() {
   applyTranscriptionMode(data.transcription_mode ?? "batch");
   renderJudgeModelOptions(data.judge_model_modes || [], data.judge_model_mode || "5.6-luna");
   applyJudgeModelMode(data.judge_model_mode || "5.6-luna", data.judge_model);
+  renderOpponentModelOptions(data.judge_model_modes || [], data.opponent_model_mode || "5.6-luna");
+  applyOpponentModelMode(data.opponent_model_mode || "5.6-luna", data.opponent_model);
 }
 
 function scheduleBackgroundSave() {
@@ -213,9 +241,11 @@ function scheduleSensitiveSave() {
         admin_password: getAdminPassword(),
         transcription_mode: getSelectedTranscriptionMode(),
         judge_model_mode: getSelectedJudgeModelMode(),
+        opponent_model_mode: getSelectedOpponentModelMode(),
       });
       applyTranscriptionMode(saved.transcription_mode ?? "batch");
       applyJudgeModelMode(saved.judge_model_mode || "5.6-luna", saved.judge_model);
+      applyOpponentModelMode(saved.opponent_model_mode || "5.6-luna", saved.opponent_model);
       if (statusMessage) statusMessage.textContent = "保存しました";
       hideLockMessage();
     } catch (err) {
@@ -271,6 +301,11 @@ function renderSessions(sessions) {
         ? `<span><span class="session-row__meta-key">文字起こし</span> ${transcriptionLabel}</span>`
         : "";
 
+      const modeLabel = s.mode === "solo"
+        ? `Solo ${escapeHtml(s.user_side || "")} / ${escapeHtml(s.ai_difficulty || "")}`
+        : "通常";
+      const modeMeta = `<span><span class="session-row__meta-key">モード</span> ${modeLabel}</span>`;
+
       let judgeLabel = "";
       if (s.judge_status === "done") {
         const modelLabel = s.judge_model ? escapeHtml(s.judge_model) : "";
@@ -296,6 +331,7 @@ function renderSessions(sessions) {
                 <span><span class="session-row__meta-key">日付</span> ${escapeHtml(dt.date)}</span>
                 <span><span class="session-row__meta-key">時刻</span> ${escapeHtml(dt.time)}</span>
                 <span>${progressLabel}</span>
+                ${modeMeta}
                 ${transcriptionMeta}
                 ${copyBadge ? `<span>${copyBadge}</span>` : ""}
                 ${judgeLabel ? `<span>${judgeLabel}</span>` : ""}
@@ -457,6 +493,8 @@ async function tryUnlock() {
     applyTranscriptionMode(data.transcription_mode ?? "batch");
     renderJudgeModelOptions(data.judge_model_modes || [], data.judge_model_mode || "5.6-luna");
     applyJudgeModelMode(data.judge_model_mode || "5.6-luna", data.judge_model);
+    renderOpponentModelOptions(data.judge_model_modes || [], data.opponent_model_mode || "5.6-luna");
+    applyOpponentModelMode(data.opponent_model_mode || "5.6-luna", data.opponent_model);
     if (statusMessage) statusMessage.textContent = "管理設定を解除しました";
   } catch (err) {
     showLockMessage(err.message);
@@ -488,6 +526,8 @@ async function restoreUnlockFromStorage() {
     applyTranscriptionMode(data.transcription_mode ?? "batch");
     renderJudgeModelOptions(data.judge_model_modes || [], data.judge_model_mode || "5.6-luna");
     applyJudgeModelMode(data.judge_model_mode || "5.6-luna", data.judge_model);
+    renderOpponentModelOptions(data.judge_model_modes || [], data.opponent_model_mode || "5.6-luna");
+    applyOpponentModelMode(data.opponent_model_mode || "5.6-luna", data.opponent_model);
   } catch (_) {
     // 保存済み解除の復元に失敗した場合はロックのまま
   }
@@ -506,6 +546,11 @@ bgPicker?.addEventListener("click", (e) => {
 });
 
 judgeModelPicker?.addEventListener("change", () => {
+  if (!unlocked) return;
+  scheduleSensitiveSave();
+});
+
+opponentModelPicker?.addEventListener("change", () => {
   if (!unlocked) return;
   scheduleSensitiveSave();
 });

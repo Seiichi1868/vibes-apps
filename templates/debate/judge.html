@@ -49,11 +49,24 @@
 </section>
 
 {% elif judge.status == 'done' %}
+{% set solo_mode = session.mode == 'solo' %}
+{% set student_won = solo_mode and judge.winner == session.user_side %}
 <section class="glass-card rounded-2xl p-6 md:p-8 mb-5 winner-banner-{{ judge.winner or 'Gov' }}">
+  {% if solo_mode %}
+  <p class="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Result</p>
+  <h2 class="text-3xl md:text-4xl font-extrabold mb-2 {{ 'text-gov-dark' if student_won else 'text-opp-dark' }}">
+    {{ '勝ち' if student_won else '負け' }}
+  </h2>
+  <p class="text-sm font-semibold text-slate-600 mb-4">
+    vs AI: {{ session.ai_difficulty or 'normal' }}
+    <span class="text-slate-400 font-medium">（判定: {{ judge.winner or '-' }}）</span>
+  </p>
+  {% else %}
   <p class="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Winner</p>
   <h2 class="text-3xl md:text-4xl font-extrabold mb-4 {{ 'text-gov-dark' if judge.winner == 'Gov' else 'text-opp-dark' }}">
     {{ judge.winner or '-' }} の勝利
   </h2>
+  {% endif %}
   <div class="flex flex-wrap gap-3 mb-4 text-xs font-semibold">
     <span class="status-pill side-badge-Gov">Gov standing: {{ judge.standing_point_count.gov }}</span>
     <span class="status-pill side-badge-Opp">Opp standing: {{ judge.standing_point_count.opp }}</span>
@@ -147,16 +160,32 @@
   <div class="space-y-3">
     {% for pf in judge.part_feedback %}
     {% set part_data = (session.parts | selectattr('part', 'equalto', pf.part) | first) %}
-    <div class="panel-soft rounded-xl px-4 py-3">
+    {% set is_ai = part_data and part_data.speaker == 'ai' %}
+    {% if is_ai %}
+    <details class="panel-soft rounded-xl px-4 py-3">
+      <summary class="flex items-center gap-2 cursor-pointer">
+        <span class="w-7 h-7 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center font-extrabold text-[0.65rem] shrink-0">
+          {{ pf.part }}
+        </span>
+        <span class="text-sm font-bold text-slate-600">{{ part_meta[pf.part].label }}</span>
+        {% if part_data %}<span class="status-pill side-badge-{{ part_data.side }}">{{ part_data.side }}</span>{% endif %}
+        <span class="text-[0.65rem] text-slate-400">相手AI</span>
+      </summary>
+      <p class="text-sm text-slate-600 leading-relaxed mt-2">{{ pf.comment or '（コメントなし）' }}</p>
+    </details>
+    {% else %}
+    <div class="panel-soft rounded-xl px-4 py-3{% if session.mode == 'solo' %} ring-1 ring-teal-200 bg-emerald-50/70{% endif %}">
       <div class="flex items-center gap-2 mb-1">
         <span class="w-7 h-7 rounded-lg bg-brand/10 text-brand-dark flex items-center justify-center font-extrabold text-[0.65rem] shrink-0">
           {{ pf.part }}
         </span>
         <span class="text-sm font-bold text-slate-800">{{ part_meta[pf.part].label }}</span>
         {% if part_data %}<span class="status-pill side-badge-{{ part_data.side }}">{{ part_data.side }}</span>{% endif %}
+        {% if session.mode == 'solo' %}<span class="text-[0.65rem] font-semibold text-teal-800">あなたのパート</span>{% endif %}
       </div>
       <p class="text-sm text-slate-600 leading-relaxed">{{ pf.comment or '（コメントなし）' }}</p>
     </div>
+    {% endif %}
     {% endfor %}
   </div>
 </section>

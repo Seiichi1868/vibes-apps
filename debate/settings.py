@@ -41,6 +41,7 @@ DEFAULT_SETTINGS = {
     "background_opacity": DEFAULT_BACKGROUND_OPACITY,
     "transcription_mode": "batch",
     "judge_model_mode": DEFAULT_JUDGE_MODEL_MODE,
+    "opponent_model_mode": DEFAULT_JUDGE_MODEL_MODE,
 }
 
 
@@ -51,6 +52,15 @@ def resolve_judge_model(mode: str | None = None) -> str:
     selected = mode if mode in get_judge_model_options() else None
     if selected is None:
         stored = load_settings().get("judge_model_mode", DEFAULT_JUDGE_MODEL_MODE)
+        selected = resolve_judge_model_mode(stored, fallback_mode=DEFAULT_JUDGE_MODEL_MODE)
+    return resolve_judge_model_id(selected)
+
+
+def resolve_opponent_model(mode: str | None = None) -> str:
+    """Solo Practice の対戦AIモデル。選択肢はジャッジと同一（価格定義を再利用）。"""
+    selected = mode if mode in get_judge_model_options() else None
+    if selected is None:
+        stored = load_settings().get("opponent_model_mode", DEFAULT_JUDGE_MODEL_MODE)
         selected = resolve_judge_model_mode(stored, fallback_mode=DEFAULT_JUDGE_MODEL_MODE)
     return resolve_judge_model_id(selected)
 
@@ -84,6 +94,12 @@ def _normalize(raw: dict | None) -> dict:
         data["judge_model_mode"] = judge_mode
     elif judge_mode:
         data["judge_model_mode"] = DEFAULT_JUDGE_MODEL_MODE
+
+    opponent_mode = raw.get("opponent_model_mode")
+    if opponent_mode in get_judge_model_options():
+        data["opponent_model_mode"] = opponent_mode
+    elif opponent_mode:
+        data["opponent_model_mode"] = DEFAULT_JUDGE_MODEL_MODE
 
     return data
 

@@ -81,6 +81,47 @@
 
   <form id="motion-form" class="space-y-5">
     <div>
+      <p class="text-sm font-semibold text-slate-700 mb-1.5">モード</p>
+      <div class="grid sm:grid-cols-2 gap-2" id="mode-picker">
+        <label class="panel-soft flex items-start gap-3 rounded-xl px-4 py-3 cursor-pointer hover:border-teal-200/80 transition-colors">
+          <input type="radio" name="debate_mode" value="duo" class="mt-1 accent-teal-600" checked>
+          <span>
+            <span class="block text-sm font-semibold text-slate-800">通常の対戦</span>
+            <span class="block text-xs text-slate-500 mt-0.5">2チームで交互に録音します</span>
+          </span>
+        </label>
+        <label class="panel-soft flex items-start gap-3 rounded-xl px-4 py-3 cursor-pointer hover:border-teal-200/80 transition-colors">
+          <input type="radio" name="debate_mode" value="solo" class="mt-1 accent-teal-600">
+          <span>
+            <span class="block text-sm font-semibold text-slate-800">Solo Practice（1人練習）</span>
+            <span class="block text-xs text-slate-500 mt-0.5">1人が片方を担当し、相手3パートはAIが話します</span>
+          </span>
+        </label>
+      </div>
+    </div>
+
+    <div id="solo-options" class="hidden space-y-4 rounded-xl border border-teal-100 bg-white/50 px-4 py-4">
+      <div>
+        <label for="solo-side" class="block text-sm font-semibold text-slate-700 mb-1.5">あなたの陣営</label>
+        <select id="solo-side"
+          class="w-full rounded-xl border border-teal-100 bg-white/80 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand">
+          <option value="Gov">Gov（肯定側）</option>
+          <option value="Opp">Opp（否定側）</option>
+          <option value="random">ランダム</option>
+        </select>
+      </div>
+      <div>
+        <label for="solo-difficulty" class="block text-sm font-semibold text-slate-700 mb-1.5">相手AIの強さ</label>
+        <select id="solo-difficulty"
+          class="w-full rounded-xl border border-teal-100 bg-white/80 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand">
+          <option value="easy">easy（やさしい）</option>
+          <option value="normal" selected>normal（ふつう）</option>
+          <option value="hard">hard（つよい）</option>
+        </select>
+      </div>
+    </div>
+
+    <div>
       <label for="motion-picker" class="block text-sm font-semibold text-slate-700 mb-1.5">
         お題から選ぶ
       </label>
@@ -131,5 +172,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='debate/js/index.js', v='20260919a') }}"></script>
+<script src="{{ url_for('static', filename='debate/js/index.js', v='20260919b') }}"></script>
 {% endblock %}

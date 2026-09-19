@@ -462,3 +462,35 @@ body {
 .session-row__btn--delete:hover {
   background: #fff1f2;
 }
+
+/* Solo Practice: 相手AIの発話カード */
+.part-card--ai {
+  background: linear-gradient(180deg, rgba(236, 253, 245, 0.72), rgba(255, 255, 255, 0.68));
+  border-color: rgba(45, 212, 191, 0.45);
+}
+.part-card--locked {
+  opacity: 0.58;
+}
+.part-card--locked .btn-record {
+  pointer-events: none;
+}
+.ai-speech-text {
+  font-size: 0.95rem;
+  line-height: 1.75;
+  color: #334155;
+  padding: 0.85rem 1rem;
+  border-radius: 0.8rem;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(153, 246, 228, 0.55);
+  max-height: 22rem;
+  overflow-y: auto;
+}
+.ai-seek {
+  height: 0.35rem;
+}
+.ai-player {
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.8rem;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(153, 246, 228, 0.45);
+}

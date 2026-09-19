@@ -63,9 +63,12 @@ def load_session(session_id: str) -> dict | None:
     with _lock:
         try:
             with path.open(encoding="utf-8") as handle:
-                return json.load(handle)
+                data = json.load(handle)
         except (json.JSONDecodeError, OSError):
             return None
+    from debate.models import normalize_session
+
+    return normalize_session(data)
 
 
 def get_part(session: dict, part: str) -> dict | None:
@@ -192,6 +195,9 @@ def session_summary(data: dict, *, mtime: float | None = None, include_notes: bo
         "judge_model": judge_model_label,
         "judge_transcription_mode": judge_result.get("transcription_mode", ""),
         "transcription_mode": summarize_transcription_mode(data),
+        "mode": data.get("mode") or "duo",
+        "user_side": data.get("user_side"),
+        "ai_difficulty": data.get("ai_difficulty"),
     }
     if include_notes:
         summary["admin_notes"] = str(data.get("admin_notes") or "")
@@ -230,5 +236,8 @@ def list_sessions(limit: int = 10, *, include_notes: bool = False) -> list[dict]
                 data = json.load(handle)
         except (json.JSONDecodeError, OSError):
             continue
+        from debate.models import normalize_session
+
+        data = normalize_session(data) or {}
         summaries.append(session_summary(data, mtime=mtime, include_notes=include_notes))
     return summaries

@@ -82,6 +82,15 @@
     </div>
 
     <div>
+      <h3 class="text-sm font-bold text-slate-800 mb-2">対戦AIモデル（Solo Practice）</h3>
+      <div id="opponent-model-picker" class="debate-mode-options debate-mode-options--ai"></div>
+      <p class="text-[0.65rem] text-slate-500 mt-1.5">
+        現在: <strong id="opponent-model-current" class="text-brand font-semibold">—</strong>
+        <span class="text-slate-400">（ジャッジと同じ候補・価格定義を再利用）</span>
+      </p>
+    </div>
+
+    <div>
       <h3 class="font-bold text-slate-800 mb-1">文字起こし方式</h3>
       <p class="text-xs text-slate-500 mb-3">
         生徒画面の録音時に使う文字起こし方式を切り替えます。セッションごとに使用モードが記録されます。
@@ -108,5 +117,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='debate/js/admin.js', v='20260802a') }}"></script>
+<script src="{{ url_for('static', filename='debate/js/admin.js', v='20260919b') }}"></script>
 {% endblock %}

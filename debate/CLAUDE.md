@@ -35,10 +35,20 @@
 
 役割文・定型ガイド・ジャッジプロンプトの正本: `debate/config.py` の `PART_ROLES`/`PART_GUIDES` と `debate/judge.py`。矛盾させない。
 
+## ソロ練習（Solo Practice）
+
+既存の通常対戦（`mode` 欠落時は duo）を壊さず追加。コード値 `"solo"`。UIは「Solo Practice（1人練習）」。生徒画面に「デュオ」は出さない。
+
+- Gov: 生徒=PM/MG/PMR、AI=LO/MO/LOR。Opp: その逆。進行は順序固定。
+- 生徒確定後に AI テキスト生成→TTS。Opp の PM はセッション作成直後から生成可。MO→LOR は同一チェーン（並列なのは MO の TTS と LOR テキスト）。
+- AIパートは録音なし。`status=confirmed`・`elapsed_sec=null`。確認画面は進行へリダイレクト。
+- 音声: サーバーTTS（`data/debate/audio/<id>/ai_<part>.mp3`）。IndexedDB 対象外。Range 対応。自動再生しない。
+- ジョブ: `debate/solo_jobs.py`（judge_jobs と同じ起動方式）。生成: `debate/opponent.py`。TTS: `debate/tts.py`。ガード: `debate/solo.py`。
+
 ## データ
 
 JSON: `data/debate/sessions/<id>.json` 音声: `data/debate/audio/<id>/`
-設定: `data/debate/settings.json`（背景・透過・transcription_mode・judge_model_mode）
+設定: `data/debate/settings.json`（背景・透過・transcription_mode・judge_model_mode・opponent_model_mode）
 書き込みは `get_session_lock(session_id)` で直列化。`save_session` は tmp→replace。
 パート status: `not_started` → `recording` → `transcribing` → `needs_review` → `confirmed`
 ジャッジ: `idle` → `judging` → `done`/`error`
@@ -75,7 +85,7 @@ Whisper: `debate/transcription.py`（短タイムアウト）。ジョブ: `tran
 
 ## 管理
 
-`/debate/admin` はリンク開放。パスワード必須は `transcription_mode` と `judge_model_mode` のみ（`DEBATE_ADMIN_PASSWORD` 既定2479）。セッション一覧・コピー・備考・削除あり。コピー時ジャッジはリセット、音声は複製。
+`/debate/admin` はリンク開放。パスワード必須は `transcription_mode`・`judge_model_mode`・`opponent_model_mode`（`DEBATE_ADMIN_PASSWORD` 既定2479）。セッション一覧・コピー・備考・削除あり。コピー時ジャッジはリセット、音声（AI音声含む）は複製。
 
 ## ファイル案内（必要なときだけ開け）
 
@@ -84,13 +94,14 @@ Whisper: `debate/transcription.py`（短タイムアウト）。ジョブ: `tran
 | URL/API | `debate/routes.py` |
 | スキーマ | `debate/models.py` `config.py` |
 | JSON/音声 | `debate/storage.py` |
-| 進行UI | `templates/debate/progress.html` `static/debate/js/progress.js` |
+| 進行UI | `templates/debate/progress.html` `static/debate/js/progress.js` `solo.js` |
 | 確認再生 | `static/debate/js/local-audio.js` `review.js` `templates/debate/review.html` |
 | 再開一覧 | `static/debate/js/local-sessions.js` |
 | 論題 | `templates/debate/index.html` `static/debate/js/index.js` |
 | ジャッジUI | `templates/debate/judge.html` `static/debate/js/judge.js` |
 | 管理 | `debate/admin.py` `templates/debate/admin.html` `static/debate/js/admin.js` |
 | 見た目 | `templates/debate/base.html` `static/debate/css/style.css` |
+| ソロ生成 | `debate/solo.py` `opponent.py` `solo_jobs.py` `tts.py` |
 
 ## 直近の確定仕様（これと違う実装は回帰）
 
