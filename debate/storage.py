@@ -156,8 +156,69 @@ def update_session_notes(session_id: str, notes: str) -> dict | None:
         return save_session(session)
 
 
+def session_summary(data: dict, *, mtime: float | None = None, include_notes: bool = False) -> dict:
+    """セッション1件の一覧用サマリー。"""
+    parts = data.get("parts", [])
+    confirmed = sum(1 for part in parts if part.get("status") == "confirmed")
+    in_progress = sum(
+        1
+        for part in parts
+        if part.get("status") in ("recording", "transcribing", "needs_review")
+    )
+    updated_at = data.get("updated_at") or data.get("created_at") or ""
+    if not updated_at and mtime:
+        from datetime import datetime, timedelta, timezone
+
+        jst = timezone(timedelta(hours=9))
+        updated_at = datetime.fromtimestamp(mtime, tz=jst).isoformat(timespec="seconds")
+
+    judge_result = data.get("judge_result") or {}
+    judge_model_info = judge_result.get("judge_model") or {}
+    judge_model_label = ""
+    if isinstance(judge_model_info, dict):
+        judge_model_label = judge_model_info.get("model") or ""
+    if not judge_model_label:
+        judge_model_label = judge_result.get("model", "")
+    summary = {
+        "session_id": data.get("session_id"),
+        "motion": data.get("motion"),
+        "created_at": data.get("created_at"),
+        "updated_at": updated_at,
+        "confirmed_parts": confirmed,
+        "in_progress_parts": in_progress,
+        "total_parts": len(parts),
+        "judge_status": judge_result.get("status", "idle"),
+        "judge_winner": judge_result.get("winner"),
+        "judge_model": judge_model_label,
+        "judge_transcription_mode": judge_result.get("transcription_mode", ""),
+        "transcription_mode": summarize_transcription_mode(data),
+    }
+    if include_notes:
+        summary["admin_notes"] = str(data.get("admin_notes") or "")
+        summary["copied_from_session_id"] = str(data.get("copied_from_session_id") or "")
+    return summary
+
+
+def lookup_sessions(session_ids: list[str], *, limit: int = 20) -> list[dict]:
+    """指定IDのうち存在するセッションだけを、渡された順で返す（生徒端末の再開一覧用）。"""
+    summaries = []
+    seen: set[str] = set()
+    for raw_id in session_ids:
+        safe_id = _safe_id(str(raw_id or ""))
+        if not safe_id or safe_id in seen:
+            continue
+        seen.add(safe_id)
+        data = load_session(safe_id)
+        if not data:
+            continue
+        summaries.append(session_summary(data))
+        if len(summaries) >= limit:
+            break
+    return summaries
+
+
 def list_sessions(limit: int = 10, *, include_notes: bool = False) -> list[dict]:
-    """保存済みセッション一覧（論題入力画面・管理画面用）。"""
+    """保存済みセッション一覧（管理画面用）。"""
     ensure_dirs()
     files = sorted(SESSIONS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
 
@@ -169,44 +230,5 @@ def list_sessions(limit: int = 10, *, include_notes: bool = False) -> list[dict]
                 data = json.load(handle)
         except (json.JSONDecodeError, OSError):
             continue
-
-        parts = data.get("parts", [])
-        confirmed = sum(1 for part in parts if part.get("status") == "confirmed")
-        in_progress = sum(
-            1
-            for part in parts
-            if part.get("status") in ("recording", "transcribing", "needs_review")
-        )
-        updated_at = data.get("updated_at") or data.get("created_at") or ""
-        if not updated_at and mtime:
-            from datetime import datetime, timedelta, timezone
-
-            jst = timezone(timedelta(hours=9))
-            updated_at = datetime.fromtimestamp(mtime, tz=jst).isoformat(timespec="seconds")
-
-        judge_result = data.get("judge_result") or {}
-        judge_model_info = judge_result.get("judge_model") or {}
-        judge_model_label = ""
-        if isinstance(judge_model_info, dict):
-            judge_model_label = judge_model_info.get("model") or ""
-        if not judge_model_label:
-            judge_model_label = judge_result.get("model", "")
-        summary = {
-                "session_id": data.get("session_id"),
-                "motion": data.get("motion"),
-                "created_at": data.get("created_at"),
-                "updated_at": updated_at,
-                "confirmed_parts": confirmed,
-                "in_progress_parts": in_progress,
-                "total_parts": len(parts),
-                "judge_status": judge_result.get("status", "idle"),
-                "judge_winner": judge_result.get("winner"),
-                "judge_model": judge_model_label,
-                "judge_transcription_mode": judge_result.get("transcription_mode", ""),
-                "transcription_mode": summarize_transcription_mode(data),
-            }
-        if include_notes:
-            summary["admin_notes"] = str(data.get("admin_notes") or "")
-            summary["copied_from_session_id"] = str(data.get("copied_from_session_id") or "")
-        summaries.append(summary)
+        summaries.append(session_summary(data, mtime=mtime, include_notes=include_notes))
     return summaries

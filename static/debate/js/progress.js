@@ -801,7 +801,7 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "保存に失敗しました。");
       showPartSaveMsg(card, "保存しました");
-      showSaveToast(`${part} パートを保存しました。管理画面から再開できます。`);
+      showSaveToast(`${part} パートを保存しました。同じ端末のトップ画面から再開できます。`);
     } catch (err) {
       setError(card, err.message);
     } finally {

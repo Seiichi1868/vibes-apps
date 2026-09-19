@@ -32,7 +32,7 @@ from debate.config import (
 from debate.judge_jobs import start_judge_job
 from debate.models import new_judge_result, new_session, now_iso
 from debate.settings import load_settings, resolve_background
-from debate.storage import get_part, get_session_lock, list_sessions, load_session, save_session, summarize_transcription_mode
+from debate.storage import get_part, get_session_lock, load_session, lookup_sessions, save_session, summarize_transcription_mode
 from debate.transcription_jobs import start_transcription_job
 
 logger = logging.getLogger(__name__)
@@ -146,7 +146,6 @@ def index():
     return render_template(
         "debate/index.html",
         default_motions=DEFAULT_MOTIONS,
-        recent_sessions=list_sessions(limit=8),
         **_background_context(),
     )
 
@@ -165,6 +164,18 @@ def create_session():
     session = new_session(motion, speaker_name=speaker_name)
     save_session(session)
     return jsonify(session), 201
+
+
+@debate_bp.route("/api/sessions/lookup", methods=["POST"])
+def lookup_sessions_api():
+    """この端末で保存したセッションIDだけを渡し、再開一覧用のサマリーを返す。"""
+    payload = request.get_json(silent=True) or {}
+    raw_ids = payload.get("session_ids") if "session_ids" in payload else payload.get("ids")
+    if raw_ids is None:
+        raw_ids = []
+    if not isinstance(raw_ids, list):
+        return jsonify({"error": "session_ids は配列で指定してください。"}), 400
+    return jsonify({"sessions": lookup_sessions(raw_ids, limit=20)})
 
 
 @debate_bp.route("/api/sessions/<session_id>", methods=["GET"])

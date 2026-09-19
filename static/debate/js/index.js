@@ -64,6 +64,7 @@
         throw new Error(data.error || "セッションの作成に失敗しました。");
       }
 
+      window.DebateLocalSessions?.remember(data.session_id);
       window.location.href = `/debate/session/${data.session_id}`;
     } catch (err) {
       showError(err.message || "予期しないエラーが発生しました。");
