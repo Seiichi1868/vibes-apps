@@ -38,7 +38,7 @@
 
   function applyTranscriptionModeUI() {
     const mode = getEffectiveMode();
-    const stopLabel = mode === "realtime" ? "停止して確定" : "停止してアップロード";
+    const stopLabel = mode === "realtime" ? "停止して確定" : "停止して保存";
     document.querySelectorAll("[data-stop-label]").forEach((el) => {
       el.textContent = stopLabel;
     });
@@ -898,7 +898,7 @@
         card.dataset.status = partData.status || "needs_review";
         card.dataset.elapsed = partData.elapsed_sec ?? "";
         renderCard(card);
-        setError(card, data.error || "アップロードに失敗しました。文字起こし確認画面から手動で入力できます。");
+        setError(card, data.error || "保存に失敗しました。文字起こし確認画面から手動で入力できます。");
         return;
       }
 
@@ -919,8 +919,8 @@
       renderCard(card);
       const msg =
         err.name === "AbortError"
-          ? "アップロードがタイムアウトしました。ネットワークをご確認のうえ、やり直してください。"
-          : "アップロードに失敗しました。ネットワークをご確認のうえ、やり直してください。";
+          ? "保存がタイムアウトしました。ネットワークをご確認のうえ、やり直してください。"
+          : "保存に失敗しました。ネットワークをご確認のうえ、やり直してください。";
       setError(card, msg);
     }
   }
