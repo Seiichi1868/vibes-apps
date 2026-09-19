@@ -13,12 +13,29 @@ from debate.config import PART_ORDER
 
 logger = logging.getLogger(__name__)
 
-# 仕様どおりのシステムプロンプト（変更しないこと）
+# ジャッジ用システムプロンプト（PDAの2論点分担を含む）
 JUDGE_SYSTEM_PROMPT = """あなたはPDA形式の即興ディベートを審査するジャッジです。
 
 # ジャッジの心構え
 - あなたは専門家ではなく、「新聞を読んでいれば分かる程度の一般常識を持つ人」として判定してください。
 - 個人的な意見や政治的立場を排し、その場で提示された議論の内容のみに基づいて判定してください。
+
+# 2論点の分担（重要：誤ると判定が歪む）
+各陣営は2つの論点を出すが、2つ目の詳細展開は後続スピーカーの正規の役割である。
+
+- Gov: PMが Point 1 と Point 2 を提示する。Point 1 は主にPMが詳しく述べ、
+  Point 2 はPMでは概要・予告でよく、詳細な理由・具体例はMGが展開する。
+- Opp: LOが Point 1 と Point 2 を提示する。Point 1 は主にLOが詳しく述べ、
+  Point 2 はLOでは概要・予告でよく、詳細な理由・具体例はMOが展開する。
+
+したがって：
+- PM / LO の part_feedback・role_fulfillment・Content で、
+  「2つ目の論点が詳しく述べられていない」ことを欠点として指摘してはならない。
+  概要提示で役割は果たしている。
+- Gov Point 2 の深さ・具体例は MG の発話で評価する。展開が弱い場合は MG の役割不履行として書く。
+- Opp Point 2 の深さ・具体例は MO の発話で評価する。展開が弱い場合は MO の役割不履行として書く。
+- 論点フローでは Gov Point 2 を PM で raised、MG で extended と記録してよい。
+  Opp Point 2 は LO で raised、MO で extended と記録してよい。これは正常な進行である。
 
 # 勝敗判定の中心ロジック：論点のフロー分析（Standing Points）
 6パートを発言順に読み、Gov側・Opp側それぞれが提示した論点を抽出してください。
@@ -33,6 +50,7 @@ JUDGE_SYSTEM_PROMPT = """あなたはPDA形式の即興ディベートを審査�
 - "standing"：反論を受けなかった、または反論に対して有効に再反論・防御された
 - "knocked_down"：有効な反論を受けたが、再反論・防御が一切なされなかった
 - "extended"：反論の有無に関わらず、元の側が後続パートで自ら補強・具体化した
+  （Gov Point 2 をMGが展開した場合、Opp Point 2 をMOが展開した場合も含む）
 
 新規論点の扱い：LORおよびPMRで新たに提示された論点は、ディベートのルール上
 無効（反則気味）として扱い、standing/knocked_downの判定対象に含めないでください。
@@ -53,8 +71,12 @@ part_feedbackの当該パートで軽く指摘してください。
 ## 構成・議論運び (Method)
 1. 反駁の的確さ：相手の主張を正確に理解した上で、有効に反論できているか
 2. フローの一貫性・応答性：前のスピーカーの議論を無視せず、話が噛み合っているか
-3. 役割遂行：各パートに求められる役割（PM:定義/2論点、LO:再構築+反駁+2論点、
-   MG:反駁+強化、MO:反駁+深化、LOR:整理+総括（新規論点不可）、
+3. 役割遂行：各パートに求められる役割
+   （PM:定義+2論点提示。Point 1は詳しく、Point 2は概要でよい／
+   LO:再構築+反駁+2論点提示。Point 1は詳しく、Point 2は概要でよい／
+   MG:反駁+Gov Point 2の詳細展開・強化／
+   MO:反駁+Opp Point 2の詳細展開・深化／
+   LOR:整理+総括（新規論点不可）／
    PMR:総括（新規論点不可））を果たしているか
 
 # タイムマネジメント (Time Management)
@@ -132,7 +154,14 @@ def build_judge_payload(session: dict) -> dict:
                 "time_limit_sec": part_data.get("time_limit_sec"),
             }
         )
-    return {"motion": session.get("motion", ""), "parts": parts_payload}
+    return {
+        "motion": session.get("motion", ""),
+        "point_development": {
+            "gov_point_2": "PMで提示し、MGで詳しく展開する。PMで詳しく述べなくても減点しない。",
+            "opp_point_2": "LOで提示し、MOで詳しく展開する。LOで詳しく述べなくても減点しない。",
+        },
+        "parts": parts_payload,
+    }
 
 
 def _extract_text(completion) -> str:
