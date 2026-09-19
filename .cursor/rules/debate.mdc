@@ -1,0 +1,12 @@
+---
+description: debate/ は CLAUDE.md を正本にし、他アプリを探索しない
+globs: debate/**,templates/debate/**,static/debate/**
+alwaysApply: false
+---
+
+# debate 作業時
+
+実装・調査の前に **`debate/CLAUDE.md` だけ**読め。他ファイルの横断探索はするな。
+編集してよいのは `debate/` `templates/debate/` `static/debate/` のみ。
+`news_app/` `flask_app/` `templates/news/` `static/news/` `/news` 経路は触るな。
+JS変更時は `url_for` の `v=` キャッシュバスターを更新。
