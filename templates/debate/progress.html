@@ -18,7 +18,7 @@
     </button>
   </div>
   <p class="text-[0.7rem] text-slate-400 mt-2">
-    各パートは録音・アップロードのたびに自動保存されます。文字起こし中でも<strong class="text-slate-500">次のパートの録音はすぐ始められます</strong>。途中で閉じても、同じ端末のトップ画面から再開できます。全セッションの管理は管理画面から行えます。
+    各パートは録音・アップロードのたびに自動保存されます。文字起こし中でも<strong class="text-slate-500">次のパートの録音はすぐ始められます</strong>。騒音などで止めたいときは<strong class="text-slate-500">一時停止</strong>すると経過時間も止まります。途中で閉じても、同じ端末のトップ画面から再開できます。
   </p>
   <div id="save-toast" class="hidden mt-2 text-xs font-medium text-emerald-700"></div>
   <div class="mt-3 grid grid-cols-6 gap-1.5">
@@ -90,11 +90,17 @@
       <p class="text-[0.65rem] text-slate-400 mt-1" data-live-monitor-note>
         ※ 録音中の確認用の参考表示です（音量とブラウザのライブ認識）。保存される文字起こしはこの後Whisperで別途生成されます。
       </p>
+      <p data-pause-note class="hidden mt-2 text-xs font-medium text-amber-800">
+        一時停止中です。経過時間は止まっています。環境が整ったら「録音を再開」を押してください。
+      </p>
     </div>
 
     <div class="flex flex-wrap items-center gap-2 mt-4">
       <button type="button" class="btn-record px-4 py-2 rounded-lg bg-brand text-white text-sm font-semibold shadow hover:bg-brand-dark transition-colors">
         ● 録音開始
+      </button>
+      <button type="button" class="btn-pause hidden px-4 py-2 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 text-sm font-semibold hover:bg-amber-100 transition-colors">
+        一時停止
       </button>
       <button type="button" class="btn-stop hidden px-4 py-2 rounded-lg bg-rose-600 text-white text-sm font-semibold shadow hover:bg-rose-700 transition-colors">
         <span class="rec-dot inline-block mr-1 align-middle"></span><span data-stop-label>停止してアップロード</span>
@@ -152,5 +158,5 @@
   window.DEBATE_STATUS_LABELS = {{ status_labels | tojson }};
   window.DEBATE_TRANSCRIPTION_MODE = {{ transcription_mode | tojson }};
 </script>
-<script src="{{ url_for('static', filename='debate/js/progress.js', v='20260919b') }}"></script>
+<script src="{{ url_for('static', filename='debate/js/progress.js', v='20260919e') }}"></script>
 {% endblock %}

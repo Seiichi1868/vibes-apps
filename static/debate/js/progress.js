@@ -186,6 +186,7 @@
 
     let finalText = "";
     let stopped = false;
+    let paused = false;
 
     recognition.addEventListener("result", (event) => {
       let interim = "";
@@ -204,7 +205,7 @@
     });
 
     recognition.addEventListener("end", () => {
-      if (!stopped) {
+      if (!stopped && !paused) {
         try { recognition.start(); } catch (_) { /* ignore */ }
       }
     });
@@ -218,7 +219,17 @@
     return {
       stop() {
         stopped = true;
+        paused = false;
         try { recognition.stop(); } catch (_) { /* ignore */ }
+      },
+      pause() {
+        paused = true;
+        try { recognition.stop(); } catch (_) { /* ignore */ }
+      },
+      resume() {
+        if (stopped) return;
+        paused = false;
+        try { recognition.start(); } catch (_) { /* ignore */ }
       },
     };
   }
@@ -236,6 +247,7 @@
     let finalTranscript = "";
     let interimTranscript = "";
     let stopped = false;
+    let paused = false;
 
     const rebuildFromResults = (event) => {
       const finalParts = [];
@@ -266,7 +278,7 @@
     });
 
     recognition.addEventListener("end", () => {
-      if (!stopped) {
+      if (!stopped && !paused) {
         try { recognition.start(); } catch (_) { /* ignore */ }
       }
     });
@@ -280,7 +292,17 @@
     return {
       stop() {
         stopped = true;
+        paused = false;
         try { recognition.stop(); } catch (_) { /* ignore */ }
+      },
+      pause() {
+        paused = true;
+        try { recognition.stop(); } catch (_) { /* ignore */ }
+      },
+      resume() {
+        if (stopped) return;
+        paused = false;
+        try { recognition.start(); } catch (_) { /* ignore */ }
       },
       getTranscript() {
         return `${finalTranscript} ${interimTranscript}`.trim();
@@ -365,6 +387,7 @@
     const elapsed = card.dataset.elapsed ? Number(card.dataset.elapsed) : null;
 
     const recordBtn = card.querySelector(".btn-record");
+    const pauseBtn = card.querySelector(".btn-pause");
     const stopBtn = card.querySelector(".btn-stop");
     const reviewBtn = card.querySelector(".btn-review");
     const saveBtn = card.querySelector(".btn-save");
@@ -377,7 +400,9 @@
     pill.className = `status-pill status-${status}`;
 
     recordBtn.classList.add("hidden");
+    if (pauseBtn) pauseBtn.classList.add("hidden");
     stopBtn.classList.add("hidden");
+    card.querySelector("[data-pause-note]")?.classList.add("hidden");
     reviewBtn.classList.add("hidden");
     if (saveBtn) saveBtn.classList.add("hidden");
     resetBtn.classList.add("hidden");
@@ -391,6 +416,19 @@
       timerEl.classList.remove("text-rose-600");
     } else if (status === "recording") {
       stopBtn.classList.remove("hidden");
+      if (pauseBtn) pauseBtn.classList.remove("hidden");
+      const paused = Boolean(state.timerPaused);
+      if (pauseBtn) pauseBtn.textContent = paused ? "録音を再開" : "一時停止";
+      const recDot = card.querySelector(".rec-dot");
+      recDot?.classList.toggle("is-paused", paused);
+      const pauseNote = card.querySelector("[data-pause-note]");
+      pauseNote?.classList.toggle("hidden", !paused);
+      if (paused) {
+        pill.textContent = "一時停止中";
+        pill.className = "status-pill status-paused";
+      }
+      timerEl.textContent = formatSeconds(getElapsedSeconds(part));
+      timerEl.classList.toggle("text-rose-600", getElapsedSeconds(part) > timeLimit);
     } else if (status === "transcribing") {
       uploadingLabel.classList.remove("hidden");
       reviewBtn.classList.remove("hidden");
@@ -424,7 +462,25 @@
     refreshOverallProgress();
   }
 
-  function stopClientTimer(part) {
+  function freezeElapsed(part) {
+    const state = cardState.get(part) || {};
+    if (state.segmentStartedAt) {
+      state.elapsedMs = (state.elapsedMs || 0) + (Date.now() - state.segmentStartedAt);
+      state.segmentStartedAt = null;
+    }
+    cardState.set(part, state);
+    return state.elapsedMs || 0;
+  }
+
+  function getElapsedSeconds(part) {
+    const state = cardState.get(part) || {};
+    const running = state.segmentStartedAt && !state.timerPaused
+      ? Date.now() - state.segmentStartedAt
+      : 0;
+    return Math.max(0, Math.floor(((state.elapsedMs || 0) + running) / 1000));
+  }
+
+  function stopTimerIntervals(part) {
     const state = cardState.get(part) || {};
     state.timerGeneration = (state.timerGeneration || 0) + 1;
     if (state.intervalId) {
@@ -438,33 +494,38 @@
     cardState.set(part, state);
   }
 
+  function stopClientTimer(part) {
+    freezeElapsed(part);
+    stopTimerIntervals(part);
+  }
+
   function stopAllClientTimers() {
     cards.forEach((card) => stopClientTimer(card.dataset.part));
   }
 
-  function startClientTimer(card) {
+  function startTimerInterval(card) {
     const part = card.dataset.part;
-    stopClientTimer(part);
+    stopTimerIntervals(part);
 
     const timeLimit = Number(card.dataset.timeLimit || 0);
     const timerEl = card.querySelector("[data-timer]");
-    const startedAt = Date.now();
-
     const state = cardState.get(part) || {};
     const generation = (state.timerGeneration || 0) + 1;
     state.timerGeneration = generation;
-    state.cuesFired = { oneMin: false, thirtySec: false };
+    state.timerPaused = false;
+    state.segmentStartedAt = Date.now();
     state.alarmIntervalId = null;
 
     const intervalId = setInterval(() => {
       const s = cardState.get(part) || {};
-      if (s.timerGeneration !== generation) return;
+      if (s.timerGeneration !== generation || s.timerPaused) return;
 
-      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+      const elapsed = getElapsedSeconds(part);
       const remaining = timeLimit - elapsed;
       timerEl.textContent = formatSeconds(elapsed);
       timerEl.classList.toggle("text-rose-600", remaining < 0);
 
+      if (!s.cuesFired) s.cuesFired = { oneMin: false, thirtySec: false };
       if (!s.cuesFired.oneMin && remaining <= 60 && remaining > 30) {
         s.cuesFired.oneMin = true;
         playBeepSequence(1);
@@ -477,7 +538,7 @@
         playBeepSequence(2);
         s.alarmIntervalId = setInterval(() => {
           const current = cardState.get(part) || {};
-          if (current.timerGeneration !== generation) return;
+          if (current.timerGeneration !== generation || current.timerPaused) return;
           playBeepSequence(2);
         }, 1000);
       }
@@ -486,6 +547,16 @@
 
     state.intervalId = intervalId;
     cardState.set(part, state);
+  }
+
+  function startClientTimer(card) {
+    const part = card.dataset.part;
+    const state = cardState.get(part) || {};
+    state.elapsedMs = 0;
+    state.timerPaused = false;
+    state.cuesFired = { oneMin: false, thirtySec: false };
+    cardState.set(part, state);
+    startTimerInterval(card);
   }
 
   async function handleRecordClick(card) {
@@ -571,6 +642,64 @@
     startClientTimer(card);
   }
 
+  function pauseRecording(card) {
+    const part = card.dataset.part;
+    const state = cardState.get(part) || {};
+    if (state.timerPaused || card.dataset.status !== "recording") return;
+
+    if (state.recorder) {
+      if (state.recorder.state !== "recording") return;
+      if (typeof state.recorder.pause !== "function") {
+        setError(card, "このブラウザは録音の一時停止に対応していません。");
+        return;
+      }
+      try {
+        state.recorder.pause();
+      } catch (_) {
+        setError(card, "一時停止できませんでした。");
+        return;
+      }
+    }
+    state.liveCaption?.pause?.();
+    state.realtimeTranscription?.pause?.();
+    freezeElapsed(part);
+    stopTimerIntervals(part);
+    const next = cardState.get(part) || {};
+    next.timerPaused = true;
+    cardState.set(part, next);
+    setError(card, "");
+    renderCard(card);
+  }
+
+  function resumeRecording(card) {
+    const part = card.dataset.part;
+    const state = cardState.get(part) || {};
+    if (!state.timerPaused || card.dataset.status !== "recording") return;
+
+    if (state.recorder) {
+      if (state.recorder.state !== "paused") return;
+      try {
+        state.recorder.resume();
+      } catch (_) {
+        setError(card, "録音を再開できませんでした。");
+        return;
+      }
+    }
+    state.liveCaption?.resume?.();
+    state.realtimeTranscription?.resume?.();
+    state.timerPaused = false;
+    cardState.set(part, state);
+    startTimerInterval(card);
+    setError(card, "");
+    renderCard(card);
+  }
+
+  function handlePauseClick(card) {
+    const state = cardState.get(card.dataset.part) || {};
+    if (state.timerPaused) resumeRecording(card);
+    else pauseRecording(card);
+  }
+
   function cleanupRecordingResources(card, part) {
     const state = cardState.get(part) || {};
     stopClientTimer(part);
@@ -594,14 +723,14 @@
     hideLiveMonitor(card);
   }
 
-  async function submitRealtimeTranscript(card, transcriptRaw) {
+  async function submitRealtimeTranscript(card, transcriptRaw, elapsedSec) {
     const part = card.dataset.part;
 
     try {
       const res = await fetch(`/debate/api/sessions/${SESSION_ID}/parts/${part}/transcript`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transcript_raw: transcriptRaw }),
+        body: JSON.stringify({ transcript_raw: transcriptRaw, elapsed_sec: elapsedSec }),
       });
       const data = await res.json();
 
@@ -633,6 +762,9 @@
     const part = card.dataset.part;
     const state = cardState.get(part) || {};
     const mode = state.recordingMode || getEffectiveMode();
+    const elapsedSec = getElapsedSeconds(part);
+    state.speakingElapsedSec = elapsedSec;
+    cardState.set(part, state);
 
     if (mode === "realtime") {
       if (!state.realtimeTranscription) return;
@@ -647,7 +779,7 @@
       card.dataset.endTime = new Date().toISOString();
       renderCard(card);
 
-      submitRealtimeTranscript(card, transcriptRaw);
+      submitRealtimeTranscript(card, transcriptRaw, elapsedSec);
       return;
     }
 
@@ -743,6 +875,8 @@
     const part = card.dataset.part;
     const formData = new FormData();
     formData.append("audio", blob, `${part}.${extensionFor(mimeType)}`);
+    const elapsedSec = (cardState.get(part) || {}).speakingElapsedSec;
+    if (elapsedSec != null) formData.append("elapsed_sec", String(elapsedSec));
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
@@ -820,7 +954,7 @@
 
   async function handleSaveExitClick() {
     if (activeRecordingPart) {
-      showSaveToast("録音中は保存できません。停止してからお試しください。");
+      showSaveToast("録音中（一時停止中を含む）は保存できません。停止してからお試しください。");
       return;
     }
     saveExitBtn.disabled = true;
@@ -886,6 +1020,7 @@
 
   cards.forEach((card) => {
     card.querySelector(".btn-record").addEventListener("click", () => handleRecordClick(card));
+    card.querySelector(".btn-pause")?.addEventListener("click", () => handlePauseClick(card));
     card.querySelector(".btn-stop").addEventListener("click", () => handleStopClick(card));
     card.querySelector(".btn-reset").addEventListener("click", () => handleResetClick(card));
     card.querySelector(".btn-review").addEventListener("click", () => handleReviewClick(card));

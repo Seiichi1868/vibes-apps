@@ -57,6 +57,25 @@ def _seconds_since(iso_timestamp: str | None) -> float | None:
         return None
 
 
+def _resolve_elapsed_sec(part_data: dict, requested, end_time: datetime) -> int | None:
+    """一時停止を除いた発話時間を優先し、なければ開始〜終了の実時間を使う。"""
+    try:
+        if requested is not None and str(requested).strip() != "":
+            value = int(round(float(requested)))
+            limit = int(part_data.get("time_limit_sec") or 210)
+            if 0 <= value <= max(limit * 3, 1800):
+                return value
+    except (TypeError, ValueError):
+        pass
+    if part_data.get("start_time"):
+        try:
+            start_dt = datetime.fromisoformat(part_data["start_time"])
+            return max(0, round((end_time - start_dt).total_seconds()))
+        except ValueError:
+            return None
+    return None
+
+
 def _audio_path(session_id: str, audio_url: str) -> Path | None:
     if not audio_url:
         return None
@@ -300,13 +319,9 @@ def upload_part_audio(session_id, part):
         part_data["transcript_edited"] = ""
         part_data["transcript_error"] = ""
         part_data["transcribe_retry_at"] = None
-
-        if part_data.get("start_time"):
-            try:
-                start_dt = datetime.fromisoformat(part_data["start_time"])
-                part_data["elapsed_sec"] = max(0, round((end_time - start_dt).total_seconds()))
-            except ValueError:
-                part_data["elapsed_sec"] = None
+        part_data["elapsed_sec"] = _resolve_elapsed_sec(
+            part_data, request.form.get("elapsed_sec"), end_time
+        )
 
         part_data["status"] = "transcribing"
         part_data["transcription_mode"] = "batch"
@@ -340,13 +355,9 @@ def submit_part_transcript(session_id, part):
         )
         part_data["transcription_mode"] = "realtime"
         part_data["transcribe_retry_at"] = None
-
-        if part_data.get("start_time"):
-            try:
-                start_dt = datetime.fromisoformat(part_data["start_time"])
-                part_data["elapsed_sec"] = max(0, round((end_time - start_dt).total_seconds()))
-            except ValueError:
-                part_data["elapsed_sec"] = None
+        part_data["elapsed_sec"] = _resolve_elapsed_sec(
+            part_data, payload.get("elapsed_sec"), end_time
+        )
 
         part_data["status"] = "needs_review"
         save_session(session)
