@@ -37,11 +37,13 @@
       </span>
       / 制限 {{ (part.time_limit_sec // 60) }}:{{ '%02d' % (part.time_limit_sec % 60) }}
     </div>
-    {% if part.audio_url %}
-    <audio controls src="{{ part.audio_url }}" class="h-9"></audio>
-    {% else %}
-    <span class="text-xs text-slate-400">音声データなし</span>
-    {% endif %}
+    <div class="flex flex-col items-end gap-1 min-w-0">
+      <audio id="review-audio" controls preload="auto" playsinline
+        {% if part.audio_url %}src="{{ part.audio_url }}"{% endif %}
+        class="h-9 max-w-full{% if not part.audio_url %} hidden{% endif %}"></audio>
+      <span id="review-audio-empty" class="text-xs text-slate-400{% if part.audio_url %} hidden{% endif %}">音声データなし</span>
+      <span id="review-audio-status" class="text-[0.68rem] text-slate-400"></span>
+    </div>
   </div>
 
   {% if part.transcript_raw %}
@@ -101,6 +103,7 @@
   window.DEBATE_SESSION_ID = {{ session.session_id | tojson }};
   window.DEBATE_PART = {{ part.part | tojson }};
   window.DEBATE_PART_STATUS = {{ part.status | tojson }};
+  window.DEBATE_AUDIO_URL = {{ (part.audio_url or "") | tojson }};
 </script>
-<script src="{{ url_for('static', filename='debate/js/review.js') }}"></script>
+<script src="{{ url_for('static', filename='debate/js/review.js', v='20260919b') }}"></script>
 {% endblock %}

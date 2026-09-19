@@ -125,6 +125,7 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "リセットに失敗しました。");
 
+      window.DebateLocalAudio?.remove(SESSION_ID, PART);
       window.location.href = `/debate/session/${SESSION_ID}`;
     } catch (err) {
       showError(err.message);

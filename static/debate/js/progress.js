@@ -2,7 +2,12 @@
   const SESSION_ID = window.DEBATE_SESSION_ID;
   const STATUS_LABELS = window.DEBATE_STATUS_LABELS || {};
   const CONFIGURED_MODE = window.DEBATE_TRANSCRIPTION_MODE || "batch";
-  const MIME_CANDIDATES = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
+  const IS_APPLE = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+    || (/Macintosh/.test(navigator.userAgent) && /^((?!chrome|android).)*safari/i.test(navigator.userAgent));
+  const MIME_CANDIDATES = IS_APPLE
+    ? ["audio/mp4", "audio/mp4;codecs=mp4a.40.2", "audio/aac", "audio/webm;codecs=opus", "audio/webm", "audio/ogg"]
+    : ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
   const SpeechRecognitionImpl = window.SpeechRecognition || window.webkitSpeechRecognition;
   const SPEECH_SUPPORTED = Boolean(SpeechRecognitionImpl);
 
@@ -90,7 +95,7 @@
   }
 
   function extensionFor(mimeType) {
-    if (mimeType.includes("mp4")) return "mp4";
+    if (mimeType.includes("mp4") || mimeType.includes("aac") || mimeType.includes("m4a")) return "mp4";
     if (mimeType.includes("ogg")) return "ogg";
     return "webm";
   }
@@ -550,6 +555,7 @@
       recorder.addEventListener("stop", () => {
         stream.getTracks().forEach((t) => t.stop());
         const blob = new Blob(chunks, { type: mimeType || "audio/webm" });
+        window.DebateLocalAudio?.put(SESSION_ID, part, blob, mimeType || "audio/webm");
         uploadAudio(card, blob, mimeType || "audio/webm");
       });
 
@@ -844,6 +850,7 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "リセットに失敗しました。");
 
+      window.DebateLocalAudio?.remove(SESSION_ID, part);
       card.dataset.status = data.status;
       card.dataset.elapsed = "";
       setError(card, "");
@@ -866,6 +873,7 @@
       });
       const data = await res.json();
       if (res.ok) {
+        window.DebateLocalAudio?.remove(SESSION_ID, part);
         card.dataset.status = data.status;
         card.dataset.elapsed = "";
         renderCard(card);
