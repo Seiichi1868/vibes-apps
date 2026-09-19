@@ -56,33 +56,35 @@ PART_LABELS = {
     "PMR": "Prime Minister Reply（首相・最終弁論）",
 }
 
-# 仕様書「2. パート別役割遂行チェックリスト」より（表示用の参考情報。ジャッジ判定には使用しない）
+# 授業フロー準拠のパート役割（進行画面表示＋ジャッジ判定の共通ソース）
 PART_ROLES = {
-    "PM": "論題の定義／2つの論点（Point 1, Point 2）の提示（新規論点：可）",
-    "LO": "Govの論点を正確に再構築（reconstruct）した上で反駁／自陣の2論点提示（新規論点：可）",
-    "MG": "LOの反駁への応答／Govの Point 2 の詳細展開・強化（新規論点：可、Point追加程度）",
-    "MO": "MGへの反駁／Oppの Point 2 の詳細展開・深化（新規論点：可、Point追加程度）",
-    "LOR": "両陣営の対立点を整理／Opp優位性を主張／総括（新規論点：不可）",
-    "PMR": "試合全体の総括／Gov優位性を主張（新規論点：不可）",
+    "PM": "論題の定義／2論点の提示（Point 1は詳しく、Point 2は概要でよい）",
+    "LO": "Gov論点の再構築・反駁／自陣2論点の提示（Point 1は詳しく、Point 2は概要でよい）",
+    "MG": "Opp Point 1への反駁／Gov Point 1の再構築・防御／Gov Point 2の詳細展開",
+    "MO": "Gov Point 1への反駁／Opp Point 1の再構築・防御／Opp Point 2の詳細展開",
+    "LOR": "対立点の整理／Opp優位の総括（新規論点不可）",
+    "PMR": "Opp Point 2への反駁のうえ総括／Gov優位の主張（新規論点不可）",
 }
 
-# 仕様書「4. Cursorへの初回プロンプト」より、各パート開始時に常時表示する定型表現ガイド文
+# 授業フロー準拠の定型表現ガイド（各パート開始時に常時表示）
 PART_GUIDES = {
     "PM": "Today's topic is ___. We define the motion as follows... "
-    "We have two points. The first point is... The second point is...",
-    "LO": "We believe that ___ should not... Let me reconstruct the Government's 1st point... "
-    "They said, however, Therefore... Then let me explain our 1st point... "
-    "Next, let me explain our 2nd point...",
+    "We have two points. The first point is... The second point is... "
+    "I will explain the 1st point...",
+    "LO": "We believe that ___ should not... Let me rebut what the Government team said... "
+    "They said, however, Therefore... We have two points. The first point is... "
+    "The second point is... I will explain the 1st point...",
     "MG": "We believe that ___ should... First, let me rebut Opposition's 1st point... "
-    "They said, however, Therefore... Next, let me reconstruct Opposition's 1st point... "
-    "As for Government's 2nd point...",
+    "They said, however, Therefore... Next, let me reconstruct Government's 1st point... "
+    "Then let me explain our 2nd point...",
     "MO": "We believe that ___ should not... Let me rebut Government's 1st point... "
     "They said, however, Therefore... Next, let me reconstruct Opposition's 1st point... "
     "Then let me explain our 2nd point...",
-    "LOR": "On this point, their idea is... On this point, our argument is superior because... "
-    "Let me summarize today's debate. The most important point is...",
-    "PMR": "Let me summarize today's debate. The most important point is... "
-    "First, I will rebut Opposition's 2nd point...",
+    "LOR": "Let me summarize today's debate. The most important point is... "
+    "On this point, their idea is... However, our argument is superior because...",
+    "PMR": "First, I will rebut Opposition's 2nd point... They said, however, Therefore... "
+    "Then I will summarize today's debate. The most important point is... "
+    "On this point, their idea is... However, our argument is superior because...",
 }
 
 DEFAULT_MOTIONS = [
