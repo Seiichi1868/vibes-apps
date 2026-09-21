@@ -266,10 +266,28 @@ class MasteryTests(unittest.TestCase):
             apply_vocab_mastery(progress, 1, True, threshold=5, direction="ja_to_es")
         apply_vocab_mastery(progress, 1, False, threshold=5, direction="ja_to_es")
         self.assertEqual(progress["vocab"]["1"]["ja_to_es"]["consecutive_correct"], 0)
+        self.assertEqual(progress["vocab"]["1"]["ja_to_es"]["miss_count"], 1)
         self.assertFalse(progress["vocab"]["1"]["ja_to_es"]["mastered"])
         for _ in range(4):
             self.assertFalse(apply_vocab_mastery(progress, 1, True, threshold=5, direction="ja_to_es"))
         self.assertTrue(apply_vocab_mastery(progress, 1, True, threshold=5, direction="ja_to_es"))
+        self.assertEqual(progress["vocab"]["1"]["ja_to_es"]["miss_count"], 1)
+
+    def test_vocab_miss_count_accumulates_across_answers(self):
+        progress = normalize_progress({})
+        apply_vocab_mastery(progress, 1, False, threshold=5, direction="ja_to_es")
+        apply_vocab_mastery(progress, 1, False, threshold=5, direction="ja_to_es")
+        apply_vocab_mastery(progress, 1, True, threshold=5, direction="ja_to_es")
+        apply_vocab_mastery(progress, 1, False, threshold=5, direction="es_to_ja")
+        self.assertEqual(progress["vocab"]["1"]["ja_to_es"]["miss_count"], 2)
+        self.assertEqual(progress["vocab"]["1"]["ja_to_es"]["consecutive_correct"], 1)
+        self.assertEqual(progress["vocab"]["1"]["es_to_ja"]["miss_count"], 1)
+        self.assertEqual(progress["vocab"]["1"]["miss_count"], 3)
+        rows = vocab_progress_list(progress, 5)
+        row = [item for item in rows if item["id"] == 1][0]
+        self.assertEqual(row["ja_to_es"]["miss_count"], 2)
+        self.assertEqual(row["es_to_ja"]["miss_count"], 1)
+        self.assertEqual(row["miss_count"], 3)
 
     def test_vocab_directions_are_independent(self):
         progress = normalize_progress({})
@@ -306,7 +324,20 @@ class MasteryTests(unittest.TestCase):
             }
         )
         self.assertEqual(progress["vocab"]["1"]["ja_to_es"]["consecutive_correct"], 3)
+        self.assertEqual(progress["vocab"]["1"]["ja_to_es"]["miss_count"], 0)
         self.assertFalse(progress["vocab"]["1"]["ja_to_es"]["mastered"])
+
+    def test_vocab_legacy_miss_count_is_preserved(self):
+        progress = normalize_progress(
+            {
+                "vocab": {
+                    "1": {"ja_to_es": {"correct_count": 2, "miss_count": 4, "mastered": False}},
+                }
+            }
+        )
+        self.assertEqual(progress["vocab"]["1"]["ja_to_es"]["miss_count"], 4)
+        self.assertEqual(progress["vocab"]["1"]["es_to_ja"]["miss_count"], 0)
+        self.assertEqual(progress["vocab"]["1"]["miss_count"], 4)
 
     def test_progress_view_includes_calendar_fields(self):
         progress = normalize_progress({})

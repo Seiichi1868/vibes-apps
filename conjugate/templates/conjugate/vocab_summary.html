@@ -18,10 +18,13 @@
   <h3 class="text-sm font-bold mb-3" style="color: var(--text-primary);">今回まちがえた単語</h3>
   <ul class="space-y-2">
     {% for item in summary.weak_items %}
-    <li class="vsc-weak-item">
+    <li class="vsc-weak-item{% if item.miss_count >= 2 %} is-weak{% endif %}">
       <div class="flex items-center justify-between gap-2">
         <span class="font-bold">{{ item.infinitive }}</span>
-        <span class="text-xs" style="color: var(--text-secondary);">{{ item.meaning_ja }}</span>
+        <span class="text-xs" style="color: {% if item.miss_count >= 2 %}var(--danger-text){% else %}var(--text-secondary){% endif %};">
+          {{ item.meaning_ja }}
+          {% if item.miss_count %}　累計 誤{{ item.miss_count }}回{% endif %}
+        </span>
       </div>
       <div class="text-sm mt-1">あなたの解答: 「{{ item.chosen_label }}」</div>
       <div class="text-sm" style="color: var(--ok-text);">正解: {{ item.correct_label }}</div>

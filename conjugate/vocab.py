@@ -167,11 +167,13 @@ def build_vocab_summary(session: dict) -> dict:
         else:
             weak_items.append(
                 {
+                    "verb_id": q.get("verb_id"),
                     "infinitive": q.get("infinitive", ""),
                     "meaning_ja": q.get("meaning_ja", ""),
                     "prompt": q.get("prompt", ""),
                     "chosen_label": ans.get("chosen_label", ""),
                     "correct_label": ans.get("correct_label", ""),
+                    "miss_count": 0,
                 }
             )
     accuracy = round((correct / total) * 100, 1) if total else 0.0

@@ -598,10 +598,18 @@ def vocab_summary_screen(session_id):
     if not session or session.get("kind") != "vocab":
         return render_template("conjugate/not_found.html"), 404
     summary = session.get("summary") or build_vocab_summary(session)
+    progress = progress_detail()
+    direction = session.get("direction")
+    miss_by_id = {
+        row.get("id"): int((row.get(direction) or {}).get("miss_count") or 0)
+        for row in progress.get("vocab_verbs") or []
+    }
+    for item in summary.get("weak_items") or []:
+        item["miss_count"] = miss_by_id.get(item.get("verb_id"), int(item.get("miss_count") or 0))
     return render_template(
         "conjugate/vocab_summary.html",
         session=session,
         summary=summary,
-        progress=progress_summary(),
+        progress=progress,
         direction_label=DIRECTION_LABELS.get(session.get("direction"), ""),
     )

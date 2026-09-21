@@ -284,33 +284,58 @@
         const rawCount = direction ? side.correct_count : row.correct_count;
         const count = Number(rawCount);
         const resolvedCount = Number.isFinite(count) ? count : 0;
+        const missRaw = direction ? side.miss_count : row.miss_count;
+        const missCount = Number(missRaw);
+        const resolvedMiss = Number.isFinite(missCount) ? missCount : 0;
         const mastered = direction
           ? Boolean(side.mastered) || resolvedCount >= threshold
           : Boolean(row.mastered);
-        return { ...row, correct_count: resolvedCount, mastered };
+        return { ...row, correct_count: resolvedCount, miss_count: resolvedMiss, mastered };
       })
       .filter((row) => {
-        if (direction) return Boolean(row.mastered) || Number(row.correct_count || 0) > 0;
+        if (direction) {
+          return Boolean(row.mastered) || Number(row.correct_count || 0) > 0 || Number(row.miss_count || 0) > 0;
+        }
         const persons = row.persons || {};
         const tuCount = Number((persons.tu || {}).consecutive_correct || 0);
         const elCount = Number((persons.el_ella_usted || {}).consecutive_correct || 0);
         return Boolean(row.mastered) || tuCount > 0 || elCount > 0 || Number(row.correct_count || 0) > 0;
       })
-      .sort((a, b) => Number(b.mastered) - Number(a.mastered) || Number(b.correct_count) - Number(a.correct_count) || String(a.infinitive).localeCompare(String(b.infinitive)));
+      .sort((a, b) => {
+        if (direction) {
+          return (
+            Number(b.miss_count) - Number(a.miss_count) ||
+            Number(b.mastered) - Number(a.mastered) ||
+            Number(b.correct_count) - Number(a.correct_count) ||
+            String(a.infinitive).localeCompare(String(b.infinitive))
+          );
+        }
+        return (
+          Number(b.mastered) - Number(a.mastered) ||
+          Number(b.correct_count) - Number(a.correct_count) ||
+          String(a.infinitive).localeCompare(String(b.infinitive))
+        );
+      });
     if (!studied.length) {
       return `<p class="vsc-master-empty">${escapeHtml(emptyText)}</p>`;
     }
     return `<div class="vsc-master-list">${studied
       .map((row) => {
         const count = Number(row.correct_count || 0);
+        const missCount = Number(row.miss_count || 0);
         const mastered = Boolean(row.mastered);
+        const isWeak = Boolean(direction) && missCount >= 2;
         const countLabel = direction
           ? `${count}/${threshold}${mastered ? " ✓" : ""}`
           : (row.person_badge || `${count}/${threshold}`);
-        return `<article class="vsc-master-item${mastered ? " is-mastered" : ""}">
+        const missHtml = direction
+          ? `<div class="vsc-master-miss">誤 ${missCount}</div>`
+          : "";
+        return `<article class="vsc-master-item${mastered ? " is-mastered" : ""}${isWeak ? " is-weak" : ""}">
           <div class="vsc-master-name">${escapeHtml(row.infinitive)}</div>
           <div class="vsc-master-count">${escapeHtml(countLabel)}</div>
           <div class="vsc-master-meaning">${escapeHtml(row.meaning_ja)}</div>
+          ${missHtml}
         </article>`;
       })
       .join("")}</div>`;
@@ -330,7 +355,7 @@
     const jaCount = progressState.vocab_mastered_ja_to_es || 0;
     const esCount = progressState.vocab_mastered_es_to_ja || 0;
     modalBody.innerHTML = `
-      <p class="vsc-modal-lead">左右の出題方向ごとに${threshold}回連続正解すると暗記マスターリストに入ります。間違えるとカウントはゼロに戻ります。</p>
+      <p class="vsc-modal-lead">左右の出題方向ごとに${threshold}回連続正解すると暗記マスターです。間違えると連続カウントはゼロに戻ります。累計の間違い回数も出し、2回以上間違えた単語は赤で表示します。</p>
       <div class="vsc-master-split">
         <section>
           <h3 class="vsc-master-col-title">日本語 → スペイン語</h3>

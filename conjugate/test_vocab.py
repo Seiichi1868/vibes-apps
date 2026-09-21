@@ -72,6 +72,8 @@ class VocabQuizTests(unittest.TestCase):
         self.assertEqual(summary["total"], 2)
         self.assertEqual(summary["correct"], 1)
         self.assertEqual(len(summary["weak_items"]), 1)
+        self.assertEqual(summary["weak_items"][0]["verb_id"], q["verb_id"])
+        self.assertEqual(summary["weak_items"][0]["miss_count"], 0)
 
     def test_vocab_pool_includes_registered_verbs(self):
         pool = vocab_verbs()
