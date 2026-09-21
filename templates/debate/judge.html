@@ -50,22 +50,15 @@
 
 {% elif judge.status == 'done' %}
 {% set solo_mode = session.mode == 'solo' %}
-{% set student_won = solo_mode and judge.winner == session.user_side %}
 <section class="glass-card rounded-2xl p-6 md:p-8 mb-5 winner-banner-{{ judge.winner or 'Gov' }}">
-  {% if solo_mode %}
-  <p class="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Result</p>
-  <h2 class="text-3xl md:text-4xl font-extrabold mb-2 {{ 'text-gov-dark' if student_won else 'text-opp-dark' }}">
-    {{ '勝ち' if student_won else '負け' }}
+  <p class="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Winner</p>
+  <h2 class="text-3xl md:text-4xl font-extrabold {{ 'mb-2' if solo_mode else 'mb-4' }} {{ 'text-gov-dark' if judge.winner == 'Gov' else 'text-opp-dark' }}">
+    {{ judge.winner or '-' }}側の勝利
   </h2>
+  {% if solo_mode %}
   <p class="text-sm font-semibold text-slate-600 mb-4">
     vs AI: {{ session.ai_difficulty or 'normal' }}
-    <span class="text-slate-400 font-medium">（判定: {{ judge.winner or '-' }}）</span>
   </p>
-  {% else %}
-  <p class="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Winner</p>
-  <h2 class="text-3xl md:text-4xl font-extrabold mb-4 {{ 'text-gov-dark' if judge.winner == 'Gov' else 'text-opp-dark' }}">
-    {{ judge.winner or '-' }} の勝利
-  </h2>
   {% endif %}
   <div class="flex flex-wrap gap-3 mb-4 text-xs font-semibold">
     <span class="status-pill side-badge-Gov">Gov standing: {{ judge.standing_point_count.gov }}</span>
