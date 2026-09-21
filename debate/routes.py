@@ -563,9 +563,13 @@ def get_part_generation(session_id, part):
     if not part_data:
         return jsonify({"error": f"不明なパート: {part}"}), 400
     if part_is_ai(part_data):
-        from debate.solo_jobs import recover_stuck_generation
+        from debate.solo_jobs import recover_stuck_generation, start_followup_generation
 
         part_data = recover_stuck_generation(session_id, part, part_data)
+        if part_data and part_data.get("generation_status") == "done":
+            start_followup_generation(session_id, part)
+            session = load_session(session_id)
+            part_data = get_part(session, part) if session else part_data
     return jsonify(generation_view(part_data))
 
 

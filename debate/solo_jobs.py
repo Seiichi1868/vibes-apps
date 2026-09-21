@@ -12,7 +12,7 @@ import uuid
 from debate.config import GENERATION_STUCK_SEC, TTS_STUCK_SEC
 from debate.models import now_iso
 from debate.opponent import generate_speech
-from debate.solo import chain_successor, generation_guard, part_is_ai, tts_filename
+from debate.solo import generation_guard, next_generation_targets, part_is_ai, tts_filename
 from debate.storage import get_part, get_session_lock, load_session, save_session
 from debate.tts import save_part_tts, synthesize_speech, tts_path
 
@@ -99,22 +99,31 @@ def _mark_text_generating(session_id: str, part: str, *, is_retry: bool) -> str 
 
 
 def _save_text_success(session_id: str, part: str, job_id: str, text: str) -> bool:
+    """先に完了した生成結果を採用する。再試行で job_id がずれても本文があれば確定する。"""
+    speech = (text or "").strip()
+    if not speech:
+        return False
     with get_session_lock(session_id):
         session = load_session(session_id)
         if not session:
             return False
         part_data = get_part(session, part)
-        if not part_data or part_data.get("generation_id") != job_id:
+        if not part_data or not part_is_ai(part_data):
             return False
-        if part_data.get("generation_status") != "generating":
-            return False
-        part_data["transcript_raw"] = text
-        part_data["transcript_edited"] = text
+        already = (
+            part_data.get("generation_status") == "done"
+            and str(part_data.get("transcript_edited") or "").strip()
+        )
+        if already:
+            return True
+        part_data["transcript_raw"] = speech
+        part_data["transcript_edited"] = speech
         part_data["transcript_error"] = ""
         part_data["elapsed_sec"] = None
         part_data["status"] = "confirmed"
         part_data["generation_status"] = "done"
         part_data["generation_error"] = None
+        part_data["generation_id"] = job_id or part_data.get("generation_id")
         if part_data.get("tts_status") not in ("done", "generating"):
             part_data["tts_status"] = "idle"
         save_session(session)
@@ -127,9 +136,11 @@ def _save_text_error(session_id: str, part: str, job_id: str, message: str) -> N
         if not session:
             return
         part_data = get_part(session, part)
-        if not part_data or part_data.get("generation_id") != job_id:
+        if not part_data:
             return
-        if part_data.get("generation_status") != "generating":
+        if part_data.get("generation_status") == "done" and str(part_data.get("transcript_edited") or "").strip():
+            return
+        if part_data.get("generation_id") not in (None, job_id):
             return
         part_data["generation_status"] = "error"
         part_data["generation_error"] = message
@@ -249,13 +260,7 @@ def run_generation_job(session_id: str, part: str, job_id: str) -> None:
         return
 
     start_tts_job(session_id, part)
-
-    session = load_session(session_id)
-    if not session:
-        return
-    successor = chain_successor(session, part)
-    if successor:
-        start_generation_job(session_id, successor)
+    start_followup_generation(session_id, part)
 
 
 def start_generation_job(session_id: str, part: str, *, force: bool = False) -> dict | None:
@@ -271,6 +276,7 @@ def start_generation_job(session_id: str, part: str, *, force: bool = False) -> 
     if status == "done" and str(part_data.get("transcript_edited") or "").strip() and not force:
         if part_data.get("tts_status") in (None, "idle", "error"):
             start_tts_job(session_id, part)
+        start_followup_generation(session_id, part)
         return get_part(load_session(session_id), part)
 
     job_id = _mark_text_generating(session_id, part, is_retry=force)
@@ -280,6 +286,15 @@ def start_generation_job(session_id: str, part: str, *, force: bool = False) -> 
     _spawn(run_generation_job, session_id, part, job_id)
     session = load_session(session_id)
     return get_part(session, part) if session else None
+
+
+def start_followup_generation(session_id: str, confirmed_part: str) -> None:
+    """確定したAIパートの直後が連続AIなら、LOR まで自動で生成を続ける。"""
+    session = load_session(session_id)
+    if not session:
+        return
+    for target in next_generation_targets(session, confirmed_part):
+        start_generation_job(session_id, target)
 
 
 def _seconds_since(iso_timestamp: str | None) -> float | None:

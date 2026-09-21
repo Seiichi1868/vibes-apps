@@ -197,7 +197,53 @@
       }
     }
 
+    const labels = window.DEBATE_STATUS_LABELS || {};
+    const pill = card.querySelector("[data-status-pill]");
+    if (pill) {
+      if (gen === "generating") {
+        pill.textContent = "相手の準備中";
+        pill.className = "status-pill status-transcribing";
+      } else if (gen === "error") {
+        pill.textContent = "エラー";
+        pill.className = "status-pill status-recording";
+      } else if (gen === "done" || card.dataset.status === "confirmed") {
+        pill.textContent = labels.confirmed || "確定済み";
+        pill.className = "status-pill status-confirmed";
+      }
+    }
+
     refreshLocks();
+    advanceAiChain();
+  }
+
+  async function startGenerationIfNeeded(card) {
+    if (card.dataset.speaker !== "ai") return;
+    const gen = card.dataset.generationStatus || "idle";
+    if (gen !== "idle") return;
+    if (!precedingConfirmed(card.dataset.part)) return;
+    if (card._soloKickoff) return;
+    card._soloKickoff = true;
+    try {
+      const res = await fetch(`/debate/api/sessions/${SESSION_ID}/parts/${card.dataset.part}/generate`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (res.ok) applyGeneration(card, data);
+      else card._soloKickoff = false;
+    } catch (_) {
+      card._soloKickoff = false;
+    }
+    ensurePolling(card);
+  }
+
+  function advanceAiChain() {
+    cards.forEach((card) => {
+      if (card.dataset.speaker !== "ai") return;
+      const gen = card.dataset.generationStatus || "idle";
+      if (!precedingConfirmed(card.dataset.part)) return;
+      if (gen === "idle") startGenerationIfNeeded(card);
+      else ensurePolling(card);
+    });
   }
 
   async function pollCard(card) {
@@ -398,4 +444,5 @@
     }
   });
   refreshLocks();
+  advanceAiChain();
 })();
