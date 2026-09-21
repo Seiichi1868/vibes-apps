@@ -79,6 +79,7 @@ class VocabQuizTests(unittest.TestCase):
         pool = vocab_verbs()
         self.assertGreaterEqual(len(pool), 4)
         self.assertTrue(any(v["infinitive"] == "gustar" for v in pool))
+        self.assertTrue(any(v["infinitive"] == "ser" for v in pool))
 
 
 if __name__ == "__main__":

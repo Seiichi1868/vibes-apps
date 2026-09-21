@@ -45,8 +45,11 @@ class TenseGuideTests(unittest.TestCase):
         guide = get_tense_guide("imperfect")
         text = " ".join(guide["irregulars"])
         self.assertIn("iba", text)
+        self.assertIn("era", text)
         self.assertIn("veía", text)
+        self.assertNotIn("未収録", text)
         self.assertTrue(guide["contrast"])
+        self.assertTrue(any(ex["infinitive"] == "ser" for ex in guide["examples"]))
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-"""動詞データ（100語）。開発指示書のJSONデータをそのままPython化したもの。
+"""動詞データ。開発指示書の100語に、DELE A2必須の抜けを追加したもの。
 
 category:
   - motion_daily     移動・日常基本動作
@@ -44,6 +44,7 @@ VERBS = [
     {"id": 15, "infinitive": "empezar", "meaning_ja": "始める", "category": "motion_daily", "reflexive": False, "stem_change": "e>ie", "tu_present": "empiezas", "irregular_tu": False},
     {"id": 16, "infinitive": "volver", "meaning_ja": "戻る", "category": "motion_daily", "reflexive": False, "stem_change": "o>ue", "tu_present": "vuelves", "irregular_tu": False},
     {"id": 17, "infinitive": "dejar", "meaning_ja": "置く", "category": "motion_daily", "reflexive": False, "stem_change": None, "tu_present": "dejas", "irregular_tu": False},
+    {"id": 105, "infinitive": "poner", "meaning_ja": "置く・つける", "category": "motion_daily", "reflexive": False, "stem_change": None, "tu_present": "pones", "irregular_tu": False},
     {"id": 18, "infinitive": "caer", "meaning_ja": "落ちる", "category": "motion_daily", "reflexive": False, "stem_change": None, "tu_present": "caes", "irregular_tu": False},
     {"id": 19, "infinitive": "llevar", "meaning_ja": "持っていく", "category": "motion_daily", "reflexive": False, "stem_change": None, "tu_present": "llevas", "irregular_tu": False},
     {"id": 20, "infinitive": "traer", "meaning_ja": "持ってくる", "category": "motion_daily", "reflexive": False, "stem_change": None, "tu_present": "traes", "irregular_tu": False},
@@ -54,6 +55,9 @@ VERBS = [
     {"id": 25, "infinitive": "cortar", "meaning_ja": "切る", "category": "motion_daily", "reflexive": False, "stem_change": None, "tu_present": "cortas", "irregular_tu": False},
 
     {"id": 26, "infinitive": "estar", "meaning_ja": "〜にある/いる", "category": "emotion_state", "reflexive": False, "stem_change": None, "tu_present": "estás", "irregular_tu": True},
+    {"id": 101, "infinitive": "ser", "meaning_ja": "〜である", "category": "emotion_state", "reflexive": False, "stem_change": None, "tu_present": "eres", "irregular_tu": True},
+    {"id": 102, "infinitive": "saber", "meaning_ja": "知る（事実・やり方）", "category": "emotion_state", "reflexive": False, "stem_change": None, "tu_present": "sabes", "irregular_tu": False},
+    {"id": 103, "infinitive": "conocer", "meaning_ja": "知っている（人・場所）", "category": "emotion_state", "reflexive": False, "stem_change": None, "tu_present": "conoces", "irregular_tu": False},
     {"id": 27, "infinitive": "parecer", "meaning_ja": "思われる", "category": "emotion_state", "reflexive": False, "stem_change": None, "tu_present": "pareces", "irregular_tu": False},
     {"id": 28, "infinitive": "sentir", "meaning_ja": "感じる", "category": "emotion_state", "reflexive": False, "stem_change": "e>ie", "tu_present": "sientes", "irregular_tu": False},
     {"id": 29, "infinitive": "gustar", "meaning_ja": "好きである", "category": "emotion_state", "reflexive": False, "stem_change": None, "tu_present": None, "irregular_tu": None, "special": "gustar_type", "note": "tú主語での活用不成立。出題対象から除外し専用モジュールで扱う"},
@@ -63,6 +67,7 @@ VERBS = [
     {"id": 33, "infinitive": "disfrutar", "meaning_ja": "楽しむ", "category": "emotion_state", "reflexive": False, "stem_change": None, "tu_present": "disfrutas", "irregular_tu": False},
     {"id": 34, "infinitive": "preferir", "meaning_ja": "好む", "category": "emotion_state", "reflexive": False, "stem_change": "e>ie", "tu_present": "prefieres", "irregular_tu": False},
     {"id": 35, "infinitive": "necesitar", "meaning_ja": "必要とする", "category": "emotion_state", "reflexive": False, "stem_change": None, "tu_present": "necesitas", "irregular_tu": False},
+    {"id": 104, "infinitive": "deber", "meaning_ja": "〜すべきである", "category": "emotion_state", "reflexive": False, "stem_change": None, "tu_present": "debes", "irregular_tu": False},
     {"id": 36, "infinitive": "desear", "meaning_ja": "望む", "category": "emotion_state", "reflexive": False, "stem_change": None, "tu_present": "deseas", "irregular_tu": False},
     {"id": 37, "infinitive": "esperar", "meaning_ja": "期待する", "category": "emotion_state", "reflexive": False, "stem_change": None, "tu_present": "esperas", "irregular_tu": False},
     {"id": 38, "infinitive": "creer", "meaning_ja": "信じる", "category": "emotion_state", "reflexive": False, "stem_change": None, "tu_present": "crees", "irregular_tu": False},
@@ -84,10 +89,13 @@ VERBS = [
     {"id": 53, "infinitive": "preguntar", "meaning_ja": "尋ねる", "category": "communication", "reflexive": False, "stem_change": None, "tu_present": "preguntas", "irregular_tu": False},
     {"id": 54, "infinitive": "responder", "meaning_ja": "答える", "category": "communication", "reflexive": False, "stem_change": None, "tu_present": "respondes", "irregular_tu": False},
     {"id": 55, "infinitive": "escuchar", "meaning_ja": "聞く", "category": "communication", "reflexive": False, "stem_change": None, "tu_present": "escuchas", "irregular_tu": False},
+    {"id": 106, "infinitive": "entender", "meaning_ja": "理解する", "category": "communication", "reflexive": False, "stem_change": "e>ie", "tu_present": "entiendes", "irregular_tu": False},
+    {"id": 107, "infinitive": "oír", "meaning_ja": "聞こえる", "category": "communication", "reflexive": False, "stem_change": None, "tu_present": "oyes", "irregular_tu": True},
     {"id": 56, "infinitive": "explicar", "meaning_ja": "説明する", "category": "communication", "reflexive": False, "stem_change": None, "tu_present": "explicas", "irregular_tu": False},
     {"id": 57, "infinitive": "pedir", "meaning_ja": "頼む", "category": "communication", "reflexive": False, "stem_change": "e>i", "tu_present": "pides", "irregular_tu": False},
     {"id": 58, "infinitive": "contar", "meaning_ja": "数える・語る", "category": "communication", "reflexive": False, "stem_change": "o>ue", "tu_present": "cuentas", "irregular_tu": False},
-    {"id": 59, "infinitive": "llamar", "meaning_ja": "呼ぶ", "category": "communication", "reflexive": False, "stem_change": None, "tu_present": "llamas", "irregular_tu": False},
+    {"id": 59, "infinitive": "llamar", "meaning_ja": "呼ぶ", "category": "communication", "reflexive": False, "stem_change": None, "tu_present": "llamas", "irregular_tu": False, "note": "llamarse(#108)と混同注意"},
+    {"id": 108, "infinitive": "llamarse", "meaning_ja": "〜という名前である", "category": "communication", "reflexive": True, "stem_change": None, "tu_present": "te llamas", "irregular_tu": False, "note": "llamar(#59)と混同注意"},
     {"id": 60, "infinitive": "gritar", "meaning_ja": "叫ぶ", "category": "communication", "reflexive": False, "stem_change": None, "tu_present": "gritas", "irregular_tu": False},
     {"id": 61, "infinitive": "susurrar", "meaning_ja": "囁く", "category": "communication", "reflexive": False, "stem_change": None, "tu_present": "susurras", "irregular_tu": False},
     {"id": 62, "infinitive": "saludar", "meaning_ja": "挨拶する", "category": "communication", "reflexive": False, "stem_change": None, "tu_present": "saludas", "irregular_tu": False},
@@ -107,14 +115,17 @@ VERBS = [
 
     {"id": 76, "infinitive": "comer", "meaning_ja": "食べる", "category": "daily_activity", "reflexive": False, "stem_change": None, "tu_present": "comes", "irregular_tu": False},
     {"id": 77, "infinitive": "beber", "meaning_ja": "飲む", "category": "daily_activity", "reflexive": False, "stem_change": None, "tu_present": "bebes", "irregular_tu": False},
+    {"id": 111, "infinitive": "tomar", "meaning_ja": "取る・飲む", "category": "daily_activity", "reflexive": False, "stem_change": None, "tu_present": "tomas", "irregular_tu": False},
     {"id": 78, "infinitive": "dormir", "meaning_ja": "眠る", "category": "daily_activity", "reflexive": False, "stem_change": "o>ue", "tu_present": "duermes", "irregular_tu": False},
     {"id": 79, "infinitive": "jugar", "meaning_ja": "遊ぶ", "category": "daily_activity", "reflexive": False, "stem_change": "u>ue", "tu_present": "juegas", "irregular_tu": False},
     {"id": 80, "infinitive": "trabajar", "meaning_ja": "働く", "category": "daily_activity", "reflexive": False, "stem_change": None, "tu_present": "trabajas", "irregular_tu": False},
     {"id": 81, "infinitive": "estudiar", "meaning_ja": "勉強する", "category": "daily_activity", "reflexive": False, "stem_change": None, "tu_present": "estudias", "irregular_tu": False},
+    {"id": 110, "infinitive": "vivir", "meaning_ja": "住む", "category": "daily_activity", "reflexive": False, "stem_change": None, "tu_present": "vives", "irregular_tu": False},
     {"id": 82, "infinitive": "cocinar", "meaning_ja": "料理する", "category": "daily_activity", "reflexive": False, "stem_change": None, "tu_present": "cocinas", "irregular_tu": False},
     {"id": 83, "infinitive": "limpiar", "meaning_ja": "掃除する", "category": "daily_activity", "reflexive": False, "stem_change": None, "tu_present": "limpias", "irregular_tu": False},
     {"id": 84, "infinitive": "lavar", "meaning_ja": "洗う", "category": "daily_activity", "reflexive": False, "stem_change": None, "tu_present": "lavas", "irregular_tu": False},
     {"id": 85, "infinitive": "comprar", "meaning_ja": "買う", "category": "daily_activity", "reflexive": False, "stem_change": None, "tu_present": "compras", "irregular_tu": False},
+    {"id": 114, "infinitive": "buscar", "meaning_ja": "探す", "category": "daily_activity", "reflexive": False, "stem_change": None, "tu_present": "buscas", "irregular_tu": False},
     {"id": 86, "infinitive": "vender", "meaning_ja": "売る", "category": "daily_activity", "reflexive": False, "stem_change": None, "tu_present": "vendes", "irregular_tu": False},
     {"id": 87, "infinitive": "conducir", "meaning_ja": "運転する", "category": "daily_activity", "reflexive": False, "stem_change": None, "tu_present": "conduces", "irregular_tu": False},
     {"id": 88, "infinitive": "viajar", "meaning_ja": "旅行する", "category": "daily_activity", "reflexive": False, "stem_change": None, "tu_present": "viajas", "irregular_tu": False},
@@ -122,6 +133,7 @@ VERBS = [
     {"id": 90, "infinitive": "nadar", "meaning_ja": "泳ぐ", "category": "daily_activity", "reflexive": False, "stem_change": None, "tu_present": "nadas", "irregular_tu": False},
     {"id": 91, "infinitive": "tener", "meaning_ja": "持つ", "category": "daily_activity", "reflexive": False, "stem_change": "e>ie", "tu_present": "tienes", "irregular_tu": False},
     {"id": 92, "infinitive": "hacer", "meaning_ja": "する・作る", "category": "daily_activity", "reflexive": False, "stem_change": None, "tu_present": "haces", "irregular_tu": False},
+    {"id": 109, "infinitive": "dar", "meaning_ja": "与える", "category": "daily_activity", "reflexive": False, "stem_change": None, "tu_present": "das", "irregular_tu": False},
     {"id": 93, "infinitive": "saltar", "meaning_ja": "跳ぶ", "category": "daily_activity", "reflexive": False, "stem_change": None, "tu_present": "saltas", "irregular_tu": False},
     {"id": 94, "infinitive": "mover", "meaning_ja": "動かす", "category": "daily_activity", "reflexive": False, "stem_change": "o>ue", "tu_present": "mueves", "irregular_tu": False},
     {"id": 95, "infinitive": "ver", "meaning_ja": "見る", "category": "daily_activity", "reflexive": False, "stem_change": None, "tu_present": "ves", "irregular_tu": False},
@@ -130,6 +142,8 @@ VERBS = [
     {"id": 98, "infinitive": "poder", "meaning_ja": "できる", "category": "daily_activity", "reflexive": False, "stem_change": "o>ue", "tu_present": "puedes", "irregular_tu": False},
     {"id": 99, "infinitive": "cambiar", "meaning_ja": "変える", "category": "daily_activity", "reflexive": False, "stem_change": None, "tu_present": "cambias", "irregular_tu": False},
     {"id": 100, "infinitive": "quedarse", "meaning_ja": "滞在する", "category": "daily_activity", "reflexive": True, "stem_change": None, "tu_present": "te quedas", "irregular_tu": False, "note": "quedar(#9)と混同注意"},
+    {"id": 112, "infinitive": "levantarse", "meaning_ja": "起きる", "category": "daily_activity", "reflexive": True, "stem_change": None, "tu_present": "te levantas", "irregular_tu": False},
+    {"id": 113, "infinitive": "nacer", "meaning_ja": "生まれる", "category": "daily_activity", "reflexive": False, "stem_change": None, "tu_present": "naces", "irregular_tu": False},
 ]
 
 VERBS_BY_ID = {v["id"]: v for v in VERBS}

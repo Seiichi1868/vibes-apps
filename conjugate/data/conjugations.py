@@ -134,6 +134,20 @@ CONJ_EXTRA: dict[int, tuple[str, str, str, str]] = {
     98: ("puedo", "pudiendo", "pude", "pudiste"),
     99: ("cambio", "cambiando", "cambié", "cambiaste"),
     100: ("quedo", "quedando", "quedé", "quedaste"),
+    101: ("soy", "siendo", "fui", "fuiste"),
+    102: ("sé", "sabiendo", "supe", "supiste"),
+    103: ("conozco", "conociendo", "conocí", "conociste"),
+    104: ("debo", "debiendo", "debí", "debiste"),
+    105: ("pongo", "poniendo", "puse", "pusiste"),
+    106: ("entiendo", "entendiendo", "entendí", "entendiste"),
+    107: ("oigo", "oyendo", "oí", "oíste"),
+    108: ("llamo", "llamando", "llamé", "llamaste"),
+    109: ("doy", "dando", "di", "diste"),
+    110: ("vivo", "viviendo", "viví", "viviste"),
+    111: ("tomo", "tomando", "tomé", "tomaste"),
+    112: ("levanto", "levantando", "levanté", "levantaste"),
+    113: ("nazco", "naciendo", "nací", "naciste"),
+    114: ("busco", "buscando", "busqué", "buscaste"),
 }
 
 

@@ -51,6 +51,11 @@ def tu_form_to_el(tu_form: str) -> str:
         rest = text[3:]
         prefix = "Se " if text[:1].isupper() else "se "
         text = prefix + rest
+        lower = text.lower()
+
+    # ser: eres → es（末尾 s 除去だと ere になる）
+    if lower == "eres":
+        return "Es" if text[:1].isupper() else "es"
 
     if text.endswith("s") or text.endswith("S"):
         text = text[:-1]
@@ -82,6 +87,8 @@ def _token_tu_to_el(token: str) -> str:
     lower = token.lower()
     if lower == "te":
         return "Se" if token[:1].isupper() else "se"
+    if lower == "eres":
+        return "Es" if token[:1].isupper() else "es"
     if lower.endswith("te") and len(lower) > 2:
         stem = token[:-2]
         se = "Se" if token[-2:-1].isupper() else "se"

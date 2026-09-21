@@ -4,7 +4,7 @@ import unittest
 from conjugate.data.conjugations import CONJ_EXTRA, build_forms, derived_person_rows
 from conjugate.data.gustar import GUSTAR_EXAMPLES
 from conjugate.data.persons import pret_tu_to_el, resolve_person, tu_form_to_el
-from conjugate.data.verbs import VERBS_BY_ID
+from conjugate.data.verbs import VERBS_BY_ID, drillable_verbs
 from conjugate.judge import grade_gustar, grade_regular
 from conjugate.session_logic import build_session_questions, public_question
 
@@ -17,6 +17,8 @@ class TuToElDerivationTests(unittest.TestCase):
         self.assertEqual(tu_form_to_el("estás"), "está")
         self.assertEqual(tu_form_to_el("vas"), "va")
         self.assertEqual(tu_form_to_el("ves"), "ve")
+        self.assertEqual(tu_form_to_el("eres"), "es")
+        self.assertEqual(tu_form_to_el("Eres"), "Es")
 
     def test_reflexive_present(self):
         self.assertEqual(tu_form_to_el("te quedas"), "se queda")
@@ -24,17 +26,29 @@ class TuToElDerivationTests(unittest.TestCase):
 
     def test_all_drillable_present_forms_drop_final_s(self):
         rows = derived_person_rows()
-        self.assertEqual(len(rows), 99)
+        self.assertEqual(len(rows), len(drillable_verbs()))
+        self.assertEqual(set(CONJ_EXTRA), {v["id"] for v in drillable_verbs()})
         for row in rows:
             el = row["el_present"]
+            if row["infinitive"] == "ser":
+                self.assertEqual(el, "es")
+                continue
             self.assertFalse(el.endswith("s"), msg=f"{row['infinitive']}: {row['tu_present']} → {el}")
             if row["reflexive"]:
                 self.assertTrue(el.startswith("se "), msg=row["infinitive"])
+        ser = next(row for row in rows if row["infinitive"] == "ser")
+        self.assertEqual(ser["tu_present"], "eres")
+        self.assertEqual(ser["el_present"], "es")
 
     def test_known_preterite_irregulars(self):
         cases = {
             1: "fue",
+            101: "fue",
             2: "vino",
+            105: "puso",
+            109: "dio",
+            102: "supo",
+            107: "oyó",
             14: "siguió",
             18: "cayó",
             22: "leyó",
@@ -77,6 +91,16 @@ class TuToElDerivationTests(unittest.TestCase):
         self.assertEqual(hablar["imperfect"]["el_ella_usted"], "Hablaba.")
         self.assertEqual(quedarse["imperfect"]["tu"], "Te quedabas.")
         self.assertEqual(quedarse["imperfect"]["el_ella_usted"], "Se quedaba.")
+        ser = build_forms(VERBS_BY_ID[101])
+        self.assertEqual(ser["present"]["yo"], "Yo soy.")
+        self.assertEqual(ser["present"]["tu"], "Eres.")
+        self.assertEqual(ser["present"]["el_ella_usted"], "Es.")
+        self.assertEqual(ser["preterite"]["yo"], "Fui.")
+        self.assertEqual(ser["preterite"]["tu"], "Fuiste.")
+        self.assertEqual(ser["preterite"]["el_ella_usted"], "Fue.")
+        llamarse = build_forms(VERBS_BY_ID[108])
+        self.assertEqual(llamarse["present"]["el_ella_usted"], "Se llama.")
+        self.assertEqual(llamarse["near_future"]["el_ella_usted"], "Va a llamarse.")
 
     def test_imperfect_regular_and_irregular(self):
         cases = {
@@ -84,6 +108,7 @@ class TuToElDerivationTests(unittest.TestCase):
             76: ("Comía.", "Comías.", "Comía."),
             21: ("Escribía.", "Escribías.", "Escribía."),
             1: ("Iba.", "Ibas.", "Iba."),
+            101: ("Era.", "Eras.", "Era."),
             95: ("Veía.", "Veías.", "Veía."),
             14: ("Seguía.", "Seguías.", "Seguía."),
             78: ("Dormía.", "Dormías.", "Dormía."),
@@ -130,6 +155,15 @@ class GradingPersonTests(unittest.TestCase):
         self.assertEqual(result["level"], "correct")
         tu = grade_regular(verb, "present", "hablas", source="typed", person="el_ella_usted")
         self.assertEqual(tu["level"], "conjugation_error")
+
+    def test_ser_eres_to_es(self):
+        verb = VERBS_BY_ID[101]
+        tu = grade_regular(verb, "present", "eres", source="typed", person="tu")
+        self.assertEqual(tu["level"], "correct")
+        el = grade_regular(verb, "present", "es", source="typed", person="el_ella_usted")
+        self.assertEqual(el["level"], "correct")
+        wrong = grade_regular(verb, "present", "eres", source="typed", person="el_ella_usted")
+        self.assertEqual(wrong["level"], "conjugation_error")
 
     def test_reflexive_se_is_required(self):
         verb = VERBS_BY_ID[100]

@@ -20,12 +20,13 @@ _GUIDES = {
             {"group": "-ir（escribir）", "forms": ["-o", "-es", "-e", "-imos", "-ís", "-en"]},
         ],
         "irregulars": [
+            "ser → soy / eres / es",
             "ir → voy / vas / va",
             "estar → estoy / estás / está",
             "tener → tengo / tienes / tiene",
             "hacer → hago / haces / hace",
         ],
-        "example_ids": [51, 76, 21, 30],
+        "example_ids": [101, 51, 76, 21, 30],
         "tips": [
             "練習では yo形を見て、tú形または él/ella/usted形に言い換えます。",
             "tú形はだいたい él形に s を付けた形です（hablas → habla）。",
@@ -90,10 +91,12 @@ _GUIDES = {
             "hacer → hice / hiciste / hizo",
             "tener → tuve / tuviste / tuvo",
             "estar → estuve / estuviste / estuvo",
+            "dar → di / diste / dio",
+            "poner → puse / pusiste / puso",
             "ver → vi / viste / vio",
             "decir → dije / dijiste / dijo",
         ],
-        "example_ids": [51, 76, 1, 92],
+        "example_ids": [51, 76, 1, 101, 92],
         "tips": [
             "tú形は -aste / -iste で終わります。él形は -ó / -ió、または不規則の -o（tuvo, hizo）。",
             "線過去と違い、「いつ終わったか」が意識できる過去です。",
@@ -120,10 +123,10 @@ _GUIDES = {
         ],
         "irregulars": [
             "ir → iba / ibas / iba",
-            "ser → era / eras / era（このアプリの100語には未収録）",
+            "ser → era / eras / era",
             "ver → veía / veías / veía（vía ではない）",
         ],
-        "example_ids": [51, 76, 1, 95, 100],
+        "example_ids": [51, 76, 1, 101, 95, 100],
         "tips": [
             "練習では Hablaba. → Hablabas. / Hablaba. です。él形は yo形と同じ動詞になります。",
             "querer は現在形 quiere でも、線過去は quería（語幹変化なし）です。",
@@ -139,7 +142,8 @@ _GUIDES = {
 }
 
 _EXAMPLE_NOTES = {
-    1: "ir は線過去も点過去も不規則です。",
+    1: "ir は線過去も点過去も不規則です。点過去は ser と同じ fui。",
+    101: "ser は線過去も点過去も不規則です。点過去は ir と同じ fui。",
     21: "-ir 規則動詞の代表例です。",
     28: "現在分詞は sintiendo（e>i）。線過去なら sentía で語幹変化しません。",
     30: "現在形は e>ie（quieres）でも、線過去は quería です。",
