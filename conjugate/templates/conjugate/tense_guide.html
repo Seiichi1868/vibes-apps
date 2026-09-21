@@ -1,0 +1,142 @@
+{% extends "conjugate/base.html" %}
+{% block title %}{{ guide.label }} - 時制の解説{% endblock %}
+{% block greeting %}{{ guide.label }}{% endblock %}
+
+{% block body %}
+<div class="vsc-filter-row mb-3">
+  <a href="{{ url_for('conjugate.verbs_page') }}" class="vsc-filter-chip">動詞一覧</a>
+  <a href="{{ url_for('conjugate.tenses_page') }}" class="vsc-filter-chip is-active">時制の解説</a>
+</div>
+
+<div class="vsc-tense-guide-row mb-3">
+  {% for t in guide.all %}
+  <a href="{{ url_for('conjugate.tense_guide_page', tense_id=t.id) }}" class="vsc-filter-chip{% if t.id == guide.id %} is-active{% endif %}">{{ t.label }}</a>
+  {% endfor %}
+</div>
+
+<section class="vsc-card mb-3">
+  <p class="vsc-guide-kicker">{{ guide.label_es }}</p>
+  <h2 class="vsc-hero-title" style="font-size: 1.35rem;">{{ guide.label }}</h2>
+  <p class="text-sm mt-2">{{ guide.summary }}</p>
+</section>
+
+<section class="vsc-card mb-3">
+  <h3 class="vsc-section-label mb-2">こんなときに使う</h3>
+  <ul class="vsc-guide-list">
+    {% for use in guide.uses %}
+    <li>{{ use }}</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="vsc-card mb-3">
+  <h3 class="vsc-section-label mb-2">作り方</h3>
+  <p class="text-sm mb-3">{{ guide.howto }}</p>
+  <div class="vsc-guide-endings">
+    <table class="vsc-guide-table">
+      <thead>
+        <tr>
+          <th></th>
+          {% for h in guide.person_headers_sg %}
+          <th>{{ h }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in guide.endings %}
+        <tr>
+          <th>{{ row.group }}</th>
+          {% for form in row.forms[:3] %}
+          <td>{{ form }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <table class="vsc-guide-table">
+      <thead>
+        <tr>
+          <th></th>
+          {% for h in guide.person_headers_pl %}
+          <th>{{ h }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in guide.endings %}
+        <tr>
+          <th>{{ row.group }}</th>
+          {% for form in row.forms[3:] %}
+          <td>{{ form }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% if guide.irregulars %}
+<section class="vsc-card mb-3">
+  <h3 class="vsc-section-label mb-2">押さえる不規則</h3>
+  <ul class="vsc-guide-list">
+    {% for item in guide.irregulars %}
+    <li>{{ item }}</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<section class="vsc-card mb-3">
+  <h3 class="vsc-section-label mb-2">このアプリの活用例</h3>
+  <p class="text-xs mb-3" style="color: var(--text-secondary);">練習と同じ yo / tú / él・ella・usted の文です。</p>
+  <div class="vsc-guide-examples">
+    {% for ex in guide.examples %}
+    <article class="vsc-guide-example">
+      <div class="vsc-guide-example-head">
+        <strong>{{ ex.infinitive }}</strong>
+        <span>{{ ex.meaning_ja }}{% if ex.reflexive %}・再帰{% endif %}</span>
+      </div>
+      <dl class="vsc-guide-example-forms">
+        <div><dt>yo</dt><dd>{{ ex.yo }}</dd></div>
+        <div><dt>tú</dt><dd>{{ ex.tu }}</dd></div>
+        <div><dt>él</dt><dd>{{ ex.el }}</dd></div>
+      </dl>
+      {% if ex.note %}
+      <p class="vsc-guide-example-note">{{ ex.note }}</p>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+{% if guide.contrast %}
+<section class="vsc-card mb-3">
+  <h3 class="vsc-section-label mb-2">{{ guide.contrast.title }}</h3>
+  <ul class="vsc-guide-list">
+    {% for point in guide.contrast.points %}
+    <li>{{ point }}</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<section class="vsc-card mb-4">
+  <h3 class="vsc-section-label mb-2">練習のコツ</h3>
+  <ul class="vsc-guide-list">
+    {% for tip in guide.tips %}
+    <li>{{ tip }}</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<div class="flex flex-col sm:flex-row gap-3 mb-4">
+  {% if guide.prev %}
+  <a href="{{ url_for('conjugate.tense_guide_page', tense_id=guide.prev.id) }}" class="vsc-btn-secondary flex-1 text-center">← {{ guide.prev.label }}</a>
+  {% endif %}
+  {% if guide.next %}
+  <a href="{{ url_for('conjugate.tense_guide_page', tense_id=guide.next.id) }}" class="vsc-btn-primary flex-1 text-center">{{ guide.next.label }} →</a>
+  {% endif %}
+</div>
+<p class="text-center mb-2"><a href="{{ url_for('conjugate.index') }}" class="vsc-link-quiet">練習を始める</a></p>
+{% endblock %}

@@ -4,6 +4,10 @@
 {% block greeting %}動詞一覧{% endblock %}
 
 {% block body %}
+<div class="vsc-filter-row mb-3">
+  <a href="{{ url_for('conjugate.verbs_page') }}" class="vsc-filter-chip is-active">動詞一覧</a>
+  <a href="{{ url_for('conjugate.tenses_page') }}" class="vsc-filter-chip">時制の解説</a>
+</div>
 <section class="mb-3">
   <h2 class="vsc-hero-title" style="font-size: 1.35rem;">習得済み {{ progress.mastered_count }}/{{ progress.total_verbs }}語</h2>
   <div class="vsc-progress-track">

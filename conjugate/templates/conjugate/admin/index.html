@@ -32,7 +32,7 @@
 
     <div>
       <h3 class="vsc-section-label">出題する文型</h3>
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mt-1.5">
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mt-1.5">
         {% for t in tense_order %}
         <label class="vsc-check-chip">
           <input type="checkbox" name="enabled_tenses" value="{{ t }}" {% if t in settings.enabled_tenses %}checked{% endif %}>
@@ -40,7 +40,7 @@
         </label>
         {% endfor %}
       </div>
-      <p class="text-xs mt-1" style="color: var(--text-secondary);">段階的実装の推奨: まず現在形のみで動作確認し、その後進行形・近接未来・点過去を追加。</p>
+      <p class="text-xs mt-1" style="color: var(--text-secondary);">段階的実装の推奨: まず現在形のみで動作確認し、その後進行形・近接未来・点過去・線過去を追加。</p>
     </div>
 
     <div>

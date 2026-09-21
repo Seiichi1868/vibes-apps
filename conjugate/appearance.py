@@ -46,7 +46,7 @@ def student_ui_context() -> dict:
     if "/conjugate/admin" in path:
         nav = "profile"
         show_bottom_nav = False
-    elif path.rstrip("/").endswith("/verbs"):
+    elif "/tenses" in path or path.rstrip("/").endswith("/verbs"):
         nav = "verbs"
         show_bottom_nav = True
     elif path.rstrip("/").endswith("/profile") or path.rstrip("/").endswith("/shop"):

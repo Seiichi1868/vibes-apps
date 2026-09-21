@@ -124,7 +124,7 @@ def grade_regular(
     source: str = "speech",
     person: str | None = "tu",
 ) -> dict:
-    """通常の99語ドリル（現在形/進行形/近接未来/点過去）の採点。"""
+    """通常の99語ドリル（現在形/進行形/近接未来/点過去/線過去）の採点。"""
     person_key = person if person in PERSON_IDS else "tu"
     forms = build_forms(verb)[tense]
     expected_sentence = forms[person_key]

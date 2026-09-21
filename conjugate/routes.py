@@ -16,6 +16,8 @@
  13. POST /conjugate/api/progress/daily-goal              … 1日の累計目標を保存
  14. GET  /conjugate/shop                                 … コインショップ（Guardián交換）
  15. POST /conjugate/api/progress/guardian/purchase        … Guardián購入（コイン消費）
+ 16. GET  /conjugate/tenses                               … 時制の解説一覧
+ 17. GET  /conjugate/tenses/<tense_id>                    … 時制ごとの解説
 """
 import logging
 import mimetypes
@@ -34,7 +36,8 @@ from conjugate.config import (
     ensure_dirs,
     whisper_cost_usd,
 )
-from conjugate.data.conjugations import TENSE_LABELS, TENSE_ORDER
+from conjugate.data.conjugations import TENSE_LABELS, TENSE_ORDER, default_selected_tenses, selectable_tenses
+from conjugate.data.tense_guides import get_tense_guide, list_tense_guides
 from conjugate.data.persons import (
     DEFAULT_PERSON_FILTER,
     EL_ELLA_USTED_HINT,
@@ -147,6 +150,8 @@ def index():
         category_person=category_person,
         tense_labels=TENSE_LABELS,
         tense_order=TENSE_ORDER,
+        selectable_tenses=selectable_tenses(settings.get("enabled_tenses")),
+        default_tenses=default_selected_tenses(settings.get("enabled_tenses")),
         person_mode=settings.get("person_mode", "tu"),
         person_mode_labels=PERSON_MODE_LABELS,
         person_filter_labels=PERSON_FILTER_LABELS,
@@ -169,7 +174,31 @@ def verbs_page():
         category_short=CATEGORY_SHORT,
         category_order=CATEGORY_ORDER,
         tense_labels=TENSE_LABELS,
+        tense_order=TENSE_ORDER,
         progress=progress,
+    )
+
+
+@main_bp.route("/tenses")
+def tenses_page():
+    return render_template(
+        "conjugate/tenses.html",
+        guides=list_tense_guides(),
+        tense_labels=TENSE_LABELS,
+        tense_order=TENSE_ORDER,
+    )
+
+
+@main_bp.route("/tenses/<tense_id>")
+def tense_guide_page(tense_id):
+    guide = get_tense_guide(tense_id)
+    if not guide:
+        return render_template("conjugate/not_found.html"), 404
+    return render_template(
+        "conjugate/tense_guide.html",
+        guide=guide,
+        tense_labels=TENSE_LABELS,
+        tense_order=TENSE_ORDER,
     )
 
 
@@ -202,7 +231,8 @@ def _prepare_session(raw_categories, raw_tenses, raw_count, raw_prioritize_weak,
     categories = [c for c in categories if c in settings["enabled_categories"]] or settings["enabled_categories"]
 
     tenses = [t for t in (raw_tenses or settings["enabled_tenses"]) if t in TENSE_ORDER]
-    tenses = [t for t in tenses if t in settings["enabled_tenses"]] or settings["enabled_tenses"]
+    allowed = set(selectable_tenses(settings["enabled_tenses"]))
+    tenses = [t for t in tenses if t in allowed] or list(default_selected_tenses(settings["enabled_tenses"]))
 
     try:
         count = int(raw_count or settings["questions_per_session"])

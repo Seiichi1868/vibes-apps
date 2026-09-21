@@ -28,7 +28,7 @@ def _build_verb_question(verb: dict, enabled_tenses: list[str], targets_per_ques
 
     k = min(targets_per_question, len(display_tenses))
     targets = random.sample(display_tenses, k=k) if k > 0 else [display_tenses[0]]
-    # 出題順は文型の並びを保つ（present→progressive→near_future→preterite）
+    # 出題順は文型の並びを保つ（present→…→preterite→imperfect）
     targets = [t for t in TENSE_ORDER if t in targets]
 
     return {

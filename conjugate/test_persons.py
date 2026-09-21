@@ -72,6 +72,40 @@ class TuToElDerivationTests(unittest.TestCase):
         self.assertEqual(quedarse["near_future"]["el_ella_usted"], "Va a quedarse.")
         self.assertEqual(quedarse["present"]["el_ella_usted"], "Se queda.")
         self.assertEqual(quedarse["preterite"]["el_ella_usted"], "Se quedó.")
+        self.assertEqual(hablar["imperfect"]["yo"], "Hablaba.")
+        self.assertEqual(hablar["imperfect"]["tu"], "Hablabas.")
+        self.assertEqual(hablar["imperfect"]["el_ella_usted"], "Hablaba.")
+        self.assertEqual(quedarse["imperfect"]["tu"], "Te quedabas.")
+        self.assertEqual(quedarse["imperfect"]["el_ella_usted"], "Se quedaba.")
+
+    def test_imperfect_regular_and_irregular(self):
+        cases = {
+            51: ("Hablaba.", "Hablabas.", "Hablaba."),
+            76: ("Comía.", "Comías.", "Comía."),
+            21: ("Escribía.", "Escribías.", "Escribía."),
+            1: ("Iba.", "Ibas.", "Iba."),
+            95: ("Veía.", "Veías.", "Veía."),
+            14: ("Seguía.", "Seguías.", "Seguía."),
+            78: ("Dormía.", "Dormías.", "Dormía."),
+            42: ("Me sentía.", "Te sentías.", "Se sentía."),
+        }
+        for vid, expected in cases.items():
+            forms = build_forms(VERBS_BY_ID[vid])["imperfect"]
+            self.assertEqual(
+                (forms["yo"], forms["tu"], forms["el_ella_usted"]),
+                expected,
+                msg=VERBS_BY_ID[vid]["infinitive"],
+            )
+
+    def test_every_drillable_verb_has_all_tenses(self):
+        from conjugate.data.conjugations import TENSE_ORDER
+
+        rows = derived_person_rows()
+        for row in rows:
+            for tense in TENSE_ORDER:
+                self.assertIn(tense, row["tenses"], msg=f"{row['infinitive']} {tense}")
+                self.assertTrue(row["tenses"][tense]["tu"])
+                self.assertTrue(row["tenses"][tense]["el_ella_usted"])
 
 
 class GustarPersonTests(unittest.TestCase):
@@ -103,6 +137,15 @@ class GradingPersonTests(unittest.TestCase):
         self.assertEqual(ok["level"], "correct")
         te = grade_regular(verb, "present", "te queda", source="typed", person="el_ella_usted")
         self.assertEqual(te["level"], "pronoun_error")
+
+    def test_imperfect_tu_and_el(self):
+        verb = VERBS_BY_ID[51]
+        tu = grade_regular(verb, "imperfect", "hablabas", source="typed", person="tu")
+        self.assertEqual(tu["level"], "correct")
+        el = grade_regular(verb, "imperfect", "hablaba", source="typed", person="el_ella_usted")
+        self.assertEqual(el["level"], "correct")
+        wrong = grade_regular(verb, "imperfect", "hablaste", source="typed", person="tu")
+        self.assertEqual(wrong["level"], "conjugation_error")
 
 
 class SessionPersonTests(unittest.TestCase):

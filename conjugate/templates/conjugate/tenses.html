@@ -1,0 +1,26 @@
+{% extends "conjugate/base.html" %}
+{% block title %}時制の解説 - Speaking Lab Conjugate{% endblock %}
+{% block greeting %}時制の解説{% endblock %}
+
+{% block body %}
+<div class="vsc-filter-row mb-3">
+  <a href="{{ url_for('conjugate.verbs_page') }}" class="vsc-filter-chip">動詞一覧</a>
+  <a href="{{ url_for('conjugate.tenses_page') }}" class="vsc-filter-chip is-active">時制の解説</a>
+</div>
+
+<section class="mb-3">
+  <h2 class="vsc-hero-title" style="font-size: 1.35rem;">時制ごとの活用を確認</h2>
+  <p class="text-sm mt-1" style="color: var(--text-secondary);">出題と同じ例文で、決まりと不規則を見てから練習できます。</p>
+</section>
+
+<div class="vsc-guide-index">
+  {% for g in guides %}
+  <a href="{{ url_for('conjugate.tense_guide_page', tense_id=g.id) }}" class="vsc-guide-index-card">
+    <p class="vsc-guide-kicker">{{ g.label_es }}</p>
+    <h3 class="vsc-guide-index-title">{{ g.label }}</h3>
+    <p class="vsc-guide-index-body">{{ g.summary }}</p>
+    <span class="vsc-guide-index-link">詳しく見る →</span>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -18,14 +18,10 @@
         <tr>
           <th class="text-left py-1">ID</th>
           <th class="text-left">原形</th>
-          <th class="text-left">tú 現在</th>
-          <th class="text-left">él 現在</th>
-          <th class="text-left">tú 進行</th>
-          <th class="text-left">él 進行</th>
-          <th class="text-left">tú 近接未来</th>
-          <th class="text-left">él 近接未来</th>
-          <th class="text-left">tú 点過去</th>
-          <th class="text-left">él 点過去</th>
+          {% for t in tense_order %}
+          <th class="text-left">tú {{ tense_labels[t] }}</th>
+          <th class="text-left">él {{ tense_labels[t] }}</th>
+          {% endfor %}
         </tr>
       </thead>
       <tbody>
@@ -33,14 +29,10 @@
         <tr style="border-top: 1px solid #EEF2E6;">
           <td class="py-1">{{ r.id }}</td>
           <td>{{ r.infinitive }}{% if r.reflexive %} <span class="vsc-mini-badge">再帰</span>{% endif %}</td>
-          <td>{{ r.tenses.present.tu }}</td>
-          <td>{{ r.tenses.present.el_ella_usted }}</td>
-          <td>{{ r.tenses.progressive.tu }}</td>
-          <td>{{ r.tenses.progressive.el_ella_usted }}</td>
-          <td>{{ r.tenses.near_future.tu }}</td>
-          <td>{{ r.tenses.near_future.el_ella_usted }}</td>
-          <td>{{ r.tenses.preterite.tu }}</td>
-          <td>{{ r.tenses.preterite.el_ella_usted }}</td>
+          {% for t in tense_order %}
+          <td>{{ r.tenses[t].tu }}</td>
+          <td>{{ r.tenses[t].el_ella_usted }}</td>
+          {% endfor %}
         </tr>
         {% endfor %}
       </tbody>

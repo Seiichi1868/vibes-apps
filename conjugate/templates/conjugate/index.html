@@ -102,6 +102,14 @@
       {% endif %}
     </div>
 
+    <h3 class="vsc-section-label mb-2">時制の解説</h3>
+    <p class="text-xs mb-2" style="color: var(--text-secondary);">活用の決まりと例を、時制ごとに確認できます。</p>
+    <div class="vsc-tense-guide-row">
+      {% for t in tense_order %}
+      <a href="{{ url_for('conjugate.tense_guide_page', tense_id=t) }}" class="vsc-filter-chip">{{ tense_labels[t] }}</a>
+      {% endfor %}
+    </div>
+
     <h3 class="vsc-section-label mb-2">カテゴリから選ぶ</h3>
     {% if settings.person_mode == 'mix' %}
     <div class="vsc-person-filter" role="radiogroup" aria-label="復習する人称">
@@ -154,19 +162,18 @@
 
         <div>
           <h3 class="vsc-section-label">出題する文型</h3>
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
-            {% for t in tense_order %}
-              {% if t in settings.enabled_tenses %}
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+            {% for t in selectable_tenses %}
               <label class="vsc-check-chip">
-                <input type="checkbox" name="tense" value="{{ t }}" checked>
+                <input type="checkbox" name="tense" value="{{ t }}" {% if t in default_tenses %}checked{% endif %}>
                 <span>{{ tense_labels[t] }}</span>
               </label>
-              {% endif %}
             {% endfor %}
           </div>
-          {% if not settings.enabled_tenses %}
+          {% if not selectable_tenses %}
           <p class="text-xs mt-2" style="color: var(--danger-text);">管理画面で文型を1つ以上有効化してください。</p>
           {% endif %}
+          <p class="text-xs mt-2"><a href="{{ url_for('conjugate.tenses_page') }}" class="vsc-link-quiet">時制の解説を見る →</a></p>
         </div>
 
         {% if settings.person_mode == 'mix' %}

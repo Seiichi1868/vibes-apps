@@ -1,7 +1,8 @@
-"""4文型（現在形／進行形／近接未来／点過去）の yo形・tú形・él/ella/usted形 文生成。
+"""5文型（現在形／進行形／近接未来／点過去／線過去）の yo形・tú形・él/ella/usted形 文生成。
 
-`tu_present` は verbs.py に既に格納されているため、残りの3文型に必要な
+`tu_present` は verbs.py に既に格納されているため、残りの文型に必要な
 「現在分詞（gerundio）」「点過去（yo/tú）」の語幹を動詞ごとに手動で保持する。
+線過去は不規則が ir / ser / ver の3語だけなので、原形から規則的に生成する。
 
 不規則活用・語幹変化はスペイン語文法上、人称・時制ごとに現れ方が異なるため
 （例: sentir の現在形は e>ie だが現在分詞は e>i、poder は -er 動詞だが
@@ -19,9 +20,18 @@ TENSE_LABELS = {
     "progressive": "進行形",
     "near_future": "近接未来形",
     "preterite": "点過去形",
+    "imperfect": "線過去形",
 }
 
-TENSE_ORDER = ["present", "progressive", "near_future", "preterite"]
+TENSE_LABELS_ES = {
+    "present": "presente",
+    "progressive": "estar + gerundio",
+    "near_future": "ir a + infinitivo",
+    "preterite": "pretérito indefinido",
+    "imperfect": "pretérito imperfecto",
+}
+
+TENSE_ORDER = ["present", "progressive", "near_future", "preterite", "imperfect"]
 
 # id -> (yo_present_base, gerundio_base, pret_yo_base, pret_tu_base)
 CONJ_EXTRA: dict[int, tuple[str, str, str, str]] = {
@@ -131,6 +141,39 @@ def _cap(s: str) -> str:
     return s[:1].upper() + s[1:] if s else s
 
 
+def selectable_tenses(enabled: list[str] | None) -> list[str]:
+    """生徒が選べる文型。管理画面で有効なものに加え、点過去と線過去は常に選べる。"""
+    selected = set(enabled or [])
+    return [t for t in TENSE_ORDER if t in selected or t in ("preterite", "imperfect")]
+
+
+def default_selected_tenses(enabled: list[str] | None) -> list[str]:
+    """練習開始時にチェックを入れる文型。点過去が有効なら線過去も入れる。"""
+    selected = set(enabled or [])
+    if "preterite" in selected:
+        selected.add("imperfect")
+    return [t for t in TENSE_ORDER if t in selected]
+
+
+def _imperfect_bases(bare_infinitive: str) -> tuple[str, str, str]:
+    """線過去の yo / tú / él 素形。語幹変化は起きない。"""
+    bare = (bare_infinitive or "").strip().lower()
+    irregular = {
+        "ir": ("iba", "ibas", "iba"),
+        "ser": ("era", "eras", "era"),
+        "ver": ("veía", "veías", "veía"),
+    }
+    if bare in irregular:
+        return irregular[bare]
+    if bare.endswith("ar"):
+        stem = bare[:-2]
+        return stem + "aba", stem + "abas", stem + "aba"
+    if bare.endswith("er") or bare.endswith("ir"):
+        stem = bare[:-2]
+        return stem + "ía", stem + "ías", stem + "ía"
+    return bare, bare, bare
+
+
 def _gerundio_with_clitic_accent(gerundio: str) -> str:
     """再帰代名詞を後置する際、元の強勢位置を保つためのアクセント付与。
 
@@ -146,10 +189,10 @@ def _gerundio_with_clitic_accent(gerundio: str) -> str:
 
 
 def build_forms(verb: dict) -> dict:
-    """指定した動詞について、4文型それぞれの yo形/tú形/él/ella/usted形 完全文を返す。
+    """指定した動詞について、各文型の yo形/tú形/él/ella/usted形 完全文を返す。
 
     戻り値: {tense: {"yo": "Yo hablo.", "tu": "Hablas.", "el_ella_usted": "Habla."}}
-    él/ella/usted形は JSON に手入力せず、tú形（点過去は yo/tú）から自動導出する。
+    él/ella/usted形は JSON に手入力せず、tú形（点過去は yo/tú、線過去は原形）から自動導出する。
     """
     vid = verb["id"]
     if vid not in CONJ_EXTRA:
@@ -192,6 +235,13 @@ def build_forms(verb: dict) -> dict:
     tu_sentence = _cap(f"{'te ' if reflexive else ''}{pret_tu}.")
     el_sentence = _cap(f"{'se ' if reflexive else ''}{pret_el}.")
     forms["preterite"] = {"yo": yo_sentence, "tu": tu_sentence, "el_ella_usted": el_sentence}
+
+    # 線過去（規則活用。yo と él は同形）
+    imp_yo, imp_tu, imp_el = _imperfect_bases(bare_infinitive)
+    yo_sentence = _cap(f"{'me ' if reflexive else ''}{imp_yo}.")
+    tu_sentence = _cap(f"{'te ' if reflexive else ''}{imp_tu}.")
+    el_sentence = _cap(f"{'se ' if reflexive else ''}{imp_el}.")
+    forms["imperfect"] = {"yo": yo_sentence, "tu": tu_sentence, "el_ella_usted": el_sentence}
 
     return forms
 
