@@ -1436,6 +1436,10 @@
   color: var(--text-secondary);
   line-height: 1.4;
 }
+.vsc-tense-miss-total {
+  color: var(--text-primary);
+  font-weight: 700;
+}
 .vsc-tense-miss.is-alert {
   color: var(--danger-text);
   background: var(--danger-soft);

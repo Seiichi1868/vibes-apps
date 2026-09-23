@@ -350,14 +350,16 @@
   function tenseMissHtml(row) {
     const alertOver = Number(progressState.miss_alert_over || 5);
     const misses = row.tense_misses || [];
-    if (!misses.length) return "";
-    return `<div class="vsc-tense-misses">${misses
-      .map((item) => {
-        const count = Number(item.miss_count || 0);
-        const hot = Boolean(item.alert) || count > alertOver;
-        return `<span class="vsc-tense-miss${hot ? " is-alert" : ""}">${escapeHtml(item.label)} 誤${count}</span>`;
-      })
-      .join("")}</div>`;
+    const total = Number(row.miss_total || 0) || tenseMissTotal(row);
+    if (!total) return "";
+    const parts = [`<span class="vsc-tense-miss vsc-tense-miss-total">累計 誤${total}</span>`];
+    misses.forEach((item) => {
+      const count = Number(item.miss_count || 0);
+      if (!count) return;
+      const hot = Boolean(item.alert) || count > alertOver;
+      parts.push(`<span class="vsc-tense-miss${hot ? " is-alert" : ""}">${escapeHtml(item.label)} 誤${count}</span>`);
+    });
+    return `<div class="vsc-tense-misses">${parts.join("")}</div>`;
   }
 
   function renderMasteredBody() {
@@ -366,7 +368,7 @@
     const tuCount = progressState.mastered_tu_count || 0;
     const elCount = progressState.mastered_el_count || 0;
     modalBody.innerHTML = `
-      <p class="vsc-modal-lead">tú形とél/ella/usted形は別々に数えます。それぞれ${threshold}回連続正解で、その人称が習得です。間違えるとその人称の連続カウントだけがゼロに戻ります。間違い回数は現在・点過去・線過去で分け、${Number(progressState.miss_alert_over || 5) + 1}回以上は赤く表示します。</p>
+      <p class="vsc-modal-lead">tú形とél/ella/usted形は別々に数えます。それぞれ${threshold}回連続正解で、その人称が習得です。間違えるとその人称の連続カウントだけがゼロに戻ります。間違いの累計は現在・点過去・線過去ごとに出し、${Number(progressState.miss_alert_over || 5) + 1}回以上の時制は赤く表示します。</p>
       <p class="vsc-master-col-meta">tú ${tuCount}/${total} · él ${elCount}/${total}</p>
       ${renderMasterList(progressState.verbs, threshold, "まだ記録がありません。練習を始めるとここに表示されます。")}
     `;

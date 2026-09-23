@@ -491,11 +491,17 @@ def summary_screen(session_id):
     if session.get("kind") == "vocab":
         return redirect(url_for("conjugate.vocab_summary_screen", session_id=session_id))
     summary = session.get("summary") or build_summary(session)
+    progress = progress_detail()
+    verbs_by_id = {row.get("id"): row for row in progress.get("verbs") or []}
+    for item in summary.get("weak_items") or []:
+        row = verbs_by_id.get(item.get("verb_id")) or {}
+        item["tense_misses"] = row.get("tense_misses") or []
+        item["miss_total"] = int(row.get("miss_total") or 0)
     return render_template(
         "conjugate/summary.html",
         session=session,
         summary=summary,
-        progress=progress_summary(),
+        progress=progress,
         category_labels=CATEGORY_LABELS,
         tense_labels=TENSE_LABELS,
     )

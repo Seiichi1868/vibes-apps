@@ -313,6 +313,7 @@ class MasteryTests(unittest.TestCase):
         self.assertFalse(tense_miss_view(entry)[1]["alert"])
         self.assertEqual(misses["imperfect"]["miss_count"], 6)
         self.assertTrue(misses["imperfect"]["alert"])
+        self.assertEqual(row["miss_total"], 9)
 
     def test_vocab_mastery_uses_threshold(self):
         progress = normalize_progress({})

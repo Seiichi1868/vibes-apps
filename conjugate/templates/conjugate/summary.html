@@ -51,6 +51,14 @@
         <span class="text-xs" style="color: var(--text-secondary);">{{ tense_labels.get(item.target, item.target) }}</span>
       </div>
       <div class="text-xs" style="color: var(--text-secondary);">{{ item.meaning_ja }}</div>
+      {% if item.miss_total %}
+      <div class="vsc-tense-misses">
+        <span class="vsc-tense-miss vsc-tense-miss-total">累計 誤{{ item.miss_total }}</span>
+        {% for miss in item.tense_misses if miss.miss_count %}
+        <span class="vsc-tense-miss{% if miss.alert %} is-alert{% endif %}">{{ miss.label }} 誤{{ miss.miss_count }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
       <div class="text-sm mt-1">あなたの解答: 「{{ item.transcript or "（認識できず）" }}」</div>
       <div class="text-sm" style="color: var(--ok-text);">正解: {{ item.expected_sentence }}</div>
     </li>

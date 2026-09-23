@@ -182,6 +182,7 @@ def build_summary(session: dict) -> dict:
                 label = q["infinitive"] if q["kind"] == "verb" else "gustar"
                 weak_items.append(
                     {
+                        "verb_id": q.get("verb_id"),
                         "infinitive": label,
                         "meaning_ja": q.get("meaning_ja") or q.get("topic_ja", ""),
                         "target": target,

@@ -32,11 +32,14 @@
       <div class="vsc-verb-copy">
         <div class="vsc-verb-name">{{ verb.infinitive }}</div>
         <div class="vsc-verb-meaning">{{ verb.meaning_ja }}</div>
+        {% if verb.miss_total %}
         <div class="vsc-tense-misses">
-          {% for miss in verb.tense_misses %}
+          <span class="vsc-tense-miss vsc-tense-miss-total">累計 誤{{ verb.miss_total }}</span>
+          {% for miss in verb.tense_misses if miss.miss_count %}
           <span class="vsc-tense-miss{% if miss.alert %} is-alert{% endif %}">{{ miss.label }} 誤{{ miss.miss_count }}</span>
           {% endfor %}
         </div>
+        {% endif %}
       </div>
       <div class="vsc-verb-progress" aria-label="{{ verb.person_badge }}">
         <span class="vsc-person-badge">{{ verb.person_badge }}</span>

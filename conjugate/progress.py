@@ -835,6 +835,7 @@ def verb_progress_list(
                 "mastered": side_mastered,
             }
         mastered = persons["tu"]["mastered"] and persons["el_ella_usted"]["mastered"]
+        tense_misses = tense_miss_view(tenses)
         rows.append(
             {
                 "id": verb["id"],
@@ -846,7 +847,8 @@ def verb_progress_list(
                 "mastered": mastered,
                 "consecutive_correct": tenses["present"]["consecutive_correct"],
                 "tenses": tenses,
-                "tense_misses": tense_miss_view(tenses),
+                "tense_misses": tense_misses,
+                "miss_total": sum(item["miss_count"] for item in tense_misses),
                 "persons": persons,
                 "person_badge": person_badge_text(
                     tu_mastered=persons["tu"]["mastered"],
