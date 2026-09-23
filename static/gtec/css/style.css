@@ -524,6 +524,36 @@
   box-shadow: 0 2px 8px var(--gtec-brand-shadow);
 }
 
+.gtec-start-btn {
+  display: block;
+  width: 100%;
+  padding: 0.875rem 1rem;
+  border: none;
+  border-radius: 0.75rem;
+  background: linear-gradient(180deg, var(--gtec-brand-light) 0%, var(--gtec-brand) 100%);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-shadow: 0 1px 0 rgba(15, 118, 110, 0.18);
+  box-shadow:
+    0 4px 14px rgba(45, 184, 146, 0.32),
+    0 1px 0 rgba(255, 255, 255, 0.35) inset;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.gtec-start-btn:hover {
+  filter: brightness(0.96);
+  box-shadow:
+    0 6px 18px rgba(45, 184, 146, 0.38),
+    0 1px 0 rgba(255, 255, 255, 0.35) inset;
+}
+
+.gtec-start-btn:active {
+  transform: scale(0.98);
+}
+
 .part-c-comic-placeholder {
   background: rgba(248, 250, 252, 0.9);
   min-height: 8rem;

@@ -882,9 +882,7 @@ function transcriptBox(id) {
 
 function startBtn(label = 'スタート', id = 'start-btn') {
   return `
-    <button id="${id}"
-      class="w-full py-3.5 rounded-xl bg-teal-600 hover:bg-teal-700 active:scale-95
-             text-white font-bold text-base shadow transition-all">
+    <button id="${id}" type="button" class="gtec-start-btn">
       ▶ ${label}
     </button>`;
 }
