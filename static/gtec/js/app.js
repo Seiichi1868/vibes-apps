@@ -1728,7 +1728,7 @@ async function renderPartIdle(partId) {
           <p class="font-bold text-teal-600">GA 理由</p><p>0〜2点</p>
         </div>
         <div class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-center">
-          <p class="font-bold text-teal-600">語い・流ちょう</p><p>各0〜4点</p>
+          <p class="font-bold text-teal-600">語彙・流暢さ</p><p>各0〜4点</p>
         </div>
       </div>
       <div class="flex gap-3 text-xs text-slate-500 mb-4">
