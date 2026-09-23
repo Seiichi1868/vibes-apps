@@ -1,0 +1,32 @@
+{
+  "id": "/gtec/admin/",
+  "name": "GTEC Speaking 管理",
+  "short_name": "GTEC 管理",
+  "description": "GTEC Speaking 管理画面",
+  "lang": "ja",
+  "start_url": "/gtec/admin/",
+  "scope": "/gtec/admin/",
+  "display": "standalone",
+  "background_color": "#7EE0C3",
+  "theme_color": "#5FCDA8",
+  "icons": [
+    {
+      "src": "/static/gtec/icons/icon-192x192.png?v=20260923a",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/gtec/icons/icon-512x512.png?v=20260923a",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/gtec/icons/icon-maskable-512x512.png?v=20260923a",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

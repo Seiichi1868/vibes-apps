@@ -1,8 +1,9 @@
 """GTEC 管理画面 Blueprint。"""
 
 import os
+from pathlib import Path
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, current_app, jsonify, render_template, request, send_from_directory
 
 from gtec_app.problems import load_problems, public_problems, save_problems
 from gtec_app.settings import (
@@ -29,6 +30,18 @@ PART_LABELS = {
 
 def _password_ok(payload: dict) -> bool:
     return str(payload.get("admin_password") or "") == ADMIN_PASSWORD
+
+
+@gtec_admin_bp.route("/gtec/admin/manifest.json")
+def web_app_manifest():
+    """管理画面用 PWA manifest（start_url / scope: /gtec/admin/）。"""
+    response = send_from_directory(
+        Path(current_app.static_folder) / "gtec" / "admin",
+        "manifest.json",
+        mimetype="application/manifest+json",
+    )
+    response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return response
 
 
 @gtec_admin_bp.route("/gtec/admin")

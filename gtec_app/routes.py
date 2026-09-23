@@ -5,9 +5,10 @@ POST /gtec/evaluate → 採点 API（テキスト＋秒数のみ受信、音声�
 """
 
 import logging
+from pathlib import Path
 
 import openai
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, current_app, jsonify, render_template, request, send_from_directory
 
 from gtec_app.evaluator import (
     evaluate_part_a,
@@ -22,6 +23,18 @@ from gtec_app.tts import synthesize_question
 logger = logging.getLogger(__name__)
 
 gtec_bp = Blueprint("gtec", __name__)
+
+
+@gtec_bp.route("/gtec/manifest.json")
+def web_app_manifest():
+    """生徒画面用 PWA manifest（scope: /gtec/）。"""
+    response = send_from_directory(
+        Path(current_app.static_folder) / "gtec",
+        "manifest.json",
+        mimetype="application/manifest+json",
+    )
+    response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return response
 
 
 @gtec_bp.route("/gtec")

@@ -1,0 +1,32 @@
+{
+  "id": "/gtec/",
+  "name": "GTEC Speaking Practice",
+  "short_name": "GTEC Speaking",
+  "description": "GTEC Speaking 公式評価基準準拠 · 自動採点",
+  "lang": "ja",
+  "start_url": "/gtec/",
+  "scope": "/gtec/",
+  "display": "standalone",
+  "background_color": "#7EE0C3",
+  "theme_color": "#5FCDA8",
+  "icons": [
+    {
+      "src": "/static/gtec/icons/icon-192x192.png?v=20260923a",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/gtec/icons/icon-512x512.png?v=20260923a",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/gtec/icons/icon-maskable-512x512.png?v=20260923a",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

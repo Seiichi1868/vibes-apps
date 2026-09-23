@@ -4,6 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GTEC Speaking 管理画面</title>
+  <link rel="manifest" href="{{ url_for('gtec_admin.web_app_manifest') }}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='gtec/icons/favicon-32x32.png', v='20260923a') }}">
+  <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='gtec/icons/favicon-16x16.png', v='20260923a') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='gtec/icons/apple-touch-icon.png', v='20260923a') }}">
+  <meta name="theme-color" content="#5FCDA8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="GTEC 管理">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='gtec/css/style.css') }}">
   <style>
