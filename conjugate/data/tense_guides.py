@@ -1,6 +1,34 @@
 """時制ごとの解説。出題と同じ build_forms() から例文を取る。"""
+import re
+
 from conjugate.data.conjugations import TENSE_LABELS, TENSE_LABELS_ES, TENSE_ORDER, build_forms
 from conjugate.data.verbs import VERBS_BY_ID
+
+_INFINITIVE_MEANING = {
+    verb["infinitive"]: verb["meaning_ja"]
+    for verb in VERBS_BY_ID.values()
+    if verb.get("infinitive") and verb.get("meaning_ja")
+}
+_INFINITIVE_PATTERN = re.compile(
+    r"(?<![\wáéíóúüñÁÉÍÓÚÜÑ])("
+    + "|".join(re.escape(inf) for inf in sorted(_INFINITIVE_MEANING, key=len, reverse=True))
+    + r")(?![\wáéíóúüñÁÉÍÓÚÜÑ])"
+)
+
+
+def _with_verb_meanings(line: str) -> str:
+    """解説文中の原形に、登録済みの日本語の意味を付ける。"""
+
+    def repl(match: re.Match) -> str:
+        infinitive = match.group(1)
+        meaning = _INFINITIVE_MEANING.get(infinitive)
+        if not meaning:
+            return infinitive
+        return f"{infinitive}（{meaning}）"
+
+    text = _INFINITIVE_PATTERN.sub(repl, line)
+    # 「ir だけ」のように原形の直後が日本語だと、意味を挟んだあとに空白が残る。
+    return re.sub(r"） (?![→/])", "）", text)
 
 PERSON_HEADERS_SG = ("yo", "tú", "él")
 PERSON_HEADERS_PL = ("nosotros", "vosotros", "ellos")
@@ -202,7 +230,7 @@ def get_tense_guide(tense_id: str) -> dict | None:
         "endings": meta["endings"],
         "person_headers_sg": PERSON_HEADERS_SG,
         "person_headers_pl": PERSON_HEADERS_PL,
-        "irregulars": meta["irregulars"],
+        "irregulars": [_with_verb_meanings(line) for line in meta["irregulars"]],
         "examples": [_example_row(vid, tense_id) for vid in meta["example_ids"]],
         "tips": meta["tips"],
         "contrast": meta.get("contrast"),

@@ -47,9 +47,24 @@ class TenseGuideTests(unittest.TestCase):
         self.assertIn("iba", text)
         self.assertIn("era", text)
         self.assertIn("veía", text)
+        self.assertIn("ir（行く）", text)
+        self.assertIn("ser（〜である）", text)
+        self.assertIn("ver（見る）", text)
         self.assertNotIn("未収録", text)
         self.assertTrue(guide["contrast"])
         self.assertTrue(any(ex["infinitive"] == "ser" for ex in guide["examples"]))
+
+    def test_irregular_lines_include_registered_meanings(self):
+        present = " ".join(get_tense_guide("present")["irregulars"])
+        self.assertIn("tener（持つ）", present)
+        self.assertIn("hacer（する・作る）", present)
+        preterite = " ".join(get_tense_guide("preterite")["irregulars"])
+        self.assertIn("ir（行く）", preterite)
+        self.assertIn("ser（〜である）", preterite)
+        self.assertIn("decir（言う）", preterite)
+        progressive = " ".join(get_tense_guide("progressive")["irregulars"])
+        self.assertIn("leer（読む）", progressive)
+        self.assertIn("poder（できる）", progressive)
 
 
 if __name__ == "__main__":

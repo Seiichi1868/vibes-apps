@@ -20,7 +20,7 @@
     })();
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}Speaking Lab Conjugate{% endblock %}</title>
+  <title>{% block title %}Spanish Lab Conjugate{% endblock %}</title>
   <link rel="manifest" href="{{ url_for('conjugate.web_app_manifest') }}">
   <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('conjugate.static', filename='icons/icon-180.png', v='20260821a') }}">
   <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('conjugate.static', filename='icons/icon-32.png', v='20260821a') }}">
@@ -52,7 +52,7 @@
       <a href="{{ url_for('conjugate.index') }}" class="vsc-brand">
         {{ brand_logo() }}
         <div>
-          <p class="vsc-greeting-kicker">Speaking Lab Conjugate</p>
+          <p class="vsc-greeting-kicker">Spanish Lab Conjugate</p>
           <h1 class="vsc-greeting">{% block greeting %}{{ greeting }}！{% endblock %}</h1>
         </div>
       </a>
