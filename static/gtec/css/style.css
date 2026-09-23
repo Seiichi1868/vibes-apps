@@ -114,15 +114,26 @@
   font-size: 0.9rem;
   line-height: 1.35;
   cursor: pointer;
-  transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
+  transition: background-color 0.2s, color 0.2s, box-shadow 0.2s, filter 0.15s ease, transform 0.15s ease;
   border: none;
   outline: none;
 }
 
 .tab-btn.tab-active {
-  background-color: var(--gtec-brand);
+  background: linear-gradient(180deg, var(--gtec-brand-light) 0%, var(--gtec-brand) 100%);
   color: #ffffff;
-  box-shadow: 0 2px 8px var(--gtec-brand-shadow);
+  text-shadow: 0 1px 0 rgba(15, 118, 110, 0.18);
+  box-shadow:
+    0 4px 14px rgba(45, 184, 146, 0.32),
+    0 1px 0 rgba(255, 255, 255, 0.35) inset;
+}
+
+.tab-btn.tab-active:hover {
+  filter: brightness(0.96);
+}
+
+.tab-btn.tab-active:active {
+  transform: scale(0.98);
 }
 
 .tab-btn.tab-inactive {
@@ -486,7 +497,7 @@
   font-weight: 700;
   color: #475569;
   cursor: pointer;
-  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s, filter 0.15s ease, transform 0.15s ease;
 }
 
 .problem-btn:hover {
@@ -495,10 +506,22 @@
 }
 
 .problem-btn-active {
-  background: var(--gtec-brand);
+  background: linear-gradient(180deg, var(--gtec-brand-light) 0%, var(--gtec-brand) 100%);
   border-color: var(--gtec-brand);
   color: #fff;
-  box-shadow: 0 2px 8px var(--gtec-brand-shadow);
+  text-shadow: 0 1px 0 rgba(15, 118, 110, 0.18);
+  box-shadow:
+    0 4px 14px rgba(45, 184, 146, 0.32),
+    0 1px 0 rgba(255, 255, 255, 0.35) inset;
+}
+
+.problem-btn-active:hover {
+  filter: brightness(0.96);
+  color: #fff;
+}
+
+.problem-btn-active:active {
+  transform: scale(0.98);
 }
 
 .gtec-start-btn {
