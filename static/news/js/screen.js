@@ -291,6 +291,19 @@
     vocabContent.innerHTML = html;
   }
 
+  function postviewQuestionFontSize(count) {
+    if (count <= 1) {
+      return "clamp(2.25rem, 7.2vmin, 6rem)";
+    }
+    if (count <= 2) {
+      return "clamp(2rem, 6.2vmin, 5rem)";
+    }
+    if (count <= 3) {
+      return "clamp(1.8rem, 5.4vmin, 4.15rem)";
+    }
+    return "clamp(1.6rem, 4.8vmin, 3.6rem)";
+  }
+
   function warmupQuestionFontSize(count, hasImage) {
     const scale = hasImage ? 0.82 : 1;
     if (count <= 1) {
@@ -353,7 +366,7 @@
     viewPostview.classList.toggle("is-answer-pending", pending);
     const hint = postviewContent.querySelector(".screen-postview-hint");
     if (!hint) return;
-    if (!total || !pending) {
+    if (!total) {
       hint.classList.add("hidden");
       return;
     }
@@ -372,6 +385,18 @@
     updatePostviewRevealUi();
   }
 
+  function hideLastPostviewAnswer() {
+    if (currentView !== "postview" || !postviewContent) return;
+    if (postviewRevealCount <= 0) return;
+    const answers = postviewContent.querySelectorAll(".screen-postview-answer");
+    postviewRevealCount -= 1;
+    const el = answers[postviewRevealCount];
+    if (!el) return;
+    el.classList.remove("is-shown");
+    el.setAttribute("aria-hidden", "true");
+    updatePostviewRevealUi();
+  }
+
   function renderPostview(questions) {
     if (!postviewContent) return;
     postviewRevealCount = 0;
@@ -383,10 +408,7 @@
       return;
     }
     const answerCount = list.filter(function (q) { return q.answer; }).length;
-    const fontSize = answerCount
-      ? "clamp(1.05rem, 3.1vmin, 2.35rem)"
-      : warmupQuestionFontSize(list.length, false);
-    postviewContent.style.setProperty("--warmup-q-size", fontSize);
+    postviewContent.style.setProperty("--warmup-q-size", postviewQuestionFontSize(list.length));
     let html = '<p class="screen-warmup-heading">' + t("screenPostviewHeading") + "</p>";
     html += '<ol class="screen-warmup-list screen-postview-list">';
     list.forEach(function (q, i) {
@@ -502,12 +524,13 @@
     if (currentView !== "postview") return;
     if (event.metaKey || event.ctrlKey || event.altKey) return;
     const key = event.key;
-    if (key !== " " && key !== "Spacebar" && key !== "ArrowRight" && key !== "ArrowDown" && key !== "PageDown" && key !== "Enter") {
-      return;
-    }
+    const showNext = key === " " || key === "Spacebar" || key === "ArrowRight" || key === "ArrowDown" || key === "PageDown" || key === "Enter";
+    const hidePrev = key === "ArrowUp" || key === "PageUp";
+    if (!showNext && !hidePrev) return;
     if (event.target && event.target.closest && event.target.closest("button, a, input, textarea")) return;
     event.preventDefault();
-    revealNextPostviewAnswer();
+    if (hidePrev) hideLastPostviewAnswer();
+    else revealNextPostviewAnswer();
   });
 
   if (fullscreenBtn) {
