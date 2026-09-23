@@ -59,6 +59,49 @@
     0 0 6px rgba(255, 255, 255, 0.2);
 }
 
+.gtec-brand-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 22%;
+  object-fit: cover;
+  display: block;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(95, 205, 168, 0.35);
+}
+
+.gtec-intro-logo {
+  width: 96px;
+  height: 96px;
+  border-radius: 22%;
+  object-fit: cover;
+  display: block;
+  margin: 0 auto 16px;
+  box-shadow:
+    0 8px 24px rgba(95, 205, 168, 0.35),
+    0 2px 6px rgba(15, 118, 110, 0.12);
+}
+
+.gtec-intro-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: rgba(15, 118, 110, 0.95);
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.55),
+    0 0 8px rgba(255, 255, 255, 0.25);
+}
+
+@media (min-width: 640px) {
+  .gtec-intro-logo {
+    width: 112px;
+    height: 112px;
+  }
+
+  .gtec-intro-title {
+    font-size: 1.75rem;
+  }
+}
+
 /* ── 背景・ガラスパネル（News と同系統）──────────────────── */
 .glass-header {
   background: rgba(255, 255, 255, 0.72);

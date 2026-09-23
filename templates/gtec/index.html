@@ -14,7 +14,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="GTEC Speaking">
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="{{ url_for('static', filename='gtec/css/style.css', v='20260817a') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='gtec/css/style.css', v='20260923b') }}">
   <style>
     .gtec-page-bg {
       background-image: url("{{ url_for('static', filename=background.background_image) }}");
@@ -48,7 +48,8 @@
     <div class="gtec-intro-orb absolute -right-12 bottom-16 h-56 w-56 rounded-full bg-emerald-200/45 blur-3xl" style="animation-delay: .35s"></div>
     <div class="gtec-intro-card relative text-center">
       <p class="gtec-intro-glass-label mb-2 text-[11px] font-semibold uppercase tracking-[0.35em]">Welcome to</p>
-      <h1 class="gtec-intro-glass-logo text-4xl font-bold tracking-tight sm:text-5xl">GTEC Speaking</h1>
+      <img class="gtec-intro-logo" src="{{ url_for('static', filename='gtec/icons/icon-192x192.png', v='20260923a') }}" width="192" height="192" alt="" decoding="async" aria-hidden="true">
+      <h1 class="gtec-intro-title">GTEC Speaking</h1>
       <p class="gtec-intro-glass-sub mt-3 text-sm font-medium">Practice. Speak. Get instant scores.</p>
     </div>
   </div>
@@ -64,7 +65,7 @@
   <header class="glass-header sticky top-0 z-40">
     <div class="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white text-lg font-bold shadow">G</div>
+        <img class="gtec-brand-logo" src="{{ url_for('static', filename='gtec/icons/icon-192x192.png', v='20260923a') }}" width="192" height="192" alt="" decoding="async" aria-hidden="true">
         <div>
           <h1 class="text-lg font-bold text-indigo-700 leading-tight">GTEC Speaking</h1>
           <p class="text-xs text-slate-500">公式評価基準準拠 · 自動採点</p>

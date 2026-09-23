@@ -27,28 +27,6 @@
       0 1px 0 rgba(255, 255, 255, 0.55),
       0 0 8px rgba(255, 255, 255, 0.25);
   }
-  .lc-intro-glass-logo {
-    display: inline-block;
-    line-height: 1.35 !important;
-    padding: 0.1em 0.18em 0.34em;
-    overflow: visible;
-    background: linear-gradient(
-      168deg,
-      rgba(56, 189, 248, 0.82) 0%,
-      rgba(3, 105, 161, 0.96) 30%,
-      rgba(15, 118, 110, 0.98) 62%,
-      rgba(4, 120, 87, 1) 100%
-    );
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    -webkit-text-stroke: 0.3px rgba(255, 255, 255, 0.22);
-    paint-order: stroke fill;
-    filter:
-      drop-shadow(0 1px 0 rgba(255, 255, 255, 0.45))
-      drop-shadow(0 4px 14px rgba(14, 116, 144, 0.2))
-      drop-shadow(0 1px 3px rgba(3, 105, 161, 0.15));
-  }
   .lc-intro-glass-sub {
     color: rgba(100, 116, 139, 0.92);
     text-shadow:
@@ -68,7 +46,8 @@
   <div class="lc-orb absolute -right-12 bottom-16 h-56 w-56 rounded-full bg-emerald-200/45 blur-3xl" style="animation-delay: .35s"></div>
   <div class="lc-intro-card relative text-center">
     <p class="lc-intro-glass-label mb-2 text-[11px] font-semibold uppercase tracking-[0.35em]">Welcome to</p>
-    <h1 class="lc-intro-glass-logo text-4xl font-bold tracking-tight sm:text-5xl">Speaking Level Check Test</h1>
+    <img class="lc-intro-logo" src="{{ url_for('level_check.static', filename='icons/icon-192x192.png', v='20260923a') }}" width="192" height="192" alt="" decoding="async" aria-hidden="true">
+    <h1 class="lc-intro-title">Speaking Level Check Test</h1>
     <p class="lc-intro-glass-sub mt-3 text-sm font-medium">Listen. Speak. Find your level.</p>
   </div>
 </div>
