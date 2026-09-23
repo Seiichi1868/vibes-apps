@@ -13,7 +13,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from flask import Blueprint, jsonify, redirect, render_template, request, send_file, send_from_directory, url_for
+from flask import Blueprint, current_app, jsonify, redirect, render_template, request, send_file, send_from_directory, url_for
 from werkzeug.utils import secure_filename
 
 from debate.config import (
@@ -173,6 +173,18 @@ def _resolve_extension(filename: str, mimetype: str | None) -> str:
 
 
 # ── ①論題入力画面 ─────────────────────────────────────────────
+@debate_bp.route("/manifest.json")
+def web_app_manifest():
+    """生徒画面用 PWA manifest（scope: /debate/）。"""
+    response = send_from_directory(
+        Path(current_app.static_folder) / "debate",
+        "manifest.json",
+        mimetype="application/manifest+json",
+    )
+    response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return response
+
+
 @debate_bp.route("/")
 def index():
     ensure_dirs()

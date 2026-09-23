@@ -1,6 +1,8 @@
 {% extends "debate/base.html" %}
 
 {% block title %}管理画面 | Parliamentary Debate Practice{% endblock %}
+{% block manifest_href %}{{ url_for('debate_admin.web_app_manifest') }}{% endblock %}
+{% block pwa_short_name %}Debate 管理{% endblock %}
 
 {% block header_actions %}
 <a href="{{ url_for('debate.index') }}"

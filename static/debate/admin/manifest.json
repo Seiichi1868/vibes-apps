@@ -1,0 +1,32 @@
+{
+  "id": "/debate/admin/",
+  "name": "Parliamentary Debate Practice 管理",
+  "short_name": "Debate 管理",
+  "description": "Parliamentary Debate Practice 管理画面",
+  "lang": "ja",
+  "start_url": "/debate/admin/",
+  "scope": "/debate/admin/",
+  "display": "standalone",
+  "background_color": "#4CA98C",
+  "theme_color": "#3D8B73",
+  "icons": [
+    {
+      "src": "/static/debate/icons/icon-192x192.png?v=20260923a",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/debate/icons/icon-512x512.png?v=20260923a",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/debate/icons/icon-maskable-512x512.png?v=20260923a",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -1,7 +1,8 @@
 """Debate app 管理画面 Blueprint（背景・透過率の設定、保存済みセッションの一覧・削除）。"""
 import os
+from pathlib import Path
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, current_app, jsonify, render_template, request, send_from_directory
 
 from debate.judge_models import public_judge_model_modes, resolve_judge_model_mode
 from debate.settings import (
@@ -41,6 +42,18 @@ def _settings_response(settings: dict) -> dict:
         "opponent_model": resolve_opponent_model(opponent_mode),
         "opponent_model_mode": opponent_mode,
     }
+
+
+@debate_admin_bp.route("/manifest.json")
+def web_app_manifest():
+    """管理画面用 PWA manifest（start_url / scope: /debate/admin/）。"""
+    response = send_from_directory(
+        Path(current_app.static_folder) / "debate" / "admin",
+        "manifest.json",
+        mimetype="application/manifest+json",
+    )
+    response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return response
 
 
 @debate_admin_bp.route("")

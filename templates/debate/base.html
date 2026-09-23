@@ -4,6 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Parliamentary Debate Practice{% endblock %}</title>
+  <link rel="manifest" href="{% block manifest_href %}{{ url_for('debate.web_app_manifest') }}{% endblock %}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='debate/icons/favicon-32x32.png', v='20260923a') }}">
+  <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='debate/icons/favicon-16x16.png', v='20260923a') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='debate/icons/apple-touch-icon.png', v='20260923a') }}">
+  <meta name="theme-color" content="#3D8B73">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="{% block pwa_short_name %}Debate Practice{% endblock %}">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

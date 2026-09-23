@@ -1,0 +1,32 @@
+{
+  "id": "/debate/",
+  "name": "Parliamentary Debate Practice",
+  "short_name": "Debate Practice",
+  "description": "議会型ディベートを練習しよう",
+  "lang": "ja",
+  "start_url": "/debate/",
+  "scope": "/debate/",
+  "display": "standalone",
+  "background_color": "#4CA98C",
+  "theme_color": "#3D8B73",
+  "icons": [
+    {
+      "src": "/static/debate/icons/icon-192x192.png?v=20260923a",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/debate/icons/icon-512x512.png?v=20260923a",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/debate/icons/icon-maskable-512x512.png?v=20260923a",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
