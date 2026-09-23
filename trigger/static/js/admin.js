@@ -34,9 +34,9 @@
 
   document.querySelectorAll(".tab-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("ring-2", "ring-teal-500"));
+      document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("is-selected"));
       document.querySelectorAll(".tab-panel").forEach((p) => p.classList.add("hidden"));
-      btn.classList.add("ring-2", "ring-teal-500");
+      btn.classList.add("is-selected");
       $(`tab-${btn.dataset.tab}`).classList.remove("hidden");
     });
   });
@@ -58,8 +58,8 @@
     const m = modelById(select.value);
     if (!statsRow || !m) return;
     statsRow.innerHTML = `
-      <span class="inline-flex items-center gap-1"><span class="text-slate-400">コスト</span> <span class="tracking-tight text-sky-600">${barString(m.cost_score)}</span></span>
-      <span class="inline-flex items-center gap-1"><span class="text-slate-400">性能</span> <span class="tracking-tight text-emerald-600">${barString(m.performance)}</span></span>
+      <span class="inline-flex items-center gap-1"><span class="text-slate-400">コスト</span> <span class="tracking-tight accent-blue">${barString(m.cost_score)}</span></span>
+      <span class="inline-flex items-center gap-1"><span class="text-slate-400">性能</span> <span class="tracking-tight accent-good">${barString(m.performance)}</span></span>
     `;
   }
 
@@ -70,7 +70,7 @@
       const wrap = document.createElement("div");
       wrap.className = "glass-inset rounded-xl p-3";
       const label = document.createElement("label");
-      label.className = "mb-1 block text-xs font-semibold text-teal-700/80";
+      label.className = "mb-1 block text-xs font-semibold accent-label";
       label.textContent = state.settings.task_labels[key];
       const select = document.createElement("select");
       select.className = "compact-input model-select";
@@ -112,7 +112,7 @@
   function renderCostEstimate(estimate) {
     const box = $("cost-estimate-box");
     box.innerHTML = `
-      <p class="mb-1 font-semibold text-teal-700">1セッションあたりの概算コスト: 約 ¥${estimate.total_jpy}（$${estimate.total_usd}）</p>
+      <p class="mb-1 font-semibold accent-strong">1セッションあたりの概算コスト: 約 ¥${estimate.total_jpy}（$${estimate.total_usd}）</p>
       <p class="text-slate-500">内訳: 評価用GPT呼び出し $${estimate.chat_total_usd} ／ TTS $${estimate.tts_total_usd} ／ Whisper $${estimate.whisper_total_usd}</p>
       <p class="mt-1 text-slate-400">※ Q&amp;A質問数・スピーチトピック数を増やすほど、TTS・Whisper・評価用GPT呼び出しの回数が線形に増加しコストも増加します。</p>
     `;
@@ -184,7 +184,7 @@
       renderWhisperSelect();
       renderCostEstimate(data.cost_estimate);
       messageEl.textContent = "保存しました。";
-      messageEl.classList.add("text-emerald-600");
+      messageEl.classList.add("accent-good");
       $("admin-password-input").value = "";
     } catch (exc) {
       messageEl.textContent = exc.message;
@@ -202,7 +202,7 @@
       row.className = "glass-inset flex items-center justify-between gap-2 rounded-lg px-2.5 py-1";
       row.innerHTML = `
         <div class="min-w-0 flex items-baseline gap-2">
-          <p class="shrink-0 text-[13px] font-semibold text-teal-800">${escapeHtml(theme.title)} ${theme.is_active ? "" : '<span class="text-[11px] font-normal text-slate-400">(無効)</span>'}</p>
+          <p class="shrink-0 text-[13px] font-semibold accent-heading">${escapeHtml(theme.title)} ${theme.is_active ? "" : '<span class="text-[11px] font-normal text-slate-400">(無効)</span>'}</p>
           <p class="truncate text-[11px] text-slate-500">${escapeHtml(theme.description_hint || "")}</p>
         </div>
         <div class="flex shrink-0 gap-1">
@@ -273,7 +273,7 @@
     }
     const rows = state.students
       .map(
-        (s) => `<tr class="border-b border-teal-100/60">
+        (s) => `<tr class="accent-row">
           <td class="px-2 py-1">${escapeHtml(s.class_name)}</td>
           <td class="px-2 py-1">${escapeHtml(s.number)}</td>
           <td class="px-2 py-1">${escapeHtml(s.name)}</td>
@@ -348,7 +348,7 @@
       .map((s) => {
         const info = s.student_info || {};
         const finalEval = s.final_evaluation || {};
-        return `<tr class="border-b border-teal-100/60">
+        return `<tr class="accent-row">
           <td class="px-2 py-1 whitespace-nowrap">${escapeHtml(s.submitted_at)}</td>
           <td class="px-2 py-1">${escapeHtml(info.class_name)}</td>
           <td class="px-2 py-1">${escapeHtml(info.number)}</td>

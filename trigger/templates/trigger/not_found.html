@@ -3,6 +3,7 @@
 {% block body %}
 <div class="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-6 text-center">
   <div class="glass-panel w-full rounded-2xl p-8">
+    <img class="trig-intro-logo" src="{{ url_for('static', filename='trigger/icons/icon-192x192.png', v='20260923a') }}" width="192" height="192" alt="" decoding="async" aria-hidden="true">
     <h1 class="mb-2 text-lg font-bold brand-title">セッションが見つかりません</h1>
     <p class="mb-4 text-sm text-slate-500">リンクの有効期限が切れているか、URLが正しくない可能性があります。</p>
     <a href="{{ url_for('trigger.index') }}" class="compact-btn inline-block">最初からやり直す</a>

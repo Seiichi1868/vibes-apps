@@ -4,9 +4,10 @@
 生徒名簿・完了セッション（総合評価レポート）閲覧をすべてここに含む。
 """
 import io
+from pathlib import Path
 
 import openpyxl
-from flask import Blueprint, jsonify, render_template, request, send_file
+from flask import Blueprint, current_app, jsonify, render_template, request, send_file, send_from_directory
 
 from trigger.config import (
     ADMIN_PASSWORD,
@@ -63,6 +64,18 @@ def _settings_payload() -> dict:
         "cost_estimate": estimate_session_cost_usd(settings),
         "api_key_configured": bool(get_openai_api_key()),
     }
+
+
+@admin_bp.route("/manifest.json")
+def web_app_manifest():
+    """管理画面用 PWA manifest（start_url / scope: /trigger/admin/）。"""
+    response = send_from_directory(
+        Path(current_app.static_folder) / "trigger" / "admin",
+        "manifest.json",
+        mimetype="application/manifest+json",
+    )
+    response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return response
 
 
 @admin_bp.route("/")

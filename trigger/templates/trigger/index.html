@@ -21,7 +21,7 @@
     animation: trigOrbFloat 2.8s ease-in-out infinite;
   }
   .trig-intro-glass-label {
-    color: rgba(13, 148, 136, 0.88);
+    color: rgba(122, 86, 192, 0.9);
     text-shadow:
       0 1px 0 rgba(255, 255, 255, 0.55),
       0 0 8px rgba(255, 255, 255, 0.25);
@@ -32,11 +32,11 @@
     padding: 0.1em 0.18em 0.34em;
     overflow: visible;
     background: linear-gradient(
-      168deg,
-      rgba(56, 189, 248, 0.82) 0%,
-      rgba(3, 105, 161, 0.96) 30%,
-      rgba(15, 118, 110, 0.98) 62%,
-      rgba(4, 120, 87, 1) 100%
+      100deg,
+      rgba(196, 90, 152, 0.96) 0%,
+      rgba(122, 86, 192, 0.98) 36%,
+      rgba(61, 142, 196, 0.98) 70%,
+      rgba(42, 168, 188, 1) 100%
     );
     -webkit-background-clip: text;
     background-clip: text;
@@ -45,8 +45,8 @@
     paint-order: stroke fill;
     filter:
       drop-shadow(0 1px 0 rgba(255, 255, 255, 0.45))
-      drop-shadow(0 4px 14px rgba(14, 116, 144, 0.2))
-      drop-shadow(0 1px 3px rgba(3, 105, 161, 0.15));
+      drop-shadow(0 4px 14px rgba(122, 86, 192, 0.22))
+      drop-shadow(0 1px 3px rgba(61, 142, 196, 0.16));
   }
   .trig-intro-glass-sub {
     color: rgba(100, 116, 139, 0.92);
@@ -59,13 +59,14 @@
 
 {% block body %}
 <div id="opening-overlay"
-  class="fixed inset-0 z-[70] flex items-center justify-center overflow-hidden bg-gradient-to-br from-sky-50 via-white to-emerald-50 p-6">
+  class="fixed inset-0 z-[70] flex items-center justify-center overflow-hidden bg-gradient-to-br from-pink-50 via-white to-sky-50 p-6">
   <div class="page-bg absolute inset-0 scale-110 opacity-[0.85]"></div>
-  <div class="absolute inset-0 bg-gradient-to-br from-white/70 via-sky-50/55 to-emerald-50/65"></div>
+  <div class="absolute inset-0 bg-gradient-to-br from-white/70 via-fuchsia-50/40 to-sky-50/55"></div>
   <div class="absolute inset-0 bg-white/20"></div>
-  <div class="trig-orb absolute -left-16 top-14 h-48 w-48 rounded-full bg-sky-200/45 blur-3xl"></div>
-  <div class="trig-orb absolute -right-12 bottom-16 h-56 w-56 rounded-full bg-emerald-200/45 blur-3xl" style="animation-delay: .35s"></div>
+  <div class="trig-orb absolute -left-16 top-14 h-48 w-48 rounded-full bg-pink-200/50 blur-3xl"></div>
+  <div class="trig-orb absolute -right-12 bottom-16 h-56 w-56 rounded-full bg-sky-200/50 blur-3xl" style="animation-delay: .35s"></div>
   <div class="trig-intro-card relative text-center">
+    <img class="trig-intro-logo" src="{{ url_for('static', filename='trigger/icons/icon-192x192.png', v='20260923a') }}" width="192" height="192" alt="" decoding="async" aria-hidden="true">
     <p class="trig-intro-glass-label mb-2 text-[11px] font-semibold uppercase tracking-[0.35em]">Welcome to</p>
     <h1 class="trig-intro-glass-logo text-4xl font-bold tracking-tight sm:text-5xl">Speaking Lab Trigger</h1>
     <p class="trig-intro-glass-sub mt-3 text-sm font-medium">Speak. Expand. Respond.</p>
@@ -75,12 +76,15 @@
 <div class="relative mx-auto flex min-h-screen max-w-3xl flex-col px-3 py-4 sm:px-6 sm:py-6">
 
   <header class="mb-4 flex items-start justify-between gap-3 glass rounded-2xl px-4 py-3">
-    <div class="min-w-0">
+    <div class="flex min-w-0 items-start gap-3">
+      <img class="trig-brand-logo mt-0.5" src="{{ url_for('static', filename='trigger/icons/icon-192x192.png', v='20260923a') }}" width="192" height="192" alt="" decoding="async" aria-hidden="true">
+      <div class="min-w-0">
       <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
         <h1 class="text-lg font-bold tracking-tight brand-title sm:text-xl">Speaking Lab Trigger</h1>
-        <span class="text-xs font-medium text-teal-700/80 sm:text-sm">英語スピーキング瞬発力テスト</span>
+        <span class="text-xs font-medium accent-label sm:text-sm">英語スピーキング瞬発力テスト</span>
       </div>
       <p class="mt-0.5 text-[11px] leading-snug text-slate-500 sm:text-xs">自分のスピーチから広がる表現力と瞬発力を身につけましょう。</p>
+      </div>
     </div>
     <div id="step-dots" class="mt-1 flex shrink-0 items-center gap-1.5">
       <span class="step-dot" data-step="login"></span>
@@ -98,7 +102,7 @@
     <!-- ステップ0: ログイン + テーマ選択 -->
     <section id="screen-login" class="screen glass-panel rounded-2xl p-5 sm:p-6">
       <div id="student-info-section">
-        <h2 class="mb-1 text-base font-bold text-teal-800">生徒情報の入力</h2>
+        <h2 class="mb-1 text-base font-bold accent-heading">生徒情報の入力</h2>
         <p class="mb-4 text-xs text-slate-500">クラス・出席番号・名前を入力してください。</p>
         <div class="mb-4 grid grid-cols-3 gap-2">
           <input id="input-class" type="text" placeholder="クラス" class="compact-input col-span-1" list="class-list" />
@@ -107,14 +111,14 @@
           <input id="input-name" type="text" placeholder="名前" class="compact-input col-span-1" />
         </div>
         <div id="roster-select-wrap" class="mb-4 hidden">
-          <label class="mb-1 block text-xs font-semibold text-teal-700/80">名簿から選択（任意）</label>
+          <label class="mb-1 block text-xs font-semibold accent-label">名簿から選択（任意）</label>
           <select id="roster-select" class="compact-input">
             <option value="">-- 名簿から選ぶ --</option>
           </select>
         </div>
       </div>
 
-      <h3 class="mb-2 text-sm font-bold text-teal-800">テーマを選ぶ</h3>
+      <h3 class="mb-2 text-sm font-bold accent-heading">テーマを選ぶ</h3>
       <div id="theme-list" class="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2"></div>
 
       <button id="btn-start" class="compact-btn w-full" disabled>スタート</button>
@@ -123,7 +127,7 @@
 
     <!-- ステップ1: 台本作成 -->
     <section id="screen-script" class="screen hidden glass-panel rounded-2xl p-5 sm:p-6">
-      <h2 class="mb-1 text-base font-bold text-teal-800">台本作成</h2>
+      <h2 class="mb-1 text-base font-bold accent-heading">台本作成</h2>
       <p id="script-theme-label" class="mb-3 text-xs text-slate-500"></p>
 
       <div class="mb-3 flex gap-2">
@@ -136,7 +140,7 @@
 
       <div id="script-result" class="hidden">
         <div class="glass-inset mb-2 rounded-xl p-3">
-          <p class="mb-1 text-xs font-semibold text-teal-700/80">完成した英文</p>
+          <p class="mb-1 text-xs font-semibold accent-label">完成した英文</p>
           <textarea id="script-output" rows="4" class="compact-input"></textarea>
         </div>
         <p id="script-notes" class="mb-3 text-xs text-slate-500"></p>
@@ -151,7 +155,7 @@
 
     <!-- ステップ2: 模範音声 -->
     <section id="screen-sample" class="screen hidden glass-panel rounded-2xl p-5 sm:p-6">
-      <h2 class="mb-1 text-base font-bold text-teal-800">模範音声を聞こう</h2>
+      <h2 class="mb-1 text-base font-bold accent-heading">模範音声を聞こう</h2>
       <p class="mb-3 text-xs text-slate-500">正しい発音・イントネーションを確認してから次に進みましょう。</p>
       <div class="glass-inset mb-3 rounded-xl p-3">
         <p id="sample-script-text" class="text-sm leading-relaxed text-slate-800"></p>
@@ -163,7 +167,7 @@
 
     <!-- ステップ3: 音読→発音評価 -->
     <section id="screen-readaloud" class="screen hidden glass-panel rounded-2xl p-5 sm:p-6">
-      <h2 class="mb-1 text-base font-bold text-teal-800">音読して発音を評価しよう</h2>
+      <h2 class="mb-1 text-base font-bold accent-heading">音読して発音を評価しよう</h2>
       <div class="glass-inset mb-3 rounded-xl p-3">
         <p id="readaloud-script-text" class="text-sm leading-relaxed text-slate-800"></p>
       </div>
@@ -173,8 +177,8 @@
       </div>
       <div id="readaloud-result" class="hidden">
         <div class="glass-inset mb-3 rounded-xl p-3 text-sm">
-          <p class="mb-1"><span class="font-semibold text-teal-700">正確さ:</span> <span id="readaloud-accuracy"></span> / 5</p>
-          <p class="mb-1"><span class="font-semibold text-teal-700">流暢さ:</span> <span id="readaloud-fluency"></span> / 5</p>
+          <p class="mb-1"><span class="font-semibold accent-strong">正確さ:</span> <span id="readaloud-accuracy"></span> / 5</p>
+          <p class="mb-1"><span class="font-semibold accent-strong">流暢さ:</span> <span id="readaloud-fluency"></span> / 5</p>
           <p id="readaloud-feedback" class="mt-2 text-slate-600"></p>
         </div>
         <button id="btn-to-qa" class="compact-btn">Q&amp;Aに進む</button>
@@ -185,7 +189,7 @@
 
     <!-- ステップ4: フォローアップQ&A -->
     <section id="screen-qa" class="screen hidden glass-panel rounded-2xl p-5 sm:p-6">
-      <h2 class="mb-1 text-base font-bold text-teal-800">フォローアップQ&amp;A</h2>
+      <h2 class="mb-1 text-base font-bold accent-heading">フォローアップQ&amp;A</h2>
       <p id="qa-progress-label" class="mb-3 text-xs text-slate-500"></p>
       <div class="glass-inset mb-3 rounded-xl p-3">
         <p id="qa-question-text" class="mb-2 text-sm font-medium text-slate-800"></p>
@@ -198,8 +202,8 @@
       <div id="qa-result" class="hidden">
         <div class="glass-inset mb-3 rounded-xl p-3 text-sm">
           <p class="mb-1 text-slate-500">文字起こし: <span id="qa-transcript" class="italic"></span></p>
-          <p class="mb-1"><span class="font-semibold text-teal-700">的確さ:</span> <span id="qa-relevance"></span> / 5</p>
-          <p class="mb-1"><span class="font-semibold text-teal-700">内容整合性:</span> <span id="qa-consistency"></span> / 5</p>
+          <p class="mb-1"><span class="font-semibold accent-strong">的確さ:</span> <span id="qa-relevance"></span> / 5</p>
+          <p class="mb-1"><span class="font-semibold accent-strong">内容整合性:</span> <span id="qa-consistency"></span> / 5</p>
           <p id="qa-feedback" class="mt-2 text-slate-600"></p>
         </div>
         <button id="btn-qa-next" class="compact-btn">次へ</button>
@@ -210,7 +214,7 @@
 
     <!-- ステップ5: 即興スピーチ -->
     <section id="screen-speech" class="screen hidden glass-panel rounded-2xl p-5 sm:p-6">
-      <h2 class="mb-1 text-base font-bold text-teal-800">即興スピーチ</h2>
+      <h2 class="mb-1 text-base font-bold accent-heading">即興スピーチ</h2>
       <p id="speech-progress-label" class="mb-3 text-xs text-slate-500"></p>
       <div class="glass-inset mb-3 rounded-xl p-3">
         <p id="speech-topic-text" class="mb-1 text-sm font-medium text-slate-800"></p>
@@ -224,10 +228,10 @@
       </div>
       <div id="speech-result" class="hidden">
         <div class="glass-inset mb-3 rounded-xl p-3 text-sm">
-          <p class="mb-1"><span class="font-semibold text-teal-700">文構成:</span> <span id="speech-sentence-mastery"></span> / 5</p>
-          <p class="mb-1"><span class="font-semibold text-teal-700">語彙:</span> <span id="speech-vocabulary"></span> / 5</p>
-          <p class="mb-1"><span class="font-semibold text-teal-700">流暢さ:</span> <span id="speech-fluency"></span> / 5</p>
-          <p class="mb-1"><span class="font-semibold text-teal-700">論理構成:</span> <span id="speech-coherence"></span> / 5</p>
+          <p class="mb-1"><span class="font-semibold accent-strong">文構成:</span> <span id="speech-sentence-mastery"></span> / 5</p>
+          <p class="mb-1"><span class="font-semibold accent-strong">語彙:</span> <span id="speech-vocabulary"></span> / 5</p>
+          <p class="mb-1"><span class="font-semibold accent-strong">流暢さ:</span> <span id="speech-fluency"></span> / 5</p>
+          <p class="mb-1"><span class="font-semibold accent-strong">論理構成:</span> <span id="speech-coherence"></span> / 5</p>
           <p id="speech-feedback" class="mt-2 text-slate-600"></p>
         </div>
         <button id="btn-speech-next" class="compact-btn">次へ</button>
@@ -238,22 +242,22 @@
 
     <!-- ステップ6: 総合評価レポート -->
     <section id="screen-report" class="screen hidden glass-panel rounded-2xl p-5 sm:p-6">
-      <h2 class="mb-1 text-base font-bold text-teal-800">総合評価レポート</h2>
+      <h2 class="mb-1 text-base font-bold accent-heading">総合評価レポート</h2>
       <p id="report-loading" class="mb-3 text-xs text-slate-500">レポートを作成しています...</p>
       <div id="report-body" class="hidden">
         <div class="glass-inset mb-3 rounded-xl p-4 text-center">
           <p class="text-xs text-slate-500">総合スコア</p>
           <p id="report-overall-score" class="text-3xl font-bold brand-title"></p>
-          <p id="report-cefr" class="text-sm font-semibold text-teal-700"></p>
+          <p id="report-cefr" class="text-sm font-semibold accent-strong"></p>
         </div>
         <div id="report-categories" class="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2"></div>
         <div class="glass-inset mb-3 rounded-xl p-3">
-          <p class="mb-1 text-xs font-semibold text-teal-700/80">総評</p>
+          <p class="mb-1 text-xs font-semibold accent-label">総評</p>
           <p id="report-summary" class="text-sm leading-relaxed text-slate-700"></p>
         </div>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div class="glass-inset rounded-xl p-3">
-            <p class="mb-1 text-xs font-semibold text-emerald-700">よかった点</p>
+            <p class="mb-1 text-xs font-semibold accent-good">よかった点</p>
             <ul id="report-strengths" class="list-inside list-disc text-xs text-slate-600"></ul>
           </div>
           <div class="glass-inset rounded-xl p-3">
@@ -275,5 +279,5 @@
 <script>
   window.TRIGGER_INITIAL_SESSION_ID = {{ initial_session_id | tojson if initial_session_id else 'null' }};
 </script>
-<script src="{{ url_for('trigger.static', filename='js/app.js', v='20260817a') }}"></script>
+<script src="{{ url_for('trigger.static', filename='js/app.js', v='20260923a') }}"></script>
 {% endblock %}

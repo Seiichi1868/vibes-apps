@@ -1,13 +1,18 @@
 {% extends "trigger/base.html" %}
 {% block title %}管理画面 - Speaking Lab Trigger{% endblock %}
+{% block manifest_href %}{{ url_for('trigger_admin.web_app_manifest') }}{% endblock %}
+{% block pwa_short_name %}Trigger 管理{% endblock %}
 
 {% block body %}
 <div class="mx-auto flex min-h-screen max-w-5xl flex-col px-3 py-4 sm:px-6 sm:py-6">
 
   <header class="mb-4 flex items-center justify-between glass rounded-2xl px-4 py-3">
-    <div class="flex items-baseline gap-2">
-      <h1 class="text-lg font-bold tracking-tight brand-title sm:text-xl">Speaking Lab Trigger</h1>
-      <span class="text-xs font-medium text-teal-700/80">管理画面</span>
+    <div class="flex items-center gap-3">
+      <img class="trig-brand-logo" src="{{ url_for('static', filename='trigger/icons/icon-192x192.png', v='20260923a') }}" width="192" height="192" alt="" decoding="async" aria-hidden="true">
+      <div class="flex items-baseline gap-2">
+        <h1 class="text-lg font-bold tracking-tight brand-title sm:text-xl">Speaking Lab Trigger</h1>
+        <span class="text-xs font-medium accent-label">管理画面</span>
+      </div>
     </div>
     <a href="{{ url_for('trigger.index') }}" class="compact-btn-outline">生徒画面へ</a>
   </header>
@@ -23,25 +28,25 @@
 
     <!-- 設定タブ -->
     <section id="tab-settings" class="tab-panel glass-panel rounded-2xl p-5">
-      <h2 class="mb-3 text-sm font-bold text-teal-800">AIモデル選択（コスト管理）</h2>
+      <h2 class="mb-3 text-sm font-bold accent-heading">AIモデル選択（コスト管理）</h2>
       <p class="mb-3 text-xs text-slate-500">処理単位ごとに使用するAIモデルを個別に選択できます。各モデルは「コスト」（安いほど●が多い）と「性能」（高いほど●が多い）で比較できます。選択の保存には管理者パスワードが必要です。</p>
       <div id="model-select-list" class="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2"></div>
 
       <div class="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label class="mb-1 block text-xs font-semibold text-teal-700/80">Whisperモデル（音声文字起こし）</label>
+          <label class="mb-1 block text-xs font-semibold accent-label">Whisperモデル（音声文字起こし）</label>
           <select id="whisper-model-select" class="compact-input"></select>
         </div>
       </div>
 
-      <h2 class="mb-3 mt-5 text-sm font-bold text-teal-800">問題数設定（互いに独立）</h2>
+      <h2 class="mb-3 mt-5 text-sm font-bold accent-heading">問題数設定（互いに独立）</h2>
       <div class="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label class="mb-1 block text-xs font-semibold text-teal-700/80">Q&amp;A 質問数</label>
+          <label class="mb-1 block text-xs font-semibold accent-label">Q&amp;A 質問数</label>
           <input id="qa-count-input" type="number" class="compact-input" />
         </div>
         <div>
-          <label class="mb-1 block text-xs font-semibold text-teal-700/80">即興スピーチ トピック数</label>
+          <label class="mb-1 block text-xs font-semibold accent-label">即興スピーチ トピック数</label>
           <input id="topic-count-input" type="number" class="compact-input" />
         </div>
       </div>
@@ -65,7 +70,7 @@
 
     <!-- テーマ管理タブ -->
     <section id="tab-themes" class="tab-panel hidden glass-panel rounded-2xl p-4">
-      <h2 class="mb-1.5 text-sm font-bold text-teal-800">テーマプール管理</h2>
+      <h2 class="mb-1.5 text-sm font-bold accent-heading">テーマプール管理</h2>
       <div class="mb-2 glass-inset rounded-lg p-2">
         <div class="flex flex-wrap items-center gap-1.5">
           <input id="theme-title-input" type="text" placeholder="テーマ名（例: 自己紹介）" class="compact-input flex-1 min-w-[140px] !py-1.5" />
@@ -83,7 +88,7 @@
 
     <!-- 生徒名簿タブ -->
     <section id="tab-roster" class="tab-panel hidden glass-panel rounded-2xl p-5">
-      <h2 class="mb-3 text-sm font-bold text-teal-800">生徒名簿</h2>
+      <h2 class="mb-3 text-sm font-bold accent-heading">生徒名簿</h2>
       <div class="mb-4 flex flex-wrap items-center gap-2">
         <input id="roster-upload-input" type="file" accept=".xlsx,.xls" class="text-xs" />
         <button id="btn-upload-roster" class="compact-btn-outline">Excelから一括登録</button>
@@ -104,7 +109,7 @@
     <!-- レポート一覧タブ -->
     <section id="tab-reports" class="tab-panel hidden glass-panel rounded-2xl p-5">
       <div class="mb-3 flex items-center justify-between">
-        <h2 class="text-sm font-bold text-teal-800">完了セッションの総合評価レポート</h2>
+        <h2 class="text-sm font-bold accent-heading">完了セッションの総合評価レポート</h2>
         <a href="{{ url_for('trigger_admin.export_submissions_api') }}" class="compact-btn-outline">Excelで書き出す</a>
       </div>
       <div id="submissions-table" class="overflow-x-auto"></div>
@@ -115,5 +120,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('trigger.static', filename='js/admin.js') }}"></script>
+<script src="{{ url_for('trigger.static', filename='js/admin.js', v='20260923a') }}"></script>
 {% endblock %}

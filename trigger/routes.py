@@ -11,7 +11,7 @@ import mimetypes
 import uuid
 from pathlib import Path
 
-from flask import Blueprint, jsonify, render_template, request, send_from_directory
+from flask import Blueprint, current_app, jsonify, render_template, request, send_from_directory
 from werkzeug.utils import secure_filename
 
 from trigger.audio_convert import normalize_audio_file
@@ -100,6 +100,18 @@ def _transcribe_or_error(file_path: Path, whisper_model: str):
     except Exception as exc:  # noqa: BLE001
         logger.error("trigger transcription failed: %s", exc)
         return None, (jsonify({"ok": False, "error": f"音声認識に失敗しました: {exc}"}), 502)
+
+
+@main_bp.route("/manifest.json")
+def web_app_manifest():
+    """生徒画面用 PWA manifest（scope: /trigger/）。"""
+    response = send_from_directory(
+        Path(current_app.static_folder) / "trigger",
+        "manifest.json",
+        mimetype="application/manifest+json",
+    )
+    response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return response
 
 
 @main_bp.route("/")

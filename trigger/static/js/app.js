@@ -126,14 +126,14 @@
       const card = document.createElement("button");
       card.type = "button";
       card.className =
-        "theme-card glass-inset rounded-xl p-3 text-left transition hover:border-teal-400";
+        "theme-card glass-inset rounded-xl p-3 text-left transition";
       card.dataset.themeId = theme.id;
-      card.innerHTML = `<p class="text-sm font-semibold text-teal-800">${escapeHtml(theme.title)}</p>
+      card.innerHTML = `<p class="text-sm font-semibold accent-heading">${escapeHtml(theme.title)}</p>
         <p class="mt-1 text-xs text-slate-500">${escapeHtml(theme.description_hint || "")}</p>`;
       card.addEventListener("click", () => {
         state.selectedThemeId = theme.id;
-        document.querySelectorAll(".theme-card").forEach((c) => c.classList.remove("ring-2", "ring-teal-500"));
-        card.classList.add("ring-2", "ring-teal-500");
+        document.querySelectorAll(".theme-card").forEach((c) => c.classList.remove("is-selected"));
+        card.classList.add("is-selected");
         validateLoginForm();
       });
       container.appendChild(card);
@@ -191,8 +191,8 @@
   document.querySelectorAll(".mode-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       state.scriptMode = btn.dataset.mode;
-      document.querySelectorAll(".mode-btn").forEach((b) => b.classList.remove("ring-2", "ring-teal-500"));
-      btn.classList.add("ring-2", "ring-teal-500");
+      document.querySelectorAll(".mode-btn").forEach((b) => b.classList.remove("is-selected"));
+      btn.classList.add("is-selected");
       $("script-input").placeholder =
         state.scriptMode === "translate"
           ? "日本語で自由に書いてください（AIが英訳します）"
@@ -223,7 +223,7 @@
       correctionsBox.innerHTML = "";
       (data.script.corrections || []).forEach((c) => {
         const p = document.createElement("p");
-        p.innerHTML = `<span class="line-through text-rose-500">${escapeHtml(c.before)}</span> → <span class="text-emerald-600">${escapeHtml(c.after)}</span> <span class="text-slate-400">(${escapeHtml(c.reason)})</span>`;
+        p.innerHTML = `<span class="line-through text-rose-500">${escapeHtml(c.before)}</span> → <span class="accent-good">${escapeHtml(c.after)}</span> <span class="text-slate-400">(${escapeHtml(c.reason)})</span>`;
         correctionsBox.appendChild(p);
       });
       $("script-result").classList.remove("hidden");
@@ -591,7 +591,7 @@
       const div = document.createElement("div");
       div.className = "glass-inset rounded-xl p-3";
       div.innerHTML = `<p class="text-xs text-slate-500">${CATEGORY_LABELS[key] || key}</p>
-        <p class="text-lg font-bold text-teal-700">${value ?? "-"} <span class="text-xs font-normal text-slate-400">/ 90</span></p>`;
+        <p class="text-lg font-bold accent-strong">${value ?? "-"} <span class="text-xs font-normal text-slate-400">/ 90</span></p>`;
       categoriesBox.appendChild(div);
     });
 
