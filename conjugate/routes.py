@@ -436,11 +436,14 @@ def submit_answer(session_id, question_id, target):
 
         question.setdefault("answers", {})[target] = result
         if result.get("newly_mastered") and question.get("kind") == "verb":
+            person = question.get("person") if question.get("person") in ("tu", "el_ella_usted") else "tu"
             session.setdefault("newly_mastered", []).append(
                 {
                     "infinitive": question.get("infinitive"),
                     "meaning_ja": question.get("meaning_ja", ""),
                     "target": target,
+                    "person": person,
+                    "person_label": "él" if person == "el_ella_usted" else "tú",
                 }
             )
         if all(t in question["answers"] for t in question["targets"]):

@@ -298,6 +298,12 @@
   color: var(--text-primary);
   line-height: 1.15;
 }
+.vsc-stat-split {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.78rem;
+}
 .vsc-stat-label {
   font-size: 0.68rem;
   color: var(--text-secondary);
@@ -1418,6 +1424,25 @@
   font-size: 0.75rem;
   color: var(--text-secondary);
 }
+.vsc-tense-misses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-top: 4px;
+}
+.vsc-tense-miss {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+.vsc-tense-miss.is-alert {
+  color: var(--danger-text);
+  background: var(--danger-soft);
+  border-radius: 999px;
+  padding: 0 6px;
+  font-weight: 700;
+}
 .vsc-master-mark {
   width: 28px;
   height: 28px;
@@ -2031,6 +2056,10 @@ body.vsc-modal-open {
   color: var(--text-secondary);
   align-self: center;
   text-align: right;
+}
+.vsc-master-item .vsc-tense-misses {
+  grid-column: 1 / -1;
+  margin-top: 2px;
 }
 .vsc-master-empty {
   font-size: 0.85rem;

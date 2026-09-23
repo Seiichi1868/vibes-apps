@@ -9,7 +9,7 @@
   <p class="text-sm mt-1" style="color: var(--text-secondary);">{{ summary.correct }} / {{ summary.total }} 問 正解</p>
 
   {% if progress %}
-  <p class="mt-4 text-sm font-semibold">🔥 {{ progress.current_streak }} Days　・　習得 {{ progress.mastered_count }}/{{ progress.total_verbs }}語</p>
+  <p class="mt-4 text-sm font-semibold">🔥 {{ progress.current_streak }} Days　・　習得 tú {{ progress.mastered_tu_count }} · él {{ progress.mastered_el_count }}/{{ progress.total_verbs }}語</p>
   {% endif %}
 
   <div class="grid grid-cols-4 gap-2 mt-6 text-xs">
@@ -36,7 +36,7 @@
 <section class="vsc-promo-card mb-4">
   <p class="vsc-promo-kicker">NEW</p>
   <h3 class="vsc-promo-title">習得バッジを獲得！</h3>
-  <p class="vsc-promo-body">{{ summary.newly_mastered | map(attribute='infinitive') | join(' / ') }}</p>
+  <p class="vsc-promo-body">{% for item in summary.newly_mastered %}{{ item.infinitive }}（{{ item.person_label or 'tú' }}）{% if not loop.last %} / {% endif %}{% endfor %}</p>
 </section>
 {% endif %}
 

@@ -155,18 +155,14 @@ def resolve_person(person_mode: str | None, person_filter: str | None) -> str:
 
 
 def person_badge_text(*, tu_mastered: bool, el_mastered: bool, threshold: int, tu_count: int, el_count: int) -> str:
-    if tu_mastered and el_mastered:
-        return "習得済み"
-    if tu_mastered:
-        tu_part = "tú✓"
-    elif tu_count > 0:
-        tu_part = f"tú {tu_count}/{threshold}"
-    else:
-        tu_part = "tú未"
-    if el_mastered:
-        el_part = "él・ella・usted✓"
-    elif el_count > 0:
-        el_part = f"él {el_count}/{threshold}"
-    else:
-        el_part = "él・ella・usted未"
-    return f"{tu_part} / {el_part}"
+    """tú と él の連続カウントを、それぞれ独立した習得状況として返す。"""
+
+    def side(label: str, mastered: bool, count: int) -> str:
+        if mastered:
+            return f"{label}✓"
+        return f"{label} {count}/{threshold}"
+
+    return (
+        f"{side('tú', tu_mastered, tu_count)} / "
+        f"{side('él', el_mastered, el_count)}"
+    )

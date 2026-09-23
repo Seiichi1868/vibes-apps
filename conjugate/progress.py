@@ -1,9 +1,11 @@
 """ストリーク・累計練習数・習得の純ロジック。
 
-活用は人称（tú / él・ella・usted）ごとに連続正解し、両方のカウントが
-しきい値に達して初めて習得。片方だけでは習得済みにならない。
+活用は人称（tú / él・ella・usted）ごとに連続正解を数え、それぞれが
+しきい値に達した時点でその人称を習得とする。両方そろわなくても、
+達した側の習得数は増える。
 単語4択は方向（日→西 / 西→日）ごとにデフォルト5回連続正解でマスター。
-間違えると連続カウントはゼロに戻るが、累計の間違い回数は残す。しきい値は管理画面から渡す。
+間違えると連続カウントはゼロに戻るが、累計の間違い回数は残す。
+活用の間違いは時制（現在・点過去・線過去）ごとに残す。しきい値は管理画面から渡す。
 """
 from datetime import date, datetime, timedelta, timezone
 
@@ -14,6 +16,16 @@ from conjugate.data.verbs import VERBS, drillable_verbs
 JST = timezone(timedelta(hours=9))
 DEFAULT_CONJUGATION_THRESHOLD = 5
 DEFAULT_VOCAB_THRESHOLD = 5
+
+# 時制追加（点過去・線過去）に合わせ、この版より古い活用進捗は読み込み時に捨ててゼロから数える。
+CONJUGATION_PROGRESS_VERSION = 1
+# 間違いがこの回数を超えた時制は赤く表示する（5回ちょうどは通常色）。
+MISS_ALERT_OVER = 5
+MISS_DISPLAY_TENSES = (
+    ("present", "現在"),
+    ("preterite", "点過去"),
+    ("imperfect", "線過去"),
+)
 DEFAULT_GUARDIAN_PRICE_COINS = 50
 VOCAB_DIRECTIONS = ("ja_to_es", "es_to_ja")
 
@@ -75,6 +87,7 @@ DEFAULT_PROGRESS = {
     "guardian_count": 0,
     "guardian_dates": [],
     "vocab_master_total": 0,
+    "conjugation_progress_version": CONJUGATION_PROGRESS_VERSION,
     "verbs": {},
     "vocab": {},
 }
@@ -168,6 +181,7 @@ def normalize_progress(raw: dict | None) -> dict:
         "guardian_count": 0,
         "guardian_dates": [],
         "vocab_master_total": 0,
+        "conjugation_progress_version": CONJUGATION_PROGRESS_VERSION,
         "verbs": {},
         "vocab": {},
     }
@@ -225,8 +239,12 @@ def normalize_progress(raw: dict | None) -> dict:
     guardian_dates.sort()
     data["guardian_dates"] = guardian_dates
 
+    stored_version = _as_nonneg_int(raw.get("conjugation_progress_version"))
+    reset_conjugation = stored_version < CONJUGATION_PROGRESS_VERSION
+    data["conjugation_progress_version"] = CONJUGATION_PROGRESS_VERSION
+
     verbs = raw.get("verbs")
-    if isinstance(verbs, dict):
+    if isinstance(verbs, dict) and not reset_conjugation:
         cleaned = {}
         for verb_id, entry in verbs.items():
             if not isinstance(entry, dict):
@@ -246,6 +264,7 @@ def normalize_progress(raw: dict | None) -> dict:
                 tense_map[tense] = {
                     "consecutive_correct": consecutive,
                     "correct_count": t_correct,
+                    "miss_count": _as_nonneg_int(tense_entry.get("miss_count")),
                     "mastered": mastered,
                 }
             verb_correct = max(_as_nonneg_int(entry.get("correct_count")), max_correct)
@@ -408,7 +427,11 @@ def apply_mastery(
     threshold: int = DEFAULT_CONJUGATION_THRESHOLD,
     person: str | None = "tu",
 ) -> bool:
-    """人称別の連続正解を更新。tú と él/ella/usted の両方がしきい値に達したら True。"""
+    """人称別の連続正解を更新。その人称が新たに習得へ達したら True。
+
+    tú と él/ella/usted は別カウント。片方だけでは動詞全体の mastered にはならない。
+    間違いは出題した時制の miss_count に残す。
+    """
     if verb_id is None:
         return False
     try:
@@ -430,20 +453,23 @@ def apply_mastery(
     entry.setdefault("persons", {"tu": _blank_person_side(), "el_ella_usted": _blank_person_side()})
     for pid in PERSON_IDS:
         entry["persons"].setdefault(pid, _blank_person_side())
-    was_mastered = verb_is_mastered(entry, threshold)
 
     if tense in TENSE_ORDER:
         tense_entry = entry.setdefault(
-            tense, {"consecutive_correct": 0, "correct_count": 0, "mastered": False}
+            tense,
+            {"consecutive_correct": 0, "correct_count": 0, "miss_count": 0, "mastered": False},
         )
+        tense_entry["miss_count"] = _as_nonneg_int(tense_entry.get("miss_count"))
         if is_correct:
             tense_entry["consecutive_correct"] = int(tense_entry.get("consecutive_correct") or 0) + 1
             tense_entry["correct_count"] = int(tense_entry.get("correct_count") or 0) + 1
         else:
             tense_entry["consecutive_correct"] = 0
+            tense_entry["miss_count"] += 1
         entry[tense] = tense_entry
 
     side = entry["persons"][person_key]
+    was_side_mastered = _person_side_mastered(side, threshold)
     if is_correct:
         side["consecutive_correct"] = int(side.get("consecutive_correct") or 0) + 1
         entry["correct_count"] = int(entry.get("correct_count") or 0) + 1
@@ -457,7 +483,7 @@ def apply_mastery(
     if tense in TENSE_ORDER:
         entry[tense]["mastered"] = entry["mastered"]
     verbs[key] = entry
-    return bool(entry["mastered"]) and not was_mastered
+    return _person_side_mastered(side, threshold) and not was_side_mastered
 
 
 def _vocab_streak(side) -> int:
@@ -612,6 +638,25 @@ def verb_is_mastered(entry: dict | None, threshold: int = DEFAULT_CONJUGATION_TH
     return False
 
 
+def mastered_person_count(
+    progress: dict,
+    person: str,
+    threshold: int = DEFAULT_CONJUGATION_THRESHOLD,
+) -> int:
+    """1つの人称について、習得済みの動詞数を返す。"""
+    if person not in PERSON_IDS:
+        return 0
+    verbs = progress.get("verbs") or {}
+    limit = max(1, int(threshold or DEFAULT_CONJUGATION_THRESHOLD))
+    count = 0
+    for verb in drillable_verbs():
+        entry = verbs.get(str(verb["id"])) or {}
+        persons = entry.get("persons") if isinstance(entry.get("persons"), dict) else {}
+        if _person_side_mastered(persons.get(person), limit):
+            count += 1
+    return count
+
+
 def mastered_verb_count(progress: dict, threshold: int = DEFAULT_CONJUGATION_THRESHOLD) -> int:
     verbs = progress.get("verbs") or {}
     count = 0
@@ -654,6 +699,24 @@ def total_vocab_master_count(
     return total
 
 
+def tense_miss_view(tenses: dict | None) -> list[dict]:
+    """現在・点過去・線過去の累計間違い回数。5回を超えると alert。"""
+    source = tenses if isinstance(tenses, dict) else {}
+    rows = []
+    for tense_id, label in MISS_DISPLAY_TENSES:
+        entry = source.get(tense_id)
+        count = _as_nonneg_int(entry.get("miss_count") if isinstance(entry, dict) else 0)
+        rows.append(
+            {
+                "id": tense_id,
+                "label": label,
+                "miss_count": count,
+                "alert": count > MISS_ALERT_OVER,
+            }
+        )
+    return rows
+
+
 def learner_level(mastered_count: int) -> int:
     return max(1, 1 + max(0, int(mastered_count)) // 5)
 
@@ -674,6 +737,8 @@ def progress_view(
     guardian_dates = list(progress.get("guardian_dates") or [])
     stage_info = guardian_stage_info(coins_earned_total)
     mastered = mastered_verb_count(progress, conj_th)
+    mastered_tu = mastered_person_count(progress, "tu", conj_th)
+    mastered_el = mastered_person_count(progress, "el_ella_usted", conj_th)
     vocab_mastered = mastered_vocab_count(progress, vocab_th)
     vocab_mastered_ja = mastered_vocab_count(progress, vocab_th, "ja_to_es")
     vocab_mastered_es = mastered_vocab_count(progress, vocab_th, "es_to_ja")
@@ -682,6 +747,9 @@ def progress_view(
     last = progress.get("last_practice_date")
     practiced_today = last == today_jst().isoformat()
     percent = round((mastered / total_verbs) * 100) if total_verbs else 0
+    tu_percent = round((mastered_tu / total_verbs) * 100) if total_verbs else 0
+    el_percent = round((mastered_el / total_verbs) * 100) if total_verbs else 0
+    track_percent = round((tu_percent + el_percent) / 2) if total_verbs else 0
     daily_goal = min(100, _as_nonneg_int(progress.get("daily_goal")))
     return {
         "last_practice_date": last,
@@ -692,8 +760,14 @@ def progress_view(
         "longest_streak": int(progress.get("longest_streak") or 0),
         "total_attempts": int(progress.get("total_attempts") or 0),
         "mastered_count": mastered,
+        "mastered_tu_count": mastered_tu,
+        "mastered_el_count": mastered_el,
         "total_verbs": total_verbs,
         "mastered_percent": percent,
+        "mastered_tu_percent": tu_percent,
+        "mastered_el_percent": el_percent,
+        "mastered_track_percent": track_percent,
+        "miss_alert_over": MISS_ALERT_OVER,
         "vocab_mastered_count": vocab_mastered,
         "vocab_mastered_ja_to_es": vocab_mastered_ja,
         "vocab_mastered_es_to_ja": vocab_mastered_es,
@@ -746,6 +820,7 @@ def verb_progress_list(
             tenses[tense] = {
                 "consecutive_correct": int(tense_entry.get("consecutive_correct") or 0),
                 "correct_count": int(tense_entry.get("correct_count") or 0),
+                "miss_count": _as_nonneg_int(tense_entry.get("miss_count")),
                 "mastered": bool(tense_entry.get("mastered")),
             }
         persons_raw = entry.get("persons") if isinstance(entry.get("persons"), dict) else {}
@@ -771,6 +846,7 @@ def verb_progress_list(
                 "mastered": mastered,
                 "consecutive_correct": tenses["present"]["consecutive_correct"],
                 "tenses": tenses,
+                "tense_misses": tense_miss_view(tenses),
                 "persons": persons,
                 "person_badge": person_badge_text(
                     tu_mastered=persons["tu"]["mastered"],

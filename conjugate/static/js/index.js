@@ -299,7 +299,9 @@
         const persons = row.persons || {};
         const tuCount = Number((persons.tu || {}).consecutive_correct || 0);
         const elCount = Number((persons.el_ella_usted || {}).consecutive_correct || 0);
-        return Boolean(row.mastered) || tuCount > 0 || elCount > 0 || Number(row.correct_count || 0) > 0;
+        const tuMastered = Boolean((persons.tu || {}).mastered);
+        const elMastered = Boolean((persons.el_ella_usted || {}).mastered);
+        return tuMastered || elMastered || tuCount > 0 || elCount > 0 || tenseMissTotal(row) > 0 || Number(row.correct_count || 0) > 0;
       })
       .sort((a, b) => {
         if (direction) {
@@ -311,7 +313,7 @@
           );
         }
         return (
-          Number(b.mastered) - Number(a.mastered) ||
+          tenseMissTotal(b) - tenseMissTotal(a) ||
           Number(b.correct_count) - Number(a.correct_count) ||
           String(a.infinitive).localeCompare(String(b.infinitive))
         );
@@ -330,7 +332,7 @@
           : (row.person_badge || `${count}/${threshold}`);
         const missHtml = direction
           ? `<div class="vsc-master-miss">誤 ${missCount}</div>`
-          : "";
+          : tenseMissHtml(row);
         return `<article class="vsc-master-item${mastered ? " is-mastered" : ""}${isWeak ? " is-weak" : ""}">
           <div class="vsc-master-name">${escapeHtml(row.infinitive)}</div>
           <div class="vsc-master-count">${escapeHtml(countLabel)}</div>
@@ -341,11 +343,32 @@
       .join("")}</div>`;
   }
 
+  function tenseMissTotal(row) {
+    return (row.tense_misses || []).reduce((sum, item) => sum + Number(item.miss_count || 0), 0);
+  }
+
+  function tenseMissHtml(row) {
+    const alertOver = Number(progressState.miss_alert_over || 5);
+    const misses = row.tense_misses || [];
+    if (!misses.length) return "";
+    return `<div class="vsc-tense-misses">${misses
+      .map((item) => {
+        const count = Number(item.miss_count || 0);
+        const hot = Boolean(item.alert) || count > alertOver;
+        return `<span class="vsc-tense-miss${hot ? " is-alert" : ""}">${escapeHtml(item.label)} 誤${count}</span>`;
+      })
+      .join("")}</div>`;
+  }
+
   function renderMasteredBody() {
     const threshold = Number(progressState.conjugation_threshold || 5);
+    const total = progressState.total_verbs || 0;
+    const tuCount = progressState.mastered_tu_count || 0;
+    const elCount = progressState.mastered_el_count || 0;
     modalBody.innerHTML = `
-      <p class="vsc-modal-lead">tú形とél/ella/usted形のそれぞれで${threshold}回連続正解すると習得です。片方だけでは習得済みになりません。</p>
-      ${renderMasterList(progressState.verbs, threshold, "まだ習得中の動詞がありません。練習を始めるとここに表示されます。")}
+      <p class="vsc-modal-lead">tú形とél/ella/usted形は別々に数えます。それぞれ${threshold}回連続正解で、その人称が習得です。間違えるとその人称の連続カウントだけがゼロに戻ります。間違い回数は現在・点過去・線過去で分け、${Number(progressState.miss_alert_over || 5) + 1}回以上は赤く表示します。</p>
+      <p class="vsc-master-col-meta">tú ${tuCount}/${total} · él ${elCount}/${total}</p>
+      ${renderMasterList(progressState.verbs, threshold, "まだ記録がありません。練習を始めるとここに表示されます。")}
     `;
   }
 

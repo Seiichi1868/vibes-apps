@@ -11,11 +11,14 @@ from conjugate.progress import (
     can_afford_guardian,
     guardian_stage_info,
     learner_level,
+    mastered_person_count,
     mastered_verb_count,
     normalize_progress,
     progress_view,
+    tense_miss_view,
     total_vocab_master_count,
     verb_is_mastered,
+    verb_progress_list,
     vocab_progress_list,
 )
 
@@ -173,15 +176,22 @@ class GuardianStreakTests(unittest.TestCase):
 
 
 class MasteryTests(unittest.TestCase):
-    def test_five_correct_on_one_person_does_not_master(self):
+    def test_five_correct_on_one_person_masters_that_person_only(self):
         progress = normalize_progress({})
-        for _ in range(5):
+        for _ in range(4):
             self.assertFalse(apply_mastery(progress, 1, "present", True, threshold=5, person="tu"))
+        self.assertTrue(apply_mastery(progress, 1, "present", True, threshold=5, person="tu"))
         entry = progress["verbs"]["1"]
         self.assertTrue(entry["persons"]["tu"]["mastered"])
         self.assertFalse(entry["persons"]["el_ella_usted"]["mastered"])
         self.assertFalse(entry["mastered"])
         self.assertEqual(entry["correct_count"], 5)
+        self.assertEqual(mastered_person_count(progress, "tu", 5), 1)
+        self.assertEqual(mastered_person_count(progress, "el_ella_usted", 5), 0)
+        view = progress_view(progress, conjugation_threshold=5)
+        self.assertEqual(view["mastered_tu_count"], 1)
+        self.assertEqual(view["mastered_el_count"], 0)
+        self.assertEqual(view["mastered_count"], 0)
 
     def test_both_persons_at_threshold_marks_mastered(self):
         progress = normalize_progress({})
@@ -233,18 +243,76 @@ class MasteryTests(unittest.TestCase):
         self.assertEqual(learner_level(0), 1)
         self.assertEqual(learner_level(23), 5)
 
-    def test_legacy_tu_progress_is_kept_but_not_fully_mastered(self):
+    def test_old_conjugation_progress_is_reset(self):
         progress = normalize_progress(
             {
+                "coins": 12,
+                "current_streak": 4,
                 "verbs": {
                     "1": {"present": {"consecutive_correct": 3, "mastered": True}},
-                }
+                },
+                "vocab": {
+                    "1": {"ja_to_es": {"consecutive_correct": 2, "miss_count": 1, "mastered": False}},
+                },
             }
         )
-        self.assertGreaterEqual(progress["verbs"]["1"]["correct_count"], 5)
-        self.assertTrue(progress["verbs"]["1"]["persons"]["tu"]["mastered"])
-        self.assertFalse(progress["verbs"]["1"]["persons"]["el_ella_usted"]["mastered"])
-        self.assertFalse(verb_is_mastered(progress["verbs"]["1"], 5))
+        self.assertEqual(progress["verbs"], {})
+        self.assertEqual(progress["conjugation_progress_version"], 1)
+        self.assertEqual(progress["coins"], 12)
+        self.assertEqual(progress["current_streak"], 4)
+        self.assertEqual(progress["vocab"]["1"]["ja_to_es"]["consecutive_correct"], 2)
+        self.assertEqual(progress["vocab"]["1"]["ja_to_es"]["miss_count"], 1)
+
+    def test_current_conjugation_progress_is_kept(self):
+        progress = normalize_progress(
+            {
+                "conjugation_progress_version": 1,
+                "verbs": {
+                    "1": {
+                        "correct_count": 2,
+                        "persons": {
+                            "tu": {"consecutive_correct": 2, "mastered": False},
+                            "el_ella_usted": {"consecutive_correct": 1, "mastered": False},
+                        },
+                        "present": {
+                            "consecutive_correct": 1,
+                            "correct_count": 1,
+                            "miss_count": 4,
+                            "mastered": False,
+                        },
+                    }
+                },
+            }
+        )
+        entry = progress["verbs"]["1"]
+        self.assertEqual(entry["persons"]["tu"]["consecutive_correct"], 2)
+        self.assertEqual(entry["persons"]["el_ella_usted"]["consecutive_correct"], 1)
+        self.assertEqual(entry["present"]["miss_count"], 4)
+        self.assertFalse(verb_is_mastered(entry, 5))
+
+    def test_conjugation_miss_counts_are_kept_per_tense(self):
+        progress = normalize_progress({})
+        apply_mastery(progress, 1, "present", False, threshold=3, person="tu")
+        apply_mastery(progress, 1, "present", False, threshold=3, person="el_ella_usted")
+        apply_mastery(progress, 1, "preterite", False, threshold=3, person="tu")
+        for _ in range(6):
+            apply_mastery(progress, 1, "imperfect", False, threshold=3, person="el_ella_usted")
+        apply_mastery(progress, 1, "imperfect", True, threshold=3, person="tu")
+        entry = progress["verbs"]["1"]
+        self.assertEqual(entry["present"]["miss_count"], 2)
+        self.assertEqual(entry["preterite"]["miss_count"], 1)
+        self.assertEqual(entry["imperfect"]["miss_count"], 6)
+        self.assertEqual(entry["persons"]["tu"]["consecutive_correct"], 1)
+        self.assertEqual(entry["persons"]["el_ella_usted"]["consecutive_correct"], 0)
+        row = next(item for item in verb_progress_list(progress, 3) if item["id"] == 1)
+        misses = {item["id"]: item for item in row["tense_misses"]}
+        self.assertEqual([item["label"] for item in row["tense_misses"]], ["現在", "点過去", "線過去"])
+        self.assertEqual(misses["present"]["miss_count"], 2)
+        self.assertFalse(misses["present"]["alert"])
+        self.assertEqual(misses["preterite"]["miss_count"], 1)
+        self.assertFalse(tense_miss_view(entry)[1]["alert"])
+        self.assertEqual(misses["imperfect"]["miss_count"], 6)
+        self.assertTrue(misses["imperfect"]["alert"])
 
     def test_vocab_mastery_uses_threshold(self):
         progress = normalize_progress({})

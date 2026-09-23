@@ -9,15 +9,17 @@
   <a href="{{ url_for('conjugate.tenses_page') }}" class="vsc-filter-chip">時制の解説</a>
 </div>
 <section class="mb-3">
-  <h2 class="vsc-hero-title" style="font-size: 1.35rem;">習得済み {{ progress.mastered_count }}/{{ progress.total_verbs }}語</h2>
+  <h2 class="vsc-hero-title" style="font-size: 1.35rem;">tú {{ progress.mastered_tu_count }}/{{ progress.total_verbs }} · él {{ progress.mastered_el_count }}/{{ progress.total_verbs }}</h2>
+  <p class="text-xs mb-1" style="color: var(--text-secondary);">tú形とél形は、それぞれ別に{{ progress.conjugation_threshold }}回連続で習得です。</p>
   <div class="vsc-progress-track">
-    <div class="vsc-progress-fill" style="width: {{ progress.mastered_percent }}%;"></div>
+    <div class="vsc-progress-fill" style="width: {{ progress.mastered_track_percent }}%;"></div>
   </div>
 </section>
 
 <div class="vsc-filter-row" id="verb-filters">
   <button type="button" class="vsc-filter-chip is-active" data-filter="all">すべて</button>
-  <button type="button" class="vsc-filter-chip" data-filter="mastered">習得済み</button>
+  <button type="button" class="vsc-filter-chip" data-filter="tu">tú習得</button>
+  <button type="button" class="vsc-filter-chip" data-filter="el">él習得</button>
   <button type="button" class="vsc-filter-chip" data-filter="learning">未習得</button>
 </div>
 
@@ -26,17 +28,21 @@
   <section class="vsc-verb-group" data-group>
     <h3 class="vsc-verb-group-title">{{ category_labels[cat] }}</h3>
     {% for verb in grouped_verbs[cat] %}
-    <article class="vsc-verb-item{% if verb.mastered %} is-mastered{% endif %}" data-mastered="{{ '1' if verb.mastered else '0' }}">
+    <article class="vsc-verb-item{% if verb.mastered %} is-mastered{% endif %}" data-tu-mastered="{{ '1' if verb.persons.tu.mastered else '0' }}" data-el-mastered="{{ '1' if verb.persons.el_ella_usted.mastered else '0' }}">
       <div class="vsc-verb-copy">
         <div class="vsc-verb-name">{{ verb.infinitive }}</div>
         <div class="vsc-verb-meaning">{{ verb.meaning_ja }}</div>
+        <div class="vsc-tense-misses">
+          {% for miss in verb.tense_misses %}
+          <span class="vsc-tense-miss{% if miss.alert %} is-alert{% endif %}">{{ miss.label }} 誤{{ miss.miss_count }}</span>
+          {% endfor %}
+        </div>
       </div>
-      {% if verb.mastered %}
-      <span class="vsc-master-mark" title="習得済み">{{ svg_check() }}</span>
-      {% else %}
       <div class="vsc-verb-progress" aria-label="{{ verb.person_badge }}">
         <span class="vsc-person-badge">{{ verb.person_badge }}</span>
       </div>
+      {% if verb.mastered %}
+      <span class="vsc-master-mark" title="tú形とél形の両方を習得">{{ svg_check() }}</span>
       {% endif %}
     </article>
     {% endfor %}
@@ -49,19 +55,23 @@
 <script>
 (() => {
   const chips = document.querySelectorAll("#verb-filters .vsc-filter-chip");
-  const items = document.querySelectorAll("[data-mastered]");
+  const items = document.querySelectorAll("[data-tu-mastered]");
   chips.forEach((chip) => {
     chip.addEventListener("click", () => {
       chips.forEach((el) => el.classList.remove("is-active"));
       chip.classList.add("is-active");
       const filter = chip.dataset.filter;
       items.forEach((item) => {
-        const mastered = item.dataset.mastered === "1";
-        const show = filter === "all" || (filter === "mastered" && mastered) || (filter === "learning" && !mastered);
+        const tu = item.dataset.tuMastered === "1";
+        const el = item.dataset.elMastered === "1";
+        const show = filter === "all"
+          || (filter === "tu" && tu)
+          || (filter === "el" && el)
+          || (filter === "learning" && !tu && !el);
         item.style.display = show ? "" : "none";
       });
       document.querySelectorAll("[data-group]").forEach((group) => {
-        const visible = Array.from(group.querySelectorAll("[data-mastered]")).some((el) => el.style.display !== "none");
+        const visible = Array.from(group.querySelectorAll("[data-tu-mastered]")).some((el) => el.style.display !== "none");
         group.style.display = visible ? "" : "none";
       });
     });

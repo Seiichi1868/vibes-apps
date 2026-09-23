@@ -45,11 +45,14 @@
         <span class="vsc-stat-icon vsc-stat-icon-mint vsc-stat-icon-ring">
           <svg class="vsc-progress-ring" viewBox="0 0 36 36" aria-hidden="true">
             <circle class="vsc-progress-ring-bg" cx="18" cy="18" r="15.915" pathLength="100" stroke-dasharray="100"></circle>
-            <circle class="vsc-progress-ring-fg" cx="18" cy="18" r="15.915" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" data-progress-ring="{{ progress.mastered_percent }}"></circle>
+            <circle class="vsc-progress-ring-fg" cx="18" cy="18" r="15.915" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" data-progress-ring="{{ progress.mastered_track_percent }}"></circle>
           </svg>
           {{ svg_check() }}
         </span>
-        <div class="vsc-stat-value"><span data-count-up data-count-to="{{ progress.mastered_count }}">0</span>/{{ progress.total_verbs }}</div>
+        <div class="vsc-stat-value vsc-stat-split">
+          <span>tú <span data-count-up data-count-to="{{ progress.mastered_tu_count }}">0</span>/{{ progress.total_verbs }}</span>
+          <span>él <span data-count-up data-count-to="{{ progress.mastered_el_count }}">0</span>/{{ progress.total_verbs }}</span>
+        </div>
         <div class="vsc-stat-label">習得済み</div>
       </button>
     </div>
