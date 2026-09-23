@@ -781,7 +781,7 @@ def api_generate_postview():
                 "ok": True,
                 "class": cls,
                 "postview_questions": questions,
-                "message": f"事後質問 {q_count} 問を生成しました。",
+                "message": f"事後質問 {q_count} 問と模範解答を生成しました。",
             }
         )
     except ValueError as exc:
@@ -843,6 +843,38 @@ def api_toggle_postview_scaffolding():
                 "class": cls,
                 "postview_scaffolding_enabled": enabled,
                 "message": "事後質問を有効にしました。" if enabled else "事後質問を無効にしました。",
+            }
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"設定の保存に失敗しました: {exc}"}), 500
+
+
+@admin_bp.route("/api/class/lesson/postview/answers", methods=["POST"])
+def api_toggle_postview_answers():
+    """生徒画面に事後質問の模範解答を出すかどうかを保存する。"""
+    data = request.get_json(silent=True) or {}
+    class_id = str(data.get("class_id") or get_active_class_id()).strip()
+    if not class_id:
+        return jsonify({"ok": False, "error": "クラスを選択または作成してください。"}), 400
+
+    enabled = bool(data.get("postview_answers_visible", False))
+    try:
+        cls = update_class_current(
+            class_id,
+            {"postview_answers_visible": enabled},
+        )
+        return jsonify(
+            {
+                "ok": True,
+                "class": cls,
+                "postview_answers_visible": enabled,
+                "message": (
+                    "生徒画面に模範解答を表示します。"
+                    if enabled
+                    else "生徒画面では模範解答を隠し、質問だけ表示します。"
+                ),
             }
         )
     except ValueError as exc:

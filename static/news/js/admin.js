@@ -97,6 +97,7 @@
   let warmupManualSaveTimer = null;
   let vocabSelectionSaving = false;
   const postviewScaffoldingEnabledEl = document.getElementById("postview-scaffolding-enabled");
+  const postviewAnswersVisibleEl = document.getElementById("postview-answers-visible");
   const postviewGenerateBtn = document.getElementById("postview-generate-btn");
   const postviewGenerateStatus = document.getElementById("postview-generate-status");
   const postviewPreview = document.getElementById("postview-preview");
@@ -934,6 +935,7 @@
     if (warmupScaffoldingEnabledEl) warmupScaffoldingEnabledEl.checked = c.warmup_scaffolding_enabled === true;
     renderAdminWarmupPreview(c.warmup_image_url || "", c.warmup_questions || []);
     if (postviewScaffoldingEnabledEl) postviewScaffoldingEnabledEl.checked = c.postview_scaffolding_enabled === true;
+    if (postviewAnswersVisibleEl) postviewAnswersVisibleEl.checked = c.postview_answers_visible === true;
     renderAdminPostviewPreview(c.postview_questions || []);
     scriptAutoManaged = false;
     suppressAutoScriptFill = false;
@@ -3017,6 +3019,20 @@
 
   // ── 事後質問（視聴後） ──────────────────────────────────────────
 
+  function postviewQuestionFromRaw(q) {
+    return {
+      id: q.id,
+      text: q.text || "",
+      answer: q.answer || "",
+      selected: q.selected !== false,
+      manual: q.manual === true,
+    };
+  }
+
+  function escAttr(str) {
+    return esc(str).replace(/"/g, "&quot;");
+  }
+
   function nextPostviewQuestionId() {
     const ids = adminPostviewQuestions.map((q) => Number(q.id)).filter((id) => Number.isFinite(id));
     return ids.length ? Math.max(...ids) + 1 : 1;
@@ -3035,6 +3051,7 @@
       adminPostviewQuestions.push({
         id: nextPostviewQuestionId(),
         text: "",
+        answer: "",
         selected: true,
         manual: true,
       });
@@ -3057,13 +3074,20 @@
     manualQuestions.forEach((q) => {
       const index = adminPostviewQuestions.indexOf(q);
       const dimClass = q.selected ? "" : " opacity-50";
-      html += `<label class="flex items-center gap-1 rounded px-1 py-0.5 bg-white/70${dimClass} cursor-pointer">
-        <input type="checkbox" class="postview-manual-select-cb shrink-0 h-3.5 w-3.5 rounded border-amber-200 text-amber-600"
-          data-index="${index}" ${q.selected ? "checked" : ""}>
-        <span class="shrink-0 text-[9px] font-bold text-amber-700">Q${q.id}</span>
-        <input type="text" class="postview-manual-input compact-input min-w-0 flex-1 text-[10px] py-0.5"
-          data-index="${index}" value="${esc(q.text)}" placeholder="質問（英語）">
-      </label>`;
+      html += `<div class="rounded px-1 py-0.5 bg-white/70${dimClass}">
+        <label class="flex items-center gap-1 cursor-pointer">
+          <input type="checkbox" class="postview-manual-select-cb shrink-0 h-3.5 w-3.5 rounded border-amber-200 text-amber-600"
+            data-index="${index}" ${q.selected ? "checked" : ""}>
+          <span class="shrink-0 text-[9px] font-bold text-amber-700">Q${q.id}</span>
+          <input type="text" class="postview-manual-input compact-input min-w-0 flex-1 text-[10px] py-0.5"
+            data-index="${index}" value="${escAttr(q.text)}" placeholder="質問（英語）">
+        </label>
+        <label class="mt-0.5 flex items-center gap-1 pl-5">
+          <span class="shrink-0 text-[9px] font-semibold text-amber-800">${t("modelAnswer")}</span>
+          <input type="text" class="postview-answer-input compact-input min-w-0 flex-1 text-[10px] py-0.5"
+            data-index="${index}" value="${escAttr(q.answer || "")}" placeholder="${escAttr(t("modelAnswerPlaceholder"))}">
+        </label>
+      </div>`;
     });
     postviewManualRows.innerHTML = html;
     postviewManualRows.querySelectorAll(".postview-manual-select-cb").forEach((cb) => {
@@ -3072,6 +3096,26 @@
     postviewManualRows.querySelectorAll(".postview-manual-input").forEach((input) => {
       input.addEventListener("input", onPostviewManualInputChange);
       input.addEventListener("blur", () => savePostviewSelection({ silent: true }));
+    });
+    bindPostviewAnswerInputs(postviewManualRows);
+  }
+
+  function onPostviewAnswerInput(event) {
+    const index = Number(event.target.dataset.index);
+    if (!Number.isInteger(index) || !adminPostviewQuestions[index]) return;
+    adminPostviewQuestions[index].answer = event.target.value;
+    schedulePostviewManualSave();
+  }
+
+  function bindPostviewAnswerInputs(root) {
+    if (!root) return;
+    root.querySelectorAll(".postview-answer-input").forEach((input) => {
+      input.addEventListener("input", onPostviewAnswerInput);
+      input.addEventListener("blur", () => savePostviewSelection({ silent: true }));
+      input.addEventListener("click", (event) => event.stopPropagation());
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") event.preventDefault();
+      });
     });
   }
 
@@ -3086,6 +3130,7 @@
     adminPostviewQuestions.push({
       id: nextPostviewQuestionId(),
       text: "",
+      answer: "",
       selected: true,
       manual: true,
     });
@@ -3100,14 +3145,7 @@
   }
 
   function renderAdminPostviewPreview(questions) {
-    const incoming = (questions || []).map(function (q) {
-      return {
-        id: q.id,
-        text: q.text || "",
-        selected: q.selected !== false,
-        manual: q.manual === true,
-      };
-    });
+    const incoming = (questions || []).map(postviewQuestionFromRaw);
     const manualFromState = incoming.length
       ? incoming.filter((q) => q.manual)
       : getManualPostviewQuestions();
@@ -3131,12 +3169,19 @@
     aiQuestions.forEach(function (q) {
       const index = adminPostviewQuestions.indexOf(q);
       const dimClass = q.selected ? "" : " opacity-50";
-      html += `<label class="flex items-start gap-2 rounded px-1.5 py-1 ${index % 2 === 0 ? "bg-white/70" : ""}${dimClass} cursor-pointer">
-        <input type="checkbox" class="postview-select-cb shrink-0 mt-0.5 h-3.5 w-3.5 rounded border-amber-200 text-amber-600"
-          data-index="${index}" ${q.selected ? "checked" : ""}>
-        <span class="shrink-0 mr-1 text-amber-700 font-bold">Q${q.id}.</span>
-        <span class="text-slate-700 leading-snug">${esc(q.text)}</span>
-      </label>`;
+      html += `<div class="rounded px-1.5 py-1 ${index % 2 === 0 ? "bg-white/70" : ""}${dimClass}">
+        <label class="flex items-start gap-2 cursor-pointer">
+          <input type="checkbox" class="postview-select-cb shrink-0 mt-0.5 h-3.5 w-3.5 rounded border-amber-200 text-amber-600"
+            data-index="${index}" ${q.selected ? "checked" : ""}>
+          <span class="shrink-0 mr-1 text-amber-700 font-bold">Q${q.id}.</span>
+          <span class="text-slate-700 leading-snug">${esc(q.text)}</span>
+        </label>
+        <label class="mt-0.5 ml-6 flex items-center gap-1 text-[9px] text-amber-800">
+          <span class="shrink-0 font-semibold">${t("modelAnswer")}</span>
+          <input type="text" class="postview-answer-input compact-input min-w-0 flex-1 text-[10px] py-0.5"
+            data-index="${index}" value="${escAttr(q.answer || "")}" placeholder="${escAttr(t("modelAnswerPlaceholder"))}">
+        </label>
+      </div>`;
     });
     html += `</div>`;
     postviewPreview.innerHTML = html;
@@ -3144,6 +3189,7 @@
     postviewPreview.querySelectorAll(".postview-select-cb").forEach(function (cb) {
       cb.addEventListener("change", onPostviewSelectionChange);
     });
+    bindPostviewAnswerInputs(postviewPreview);
     renderPostviewManualRows();
   }
 
@@ -3163,14 +3209,7 @@
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "保存に失敗しました");
       const savedManual = getManualPostviewQuestions();
-      const savedFromServer = (data.postview_questions || questionsToSave).map(function (q) {
-        return {
-          id: q.id,
-          text: q.text || "",
-          selected: q.selected !== false,
-          manual: q.manual === true,
-        };
-      });
+      const savedFromServer = (data.postview_questions || questionsToSave).map(postviewQuestionFromRaw);
       const serverManual = savedFromServer.filter((q) => q.manual);
       const serverAi = savedFromServer.filter((q) => !q.manual);
       const draftManual = savedManual.filter((q) => !(q.text || "").trim());
@@ -3227,6 +3266,31 @@
       } catch (err) {
         showMessage(lessonMessage, err.message, true);
         postviewScaffoldingEnabledEl.checked = !enabled;
+      }
+    });
+  }
+
+  if (postviewAnswersVisibleEl) {
+    postviewAnswersVisibleEl.addEventListener("change", async function () {
+      const classId = getSelectedClassId() || (lessonClassId && lessonClassId.value);
+      if (!classId) {
+        showMessage(lessonMessage, "クラスを選択してから操作してください。", true);
+        postviewAnswersVisibleEl.checked = !postviewAnswersVisibleEl.checked;
+        return;
+      }
+      const enabled = postviewAnswersVisibleEl.checked;
+      try {
+        const res = await fetch("/news/admin/api/class/lesson/postview/answers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ class_id: classId, postview_answers_visible: enabled }),
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "保存に失敗しました");
+        showMessage(lessonMessage, data.message || "模範解答の表示設定を保存しました。", false);
+      } catch (err) {
+        showMessage(lessonMessage, err.message, true);
+        postviewAnswersVisibleEl.checked = !enabled;
       }
     });
   }

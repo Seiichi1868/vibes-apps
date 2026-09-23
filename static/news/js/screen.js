@@ -30,6 +30,7 @@
   const viewButtons = controlsEl ? controlsEl.querySelectorAll("[data-view]") : [];
 
   let currentView = "video";
+  let postviewRevealCount = 0;
   let youtubeApiPlayer = null;
   let youtubeApiReadyPromise = null;
   let activePlayerSubtitles = null;
@@ -344,26 +345,72 @@
     warmupContent.innerHTML = html;
   }
 
+  function updatePostviewRevealUi() {
+    if (!postviewContent || !viewPostview) return;
+    const answers = postviewContent.querySelectorAll(".screen-postview-answer");
+    const total = answers.length;
+    const pending = postviewRevealCount < total;
+    viewPostview.classList.toggle("is-answer-pending", pending);
+    const hint = postviewContent.querySelector(".screen-postview-hint");
+    if (!hint) return;
+    if (!total || !pending) {
+      hint.classList.add("hidden");
+      return;
+    }
+    hint.classList.remove("hidden");
+    hint.textContent = t("screenClickAnswer", { shown: postviewRevealCount, total: total });
+  }
+
+  function revealNextPostviewAnswer() {
+    if (currentView !== "postview" || !postviewContent) return;
+    const answers = postviewContent.querySelectorAll(".screen-postview-answer");
+    if (postviewRevealCount >= answers.length) return;
+    const el = answers[postviewRevealCount];
+    el.classList.add("is-shown");
+    el.setAttribute("aria-hidden", "false");
+    postviewRevealCount += 1;
+    updatePostviewRevealUi();
+  }
+
   function renderPostview(questions) {
     if (!postviewContent) return;
+    postviewRevealCount = 0;
     const list = (questions || []).filter(function (q) { return q && q.text; });
     if (!list.length) {
       postviewContent.innerHTML =
         '<p class="text-center text-slate-400">' + t("screenNoPostview") + "</p>";
+      if (viewPostview) viewPostview.classList.remove("is-answer-pending");
       return;
     }
-    postviewContent.style.setProperty("--warmup-q-size", warmupQuestionFontSize(list.length, false));
+    const answerCount = list.filter(function (q) { return q.answer; }).length;
+    const fontSize = answerCount
+      ? "clamp(1.05rem, 3.1vmin, 2.35rem)"
+      : warmupQuestionFontSize(list.length, false);
+    postviewContent.style.setProperty("--warmup-q-size", fontSize);
     let html = '<p class="screen-warmup-heading">' + t("screenPostviewHeading") + "</p>";
-    html += '<ol class="screen-warmup-list">';
+    html += '<ol class="screen-warmup-list screen-postview-list">';
     list.forEach(function (q, i) {
+      html += '<li class="screen-postview-item">';
       html +=
-        '<li class="screen-warmup-q flex items-start gap-[0.35em]">' +
+        '<div class="screen-warmup-q flex items-start gap-[0.35em]">' +
         '<span class="screen-warmup-num">Q' + (i + 1) + ".</span>" +
         '<span class="screen-warmup-text">' + escHtml(q.text) + "</span>" +
-        "</li>";
+        "</div>";
+      if (q.answer) {
+        html +=
+          '<p class="screen-postview-answer" aria-hidden="true"><span>' +
+          '<span class="screen-postview-answer-label">A.</span>' +
+          escHtml(q.answer) +
+          "</span></p>";
+      }
+      html += "</li>";
     });
     html += "</ol>";
+    if (answerCount) {
+      html += '<p class="screen-postview-hint"></p>';
+    }
     postviewContent.innerHTML = html;
+    updatePostviewRevealUi();
   }
 
   function setActiveView(view) {
@@ -443,6 +490,24 @@
       if (btn.disabled) return;
       setActiveView(btn.dataset.view);
     });
+  });
+
+  if (viewPostview) {
+    viewPostview.addEventListener("click", function () {
+      revealNextPostviewAnswer();
+    });
+  }
+
+  document.addEventListener("keydown", function (event) {
+    if (currentView !== "postview") return;
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    const key = event.key;
+    if (key !== " " && key !== "Spacebar" && key !== "ArrowRight" && key !== "ArrowDown" && key !== "PageDown" && key !== "Enter") {
+      return;
+    }
+    if (event.target && event.target.closest && event.target.closest("button, a, input, textarea")) return;
+    event.preventDefault();
+    revealNextPostviewAnswer();
   });
 
   if (fullscreenBtn) {

@@ -213,10 +213,15 @@ def _class_public_payload(class_id: str, origin: str, display_language: str = "j
         warmup_image_url = ""
 
     postview_scaffolding_enabled = bool(current.get("postview_scaffolding_enabled", False))
+    postview_answers_visible = bool(current.get("postview_answers_visible", False))
     if postview_scaffolding_enabled:
-        postview_questions = selected_display_questions(current.get("postview_questions"))
+        postview_questions = selected_display_questions(
+            current.get("postview_questions"),
+            include_answers=postview_answers_visible,
+        )
     else:
         postview_questions = []
+        postview_answers_visible = False
 
     return {
         "id": cls["id"],
@@ -245,6 +250,7 @@ def _class_public_payload(class_id: str, origin: str, display_language: str = "j
         "warmup_image_url": warmup_image_url,
         "warmup_questions": warmup_questions,
         "postview_scaffolding_enabled": postview_scaffolding_enabled,
+        "postview_answers_visible": postview_answers_visible,
         "postview_questions": postview_questions,
     }
 

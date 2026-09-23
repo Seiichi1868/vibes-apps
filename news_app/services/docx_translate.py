@@ -221,18 +221,31 @@ def _add_vocab_table(doc, vocabulary: list[dict], *, col_widths: list[int]) -> N
 
 
 def _add_question_list(doc, questions: list[dict]) -> None:
+    answer_color = RGBColor(0xB4, 0x53, 0x09)
     for index, question in enumerate(questions, start=1):
         text = str(question.get("text") or "").strip()
         if not text:
             continue
+        answer = str(question.get("answer") or "").strip()
         paragraph = doc.add_paragraph()
         paragraph.paragraph_format.space_before = Pt(2)
-        paragraph.paragraph_format.space_after = Pt(6)
+        paragraph.paragraph_format.space_after = Pt(1 if answer else 6)
         paragraph.paragraph_format.line_spacing = 1.25
         num_run = paragraph.add_run(f"Q{index}. ")
         _set_run_font(num_run, size_pt=11, bold=True, color=HEADER_EN_COLOR)
         text_run = paragraph.add_run(text)
         _set_run_font(text_run, size_pt=11, color=BODY_EN_COLOR)
+        if not answer:
+            continue
+        answer_p = doc.add_paragraph()
+        answer_p.paragraph_format.left_indent = Cm(0.75)
+        answer_p.paragraph_format.space_before = Pt(0)
+        answer_p.paragraph_format.space_after = Pt(8)
+        answer_p.paragraph_format.line_spacing = 1.2
+        label_run = answer_p.add_run("A. ")
+        _set_run_font(label_run, size_pt=10, bold=True, color=answer_color)
+        answer_run = answer_p.add_run(answer)
+        _set_run_font(answer_run, size_pt=10, color=BODY_EN_COLOR)
 
 
 def build_lesson_materials_docx(

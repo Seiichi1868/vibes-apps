@@ -535,7 +535,7 @@
 
   // ── 事後質問（視聴後の会話練習） ────────────────────────────────
 
-  function renderPostview(questions, enabled) {
+  function renderPostview(questions, enabled, showAnswers) {
     if (!postviewAccordion) return;
     var visibleQuestions = (questions || []).filter(function (q) {
       return q && q.text;
@@ -546,12 +546,19 @@
     }
     if (!postviewContentWrap) return;
     var html = '<p class="mb-1 text-[10px] font-semibold text-amber-800">' + t("postviewPrompt") + "</p>";
-    html += '<ol class="space-y-1 list-none">';
+    html += '<ol class="space-y-1.5 list-none">';
     visibleQuestions.forEach(function (q, i) {
-      html += '<li class="flex items-start gap-1.5 text-[11px] text-slate-700">' +
+      html += '<li class="text-[11px] text-slate-700">' +
+        '<div class="flex items-start gap-1.5">' +
         '<span class="shrink-0 text-[10px] font-bold text-amber-700">Q' + (i + 1) + '.</span>' +
         '<span class="leading-snug">' + escHtml(q.text) + '</span>' +
-        '</li>';
+        '</div>';
+      if (showAnswers && q.answer) {
+        html += '<p class="mt-0.5 pl-5 text-[10px] leading-snug text-amber-900">' +
+          '<span class="font-semibold">' + t("modelAnswer") + ':</span> ' +
+          escHtml(q.answer) + '</p>';
+      }
+      html += '</li>';
     });
     html += '</ol>';
     postviewContentWrap.innerHTML = html;
@@ -565,9 +572,10 @@
     postviewToggleBtn.addEventListener("click", function () {
       postviewOpen = !postviewOpen;
       if (postviewOpen) {
-        var h = Math.min(postviewBody.scrollHeight, 320);
+        var limit = 480;
+        var h = Math.min(postviewBody.scrollHeight, limit);
         postviewBody.style.maxHeight = h + "px";
-        postviewBody.style.overflowY = postviewBody.scrollHeight > 320 ? "auto" : "hidden";
+        postviewBody.style.overflowY = postviewBody.scrollHeight > limit ? "auto" : "hidden";
         if (postviewToggleLabel) postviewToggleLabel.textContent = t("closeAccordion");
       } else {
         postviewBody.style.maxHeight = "0";
@@ -972,7 +980,8 @@
     );
     renderPostview(
       cls.postview_questions || [],
-      cls.postview_scaffolding_enabled === true
+      cls.postview_scaffolding_enabled === true,
+      cls.postview_answers_visible === true
     );
     setVideoPlayer(cls.video);
 

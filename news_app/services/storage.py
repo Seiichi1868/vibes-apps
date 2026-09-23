@@ -75,6 +75,7 @@ DEFAULT_CLASS_CURRENT = {
     "warmup_scaffolding_enabled": False,
     "postview_questions": [],
     "postview_scaffolding_enabled": False,
+    "postview_answers_visible": False,
 }
 
 DEFAULT_STATE = {
@@ -235,18 +236,28 @@ def _normalize_warmup_questions(raw) -> list[dict]:
         item = {"id": q_id, "text": text, "selected": selected}
         if manual:
             item["manual"] = True
+        answer = str(entry.get("answer") or "").strip()
+        if len(answer) > 400:
+            answer = answer[:400].rstrip()
+        if answer:
+            item["answer"] = answer
         items.append(item)
     return items
 
 
-def selected_display_questions(raw) -> list[dict]:
+def selected_display_questions(raw, *, include_answers: bool = True) -> list[dict]:
     """選択済みの質問だけを、表示用の連番付きリストにする。"""
     items: list[dict] = []
     for q in _normalize_warmup_questions(raw):
         text = str(q.get("text") or "").strip()
         if not text or not q.get("selected", True):
             continue
-        items.append({"id": len(items) + 1, "text": text})
+        item = {"id": len(items) + 1, "text": text}
+        if include_answers:
+            answer = str(q.get("answer") or "").strip()
+            if answer:
+                item["answer"] = answer
+        items.append(item)
     return items
 
 
@@ -370,6 +381,7 @@ def _normalize_current(raw: dict | None) -> dict:
             "warmup_scaffolding_enabled": bool(raw.get("warmup_scaffolding_enabled", False)),
             "postview_questions": _normalize_warmup_questions(raw.get("postview_questions")),
             "postview_scaffolding_enabled": bool(raw.get("postview_scaffolding_enabled", False)),
+            "postview_answers_visible": bool(raw.get("postview_answers_visible", False)),
         }
     )
     return current
@@ -408,6 +420,7 @@ def _normalize_class(class_id: str, raw: dict) -> dict:
                 "warmup_scaffolding_enabled": bool(item.get("warmup_scaffolding_enabled", False)),
                 "postview_questions": _normalize_warmup_questions(item.get("postview_questions")),
                 "postview_scaffolding_enabled": bool(item.get("postview_scaffolding_enabled", False)),
+                "postview_answers_visible": bool(item.get("postview_answers_visible", False)),
             }
         )
     return {

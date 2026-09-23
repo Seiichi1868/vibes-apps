@@ -162,6 +162,57 @@
     border-radius: 0.75rem;
     object-fit: contain;
   }
+  #view-postview.is-answer-pending {
+    cursor: pointer;
+  }
+  .screen-postview-item {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .screen-postview-answer {
+    display: grid;
+    grid-template-rows: 0fr;
+    margin-left: 2.2em;
+    opacity: 0;
+    transform: translateY(-0.35rem);
+    color: #fcd34d;
+    font-size: calc(var(--warmup-q-size, 2rem) * 0.62);
+    font-weight: 500;
+    line-height: 1.35;
+    transition: grid-template-rows 0.5s ease, opacity 0.6s ease, transform 0.6s ease;
+  }
+  .screen-postview-answer > span {
+    overflow: hidden;
+    min-height: 0;
+  }
+  .screen-postview-answer.is-shown {
+    grid-template-rows: 1fr;
+    opacity: 1;
+    transform: none;
+  }
+  .screen-postview-answer-label {
+    font-weight: 700;
+    margin-right: 0.35em;
+  }
+  .screen-postview-hint {
+    position: absolute;
+    left: 50%;
+    bottom: 0.85rem;
+    transform: translateX(-50%);
+    margin: 0;
+    font-size: clamp(0.75rem, 1.6vmin, 1rem);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: rgba(253, 230, 138, 0.8);
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .screen-postview-answer {
+      transition: none;
+    }
+  }
   .screen-view--warmup {
     flex-direction: column;
     justify-content: stretch;
@@ -221,6 +272,6 @@
   window.SCREEN_INITIAL_CLASS_ID = {{ initial_class_id|tojson }};
   window.SCREEN_CLASSES = {{ classes|tojson }};
 </script>
-<script src="{{ url_for('static', filename='news/js/i18n.js', v='20260907d') }}"></script>
-<script src="{{ url_for('static', filename='news/js/screen.js', v='20260907b') }}"></script>
+<script src="{{ url_for('static', filename='news/js/i18n.js', v='20260923a') }}"></script>
+<script src="{{ url_for('static', filename='news/js/screen.js', v='20260923a') }}"></script>
 {% endblock %}
