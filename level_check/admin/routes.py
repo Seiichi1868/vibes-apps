@@ -4,9 +4,10 @@ roster 管理・問題バンク編集・結果閲覧・設定切替をすべて�
 """
 import io
 import logging
+from pathlib import Path
 
 import openpyxl
-from flask import Blueprint, jsonify, render_template, request, send_file
+from flask import Blueprint, jsonify, render_template, request, send_file, send_from_directory
 
 from level_check.config import (
     AI_MODEL_MODES,
@@ -76,6 +77,18 @@ def _settings_payload() -> dict:
         "categories": [{"id": c, "label": CATEGORY_LABELS[c]} for c in CATEGORIES],
         "api_key_configured": bool(get_openai_api_key()),
     }
+
+
+@admin_bp.route("/manifest.json")
+def web_app_manifest():
+    """管理画面用 PWA manifest（start_url / scope: /level_check/admin/）。"""
+    response = send_from_directory(
+        Path(admin_bp.root_path).parent / "static" / "admin",
+        "manifest.json",
+        mimetype="application/manifest+json",
+    )
+    response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return response
 
 
 @admin_bp.route("/")

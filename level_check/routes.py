@@ -147,6 +147,18 @@ def _resolve_extension(filename: str, mimetype: str | None) -> str:
     return guessed.lstrip(".").lower() or "webm"
 
 
+@main_bp.route("/manifest.json")
+def web_app_manifest():
+    """生徒画面用 PWA manifest（scope: /level_check/）。"""
+    response = send_from_directory(
+        Path(main_bp.root_path) / "static",
+        "manifest.json",
+        mimetype="application/manifest+json",
+    )
+    response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return response
+
+
 @main_bp.route("/")
 def index():
     settings = load_settings()
