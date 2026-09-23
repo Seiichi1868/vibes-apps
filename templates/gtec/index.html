@@ -14,7 +14,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="GTEC Speaking">
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="{{ url_for('static', filename='gtec/css/style.css', v='20260923b') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='gtec/css/style.css', v='20260923c') }}">
   <style>
     .gtec-page-bg {
       background-image: url("{{ url_for('static', filename=background.background_image) }}");
@@ -29,7 +29,7 @@
       theme: {
         extend: {
           colors: {
-            brand: { DEFAULT: '#4f46e5', dark: '#3730a3', light: '#818cf8' }
+            brand: { DEFAULT: '#2db892', dark: '#0f766e', light: '#7EE0C3' }
           }
         }
       }
@@ -40,12 +40,12 @@
 
   <!-- オープニング -->
   <div id="opening-overlay"
-    class="fixed inset-0 z-[70] flex items-center justify-center overflow-hidden bg-gradient-to-br from-sky-50 via-white to-emerald-50 p-6">
+    class="fixed inset-0 z-[70] flex items-center justify-center overflow-hidden bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-6">
     <div class="gtec-page-bg absolute inset-0 scale-110 opacity-[0.45]"></div>
-    <div class="absolute inset-0 bg-gradient-to-br from-white/70 via-sky-50/55 to-emerald-50/65"></div>
+    <div class="absolute inset-0 bg-gradient-to-br from-white/70 via-emerald-50/55 to-teal-50/65"></div>
     <div class="absolute inset-0 bg-white/20"></div>
-    <div class="gtec-intro-orb absolute -left-16 top-14 h-48 w-48 rounded-full bg-indigo-200/45 blur-3xl"></div>
-    <div class="gtec-intro-orb absolute -right-12 bottom-16 h-56 w-56 rounded-full bg-emerald-200/45 blur-3xl" style="animation-delay: .35s"></div>
+    <div class="gtec-intro-orb absolute -left-16 top-14 h-48 w-48 rounded-full bg-teal-200/50 blur-3xl"></div>
+    <div class="gtec-intro-orb absolute -right-12 bottom-16 h-56 w-56 rounded-full bg-emerald-200/50 blur-3xl" style="animation-delay: .35s"></div>
     <div class="gtec-intro-card relative text-center">
       <p class="gtec-intro-glass-label mb-2 text-[11px] font-semibold uppercase tracking-[0.35em]">Welcome to</p>
       <img class="gtec-intro-logo" src="{{ url_for('static', filename='gtec/icons/icon-192x192.png', v='20260923a') }}" width="192" height="192" alt="" decoding="async" aria-hidden="true">
@@ -57,8 +57,8 @@
   <!-- 背景透かし（News と同様の自然風景） -->
   <div class="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
     <div id="page-bg-layer" class="gtec-page-bg absolute inset-0 scale-105" style="opacity: {{ background_opacity }}"></div>
-    <div class="absolute inset-0 bg-gradient-to-br from-sky-100/75 via-white/55 to-emerald-100/70"></div>
-    <div class="absolute inset-0 bg-gradient-to-t from-emerald-50/40 via-transparent to-sky-50/30"></div>
+    <div class="absolute inset-0 bg-gradient-to-br from-teal-100/70 via-white/55 to-emerald-100/70"></div>
+    <div class="absolute inset-0 bg-gradient-to-t from-emerald-50/40 via-transparent to-teal-50/35"></div>
   </div>
 
   <!-- ── Header ─────────────────────────────────────────────── -->
@@ -67,7 +67,7 @@
       <div class="flex items-center gap-3">
         <img class="gtec-brand-logo" src="{{ url_for('static', filename='gtec/icons/icon-192x192.png', v='20260923a') }}" width="192" height="192" alt="" decoding="async" aria-hidden="true">
         <div>
-          <h1 class="text-lg font-bold text-indigo-700 leading-tight">GTEC Speaking</h1>
+          <h1 class="text-lg font-bold text-teal-700 leading-tight">GTEC Speaking</h1>
           <p class="text-xs text-slate-500">公式評価基準準拠 · 自動採点</p>
         </div>
       </div>

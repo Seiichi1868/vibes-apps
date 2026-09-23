@@ -279,19 +279,19 @@ function renderProblemAdmin() {
         <textarea class="admin-problem-textarea problem-field" data-part="${part}" data-num="${editNum}" data-key="schedule" rows="4"></textarea>
         <label class="block text-[10px] text-slate-600 mt-2 mb-1">質問（JSON）</label>
         <textarea class="admin-problem-textarea problem-field" data-part="${part}" data-num="${editNum}" data-key="questions" rows="5"></textarea>
-        <div class="mt-3 rounded-lg border border-sky-200 bg-sky-50/70 p-3">
+        <div class="mt-3 rounded-lg border border-cyan-200 bg-cyan-50/70 p-3">
           <label class="flex items-center justify-between gap-3 cursor-pointer">
             <span>
-              <span class="block text-[11px] font-bold text-sky-800">ページ更新ごとに4問をランダム出題</span>
+              <span class="block text-[11px] font-bold text-cyan-800">ページ更新ごとに4問をランダム出題</span>
               <span class="block text-[10px] text-slate-500">オンの場合、下の固定選択は使用されません</span>
             </span>
             <input type="checkbox" class="problem-field part-b-random-toggle h-5 w-5"
               data-part="${part}" data-num="${editNum}" data-key="randomQuestions" />
           </label>
-          <div class="part-b-fixed-question-area mt-3 border-t border-sky-200 pt-3">
+          <div class="part-b-fixed-question-area mt-3 border-t border-cyan-200 pt-3">
             <div class="flex items-center justify-between mb-2">
-              <span class="text-[11px] font-bold text-sky-800">通常出題する4問を選択</span>
-              <span class="part-b-question-count text-[10px] font-bold text-sky-700">0 / 4問</span>
+              <span class="text-[11px] font-bold text-cyan-800">通常出題する4問を選択</span>
+              <span class="part-b-question-count text-[10px] font-bold text-cyan-700">0 / 4問</span>
             </div>
             <div class="space-y-1.5">
               ${questions.map((question, index) => `
@@ -311,7 +311,7 @@ function renderProblemAdmin() {
         <input class="admin-problem-input problem-field mb-2" data-part="${part}" data-num="${editNum}" data-key="storyImage" placeholder="gtec/images/part-c-story-${editNum}.png" />
         ${[0, 1, 2, 3].map(i => `
           <div class="mt-2">
-            <label class="block text-[10px] font-semibold text-violet-700 mb-1">Panel ${i + 1}</label>
+            <label class="block text-[10px] font-semibold text-emerald-700 mb-1">Panel ${i + 1}</label>
             <input class="admin-problem-input problem-field mb-1" data-part="${part}" data-num="${editNum}" data-key="panel-desc-${i}" placeholder="description" />
             <input class="admin-problem-input problem-field" data-part="${part}" data-num="${editNum}" data-key="panel-ex-${i}" placeholder="example sentence" />
           </div>
@@ -329,7 +329,7 @@ function renderProblemAdmin() {
         <button type="button" class="admin-problem-toggle" data-part="${part}" aria-expanded="${isOpen}">
           <span class="admin-problem-toggle-icon">${isOpen ? '▼' : '▶'}</span>
           <span class="admin-problem-toggle-label">
-            <span class="text-[11px] font-bold text-indigo-800">${PART_LABELS[part]}</span>
+            <span class="text-[11px] font-bold text-teal-800">${PART_LABELS[part]}</span>
             <span class="text-[10px] text-slate-500">既定: 問題${active} / 編集中: 問題${editNum}</span>
           </span>
         </button>

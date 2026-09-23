@@ -476,7 +476,7 @@ function renderWordComparisonHTML(referenceText, spokenText) {
       <div class="mb-3">
         <div class="flex items-center justify-between mb-2">
           <p class="text-xs font-semibold text-slate-600">発音一致率</p>
-          <span class="text-sm font-bold text-indigo-700">${percent}%</span>
+          <span class="text-sm font-bold text-teal-700">${percent}%</span>
         </div>
         <div class="accuracy-bar mb-2">
           <div class="accuracy-bar-fill" style="width:${percent}%"></div>
@@ -852,11 +852,11 @@ function cardWrap(html) {
 
 function timerDisplay(sec, phase) {
   const color =
-    phase === 'prep' ? 'text-sky-600' :
+    phase === 'prep' ? 'text-teal-600' :
     sec <= 5         ? 'text-red-600 animate-pulse' :
     sec <= 10        ? 'text-orange-500' : 'text-emerald-600';
   const label = phase === 'prep' ? '準備時間' : '解答時間';
-  const bg    = phase === 'prep' ? 'bg-sky-50 border-sky-200' : 'bg-emerald-50 border-emerald-200';
+  const bg    = phase === 'prep' ? 'bg-teal-50 border-teal-200' : 'bg-emerald-50 border-emerald-200';
   return `
     <div class="flex flex-col items-center ${bg} border rounded-2xl p-5 mb-4">
       <span class="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-1">${label}</span>
@@ -883,7 +883,7 @@ function transcriptBox(id) {
 function startBtn(label = 'スタート', id = 'start-btn') {
   return `
     <button id="${id}"
-      class="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95
+      class="w-full py-3.5 rounded-xl bg-teal-600 hover:bg-teal-700 active:scale-95
              text-white font-bold text-base shadow transition-all">
       ▶ ${label}
     </button>`;
@@ -892,25 +892,24 @@ function startBtn(label = 'スタート', id = 'start-btn') {
 function renderLoading(msg = '採点中...') {
   $root().innerHTML = `
     <div class="flex flex-col items-center justify-center py-16 gap-4">
-      <div class="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-      <p class="text-indigo-700 font-semibold text-lg">${msg}</p>
+      <div class="w-12 h-12 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin"></div>
+      <p class="text-teal-700 font-semibold text-lg">${msg}</p>
       <p class="text-slate-400 text-sm">OpenAI で採点しています。しばらくお待ちください。</p>
     </div>`;
 }
 
 // ─── 8. 結果レンダラ ─────────────────────────────────────────
 
-function scoreCircle(score, max, label, color = 'indigo') {
+function scoreCircle(score, max, label, color = 'teal') {
   const colors = {
-    indigo: ['bg-indigo-600', 'text-indigo-700'],
-    sky:    ['bg-sky-500',    'text-sky-700'],
-    violet: ['bg-violet-500', 'text-violet-700'],
-    teal:   ['bg-teal-500',   'text-teal-700'],
+    teal:   ['bg-teal-600',   'text-teal-700'],
+    cyan:   ['bg-cyan-500',   'text-cyan-700'],
     emerald:['bg-emerald-500','text-emerald-700'],
+    sky:    ['bg-cyan-500',   'text-cyan-700'],
     amber:  ['bg-amber-500',  'text-amber-700'],
     rose:   ['bg-rose-500',   'text-rose-700'],
   };
-  const [bg, txt] = colors[color] || colors.indigo;
+  const [bg, txt] = colors[color] || colors.teal;
   const pct = max > 0 ? Math.round((score / max) * 100) : 0;
   const grade = pct >= 80 ? '🌟' : pct >= 60 ? '👍' : pct >= 40 ? '📝' : '💪';
   return `
@@ -1001,8 +1000,8 @@ function feedbackBlock(fb) {
 function retryBtn() {
   return `
     <button id="retry-btn"
-      class="mt-4 w-full py-3 rounded-xl border-2 border-indigo-600 text-indigo-700 font-bold
-             hover:bg-indigo-50 active:scale-95 transition-all">
+      class="mt-4 w-full py-3 rounded-xl border-2 border-teal-600 text-teal-700 font-bold
+             hover:bg-teal-50 active:scale-95 transition-all">
       🔁 もう一度練習する
     </button>`;
 }
@@ -1043,9 +1042,9 @@ async function runPartA() {
   if (prep.enabled) {
     let timerEl;
     $root().innerHTML = cardWrap(`
-      <p class="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-3">${d.title} — 準備</p>
+      <p class="text-xs font-bold text-teal-600 uppercase tracking-wider mb-3">${d.title} — 準備</p>
       <div id="timer-wrap"></div>
-      <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-base leading-relaxed text-slate-800 font-medium">
+      <div class="bg-teal-50 border border-teal-200 rounded-xl p-4 text-base leading-relaxed text-slate-800 font-medium">
         ${d.text}
       </div>
       <p class="text-center text-sm text-slate-400 mt-3">英文をよく読んで発音を確認してください</p>
@@ -1062,7 +1061,7 @@ async function runPartA() {
     <p class="text-xs font-bold text-red-600 uppercase tracking-wider mb-3">${d.title} — 録音</p>
     <div id="timer-wrap"></div>
     ${recIndicator(true)}
-    <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-base leading-relaxed text-slate-800 font-medium mb-3">
+    <div class="bg-teal-50 border border-teal-200 rounded-xl p-4 text-base leading-relaxed text-slate-800 font-medium mb-3">
       ${d.text}
     </div>
     <p class="text-xs text-slate-400 mb-1">文字起こし</p>
@@ -1103,9 +1102,9 @@ function renderPartAResult(result, text, duration, targetText) {
 
   $root().innerHTML = `
     <div class="mb-4">${cardWrap(`
-      <p class="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-4">Part A 結果</p>
+      <p class="text-xs font-bold text-teal-600 uppercase tracking-wider mb-4">Part A 結果</p>
       <div class="flex justify-around mb-4">
-        ${scoreCircle(s.fluency_pronunciation ?? 0, 4, '発音・流ちょうさ', 'indigo')}
+        ${scoreCircle(s.fluency_pronunciation ?? 0, 4, '発音・流ちょうさ', 'teal')}
       </div>
       <div class="text-xs text-slate-500 text-center mb-4">
         推定 WPM: <strong>${wpm}</strong>（目安: 120〜150）
@@ -1134,7 +1133,7 @@ function buildScheduleHTML(schedule) {
       rows += `
         <tr class="bg-white border-b border-slate-300 last:border-b-0">
           <td class="w-24 px-3 py-2 text-center font-bold text-slate-800 border-r border-slate-300">
-            <span class="${row.publicHoliday ? 'inline-block border-2 border-sky-600 px-2 py-0.5' : ''}">
+            <span class="${row.publicHoliday ? 'inline-block border-2 border-cyan-600 px-2 py-0.5' : ''}">
               ${escapeHTML(row.date || '')}
             </span>
           </td>
@@ -1150,14 +1149,14 @@ function buildScheduleHTML(schedule) {
         <tbody>${rows}</tbody>
       </table>
       <p class="px-3 py-2 text-xs text-slate-600 bg-slate-50 border-t border-slate-300">
-        <span class="inline-block w-9 h-4 border-2 border-sky-600 align-middle mr-1"></span>
+        <span class="inline-block w-9 h-4 border-2 border-cyan-600 align-middle mr-1"></span>
         = public holiday
       </p>`;
   }
 
   const rows = schedule.map((r, i) =>
-    `<tr class="${i % 2 === 0 ? 'bg-sky-50' : 'bg-white'}">
-      <td class="px-3 py-2 font-mono text-xs text-sky-700 whitespace-nowrap">${escapeHTML(r.time || '')}</td>
+    `<tr class="${i % 2 === 0 ? 'bg-cyan-50' : 'bg-white'}">
+      <td class="px-3 py-2 font-mono text-xs text-cyan-700 whitespace-nowrap">${escapeHTML(r.time || '')}</td>
       <td class="px-3 py-2 font-semibold text-slate-800 text-sm">${escapeHTML(r.activity || '')}</td>
       <td class="px-3 py-2 text-slate-500 text-xs">${escapeHTML(r.place || '')}</td>
     </tr>`
@@ -1165,7 +1164,7 @@ function buildScheduleHTML(schedule) {
   return `
     <table class="w-full text-left border-collapse rounded-xl overflow-hidden text-sm">
       <thead>
-        <tr class="bg-sky-600 text-white">
+        <tr class="bg-cyan-600 text-white">
           <th class="px-3 py-2 font-semibold">時刻</th>
           <th class="px-3 py-2 font-semibold">予定</th>
           <th class="px-3 py-2 font-semibold">場所</th>
@@ -1177,12 +1176,12 @@ function buildScheduleHTML(schedule) {
 
 function buildPartBInformationHTML(d) {
   const information = d.informationImage
-    ? `<div class="border border-sky-200 rounded-xl overflow-hidden bg-white p-2">
+    ? `<div class="border border-cyan-200 rounded-xl overflow-hidden bg-white p-2">
         <img src="${escapeHTML(d.informationImage)}"
           alt="公園周辺のサイクリングマップ"
           class="block w-full h-auto max-h-[34rem] object-contain mx-auto" />
        </div>`
-    : `<div class="border border-sky-200 rounded-xl overflow-hidden">${buildScheduleHTML(d.schedule || [])}</div>`;
+    : `<div class="border border-cyan-200 rounded-xl overflow-hidden">${buildScheduleHTML(d.schedule || [])}</div>`;
   return `
     ${d.heading ? `<p class="text-lg font-semibold text-slate-800 underline mb-3">${escapeHTML(d.heading)}</p>` : ''}
     ${d.instructionJa ? `
@@ -1209,7 +1208,7 @@ async function runPartB() {
   if (prep.enabled) {
     let timerEl;
     $root().innerHTML = cardWrap(`
-      <p class="text-xs font-bold text-sky-600 uppercase tracking-wider mb-3">${d.title} — 準備</p>
+      <p class="text-xs font-bold text-cyan-600 uppercase tracking-wider mb-3">${d.title} — 準備</p>
       <div id="timer-wrap"></div>
       ${buildPartBInformationHTML(d)}
       <p class="text-center text-sm text-slate-400 mt-3">画面の資料を確認してください</p>
@@ -1227,10 +1226,10 @@ async function runPartB() {
     if (mobile) {
       // スマホ: ユーザーがタップするまで待つ → ジェスチャー内で即座に読み上げ
       $root().innerHTML = cardWrap(`
-        <p class="text-xs font-bold text-sky-600 uppercase tracking-wider mb-1">${d.title} — 質問 ${qi + 1} / ${d.questions.length}</p>
+        <p class="text-xs font-bold text-cyan-600 uppercase tracking-wider mb-1">${d.title} — 質問 ${qi + 1} / ${d.questions.length}</p>
         <div class="mb-4">${buildPartBInformationHTML(d)}</div>
         <button id="hear-btn"
-          class="w-full py-4 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white font-bold text-base shadow-lg transition-all">
+          class="w-full py-4 rounded-xl bg-cyan-600 hover:bg-cyan-700 active:scale-95 text-white font-bold text-base shadow-lg transition-all">
           🔊 タップして質問を聞く（Q${qi + 1}）
         </button>
       `);
@@ -1246,10 +1245,10 @@ async function runPartB() {
     } else {
       // PC: 自動読み上げ
       $root().innerHTML = cardWrap(`
-        <p class="text-xs font-bold text-sky-600 uppercase tracking-wider mb-1">${d.title} — 質問 ${qi + 1} / ${d.questions.length}</p>
-        <div class="bg-sky-50 border border-sky-200 rounded-2xl p-4 mb-4 text-center">
+        <p class="text-xs font-bold text-cyan-600 uppercase tracking-wider mb-1">${d.title} — 質問 ${qi + 1} / ${d.questions.length}</p>
+        <div class="bg-cyan-50 border border-cyan-200 rounded-2xl p-4 mb-4 text-center">
           <span class="text-2xl">🔊</span>
-          <p class="text-sky-700 font-semibold mt-1">質問を読み上げています...</p>
+          <p class="text-cyan-700 font-semibold mt-1">質問を読み上げています...</p>
         </div>
         ${buildPartBInformationHTML(d)}
       `);
@@ -1336,19 +1335,19 @@ function renderPartBResult(results, recordings, totalQCount = 4) {
       .join('');
     return `
       <div class="border border-slate-200 rounded-xl p-3 mb-2">
-        <p class="text-xs font-semibold text-sky-600 mb-1">Q${i + 1}: ${escapeHTML(recordings[i].question.text)}</p>
+        <p class="text-xs font-semibold text-cyan-600 mb-1">Q${i + 1}: ${escapeHTML(recordings[i].question.text)}</p>
         <p class="text-sm text-slate-700 mb-1">回答: <em>"${escapeHTML(recordings[i].text) || '（認識できませんでした）'}"</em></p>
         <div class="flex items-center gap-2">${badge}</div>
         ${examples ? `
-          <div class="mt-3 bg-sky-50 border border-sky-100 rounded-lg px-3 py-2">
-            <p class="text-xs font-bold text-sky-700 mb-1">解答例</p>
+          <div class="mt-3 bg-cyan-50 border border-cyan-100 rounded-lg px-3 py-2">
+            <p class="text-xs font-bold text-cyan-700 mb-1">解答例</p>
             <ul class="list-disc pl-5 text-xs text-slate-700 space-y-1">${examples}</ul>
           </div>` : ''}
       </div>`;
   }).join('');
 
   $root().innerHTML = cardWrap(`
-    <p class="text-xs font-bold text-sky-600 uppercase tracking-wider mb-4">Part B 結果</p>
+    <p class="text-xs font-bold text-cyan-600 uppercase tracking-wider mb-4">Part B 結果</p>
     ${partialNote}
     <div class="flex justify-around mb-5">
       ${scoreCircle(total, answeredCount, 'Goal合計', 'sky')}
@@ -1383,12 +1382,12 @@ function buildStoryComic(imageSrc) {
 
 function buildPanelExamples(panels) {
   return `
-    <div class="bg-violet-50 border border-violet-200 rounded-xl p-3 mb-4">
-      <p class="text-xs font-semibold text-violet-700 mb-3">見本（各コマの例文）</p>
+    <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3 mb-4">
+      <p class="text-xs font-semibold text-emerald-700 mb-3">見本（各コマの例文）</p>
       <ol class="space-y-2 list-none">
         ${panels.map((p, i) => `
           <li class="text-sm leading-relaxed">
-            <span class="font-bold text-violet-600">Panel ${i + 1}:</span>
+            <span class="font-bold text-emerald-600">Panel ${i + 1}:</span>
             <span class="text-slate-700">${p.example}</span>
           </li>`).join('')}
       </ol>
@@ -1409,7 +1408,7 @@ async function runPartC() {
   if (prep.enabled) {
     let timerEl;
     $root().innerHTML = cardWrap(`
-      <p class="text-xs font-bold text-violet-600 uppercase tracking-wider mb-3">${d.title} — 準備</p>
+      <p class="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-3">${d.title} — 準備</p>
       <div id="timer-wrap"></div>
       ${buildStoryComic(d.storyImage)}
       <p class="text-center text-sm text-slate-400">4コマのストーリーを英語でどう話すか考えてください</p>
@@ -1471,17 +1470,17 @@ function renderPartCResult(result, text, panels) {
   }).join('');
 
   $root().innerHTML = cardWrap(`
-    <p class="text-xs font-bold text-violet-600 uppercase tracking-wider mb-4">Part C 結果</p>
+    <p class="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-4">Part C 結果</p>
     <div class="flex justify-around mb-4">
-      ${scoreCircle(ga, 4, 'Goal Achievement', 'violet')}
+      ${scoreCircle(ga, 4, 'Goal Achievement', 'emerald')}
       ${scoreCircle(s.vocabulary_grammar ?? 0, 4, '語い・文法', 'sky')}
       ${scoreCircle(s.fluency_pronunciation ?? 0, 4, '流ちょうさ', 'emerald')}
     </div>
-    <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-3 mb-4">
-      <p class="text-xs font-semibold text-indigo-700 mb-2">コマ別 Goal Achievement</p>
+    <div class="bg-teal-50 border border-teal-200 rounded-xl p-3 mb-4">
+      <p class="text-xs font-semibold text-teal-700 mb-2">コマ別 Goal Achievement</p>
       <div class="grid grid-cols-2 gap-2">${panelBadges}</div>
     </div>
-    <p class="text-center text-sm font-bold text-indigo-700 mb-4">合計: ${total} / 12点</p>
+    <p class="text-center text-sm font-bold text-teal-700 mb-4">合計: ${total} / 12点</p>
     <p class="text-xs text-slate-400 mb-1">あなたの回答</p>
     <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-700 mb-4">${text || '（認識できませんでした）'}</div>
     ${buildPanelExamples(panels)}
@@ -1597,7 +1596,7 @@ function renderError(msg) {
       <p class="font-bold text-red-600">エラーが発生しました</p>
       <p class="text-sm text-slate-600 text-center">${msg}</p>
       <button id="retry-btn"
-        class="mt-2 px-6 py-2.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition-all">
+        class="mt-2 px-6 py-2.5 rounded-xl bg-teal-600 text-white font-bold hover:bg-teal-700 transition-all">
         🔁 もう一度
       </button>
     </div>
@@ -1677,10 +1676,10 @@ async function renderPartIdle(partId) {
   if (partId === 'A') {
     const d = getPartData('A');
     $root().innerHTML = cardWrap(`
-      <p class="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-1">${d.title}</p>
+      <p class="text-xs font-bold text-teal-600 uppercase tracking-wider mb-1">${d.title}</p>
       <p class="text-sm text-slate-500 mb-3">${d.desc}</p>
       ${problemPickerHTML('A')}
-      <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-4 text-base leading-relaxed text-slate-800 font-medium">
+      <div class="bg-teal-50 border border-teal-200 rounded-xl p-4 mb-4 text-base leading-relaxed text-slate-800 font-medium">
         ${escapeHTML(d.text || '')}
       </div>
       <div class="flex gap-3 text-xs text-slate-500 mb-4">
@@ -1691,11 +1690,11 @@ async function renderPartIdle(partId) {
   } else if (partId === 'B') {
     const d = getPartData('B');
     $root().innerHTML = cardWrap(`
-      <p class="text-xs font-bold text-sky-600 uppercase tracking-wider mb-1">${d.title}</p>
+      <p class="text-xs font-bold text-cyan-600 uppercase tracking-wider mb-1">${d.title}</p>
       <p class="text-sm text-slate-500 whitespace-pre-line mb-3">${d.desc}</p>
       ${problemPickerHTML('B')}
       <div class="mb-4">${buildPartBInformationHTML(d)}</div>
-      <p class="text-xs text-sky-700 bg-sky-50 border border-sky-100 rounded-lg px-3 py-2 mb-3">
+      <p class="text-xs text-cyan-700 bg-cyan-50 border border-cyan-100 rounded-lg px-3 py-2 mb-3">
         問題バンク: ${d.questionPoolSize || d.questions?.length || 0}問 ／ 今回の出題: ${d.questions?.length || 0}問
         ${d.randomQuestions ? '（ページ更新時にランダム選択）' : '（管理者指定）'}
       </p>
@@ -1710,7 +1709,7 @@ async function renderPartIdle(partId) {
   } else if (partId === 'C') {
     const d = getPartData('C');
     $root().innerHTML = cardWrap(`
-      <p class="text-xs font-bold text-violet-600 uppercase tracking-wider mb-1">${d.title}</p>
+      <p class="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">${d.title}</p>
       <p class="text-sm text-slate-500 mb-3">${d.desc}</p>
       ${problemPickerHTML('C')}
       ${buildStoryComic(d.storyImage)}
