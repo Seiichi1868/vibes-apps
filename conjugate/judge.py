@@ -103,6 +103,73 @@ def _close_enough_overall(expected_core: str, actual_core: str, actual_tokens: l
     return ratio >= _WAY_OFF_RATIO or _has_stem_overlap(content_word, actual_tokens)
 
 
+def _differs_only_by_final_s(a: str, b: str) -> bool:
+    """tú / él の違いになりやすい語末の s だけが違うか。"""
+    return a + "s" == b or b + "s" == a
+
+
+def _edit_distance(a: str, b: str) -> int:
+    if abs(len(a) - len(b)) > 2:
+        return 3
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        for j, cb in enumerate(b, 1):
+            cur.append(min(cur[j - 1] + 1, prev[j] + 1, prev[j - 1] + (ca != cb)))
+        prev = cur
+    return prev[-1]
+
+
+def _same_except_bv(a: str, b: str) -> bool:
+    if len(a) != len(b):
+        return False
+    diffs = [(left, right) for left, right in zip(a, b) if left != right]
+    return bool(diffs) and all(set(pair) <= {"b", "v"} for pair in diffs)
+
+
+def _speech_token_ok(expected: str, actual: str) -> bool:
+    """発音認識でありがちな揺れだけを正解扱いにする。人称を分ける語末 s は許さない。"""
+    if expected == actual:
+        return True
+    if _differs_only_by_final_s(expected, actual):
+        return False
+    if expected.startswith("h") and expected[1:] == actual:
+        return True
+    if actual.startswith("h") and actual[1:] == expected:
+        return True
+    if expected.startswith("ll") and actual == "y" + expected[2:]:
+        return True
+    if actual.startswith("ll") and expected == "y" + actual[2:]:
+        return True
+    if _same_except_bv(expected, actual):
+        return True
+    if min(len(expected), len(actual)) >= 6 and _edit_distance(expected, actual) == 1 and expected[-1] == actual[-1]:
+        return True
+    return False
+
+
+def _speech_covers(expected_tokens: list[str], actual_tokens: list[str]) -> bool:
+    """期待する語がすべて、認識結果のどれかに対応するか。余分な語は無視する。"""
+    if not expected_tokens or not actual_tokens:
+        return False
+    pool = list(actual_tokens)
+    for exp in expected_tokens:
+        exact_only = exp in _PRONOUNS or exp in _STRUCTURE_WORDS
+        found = None
+        for index, act in enumerate(pool):
+            if exact_only:
+                matched = act == exp
+            else:
+                matched = _speech_token_ok(exp, act)
+            if matched:
+                found = index
+                break
+        if found is None:
+            return False
+        pool.pop(found)
+    return True
+
+
 def _pronoun_only_mismatch(expected_tokens: list[str], actual_tokens: list[str], expected_pronoun: str = "te") -> bool:
     """代名詞以外が一致している（代名詞ミス専用）。"""
     core_expected = " ".join(t for t in expected_tokens if t != expected_pronoun)
@@ -153,6 +220,11 @@ def grade_regular(
     actual_core = " ".join(actual_tokens)
 
     if expected_tokens and expected_tokens == actual_tokens:
+        result["level"] = "correct"
+        result["message"] = "完璧です！正解です。"
+        return result
+
+    if source != "typed" and _speech_covers(expected_tokens, actual_tokens):
         result["level"] = "correct"
         result["message"] = "完璧です！正解です。"
         return result
@@ -227,6 +299,11 @@ def grade_gustar(
     actual_core = " ".join(actual_tokens)
 
     if expected_tokens and expected_tokens == actual_tokens:
+        result["level"] = "correct"
+        result["message"] = f"完璧です！gustarはme→{expected_pronoun}の変化だけでOKでしたね。"
+        return result
+
+    if source != "typed" and _speech_covers(expected_tokens, actual_tokens):
         result["level"] = "correct"
         result["message"] = f"完璧です！gustarはme→{expected_pronoun}の変化だけでOKでしたね。"
         return result

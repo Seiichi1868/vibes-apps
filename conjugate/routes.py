@@ -19,6 +19,7 @@
  16. GET  /conjugate/tenses                               … 時制の解説一覧
  17. GET  /conjugate/tenses/<tense_id>                    … 時制ごとの解説
 """
+import json
 import logging
 import mimetypes
 import uuid
@@ -47,7 +48,13 @@ from conjugate.data.persons import (
     PERSON_MODE_LABELS,
 )
 from conjugate.data.verbs import CATEGORY_LABELS, CATEGORY_ORDER, CATEGORY_SHORT, drillable_verbs
-from conjugate.session_logic import build_session_questions, build_summary, grade_target, public_question
+from conjugate.session_logic import (
+    build_session_questions,
+    build_summary,
+    grade_candidates,
+    grade_target,
+    public_question,
+)
 from conjugate.storage import (
     get_session_lock,
     get_submissions,
@@ -63,7 +70,7 @@ from conjugate.storage import (
     save_submission,
     weak_verbs_report,
 )
-from conjugate.transcription import keep_spanish_transcript, transcribe_audio
+from conjugate.transcription import glossary_sentences, keep_spanish_transcript, transcribe_audio
 from conjugate.vocab import (
     DEFAULT_VOCAB_COUNT,
     DIRECTION_LABELS,
@@ -362,6 +369,24 @@ def _add_whisper_usage(session: dict, model: str, duration_sec: float) -> None:
     usage["cost_usd"] = float(usage.get("cost_usd") or 0) + whisper_cost_usd(model, billed_sec)
 
 
+def _speech_candidates(payload: dict, transcript: str) -> list[str]:
+    raw = payload.get("alternatives")
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except json.JSONDecodeError:
+            raw = []
+    found: list[str] = []
+    if isinstance(raw, list):
+        for item in raw[:5]:
+            text = keep_spanish_transcript(str(item or ""))
+            if text and text not in found:
+                found.append(text)
+    if transcript and transcript not in found:
+        found.insert(0, transcript)
+    return found or [transcript]
+
+
 def _find_question(session: dict, question_id: str) -> dict | None:
     for q in session["questions"]:
         if q["question_id"] == question_id:
@@ -407,7 +432,12 @@ def submit_answer(session_id, question_id, target):
                 whisper_model = session.get("whisper_model", "whisper-1")
                 duration_sec = audio_duration_sec(norm_path)
                 try:
-                    transcript = transcribe_audio(norm_path, model=whisper_model, language="es")
+                    transcript = transcribe_audio(
+                        norm_path,
+                        model=whisper_model,
+                        language="es",
+                        glossary=glossary_sentences(question, target),
+                    )
                 except Exception as exc:  # noqa: BLE001
                     logger.exception("Whisper transcription failed")
                     return jsonify({"ok": False, "error": f"文字起こしに失敗しました: {exc}"}), 502
@@ -431,7 +461,16 @@ def submit_answer(session_id, question_id, target):
                     return jsonify({"ok": False, "error": "音声ファイルまたは認識テキストがありません。"}), 400
 
         strict = session.get("strictness") == "strict"
-        result = grade_target(question, target, transcript, strict, source=answer_source)
+        if answer_source == "speech" and transcript_source == "web_speech":
+            result = grade_candidates(
+                question,
+                target,
+                _speech_candidates(payload, transcript),
+                strict,
+                source=answer_source,
+            )
+        else:
+            result = grade_target(question, target, transcript, strict, source=answer_source)
         result["transcript_source"] = transcript_source
 
         question.setdefault("answers", {})[target] = result

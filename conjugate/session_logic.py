@@ -140,29 +140,74 @@ def public_question(question: dict) -> dict:
     return q
 
 
-def grade_target(question: dict, target: str, transcript: str, strict: bool, source: str = "speech") -> dict:
+def _counts_toward_mastery(source: str, level: str) -> bool:
+    """発音の不正解は累計ミスにも連続正解のリセットにも入れない。正解とタイプ入力は数える。"""
+    return source == "typed" or level == "correct"
+
+
+def _score_transcript(question: dict, target: str, transcript: str, strict: bool, source: str) -> dict:
     person = question.get("person") if question.get("person") in PERSON_IDS else "tu"
     if question["kind"] == "gustar":
         item = GUSTAR_BY_ID[question["gustar_id"]]
-        result = grade_gustar(item, transcript, strict=strict, source=source, person=person)
-        record_answer_result(verb_id="gustar", infinitive="gustar", level=result["level"])
-        progress = record_progress(verb_id=None, tense=None, is_correct=result["level"] == "correct")
-        result["newly_mastered"] = False
-        result["progress"] = progress
-        return result
-
+        return grade_gustar(item, transcript, strict=strict, source=source, person=person)
     verb = VERBS_BY_ID[question["verb_id"]]
-    result = grade_regular(verb, target, transcript, strict=strict, source=source, person=person)
-    record_answer_result(verb_id=verb["id"], infinitive=verb["infinitive"], level=result["level"])
-    progress = record_progress(
-        verb_id=verb["id"],
-        tense=target,
-        is_correct=result["level"] == "correct",
-        person=person,
-    )
-    result["newly_mastered"] = bool(progress.get("newly_mastered"))
+    return grade_regular(verb, target, transcript, strict=strict, source=source, person=person)
+
+
+def _commit_grade(question: dict, target: str, result: dict, source: str) -> dict:
+    person = question.get("person") if question.get("person") in PERSON_IDS else "tu"
+    is_correct = result["level"] == "correct"
+    track_mastery = _counts_toward_mastery(source, result["level"])
+    if question["kind"] == "gustar":
+        if track_mastery:
+            record_answer_result(verb_id="gustar", infinitive="gustar", level=result["level"])
+        progress = record_progress(
+            verb_id=None,
+            tense=None,
+            is_correct=is_correct,
+            track_mastery=track_mastery,
+        )
+        result["newly_mastered"] = False
+    else:
+        verb = VERBS_BY_ID[question["verb_id"]]
+        if track_mastery:
+            record_answer_result(verb_id=verb["id"], infinitive=verb["infinitive"], level=result["level"])
+        progress = record_progress(
+            verb_id=verb["id"],
+            tense=target,
+            is_correct=is_correct,
+            person=person,
+            track_mastery=track_mastery,
+        )
+        result["newly_mastered"] = bool(progress.get("newly_mastered"))
+    result["counts_toward_mastery"] = track_mastery
     result["progress"] = progress
     return result
+
+
+def grade_target(question: dict, target: str, transcript: str, strict: bool, source: str = "speech") -> dict:
+    result = _score_transcript(question, target, transcript, strict, source)
+    return _commit_grade(question, target, result, source)
+
+
+def grade_candidates(
+    question: dict,
+    target: str,
+    transcripts: list[str],
+    strict: bool,
+    source: str = "speech",
+) -> dict:
+    """認識候補が複数あるとき、正解になるものを優先して1回だけ記録する。"""
+    cleaned: list[str] = []
+    for text in transcripts:
+        item = (text or "").strip()
+        if item and item not in cleaned:
+            cleaned.append(item)
+    if not cleaned:
+        return grade_target(question, target, "", strict, source)
+    scored = [_score_transcript(question, target, text, strict, source) for text in cleaned]
+    chosen = next((item for item in scored if item["level"] == "correct"), scored[0])
+    return _commit_grade(question, target, chosen, source)
 
 
 def build_summary(session: dict) -> dict:

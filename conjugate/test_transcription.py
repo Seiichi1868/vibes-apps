@@ -2,7 +2,9 @@
 import unittest
 
 from conjugate.transcription import (
+    glossary_sentences,
     keep_spanish_transcript,
+    looks_like_glossary_echo,
     looks_like_prompt_echo,
     sanitize_transcript,
     strip_prompt_echo,
@@ -38,6 +40,31 @@ class PromptEchoTests(unittest.TestCase):
 
     def test_keep_spanish_transcript_allows_spanish(self):
         self.assertEqual(keep_spanish_transcript("Estás llegando."), "Estás llegando.")
+
+
+class GlossaryPromptTests(unittest.TestCase):
+    def test_glossary_lists_this_tense_only(self):
+        question = {
+            "kind": "verb",
+            "infinitive": "hablar",
+            "forms": {
+                "present": {"yo": "Hablo.", "tu": "Hablas.", "el_ella_usted": "Habla."},
+                "preterite": {"yo": "Hablé.", "tu": "Hablaste.", "el_ella_usted": "Habló."},
+            },
+        }
+        self.assertEqual(
+            glossary_sentences(question, "present"),
+            ["hablar", "Hablo", "Hablas", "Habla"],
+        )
+
+    def test_one_matching_form_is_not_an_echo(self):
+        glossary = ["hablar", "Yo hablo", "Tú hablas", "Él habla"]
+        self.assertFalse(looks_like_glossary_echo("Hablas.", glossary))
+
+    def test_full_glossary_dump_is_an_echo(self):
+        glossary = ["hablar", "Yo hablo", "Tú hablas", "Él habla"]
+        echoed = "hablar. Yo hablo. Tú hablas. Él habla."
+        self.assertTrue(looks_like_glossary_echo(echoed, glossary))
 
 
 if __name__ == "__main__":

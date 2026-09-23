@@ -315,6 +315,54 @@ class MasteryTests(unittest.TestCase):
         self.assertTrue(misses["imperfect"]["alert"])
         self.assertEqual(row["miss_total"], 9)
 
+    def test_untracked_wrong_keeps_streak_and_miss_count(self):
+        progress = normalize_progress({})
+        today = date(2026, 9, 23)
+        apply_attempt(
+            progress,
+            verb_id=1,
+            tense="present",
+            is_correct=True,
+            today=today,
+            threshold=3,
+            person="tu",
+        )
+        apply_attempt(
+            progress,
+            verb_id=1,
+            tense="present",
+            is_correct=False,
+            today=today,
+            threshold=3,
+            person="tu",
+            track_mastery=False,
+        )
+        entry = progress["verbs"]["1"]
+        self.assertEqual(entry["persons"]["tu"]["consecutive_correct"], 1)
+        self.assertEqual(entry["present"].get("miss_count", 0), 0)
+        self.assertEqual(entry["present"]["consecutive_correct"], 1)
+        self.assertEqual(progress["total_attempts"], 2)
+        self.assertEqual(progress["coins"], 1)
+        apply_attempt(
+            progress,
+            verb_id=1,
+            tense="present",
+            is_correct=True,
+            today=today,
+            threshold=3,
+            person="tu",
+        )
+        self.assertEqual(progress["verbs"]["1"]["persons"]["tu"]["consecutive_correct"], 2)
+        self.assertEqual(progress["coins"], 2)
+
+    def test_tracked_wrong_still_resets_streak_and_adds_miss(self):
+        progress = normalize_progress({})
+        apply_attempt(progress, verb_id=1, tense="present", is_correct=True, threshold=3, person="tu")
+        apply_attempt(progress, verb_id=1, tense="present", is_correct=False, threshold=3, person="tu")
+        entry = progress["verbs"]["1"]
+        self.assertEqual(entry["persons"]["tu"]["consecutive_correct"], 0)
+        self.assertEqual(entry["present"]["miss_count"], 1)
+
     def test_vocab_mastery_uses_threshold(self):
         progress = normalize_progress({})
         for _ in range(4):

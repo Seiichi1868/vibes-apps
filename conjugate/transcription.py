@@ -131,6 +131,42 @@ def sanitize_transcript(text: str) -> str:
     return strip_prompt_echo(keep_spanish_transcript(text))
 
 
+def glossary_sentences(question: dict, target: str) -> list[str]:
+    """この問題の活用形だけを並べた短い用語集。正解文そのものはプロンプトにしない。"""
+    sentences: list[str] = []
+    if question.get("kind") == "gustar":
+        keys = ("yo_sentence", "tu_sentence", "el_ella_usted_sentence")
+        raw_items = [question.get(key) for key in keys]
+    else:
+        infinitive = (question.get("infinitive") or "").strip()
+        forms = (question.get("forms") or {}).get(target) or {}
+        raw_items = [infinitive, forms.get("yo"), forms.get("tu"), forms.get("el_ella_usted")]
+    for raw in raw_items:
+        text = (raw or "").strip().rstrip(".")
+        if text and text not in sentences:
+            sentences.append(text)
+    return sentences
+
+
+def _contains_phrase(norm_text: str, norm_phrase: str) -> bool:
+    if not norm_phrase:
+        return False
+    return f" {norm_phrase} " in f" {norm_text} "
+
+
+def looks_like_glossary_echo(text: str, glossary: list[str]) -> bool:
+    """用語集の文が2つ以上そのまま返ってきたら、無音時のエコーとみなす。"""
+    norm = _norm_for_echo(text)
+    if not norm:
+        return False
+    hits = 0
+    for sentence in glossary:
+        phrase = _norm_for_echo(sentence)
+        if len(phrase) >= 3 and _contains_phrase(norm, phrase):
+            hits += 1
+    return hits >= 2
+
+
 def _transcribe_once(client, file_path: Path, model: str, prompt: str) -> str:
     kwargs = {
         "model": model,
@@ -145,13 +181,20 @@ def _transcribe_once(client, file_path: Path, model: str, prompt: str) -> str:
     return (getattr(result, "text", "") or "").strip()
 
 
-def transcribe_audio(file_path: Path, model: str = "whisper-1", language: str = "es") -> str:
+def transcribe_audio(
+    file_path: Path,
+    model: str = "whisper-1",
+    language: str = "es",
+    glossary: list[str] | None = None,
+) -> str:
     del language  # 常にスペイン語。呼び出し側の上書きは受け付けない。
     client = _get_client()
     if not client:
         raise RuntimeError("OPENAI_API_KEYが設定されていないため、文字起こしできません。")
 
-    raw = _transcribe_once(client, file_path, model, SPANISH_PROMPT)
+    terms = [item for item in (glossary or []) if (item or "").strip()]
+    prompt = ". ".join(terms) + "." if len(terms) >= 2 else SPANISH_PROMPT
+    raw = _transcribe_once(client, file_path, model, prompt)
     if _is_non_spanish_script(raw):
         logger.warning("Non-Spanish script detected, retrying as Spanish-only: %s", raw[:80])
         raw = _transcribe_once(client, file_path, model, SPANISH_RETRY_PROMPT)
@@ -159,10 +202,18 @@ def transcribe_audio(file_path: Path, model: str = "whisper-1", language: str = 
             logger.warning("Retry still non-Spanish; dropping transcript: %s", raw[:80])
             return ""
 
+    if terms and looks_like_glossary_echo(raw, terms):
+        logger.warning("Glossary echo detected, retrying without prompt: %s", raw[:80])
+        raw = _transcribe_once(client, file_path, model, "")
+        if _is_non_spanish_script(raw) or looks_like_glossary_echo(raw, terms):
+            return ""
+
     text = sanitize_transcript(raw)
     if looks_like_prompt_echo(raw) or not text:
         logger.warning("Prompt-like transcript detected, retrying without examples: %s", raw[:80])
         retry_raw = _transcribe_once(client, file_path, model, "")
+        if terms and looks_like_glossary_echo(retry_raw, terms):
+            return ""
         retry_text = sanitize_transcript(retry_raw)
         if retry_text:
             return retry_text

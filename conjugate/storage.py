@@ -380,6 +380,7 @@ def record_progress(
     kind: str = "conjugation",
     direction: str | None = None,
     person: str | None = None,
+    track_mastery: bool = True,
 ) -> dict:
     """判定1回分を進捗に反映し、更新後のサマリを返す。"""
     settings = load_settings()
@@ -396,6 +397,7 @@ def record_progress(
             threshold=threshold,
             direction=direction,
             person=person,
+            track_mastery=track_mastery,
         )
         _write_json(PROGRESS_FILE, data)
         view = _progress_view_from(data, settings)

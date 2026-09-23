@@ -579,8 +579,13 @@ def apply_attempt(
     threshold: int | None = None,
     direction: str | None = None,
     person: str | None = None,
+    track_mastery: bool = True,
 ) -> dict:
-    """1回の判定を進捗に反映する。"""
+    """1回の判定を進捗に反映する。
+
+    track_mastery が False のときは練習回数だけ増やし、連続正解と間違い累計は変えない。
+    発音の不正解（読み取りミスが多い）向け。発音の正解は True のまま渡す。
+    """
     today = today or today_jst()
     iso = today.isoformat()
     progress["total_attempts"] = int(progress.get("total_attempts") or 0) + 1
@@ -606,9 +611,12 @@ def apply_attempt(
         conj_threshold = DEFAULT_CONJUGATION_THRESHOLD
     else:
         conj_threshold = threshold if threshold is not None else DEFAULT_CONJUGATION_THRESHOLD
-        newly_mastered = apply_mastery(
-            progress, verb_id, tense, is_correct, conj_threshold, person=person
-        )
+        if track_mastery:
+            newly_mastered = apply_mastery(
+                progress, verb_id, tense, is_correct, conj_threshold, person=person
+            )
+        else:
+            newly_mastered = False
 
     return {
         "streak_incremented": streak_result["streak_incremented"],

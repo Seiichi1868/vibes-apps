@@ -244,6 +244,7 @@
       <div class="text-sm mt-1">${result.message}</div>
       ${result.newly_mastered ? '<div class="vsc-mastered-toast">習得バッジを獲得！</div>' : ""}
       <div class="text-xs mt-2" style="color: var(--text-secondary);">${result.transcript_source === "typed" ? "入力" : "認識結果"}: 「${result.transcript || "（空）"}」</div>
+      ${result.counts_toward_mastery === false ? '<div class="text-xs mt-1" style="color: var(--text-secondary);">発音の読み取り違いは、間違いの累計と連続正解には入れません。</div>' : ""}
     `;
     feedbackBox.classList.remove("hidden");
     if (window.vscCelebrateFromResult) window.vscCelebrateFromResult(result);
@@ -257,7 +258,7 @@
     typeSubmitBtn.disabled = true;
   }
 
-  async function submitAnswer({ audioBlob, mimeType, transcript, answerMode }) {
+  async function submitAnswer({ audioBlob, mimeType, transcript, answerMode, alternatives }) {
     const q = currentQuestion();
     const target = currentTarget();
     const url = `/conjugate/api/sessions/${SESSION_ID}/questions/${q.question_id}/targets/${target}/answer`;
@@ -268,6 +269,9 @@
     } else {
       formData.append("transcript", transcript || "");
       if (answerMode) formData.append("answer_mode", answerMode);
+      if (alternatives && alternatives.length > 1) {
+        formData.append("alternatives", JSON.stringify(alternatives.slice(0, 5)));
+      }
     }
 
     recordingStatus.textContent = "判定中...";
@@ -425,7 +429,7 @@
     speechRecognizer = new Recognition();
     speechRecognizer.lang = "es-ES";
     speechRecognizer.interimResults = false;
-    speechRecognizer.maxAlternatives = 1;
+    speechRecognizer.maxAlternatives = 5;
     speechRecognizer.continuous = false;
 
     setRecordState("recording");
@@ -438,10 +442,16 @@
     let speechGotResult = false;
     speechRecognizer.addEventListener("result", async (event) => {
       speechGotResult = true;
-      const transcript = event.results[0][0].transcript;
+      const recognition = event.results[0];
+      const alternatives = [];
+      for (let i = 0; i < recognition.length; i += 1) {
+        const text = recognition[i].transcript;
+        if (text) alternatives.push(text);
+      }
+      const transcript = alternatives[0] || "";
       stopBtn.classList.add("hidden");
       try {
-        await finishRecordingThenSubmit({ transcript });
+        await finishRecordingThenSubmit({ transcript, alternatives });
       } catch (err) {
         recordingStatus.textContent = "";
         setMicError(err.message);
