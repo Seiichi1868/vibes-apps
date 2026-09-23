@@ -1,6 +1,7 @@
 from datetime import datetime
+from pathlib import Path
 
-from flask import Blueprint, jsonify, render_template, send_from_directory, session
+from flask import Blueprint, current_app, jsonify, render_template, send_from_directory, session
 
 from flask_app.config import Config
 from flask_app.services.ai_service import AIService
@@ -26,6 +27,22 @@ def index():
 @main_bp.route("/admin")
 def admin_page():
     return render_template("admin.html")
+
+
+@main_bp.route("/admin/manifest.json")
+def admin_web_app_manifest():
+    """管理画面用 PWA。start_url を /admin に固定し、学習者画面とは別アイコンで保存する。
+
+    マニフェスト自体も scope（/admin）の内側で配信する。学習者用 manifest の
+    start_url は / なので、管理画面がそれを参照するとホーム画面追加時に /admin が消える。
+    """
+    response = send_from_directory(
+        Path(current_app.static_folder) / "admin",
+        "manifest.json",
+        mimetype="application/manifest+json",
+    )
+    response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return response
 
 
 @main_bp.route("/static/audio/<path:filename>")

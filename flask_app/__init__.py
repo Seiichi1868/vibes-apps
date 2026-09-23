@@ -31,8 +31,9 @@ def create_app(config_class=Config):
         """PWA manifest を application/manifest+json で配信する。
 
         Flask の static ハンドラは .json を application/json にするため、
-        専用ルートで MIME を明示する。start_url / scope は / だが、
-        Conjugate 等の他アプリは各ページで別 manifest をリンクしている。
+        専用ルートで MIME を明示する。start_url / scope は / （学習者画面）。
+        管理画面は /admin/manifest.json（start_url: /admin）を別にリンクする。
+        Conjugate 等の他アプリも各ページで別 manifest をリンクしている。
         """
         response = send_from_directory(
             app.static_folder,
