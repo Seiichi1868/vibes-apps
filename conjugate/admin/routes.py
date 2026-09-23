@@ -4,7 +4,9 @@
 判定の厳しさ、1問あたりの出題数・対象文型数、gustar特殊構文モードの
 頻度、弱点動詞優先出題の有無を切り替えられる。
 """
-from flask import Blueprint, jsonify, render_template, request
+from pathlib import Path
+
+from flask import Blueprint, jsonify, render_template, request, send_from_directory
 
 from conjugate.appearance import appearance_context
 from conjugate.config import (
@@ -31,6 +33,18 @@ admin_bp = Blueprint(
 @admin_bp.context_processor
 def _inject_appearance():
     return appearance_context()
+
+
+@admin_bp.route("/manifest.json")
+def web_app_manifest():
+    """管理画面用 PWA。start_url を /conjugate/admin/ に固定する。"""
+    response = send_from_directory(
+        Path(admin_bp.root_path).parent / "static" / "admin",
+        "manifest.json",
+        mimetype="application/manifest+json",
+    )
+    response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return response
 
 
 def _require_admin_password(payload: dict):

@@ -1,8 +1,9 @@
 import io
 import logging
+from pathlib import Path
 
 import openpyxl
-from flask import Blueprint, jsonify, render_template, request, send_file, url_for
+from flask import Blueprint, current_app, jsonify, render_template, request, send_file, send_from_directory, url_for
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +70,18 @@ from news_app.services.pdf_report import build_submissions_pdf
 from news_app.services.youtube import extract_video_id, fetch_youtube_title, parse_time_to_seconds, seconds_to_display
 
 admin_bp = Blueprint("news_admin", __name__)
+
+
+@admin_bp.route("/manifest.json")
+def web_app_manifest():
+    """管理画面用 PWA。start_url を /news/admin/ に固定する。"""
+    response = send_from_directory(
+        Path(current_app.static_folder) / "news" / "admin",
+        "manifest.json",
+        mimetype="application/manifest+json",
+    )
+    response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return response
 
 
 def _active_class_or_none():

@@ -21,14 +21,14 @@
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Spanish Lab Conjugate{% endblock %}</title>
-  <link rel="manifest" href="{{ url_for('conjugate.web_app_manifest') }}">
+  <link rel="manifest" href="{% block manifest_href %}{{ url_for('conjugate.web_app_manifest') }}{% endblock %}">
   <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('conjugate.static', filename='icons/icon-180.png', v='20260821a') }}">
   <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('conjugate.static', filename='icons/icon-32.png', v='20260821a') }}">
   <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('conjugate.static', filename='icons/icon-16.png', v='20260821a') }}">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="Conjugate">
+  <meta name="apple-mobile-web-app-title" content="{% block pwa_short_name %}Conjugate{% endblock %}">
   <meta name="theme-color" content="#7CB342">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
