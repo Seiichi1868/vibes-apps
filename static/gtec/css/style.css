@@ -39,29 +39,6 @@
     0 0 8px rgba(255, 255, 255, 0.25);
 }
 
-.gtec-intro-glass-logo {
-  display: inline-block;
-  line-height: 1.35 !important;
-  padding: 0.1em 0.18em 0.34em;
-  overflow: visible;
-  background: linear-gradient(
-    168deg,
-    rgba(129, 140, 248, 0.82) 0%,
-    rgba(79, 70, 229, 0.96) 30%,
-    rgba(67, 56, 202, 0.98) 62%,
-    rgba(55, 48, 163, 1) 100%
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  -webkit-text-stroke: 0.3px rgba(255, 255, 255, 0.22);
-  paint-order: stroke fill;
-  filter:
-    drop-shadow(0 1px 0 rgba(255, 255, 255, 0.45))
-    drop-shadow(0 4px 14px rgba(79, 70, 229, 0.2))
-    drop-shadow(0 1px 3px rgba(55, 48, 163, 0.15));
-}
-
 .gtec-intro-glass-sub {
   color: rgba(100, 116, 139, 0.92);
   text-shadow:
@@ -551,6 +528,76 @@
 }
 
 .gtec-start-btn:active {
+  transform: scale(0.98);
+}
+
+/* ── 共通ボタン（練習スタート以外の CTA も同系統に統一）───── */
+.gtec-btn-primary-sm {
+  display: inline-block;
+  padding: 0.6rem 1.5rem;
+  border: none;
+  border-radius: 0.75rem;
+  background: linear-gradient(180deg, var(--gtec-brand-light) 0%, var(--gtec-brand) 100%);
+  color: #fff;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  text-shadow: 0 1px 0 rgba(15, 118, 110, 0.18);
+  box-shadow:
+    0 4px 14px rgba(45, 184, 146, 0.32),
+    0 1px 0 rgba(255, 255, 255, 0.35) inset;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.gtec-btn-primary-sm:hover {
+  filter: brightness(0.96);
+}
+
+.gtec-btn-primary-sm:active {
+  transform: scale(0.97);
+}
+
+.gtec-btn-secondary {
+  display: block;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--gtec-brand-border);
+  border-radius: 0.75rem;
+  background: var(--gtec-brand-pale);
+  color: var(--gtec-brand-dark);
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.gtec-btn-secondary:hover {
+  background: #d4f5e9;
+}
+
+.gtec-btn-secondary:active {
+  transform: scale(0.98);
+}
+
+.gtec-btn-outline {
+  display: block;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--gtec-brand);
+  border-radius: 0.75rem;
+  background: transparent;
+  color: var(--gtec-brand-dark);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.gtec-btn-outline:hover {
+  background: var(--gtec-brand-pale);
+}
+
+.gtec-btn-outline:active {
   transform: scale(0.98);
 }
 

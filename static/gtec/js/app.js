@@ -997,18 +997,14 @@ function feedbackBlock(fb) {
 
 function retryBtn() {
   return `
-    <button id="retry-btn"
-      class="mt-4 w-full py-3 rounded-xl border-2 border-teal-600 text-teal-700 font-bold
-             hover:bg-teal-50 active:scale-95 transition-all">
+    <button id="retry-btn" type="button" class="mt-4 gtec-btn-outline">
       🔁 もう一度練習する
     </button>`;
 }
 
 function submitBtn(label = 'ここで提出する（早く終わった場合）') {
   return `
-    <button id="submit-btn"
-      class="mt-3 w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95
-             text-white font-bold text-sm shadow transition-all">
+    <button id="submit-btn" type="button" class="mt-3 gtec-btn-secondary">
       ✅ ${label}
     </button>`;
 }
@@ -1226,8 +1222,7 @@ async function runPartB() {
       $root().innerHTML = cardWrap(`
         <p class="text-xs font-bold text-cyan-600 uppercase tracking-wider mb-1">${d.title} — 質問 ${qi + 1} / ${d.questions.length}</p>
         <div class="mb-4">${buildPartBInformationHTML(d)}</div>
-        <button id="hear-btn"
-          class="w-full py-4 rounded-xl bg-cyan-600 hover:bg-cyan-700 active:scale-95 text-white font-bold text-base shadow-lg transition-all">
+        <button id="hear-btn" type="button" class="gtec-start-btn">
           🔊 タップして質問を聞く（Q${qi + 1}）
         </button>
       `);
@@ -1593,8 +1588,7 @@ function renderError(msg) {
       <span class="text-4xl">❌</span>
       <p class="font-bold text-red-600">エラーが発生しました</p>
       <p class="text-sm text-slate-600 text-center">${msg}</p>
-      <button id="retry-btn"
-        class="mt-2 px-6 py-2.5 rounded-xl bg-teal-600 text-white font-bold hover:bg-teal-700 transition-all">
+      <button id="retry-btn" type="button" class="mt-2 gtec-btn-primary-sm">
         🔁 もう一度
       </button>
     </div>
