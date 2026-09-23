@@ -3,6 +3,11 @@
 {% block greeting %}練習中{% endblock %}
 {% block body_class %}vsc-quiz-page{% endblock %}
 {% block header_actions %}
+{% from "conjugate/macros.html" import svg_clock %}
+<button type="button" id="tense-guide-btn" class="vsc-guide-open-btn" aria-haspopup="dialog" aria-controls="tense-guide-modal">
+  {{ svg_clock() }}
+  <span>時制</span>
+</button>
 <span id="progress-label" class="vsc-progress-chip">0/0問</span>
 {% endblock %}
 
@@ -71,6 +76,28 @@
 </section>
 {% endblock %}
 
+{% block overlays %}
+<div id="tense-guide-modal" class="vsc-modal hidden" role="dialog" aria-modal="true" aria-labelledby="tense-guide-modal-title">
+  <button type="button" class="vsc-modal-backdrop" data-close-tense-guide aria-label="閉じる"></button>
+  <div class="vsc-modal-sheet vsc-modal-sheet--guide">
+    <div class="vsc-modal-head">
+      <h2 id="tense-guide-modal-title" class="vsc-modal-title">時制の解説</h2>
+      <button type="button" class="vsc-modal-close" data-close-tense-guide aria-label="閉じる">×</button>
+    </div>
+    <div class="vsc-tense-guide-row vsc-quiz-guide-tabs" role="tablist" aria-label="時制">
+      {% for guide in tense_guides or [] %}
+      <button type="button" class="vsc-filter-chip{% if loop.first %} is-active{% endif %}" role="tab" data-tense-guide="{{ guide.id }}" aria-selected="{{ 'true' if loop.first else 'false' }}">{{ guide.label }}</button>
+      {% endfor %}
+    </div>
+    {% for guide in tense_guides or [] %}
+    <div class="vsc-quiz-guide-panel{% if not loop.first %} hidden{% endif %}" data-tense-guide-panel="{{ guide.id }}" role="tabpanel">
+      {% include "conjugate/_tense_guide_body.html" %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+
 {% block scripts %}
 <script>
   window.CONJUGATE_SESSION_ID = {{ session_id | tojson }};
@@ -80,5 +107,5 @@
   window.CONJUGATE_PERSON_LABELS = {{ person_badge_labels | tojson }};
   window.CONJUGATE_EL_HINT = {{ el_ella_usted_hint | tojson }};
 </script>
-<script src="{{ url_for('conjugate.static', filename='js/quiz.js', v='20260820a') }}"></script>
+<script src="{{ url_for('conjugate.static', filename='js/quiz.js', v='20260923a') }}"></script>
 {% endblock %}

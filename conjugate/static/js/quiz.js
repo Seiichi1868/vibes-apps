@@ -538,6 +538,72 @@
   typeForm.addEventListener("submit", handleTypeSubmit);
   nextBtn.addEventListener("click", handleNext);
 
+  const tenseGuideBtn = document.getElementById("tense-guide-btn");
+  const tenseGuideModal = document.getElementById("tense-guide-modal");
+  const tenseGuideTabs = tenseGuideModal ? tenseGuideModal.querySelectorAll("[data-tense-guide]") : [];
+  const tenseGuidePanels = tenseGuideModal ? tenseGuideModal.querySelectorAll("[data-tense-guide-panel]") : [];
+
+  function preferredGuideTense() {
+    try {
+      const q = currentQuestion();
+      if (!q || q.kind === "gustar") return "present";
+      const target = currentTarget();
+      if ([...tenseGuideTabs].some((tab) => tab.dataset.tenseGuide === target)) return target;
+    } catch (_) { /* session not ready */ }
+    return "present";
+  }
+
+  function showGuideTense(tenseId) {
+    const chosen = [...tenseGuideTabs].some((tab) => tab.dataset.tenseGuide === tenseId)
+      ? tenseId
+      : (tenseGuideTabs[0] ? tenseGuideTabs[0].dataset.tenseGuide : "");
+    tenseGuideTabs.forEach((tab) => {
+      const on = tab.dataset.tenseGuide === chosen;
+      tab.classList.toggle("is-active", on);
+      tab.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    tenseGuidePanels.forEach((panel) => {
+      panel.classList.toggle("hidden", panel.dataset.tenseGuidePanel !== chosen);
+    });
+  }
+
+  function openTenseGuide() {
+    if (!tenseGuideModal) return;
+    showGuideTense(preferredGuideTense());
+    tenseGuideModal.classList.remove("hidden");
+    document.body.classList.add("vsc-modal-open");
+    if (tenseGuideBtn) tenseGuideBtn.setAttribute("aria-expanded", "true");
+  }
+
+  function closeTenseGuide() {
+    if (!tenseGuideModal) return;
+    tenseGuideModal.classList.add("hidden");
+    document.body.classList.remove("vsc-modal-open");
+    if (tenseGuideBtn) tenseGuideBtn.setAttribute("aria-expanded", "false");
+  }
+
+  if (tenseGuideBtn) {
+    tenseGuideBtn.setAttribute("aria-expanded", "false");
+    tenseGuideBtn.addEventListener("click", () => {
+      if (tenseGuideModal && !tenseGuideModal.classList.contains("hidden")) closeTenseGuide();
+      else openTenseGuide();
+    });
+  }
+  if (tenseGuideModal) {
+    tenseGuideModal.querySelectorAll("[data-close-tense-guide]").forEach((el) => {
+      el.addEventListener("click", closeTenseGuide);
+    });
+    tenseGuideTabs.forEach((tab) => {
+      tab.addEventListener("click", () => showGuideTense(tab.dataset.tenseGuide));
+    });
+  }
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && tenseGuideModal && !tenseGuideModal.classList.contains("hidden")) {
+      event.preventDefault();
+      closeTenseGuide();
+    }
+  });
+
   (async () => {
     try {
       await loadSession();

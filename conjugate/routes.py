@@ -328,6 +328,7 @@ def quiz_screen(session_id):
         category_labels=CATEGORY_LABELS,
         person_badge_labels=PERSON_BADGE_LABELS,
         el_ella_usted_hint=EL_ELLA_USTED_HINT,
+        tense_guides=[get_tense_guide(tid) for tid in TENSE_ORDER],
     )
 
 

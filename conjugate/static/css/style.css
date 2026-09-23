@@ -1053,6 +1053,31 @@
   border-radius: var(--radius-pill);
 }
 
+.vsc-guide-open-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: #fff;
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: var(--shadow-soft);
+  cursor: pointer;
+}
+.vsc-guide-open-btn svg {
+  width: 14px;
+  height: 14px;
+}
+.vsc-guide-open-btn[aria-expanded="true"] {
+  background: var(--nav-ink);
+  color: #fff;
+}
+
 .vsc-banner-error {
   margin-bottom: 16px;
   font-size: 0.875rem;
@@ -1809,6 +1834,27 @@ html.vsc-skip-opening .vsc-splash {
   border-radius: 20px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
   padding: 16px 16px 20px;
+}
+.vsc-modal-sheet--guide {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(calc(100vw - 24px), 560px);
+  max-height: min(84dvh, calc(100dvh - 24px));
+}
+.vsc-quiz-guide-tabs {
+  margin-bottom: 12px;
+}
+.vsc-quiz-guide-panel .vsc-card {
+  box-shadow: none;
+  background: #F7F9F2;
+  padding: 14px;
+}
+.vsc-quiz-guide-panel .vsc-hero-title {
+  font-size: 1.15rem !important;
+}
+.vsc-quiz-guide-panel .vsc-card.mb-4 {
+  margin-bottom: 0;
 }
 body.vsc-modal-open {
   overflow: hidden;
