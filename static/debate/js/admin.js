@@ -5,6 +5,8 @@ const UNLOCK_STORAGE_KEY = "debate_admin_unlocked";
 const passwordInput = document.getElementById("admin-password");
 const unlockBtn = document.getElementById("unlock-btn");
 const lockMessage = document.getElementById("lock-message");
+const adminSettingsLock = document.getElementById("admin-settings-lock");
+const adminSettingsPanel = document.getElementById("admin-settings-panel");
 const sensitiveSettings = document.getElementById("sensitive-settings");
 const statusMessage = document.getElementById("status-message");
 const pageBgLayer = document.getElementById("page-bg-layer");
@@ -49,8 +51,8 @@ function clearUnlockState() {
 
 function applyUnlockUI() {
   unlocked = true;
-  if (passwordInput) passwordInput.disabled = true;
-  if (unlockBtn) unlockBtn.disabled = true;
+  adminSettingsLock?.classList.add("hidden");
+  adminSettingsPanel?.classList.remove("hidden");
   if (sensitiveSettings) {
     sensitiveSettings.classList.remove("opacity-50", "pointer-events-none");
     sensitiveSettings.removeAttribute("aria-disabled");

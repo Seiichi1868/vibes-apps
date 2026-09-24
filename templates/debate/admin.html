@@ -59,9 +59,12 @@
   </div>
 </section>
 
-<section class="glass-card rounded-2xl p-4 md:p-5">
-  <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-    <h2 class="text-sm font-bold text-slate-800">管理設定</h2>
+<section id="admin-settings-section" class="glass-card rounded-2xl p-4 md:p-5">
+  <div id="admin-settings-lock">
+    <h2 class="text-sm font-bold text-slate-800 mb-1">管理設定</h2>
+    <p class="text-xs text-slate-500 mb-3">
+      AIモデルや文字起こし方式の変更にはパスワードが必要です。
+    </p>
     <div id="admin-lock" class="flex items-center gap-1.5">
       <input id="admin-password" type="password" inputmode="numeric" autocomplete="off"
         placeholder="パスワード"
@@ -73,7 +76,9 @@
     </div>
   </div>
 
-  <div id="sensitive-settings" class="space-y-4 opacity-50 pointer-events-none" aria-disabled="true">
+  <div id="admin-settings-panel" class="hidden">
+    <h2 class="text-sm font-bold text-slate-800 mb-3">管理設定</h2>
+    <div id="sensitive-settings" class="space-y-4">
     <div>
       <h3 class="text-sm font-bold text-slate-800 mb-2">ジャッジ用AIモデル</h3>
       <div id="judge-model-picker" class="debate-mode-options debate-mode-options--ai"></div>
@@ -115,9 +120,10 @@
       </div>
     </div>
   </div>
+  </div>
 </section>
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='debate/js/admin.js', v='20260919b') }}"></script>
+<script src="{{ url_for('static', filename='debate/js/admin.js', v='20260924a') }}"></script>
 {% endblock %}
