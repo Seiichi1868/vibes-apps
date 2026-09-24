@@ -17,7 +17,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='debate/css/style.css', v='20260919f') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='debate/css/style.css', v='20260924a') }}">
   <style>
     .debate-page-bg {
       background-image: url("{{ url_for('static', filename=background.background_image) }}");
@@ -52,7 +52,7 @@
   <header class="glass-header sticky top-0 z-40">
     <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
       <a href="{{ url_for('debate.index') }}" class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-xl bg-brand flex items-center justify-center text-white text-lg font-bold shadow">D</div>
+        <img class="debate-brand-logo" src="{{ url_for('static', filename='debate/icons/icon-192x192.png', v='20260923a') }}" width="192" height="192" alt="" decoding="async" aria-hidden="true">
         <div>
           <h1 class="text-sm sm:text-lg font-bold text-brand-dark leading-tight">Parliamentary Debate Practice</h1>
           <p class="text-xs text-slate-500">議会型ディベートを練習しよう</p>
