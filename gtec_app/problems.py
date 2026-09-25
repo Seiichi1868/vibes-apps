@@ -22,6 +22,7 @@ PART_B_2_DEFAULTS_VERSION = 9
 PART_C_DEFAULTS_VERSION = 4
 PART_D_DEFAULTS_VERSION = 10
 PART_B_PROMPT_DEFAULTS_VERSION = 11
+IMAGE_ASSET_VERSION = "20260926a"
 
 DEFAULT_ACTIVE = {part: 1 for part in PARTS}
 
@@ -713,10 +714,14 @@ def public_problems() -> dict:
         key = str(num)
         part_b = sets.get("b", {}).get(key)
         if part_b and part_b.get("informationImage"):
-            part_b["informationImage"] = f"/static/{part_b['informationImage']}"
+            part_b["informationImage"] = (
+                f"/static/{part_b['informationImage']}?v={IMAGE_ASSET_VERSION}"
+            )
         part_c = sets.get("c", {}).get(key)
         if part_c and part_c.get("storyImage"):
-            part_c["storyImage"] = f"/static/{part_c['storyImage']}"
+            part_c["storyImage"] = (
+                f"/static/{part_c['storyImage']}?v={IMAGE_ASSET_VERSION}"
+            )
     return {"active": data["active"], "sets": sets}
 
 
