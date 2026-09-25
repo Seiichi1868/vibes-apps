@@ -266,7 +266,9 @@ function renderProblemAdmin() {
         <label class="block text-[10px] text-slate-600 mb-1">音読テキスト</label>
         <textarea class="admin-problem-textarea problem-field" data-part="${part}" data-num="${editNum}" data-key="text"></textarea>`;
     } else if (part === 'b') {
-      const questions = getProblemSet(part, editNum).questions || [];
+      const problemSet = getProblemSet(part, editNum);
+      const questions = problemSet.questions || [];
+      const isPrompt = problemSet.format === 'prompt';
       fields = `
         <label class="block text-[10px] text-slate-600 mb-1">問題見出し</label>
         <input class="admin-problem-input problem-field mb-2" data-part="${part}" data-num="${editNum}" data-key="heading" placeholder="Question 1–4" />
@@ -279,6 +281,8 @@ function renderProblemAdmin() {
         <textarea class="admin-problem-textarea problem-field" data-part="${part}" data-num="${editNum}" data-key="schedule" rows="4"></textarea>
         <label class="block text-[10px] text-slate-600 mt-2 mb-1">質問（JSON）</label>
         <textarea class="admin-problem-textarea problem-field" data-part="${part}" data-num="${editNum}" data-key="questions" rows="5"></textarea>
+        ${isPrompt ? `
+        <p class="mt-2 text-[10px] text-cyan-700">この問題は、画面の指示を見て自分から話す形式です（準備 ${problemSet.prepSeconds || 20}秒 / 解答 ${problemSet.answerSeconds || 20}秒）。</p>` : `
         <div class="mt-3 rounded-lg border border-cyan-200 bg-cyan-50/70 p-3">
           <label class="flex items-center justify-between gap-3 cursor-pointer">
             <span>
@@ -304,7 +308,7 @@ function renderProblemAdmin() {
               `).join('')}
             </div>
           </div>
-        </div>`;
+        </div>`}`;
     } else if (part === 'c') {
       fields = `
         <label class="block text-[10px] text-slate-600 mb-1">イラスト画像パス</label>
@@ -408,6 +412,8 @@ function updatePartBQuestionControls() {
 }
 
 function hasValidPartBQuestionSelection() {
+  const set = getProblemSet('b', problemEditNum.b || 1);
+  if (set.format === 'prompt') return true;
   const randomToggle = problemAdmin?.querySelector('.part-b-random-toggle');
   if (!randomToggle || randomToggle.checked) return true;
   return problemAdmin.querySelectorAll('.part-b-question-choice:checked').length === 4;

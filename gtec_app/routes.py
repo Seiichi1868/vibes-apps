@@ -99,11 +99,15 @@ def evaluate():
                 str(data.get("target_text", "")),
             )
         elif part == "B":
+            task_type = str(data.get("task_type", "answer") or "answer")
+            if task_type not in ("answer", "explain", "ask"):
+                task_type = "answer"
             result = evaluate_part_b(
                 text,
                 duration,
                 str(data.get("question", "")),
                 str(data.get("context", "")),
+                task_type,
             )
         elif part == "C":
             panels = data.get("panel_descriptions", [])

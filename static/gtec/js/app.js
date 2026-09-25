@@ -17,7 +17,7 @@ const PART_META = {
   },
   B: {
     title: 'Part B：やり取り (Interacting with Others)',
-    desc: 'Part Bは、全部で4問あります。与えられた情報をもとに、質問に対して英語で答えてください。はじめに準備時間が10秒あり、その後質問が始まります。解答時間はそれぞれ15秒です。開始の音が鳴ってから解答を始めてください。',
+    desc: 'Part Bは、全部で4問あります。質問に答える問題が2問と、あなたから問いかける問題が2問です。与えられた情報をもとに、英語で話してください。録音開始の音が鳴ってから解答を始めてください。',
     prepTime: 10,
     recTime: 15,
     maxScore: 4,
@@ -132,6 +132,15 @@ function getPartData(partId) {
   const content = App.problems?.sets?.[key]?.[String(num)] || {};
   if (partId === 'B') {
     const pool = Array.isArray(content.questions) ? content.questions : [];
+    if (content.format === 'prompt') {
+      return {
+        ...meta,
+        ...content,
+        questions: pool,
+        questionPoolSize: pool.length,
+        problemNum: num,
+      };
+    }
     let questionNumbers;
     if (content.randomQuestions) {
       const cacheKey = `${num}:${pool.length}`;
@@ -1172,7 +1181,7 @@ function buildPartBInformationHTML(d) {
   const information = d.informationImage
     ? `<div class="border border-cyan-200 rounded-xl overflow-hidden bg-white p-2">
         <img src="${escapeHTML(d.informationImage)}"
-          alt="公園周辺のサイクリングマップ"
+          alt="${escapeHTML(d.heading || 'Part B の資料')}"
           class="block w-full h-auto max-h-[34rem] object-contain mx-auto" />
        </div>`
     : `<div class="border border-cyan-200 rounded-xl overflow-hidden">${buildScheduleHTML(d.schedule || [])}</div>`;
@@ -1182,7 +1191,8 @@ function buildPartBInformationHTML(d) {
       <div class="border border-slate-300 rounded-lg px-4 py-3 mb-4 text-sm leading-relaxed text-slate-700">
         ${escapeHTML(d.instructionJa)}
       </div>` : ''}
-    ${information}`;
+    ${information}
+    ${d.noteJa ? `<p class="text-xs text-slate-500 mt-2">${escapeHTML(d.noteJa)}</p>` : ''}`;
 }
 
 async function runPartB() {
@@ -1194,12 +1204,14 @@ async function runPartB() {
   setStopButtonVisible(true);
 
   const prep = getPrepConfig('B');
+  const isPrompt = d.format === 'prompt';
+  const answerSeconds = d.answerSeconds || d.recTime;
   const recordings = [];
   let earlySubmit = false;
   const mobile = isMobileDevice();
 
-  // Part B の準備時間は、全質問の開始前に1回だけ設ける。
-  if (prep.enabled) {
+  // 質問に答える形式は、全質問の開始前に準備時間を1回だけ設ける。
+  if (!isPrompt && prep.enabled) {
     let timerEl;
     $root().innerHTML = cardWrap(`
       <p class="text-xs font-bold text-cyan-600 uppercase tracking-wider mb-3">${d.title} — 準備</p>
@@ -1216,8 +1228,20 @@ async function runPartB() {
     if (App.cancelRequested) return;
     const q = d.questions[qi];
 
-    // TTS フェーズ
-    if (mobile) {
+    if (isPrompt && prep.enabled) {
+      const prepSeconds = d.prepSeconds || prep.seconds;
+      $root().innerHTML = cardWrap(`
+        <p class="text-xs font-bold text-cyan-600 uppercase tracking-wider mb-3">${d.title} — 質問 ${qi + 1} / ${d.questions.length} 準備</p>
+        <div id="timer-wrap"></div>
+        <div class="mb-3">${buildPartBInformationHTML(d)}</div>
+        <p class="text-center text-sm text-slate-500">イラストと指示を見て、英語で話す内容を考えてください</p>
+      `);
+      const prepTimer = document.getElementById('timer-wrap');
+      await countdown(prepSeconds, sec => { prepTimer.innerHTML = timerDisplay(sec, 'prep'); });
+      if (App.cancelRequested) return;
+    }
+
+    if (!isPrompt && mobile) {
       // スマホ: ユーザーがタップするまで待つ → ジェスチャー内で即座に読み上げ
       $root().innerHTML = cardWrap(`
         <p class="text-xs font-bold text-cyan-600 uppercase tracking-wider mb-1">${d.title} — 質問 ${qi + 1} / ${d.questions.length}</p>
@@ -1235,7 +1259,9 @@ async function runPartB() {
           speakInGestureContext(q.text).then(resolve);
         }, { once: true });
       });
-    } else {
+      if (App.cancelRequested) return;
+      await sleep(300);
+    } else if (!isPrompt) {
       // PC: 自動読み上げ
       $root().innerHTML = cardWrap(`
         <p class="text-xs font-bold text-cyan-600 uppercase tracking-wider mb-1">${d.title} — 質問 ${qi + 1} / ${d.questions.length}</p>
@@ -1246,9 +1272,10 @@ async function runPartB() {
         ${buildPartBInformationHTML(d)}
       `);
       await speak(q.text);
+      if (App.cancelRequested) return;
+      await sleep(300);
     }
     if (App.cancelRequested) return;
-    await sleep(300);
 
     // recording
     let timerEl;
@@ -1267,8 +1294,8 @@ async function runPartB() {
     wireSubmitBtn();
 
     const [{ text, duration }] = await Promise.all([
-      startRecording(d.recTime, transEl),
-      countdown(d.recTime, sec => { timerEl.innerHTML = timerDisplay(sec, 'rec'); }),
+      startRecording(answerSeconds, transEl),
+      countdown(answerSeconds, sec => { timerEl.innerHTML = timerDisplay(sec, 'rec'); }),
     ]);
     const wasSubmit = App.submitRequested;
     App.submitRequested = false;
@@ -1300,6 +1327,7 @@ async function runPartB() {
           duration: r.duration,
           question: r.question.text,
           context: r.question.context,
+          task_type: r.question.taskType || 'answer',
         })
       )
     );
@@ -1328,7 +1356,7 @@ function renderPartBResult(results, recordings, totalQCount = 4) {
       .join('');
     return `
       <div class="border border-slate-200 rounded-xl p-3 mb-2">
-        <p class="text-xs font-semibold text-cyan-600 mb-1">Q${i + 1}: ${escapeHTML(recordings[i].question.text)}</p>
+        <p class="text-xs font-semibold text-cyan-600 mb-1">Q${i + 1}: ${escapeHTML(recordings[i].question.promptJa || recordings[i].question.text)}</p>
         <p class="text-sm text-slate-700 mb-1">回答: <em>"${escapeHTML(recordings[i].text) || '（認識できませんでした）'}"</em></p>
         <div class="flex items-center gap-2">${badge}</div>
         ${examples ? `
@@ -1686,16 +1714,23 @@ async function renderPartIdle(partId) {
       <p class="text-sm text-slate-500 whitespace-pre-line mb-3">${d.desc}</p>
       ${problemPickerHTML('B')}
       <div class="mb-4">${buildPartBInformationHTML(d)}</div>
+      ${d.format === 'prompt' ? '' : `
       <p class="text-xs text-cyan-700 bg-cyan-50 border border-cyan-100 rounded-lg px-3 py-2 mb-3">
         問題バンク: ${d.questionPoolSize || d.questions?.length || 0}問 ／ 今回の出題: ${d.questions?.length || 0}問
         ${d.randomQuestions ? '（ページ更新時にランダム選択）' : '（管理者指定）'}
-      </p>
+      </p>`}
       <div class="flex gap-3 text-xs text-slate-500 mb-4">
-        <span>⏱ 準備: ${prepLabel('B')}</span><span>🎤 解答: 15秒/問</span><span>📊 この問題: ${d.questions?.length || 0}点</span>
+        <span>⏱ 準備: ${d.format === 'prompt' ? `${d.prepSeconds || 20}秒` : prepLabel('B')}</span>
+        <span>🎤 解答: ${d.format === 'prompt' ? `${d.answerSeconds || 20}秒` : '15秒'}/問</span>
+        <span>📊 この問題: ${d.questions?.length || 0}点</span>
       </div>
+      ${d.format === 'prompt' ? `
+      <p class="text-xs bg-cyan-50 border border-cyan-200 rounded-lg px-3 py-2 text-cyan-800 mb-4">
+        画面のイラストと指示を見て、自分から英語で話してください。
+      </p>` : `
       <p class="text-xs bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-amber-700 mb-4">
         ⚠️ 質問文は<strong>画面に表示されません</strong>。スピーカーの音声をよく聞いて答えてください。
-      </p>
+      </p>`}
       ${startBtn('練習スタート')}
     `);
   } else if (partId === 'C') {

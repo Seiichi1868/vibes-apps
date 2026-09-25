@@ -15,12 +15,13 @@ PROBLEMS_FILE = DATA_DIR / "gtec_problems.json"
 
 PARTS = ("a", "b", "c", "d")
 PROBLEM_NUMS = (1, 2, 3, 4)
-PROBLEMS_VERSION = 10
+PROBLEMS_VERSION = 11
 PART_A_DEFAULTS_VERSION = 6
 PART_B_1_DEFAULTS_VERSION = 8
 PART_B_2_DEFAULTS_VERSION = 9
 PART_C_DEFAULTS_VERSION = 4
 PART_D_DEFAULTS_VERSION = 10
+PART_B_PROMPT_DEFAULTS_VERSION = 11
 
 DEFAULT_ACTIVE = {part: 1 for part in PARTS}
 
@@ -266,31 +267,81 @@ DEFAULT_SETS: dict[str, dict[str, dict]] = {
             ],
         },
         "3": {
-            "schedule": [
-                {"time": "3:30 PM", "activity": "Basketball Club", "place": "Gym"},
-                {"time": "5:00 PM", "activity": "Snack", "place": "School Store"},
-                {"time": "5:30 PM", "activity": "English Conversation", "place": "Room 201"},
-                {"time": "7:00 PM", "activity": "Go Home", "place": "Station"},
-            ],
+            "format": "prompt",
+            "heading": "No. 3",
+            "instructionJa": (
+                "あなたはホームステイ中です。オンラインショップで注文したカメラが届きましたが、"
+                "ある問題に気づき、問い合わせ窓口に電話をかけ、話をしています。"
+                "与えられた情報をもとに、あなたが直面している問題と、それをどう解決したいかを"
+                "問い合わせ窓口に伝えてください。"
+            ),
+            "noteJa": "※イラスト内で「あなた」は影絵で表されています。",
+            "informationImage": "gtec/images/part-b-camera-problem.png",
+            "prepSeconds": 20,
+            "answerSeconds": 20,
+            "randomQuestions": False,
+            "selectedQuestions": [1],
+            "schedule": [],
             "questions": [
-                {"text": "What club does Maria belong to?", "context": "Maria's after-school schedule"},
-                {"text": "Where does Maria buy a snack?", "context": "Maria's after-school schedule"},
-                {"text": "What time does Maria's English class start?", "context": "Maria's after-school schedule"},
-                {"text": "Where does Maria go at seven o'clock?", "context": "Maria's after-school schedule"},
+                {
+                    "text": (
+                        "Tell the customer service representative the problem you are facing "
+                        "and how you want to solve it."
+                    ),
+                    "promptJa": (
+                        "あなたが直面している問題と、それをどう解決したいかを"
+                        "問い合わせ窓口に伝えてください。"
+                    ),
+                    "taskType": "explain",
+                    "context": (
+                        "The student ordered a camera online. The illustration shows a cracked "
+                        "camera lens with a broken piece, and an arrow pointing to a new camera. "
+                        "The camera is sitting on an open box on the table. The student, shown "
+                        "as a silhouette, is calling customer service. The student should say "
+                        "the lens is broken and ask for a replacement or a new camera."
+                    ),
+                    "examples": [
+                        "The lens of the camera I ordered is broken. Could you exchange it for a new one?",
+                        "I received a camera, but the lens is cracked. I would like a replacement.",
+                    ],
+                },
             ],
         },
         "4": {
-            "schedule": [
-                {"time": "8:00 AM", "activity": "Visit Grandparents", "place": "Grandparents' House"},
-                {"time": "11:00 AM", "activity": "Shopping", "place": "Shopping Mall"},
-                {"time": "2:00 PM", "activity": "Cooking Class", "place": "Community Center"},
-                {"time": "4:30 PM", "activity": "Return Home", "place": "Home"},
-            ],
+            "format": "prompt",
+            "heading": "No. 4",
+            "instructionJa": (
+                "問題を解決したあと、あなたはカメラが届いた箱に入っていた新商品のチラシを見たことを"
+                "問い合わせ窓口に伝えました。あなたはその新商品に興味があり、チラシの情報について"
+                "さらに知りたいことがあります。問い合わせ窓口に1つ質問してください。"
+            ),
+            "noteJa": "",
+            "informationImage": "gtec/images/part-b-camera-bag.png",
+            "prepSeconds": 20,
+            "answerSeconds": 20,
+            "randomQuestions": False,
+            "selectedQuestions": [1],
+            "schedule": [],
             "questions": [
-                {"text": "Where does Tom go at eight in the morning?", "context": "Tom's holiday schedule"},
-                {"text": "Where will Tom go shopping?", "context": "Tom's holiday schedule"},
-                {"text": "What activity does Tom do at two o'clock?", "context": "Tom's holiday schedule"},
-                {"text": "What time does Tom return home?", "context": "Tom's holiday schedule"},
+                {
+                    "text": (
+                        "Ask the customer service representative one question about the new camera bag "
+                        "on the flyer."
+                    ),
+                    "promptJa": "問い合わせ窓口に1つ質問してください。",
+                    "taskType": "ask",
+                    "context": (
+                        "The flyer says: NEW CAMERA BAG, COMING SOON. It comes in 2 sizes and "
+                        "4 different colors. If you've bought a camera from us before, you can "
+                        "get 10% off. CONTACT US FOR DETAILS. The student should ask one question "
+                        "about this information, such as the sizes, colors, discount, or release date."
+                    ),
+                    "examples": [
+                        "When will the new camera bag be available?",
+                        "What colors does the camera bag come in?",
+                        "How can I get the 10% discount?",
+                    ],
+                },
             ],
         },
     },
@@ -467,8 +518,13 @@ def _normalize_questions(items) -> list[dict]:
         text = str(item.get("text", "")).strip()
         if not text:
             continue
+        task_type = str(item.get("taskType", "answer")).strip()
+        if task_type not in ("answer", "explain", "ask"):
+            task_type = "answer"
         out.append({
             "text": text,
+            "promptJa": str(item.get("promptJa", "")).strip(),
+            "taskType": task_type,
             "context": str(item.get("context", "")).strip(),
             "examples": [
                 str(example).strip()
@@ -524,11 +580,26 @@ def _normalize_part_set(part: str, num: int, raw: dict | None) -> dict:
         schedule = _normalize_schedule(raw.get("schedule", default.get("schedule")))
         questions = _normalize_questions(raw.get("questions", default.get("questions")))
         questions = questions or default["questions"]
+        fmt = str(raw.get("format", default.get("format", "answer"))).strip()
+        if fmt not in ("answer", "prompt"):
+            fmt = "answer"
+        try:
+            prep_seconds = int(raw.get("prepSeconds", default.get("prepSeconds", 0)) or 0)
+        except (TypeError, ValueError):
+            prep_seconds = int(default.get("prepSeconds", 0) or 0)
+        try:
+            answer_seconds = int(raw.get("answerSeconds", default.get("answerSeconds", 0)) or 0)
+        except (TypeError, ValueError):
+            answer_seconds = int(default.get("answerSeconds", 0) or 0)
         return {
+            "format": fmt,
             "heading": str(raw.get("heading", default.get("heading", ""))).strip(),
             "instructionJa": str(
                 raw.get("instructionJa", default.get("instructionJa", ""))
             ).strip(),
+            "noteJa": str(raw.get("noteJa", default.get("noteJa", ""))).strip(),
+            "prepSeconds": prep_seconds,
+            "answerSeconds": answer_seconds,
             "informationImage": _normalize_part_b_image(
                 raw.get("informationImage"),
                 default.get("informationImage", ""),
@@ -601,6 +672,8 @@ def _normalize(raw: dict | None) -> dict:
                     if part == "b" and num == 1 and stored_version < PART_B_1_DEFAULTS_VERSION:
                         continue
                     if part == "b" and num == 2 and stored_version < PART_B_2_DEFAULTS_VERSION:
+                        continue
+                    if part == "b" and num in (3, 4) and stored_version < PART_B_PROMPT_DEFAULTS_VERSION:
                         continue
                     if part == "c" and num > 1 and stored_version < PART_C_DEFAULTS_VERSION:
                         continue

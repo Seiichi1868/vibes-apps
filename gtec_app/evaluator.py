@@ -126,23 +126,45 @@ Return exactly this JSON (no extra keys):
 
 # ─── Part B: Interacting with Others ─────────────────────────────────────────
 
-def evaluate_part_b(text: str, duration: float, question: str, context: str) -> dict:
+def evaluate_part_b(
+    text: str,
+    duration: float,
+    question: str,
+    context: str,
+    task_type: str = "answer",
+) -> dict:
     """Goal Achievement 0 or 1 per question."""
+    if task_type == "explain":
+        goal = """1 – Student stated the problem AND how they want it solved
+0 – The problem or the requested solution is missing, or the response is unrelated"""
+        notes = """- The student must explain the problem shown in the illustration and the solution they want.
+- A short but complete explanation is enough. Do not require extra details beyond the picture."""
+        task_label = "Task (shown on screen)"
+    elif task_type == "ask":
+        goal = """1 – Student asked one question about the information shown
+0 – No question, or the question is unrelated to the information"""
+        notes = """- One clear question about the flyer or illustration is enough.
+- Do not require the student to also answer their own question."""
+        task_label = "Task (shown on screen)"
+    else:
+        goal = """1 – Student conveyed the necessary information (even a single word or number is fine)
+0 – No response, irrelevant response, or required information not conveyed"""
+        notes = """- Even one-word answers earn full marks if they correctly answer the question.
+- Part B only requires stating facts visible on the chart. Do NOT suggest elaborating, explaining more, or giving longer answers.
+- Do NOT advise the student to "explain in more detail" or similar."""
+        task_label = "Question asked (audio only)"
     prompt = f"""GTEC Part B – Interacting with Others
 
 Context shown to student: {context}
-Question asked (audio only): "{question}"
+{task_label}: "{question}"
 Student's response (transcription): "{text}"
 Duration: {duration:.1f}s
 
 === Goal Achievement (0 or 1) ===
-1 – Student conveyed the necessary information (even a single word or number is fine)
-0 – No response, irrelevant response, or required information not conveyed
+{goal}
 
 IMPORTANT:
-- Even one-word answers earn full marks if they correctly answer the question.
-- Part B only requires stating facts visible on the chart. Do NOT suggest elaborating, explaining more, or giving longer answers.
-- Do NOT advise the student to "explain in more detail" or similar.
+{notes}
 
 Return exactly:
 {{
