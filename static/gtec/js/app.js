@@ -31,7 +31,7 @@ const PART_META = {
   },
   D: {
     title: 'Part D：意見表明 (Expressing Your Opinion)',
-    desc: 'トピックについて自分の意見と理由を英語で述べてください。準備時間 60 秒・解答時間 60 秒です。',
+    desc: 'パートDは、あるテーマについて、自分の考えとそう考える理由を述べる問題です。はじめに準備時間が1分あります。解答時間は1分です。\n\nあなたは英語の授業で、次のテーマについて発表することになりました。自分の考えを述べ、その理由を詳しく具体的に説明してください。日本のことを知らない外国人の先生にも伝わるように英語で話してください。',
     prepTime: 60,
     recTime: 60,
     maxScore: 11,
@@ -1504,8 +1504,8 @@ async function runPartD() {
       <div class="bg-teal-50 border border-teal-200 rounded-xl p-4 mb-3">
         <p class="font-semibold text-teal-900 text-base leading-relaxed">${d.topic}</p>
       </div>
-      <p class="text-xs text-slate-400 text-center">
-        ① 自分の意見（賛成/反対）→ ② 客観的な理由・具体例 の順で話す練習をしてください
+      <p class="text-xs text-slate-500 text-center leading-relaxed">
+        自分の考えを述べ、その理由を詳しく具体的に説明してください。日本のことを知らない外国人の先生にも伝わるように英語で話してください。
       </p>
     `);
     timerEl = document.getElementById('timer-wrap');
@@ -1560,14 +1560,14 @@ function renderPartDResult(result, text) {
   $root().innerHTML = cardWrap(`
     <p class="text-xs font-bold text-teal-600 uppercase tracking-wider mb-4">Part D 結果</p>
     <div class="grid grid-cols-2 gap-4 mb-4">
-      ${scoreCircle(s.goal_achievement_opinion ?? 0, 1, '目的達成① 意見', 'teal')}
-      ${scoreCircle(s.goal_achievement_reason  ?? 0, 2, '目的達成② 理由', 'amber')}
-      ${scoreCircle(s.vocabulary_grammar       ?? 0, 4, '語い・文法', 'sky')}
-      ${scoreCircle(s.fluency_pronunciation    ?? 0, 4, '流ちょうさ', 'emerald')}
+      ${scoreCircle(s.goal_achievement_opinion ?? 0, 1, '意見', 'teal')}
+      ${scoreCircle(s.goal_achievement_reason  ?? 0, 2, '理由', 'amber')}
+      ${scoreCircle(s.vocabulary_grammar       ?? 0, 4, '語彙・文法', 'sky')}
+      ${scoreCircle(s.fluency_pronunciation    ?? 0, 4, '流暢さ', 'emerald')}
     </div>
     <p class="text-center text-sm font-bold text-teal-700 mb-4">合計: ${total} / 11点</p>
     <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-4 text-xs text-slate-600">
-      <strong>目的達成② 理由の採点基準:</strong><br>
+      <strong>理由の採点基準:</strong><br>
       2点: 客観的・社会的な視点からの理由と具体例あり<br>
       1点: 個人的な体験・感想のみ<br>
       0点: 理由・具体例なし
@@ -1714,7 +1714,7 @@ async function renderPartIdle(partId) {
     const d = getPartData('D');
     $root().innerHTML = cardWrap(`
       <p class="text-xs font-bold text-teal-600 uppercase tracking-wider mb-1">${d.title}</p>
-      <p class="text-sm text-slate-500 mb-3">${d.desc}</p>
+      <p class="text-sm text-slate-500 whitespace-pre-line mb-3">${d.desc}</p>
       ${problemPickerHTML('D')}
       <div class="bg-teal-50 border border-teal-200 rounded-xl p-4 mb-2">
         <p class="font-semibold text-teal-900 text-base leading-relaxed">${escapeHTML(d.topic || '')}</p>
@@ -1722,16 +1722,16 @@ async function renderPartIdle(partId) {
       <p class="text-xs text-slate-500 text-right mb-4">🇯🇵 ${escapeHTML(d.topicJa || '')}</p>
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-slate-500 mb-4">
         <div class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-center">
-          <p class="font-bold text-teal-600">目的達成① 意見</p><p>0〜1点</p>
+          <p class="font-bold text-teal-600">意見</p><p>0〜1点</p>
         </div>
         <div class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-center">
-          <p class="font-bold text-teal-600">目的達成② 理由</p><p>0〜2点</p>
+          <p class="font-bold text-teal-600">理由</p><p>0〜2点</p>
         </div>
         <div class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-center">
-          <p class="font-bold text-teal-600">語い・文法</p><p>0〜4点</p>
+          <p class="font-bold text-teal-600">語彙・文法</p><p>0〜4点</p>
         </div>
         <div class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-center">
-          <p class="font-bold text-teal-600">流ちょうさ</p><p>0〜4点</p>
+          <p class="font-bold text-teal-600">流暢さ</p><p>0〜4点</p>
         </div>
       </div>
       <div class="flex gap-3 text-xs text-slate-500 mb-4">

@@ -15,11 +15,12 @@ PROBLEMS_FILE = DATA_DIR / "gtec_problems.json"
 
 PARTS = ("a", "b", "c", "d")
 PROBLEM_NUMS = (1, 2, 3, 4)
-PROBLEMS_VERSION = 9
+PROBLEMS_VERSION = 10
 PART_A_DEFAULTS_VERSION = 6
 PART_B_1_DEFAULTS_VERSION = 8
 PART_B_2_DEFAULTS_VERSION = 9
 PART_C_DEFAULTS_VERSION = 4
+PART_D_DEFAULTS_VERSION = 10
 
 DEFAULT_ACTIVE = {part: 1 for part in PARTS}
 
@@ -381,20 +382,20 @@ DEFAULT_SETS: dict[str, dict[str, dict]] = {
     },
     "d": {
         "1": {
-            "topic": "Should students be allowed to use smartphones at school? State your opinion clearly and support it with reasons and specific examples.",
-            "topicJa": "学校でのスマートフォン使用を許可すべきか？自分の意見を明確に述べ、理由と具体例を挙げて説明してください。",
+            "topic": "Should students be allowed to use smartphones at school?",
+            "topicJa": "学校でのスマートフォン使用を許可すべきか？",
         },
         "2": {
-            "topic": "Should school uniforms be mandatory for all students? State your opinion clearly and support it with reasons and specific examples.",
-            "topicJa": "生徒全員に制服を義務付けるべきか？自分の意見を明確に述べ、理由と具体例を挙げて説明してください。",
+            "topic": "Should school uniforms be mandatory for all students?",
+            "topicJa": "生徒全員に制服を義務付けるべきか？",
         },
         "3": {
-            "topic": "Should high school students have part-time jobs? State your opinion clearly and support it with reasons and specific examples.",
-            "topicJa": "高校生はアルバイトをすべきか？自分の意見を明確に述べ、理由と具体例を挙げて説明してください。",
+            "topic": "Should high school students have part-time jobs?",
+            "topicJa": "高校生はアルバイトをすべきか？",
         },
         "4": {
-            "topic": "Should plastic shopping bags be banned in Japan? State your opinion clearly and support it with reasons and specific examples.",
-            "topicJa": "日本ではレジ袋を禁止すべきか？自分の意見を明確に述べ、理由と具体例を挙げて説明してください。",
+            "topic": "Should plastic shopping bags be banned in Japan?",
+            "topicJa": "日本ではレジ袋を禁止すべきか？",
         },
     },
 }
@@ -602,6 +603,8 @@ def _normalize(raw: dict | None) -> dict:
                     if part == "b" and num == 2 and stored_version < PART_B_2_DEFAULTS_VERSION:
                         continue
                     if part == "c" and num > 1 and stored_version < PART_C_DEFAULTS_VERSION:
+                        continue
+                    if part == "d" and stored_version < PART_D_DEFAULTS_VERSION:
                         continue
                     data["sets"][part][key] = _normalize_part_set(part, num, part_sets[key])
 
