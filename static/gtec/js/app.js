@@ -1560,14 +1560,14 @@ function renderPartDResult(result, text) {
   $root().innerHTML = cardWrap(`
     <p class="text-xs font-bold text-teal-600 uppercase tracking-wider mb-4">Part D 結果</p>
     <div class="grid grid-cols-2 gap-4 mb-4">
-      ${scoreCircle(s.goal_achievement_opinion ?? 0, 1, 'GA①意見', 'teal')}
-      ${scoreCircle(s.goal_achievement_reason  ?? 0, 2, 'GA②理由', 'amber')}
+      ${scoreCircle(s.goal_achievement_opinion ?? 0, 1, '目的達成① 意見', 'teal')}
+      ${scoreCircle(s.goal_achievement_reason  ?? 0, 2, '目的達成② 理由', 'amber')}
       ${scoreCircle(s.vocabulary_grammar       ?? 0, 4, '語い・文法', 'sky')}
       ${scoreCircle(s.fluency_pronunciation    ?? 0, 4, '流ちょうさ', 'emerald')}
     </div>
     <p class="text-center text-sm font-bold text-teal-700 mb-4">合計: ${total} / 11点</p>
     <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-4 text-xs text-slate-600">
-      <strong>GA②理由の採点基準:</strong><br>
+      <strong>目的達成② 理由の採点基準:</strong><br>
       2点: 客観的・社会的な視点からの理由と具体例あり<br>
       1点: 個人的な体験・感想のみ<br>
       0点: 理由・具体例なし
@@ -1720,15 +1720,18 @@ async function renderPartIdle(partId) {
         <p class="font-semibold text-teal-900 text-base leading-relaxed">${escapeHTML(d.topic || '')}</p>
       </div>
       <p class="text-xs text-slate-500 text-right mb-4">🇯🇵 ${escapeHTML(d.topicJa || '')}</p>
-      <div class="grid grid-cols-3 gap-2 text-xs text-slate-500 mb-4">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-slate-500 mb-4">
         <div class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-center">
-          <p class="font-bold text-teal-600">GA 意見</p><p>0〜1点</p>
+          <p class="font-bold text-teal-600">目的達成① 意見</p><p>0〜1点</p>
         </div>
         <div class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-center">
-          <p class="font-bold text-teal-600">GA 理由</p><p>0〜2点</p>
+          <p class="font-bold text-teal-600">目的達成② 理由</p><p>0〜2点</p>
         </div>
         <div class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-center">
-          <p class="font-bold text-teal-600">語彙・流暢さ</p><p>各0〜4点</p>
+          <p class="font-bold text-teal-600">語い・文法</p><p>0〜4点</p>
+        </div>
+        <div class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-center">
+          <p class="font-bold text-teal-600">流ちょうさ</p><p>0〜4点</p>
         </div>
       </div>
       <div class="flex gap-3 text-xs text-slate-500 mb-4">
