@@ -887,6 +887,196 @@
     await loadCnn10Episodes(false);
   }
 
+  let cnn10LibInput = null;
+  let cnn10LibStatus = null;
+  let cnn10LibUpdateBtn = null;
+  let cnn10LibFullBtn = null;
+  let cnn10LibResults = null;
+  let cnn10LibSearchTimer = null;
+  let cnn10LibSearchRequestId = 0;
+  let cnn10LibPollTimer = null;
+  let cnn10LibCount = 0;
+
+  function formatCnn10LibDate(iso) {
+    if (!iso) return "";
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return "";
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
+  function buildCnn10LibraryUi() {
+    if (!cnn10Panel || !cnn10Message || cnn10LibInput) return;
+
+    const wrap = document.createElement("div");
+    wrap.className = "mb-2 rounded-lg border border-sky-100 bg-sky-50/50 p-2";
+
+    const row = document.createElement("div");
+    row.className = "flex flex-wrap items-center gap-2";
+
+    cnn10LibInput = document.createElement("input");
+    cnn10LibInput.type = "search";
+    cnn10LibInput.className = "compact-input min-w-[12rem] flex-1";
+    cnn10LibInput.placeholder = "全エピソードをタイトルで検索（例: Mars, election）";
+    cnn10LibInput.autocomplete = "off";
+
+    cnn10LibUpdateBtn = document.createElement("button");
+    cnn10LibUpdateBtn.type = "button";
+    cnn10LibUpdateBtn.className =
+      "rounded-full border border-sky-200 bg-white px-2.5 py-0.5 text-[11px] font-semibold text-sky-700 hover:bg-sky-100 disabled:opacity-50";
+    cnn10LibUpdateBtn.textContent = "新着を取り込む";
+
+    cnn10LibFullBtn = document.createElement("button");
+    cnn10LibFullBtn.type = "button";
+    cnn10LibFullBtn.className =
+      "text-[10px] font-medium text-slate-500 underline hover:text-slate-700 disabled:opacity-50";
+    cnn10LibFullBtn.textContent = "全件取り直し";
+
+    row.append(cnn10LibInput, cnn10LibUpdateBtn, cnn10LibFullBtn);
+
+    cnn10LibStatus = document.createElement("p");
+    cnn10LibStatus.className = "mt-1 text-[10px] text-slate-500";
+    cnn10LibStatus.textContent = "蓄積状況を確認中…";
+
+    cnn10LibResults = document.createElement("div");
+    cnn10LibResults.className = "mt-2 hidden max-h-[60vh] space-y-2 overflow-y-auto text-xs";
+
+    wrap.append(row, cnn10LibStatus, cnn10LibResults);
+    cnn10Message.parentNode.insertBefore(wrap, cnn10Message);
+
+    cnn10LibInput.addEventListener("input", () => {
+      if (cnn10LibSearchTimer) clearTimeout(cnn10LibSearchTimer);
+      cnn10LibSearchTimer = setTimeout(runCnn10LibrarySearch, 300);
+    });
+    cnn10LibUpdateBtn.addEventListener("click", () => startCnn10LibraryUpdate(cnn10LibCount ? "diff" : "full"));
+    cnn10LibFullBtn.addEventListener("click", () => {
+      if (!window.confirm("CNN10 の全エピソードを取り直します（1〜2分かかります）。よろしいですか？")) return;
+      startCnn10LibraryUpdate("full");
+    });
+  }
+
+  function setCnn10LibrarySearching(active) {
+    cnn10LibResults?.classList.toggle("hidden", !active);
+    cnn10List?.classList.toggle("hidden", active);
+    cnn10MoreBtn?.parentElement?.classList.toggle("hidden", active);
+  }
+
+  function renderCnn10LibraryStatus(data) {
+    if (!cnn10LibStatus) return;
+    cnn10LibCount = data.count || 0;
+    const job = data.job || {};
+    const running = !!data.running;
+
+    if (cnn10LibUpdateBtn) {
+      cnn10LibUpdateBtn.disabled = running;
+      cnn10LibUpdateBtn.textContent = running
+        ? "取得中…"
+        : cnn10LibCount
+          ? "新着を取り込む"
+          : "全エピソードを取得（約1分）";
+    }
+    if (cnn10LibFullBtn) {
+      cnn10LibFullBtn.disabled = running;
+      cnn10LibFullBtn.classList.toggle("hidden", !cnn10LibCount);
+    }
+    if (cnn10LibInput) cnn10LibInput.disabled = !cnn10LibCount;
+
+    let text;
+    if (running) {
+      text = `取得中… ${job.pages || 0} ページ / ${job.fetched || 0} 本`;
+    } else if (cnn10LibCount) {
+      text = `蓄積 ${cnn10LibCount.toLocaleString()} 本 ・ 最終更新 ${formatCnn10LibDate(data.updated_at) || "—"}`;
+      if (job.finished_at && job.mode) {
+        text += job.error
+          ? ` ・ 前回の${job.mode === "full" ? "全件取得" : "更新"}は途中で失敗（取得済み分は保存済み）`
+          : ` ・ 前回 +${job.added || 0} 本`;
+      }
+    } else {
+      text = "まだ蓄積がありません。「全エピソードを取得」を押すと検索できるようになります。";
+    }
+    cnn10LibStatus.textContent = text;
+    cnn10LibStatus.classList.toggle("text-amber-700", !running && !!job.error);
+  }
+
+  async function loadCnn10LibraryStatus() {
+    try {
+      const res = await fetch("/news/admin/api/cnn10/library/status");
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "蓄積状況を取得できませんでした。");
+      renderCnn10LibraryStatus(data);
+      return data;
+    } catch (err) {
+      if (cnn10LibStatus) cnn10LibStatus.textContent = err.message || "蓄積状況を取得できませんでした。";
+      return null;
+    }
+  }
+
+  function pollCnn10LibraryStatus() {
+    if (cnn10LibPollTimer) clearTimeout(cnn10LibPollTimer);
+    cnn10LibPollTimer = setTimeout(async () => {
+      cnn10LibPollTimer = null;
+      const data = await loadCnn10LibraryStatus();
+      if (data?.running) {
+        pollCnn10LibraryStatus();
+      } else if (cnn10LibInput?.value.trim()) {
+        runCnn10LibrarySearch();
+      }
+    }, 2000);
+  }
+
+  async function startCnn10LibraryUpdate(mode) {
+    try {
+      const res = await fetch("/news/admin/api/cnn10/library/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "更新を開始できませんでした。");
+      renderCnn10LibraryStatus(data);
+      pollCnn10LibraryStatus();
+    } catch (err) {
+      if (cnn10LibStatus) cnn10LibStatus.textContent = err.message || "更新を開始できませんでした。";
+    }
+  }
+
+  async function runCnn10LibrarySearch() {
+    if (!cnn10LibInput || !cnn10LibResults) return;
+    const query = cnn10LibInput.value.trim();
+    const requestId = ++cnn10LibSearchRequestId;
+    if (!query) {
+      cnn10LibResults.innerHTML = "";
+      setCnn10LibrarySearching(false);
+      return;
+    }
+    setCnn10LibrarySearching(true);
+    try {
+      const res = await fetch(`/news/admin/api/cnn10/library/search?q=${encodeURIComponent(query)}&limit=50`);
+      const data = await res.json();
+      if (requestId !== cnn10LibSearchRequestId) return;
+      if (!data.ok) throw new Error(data.error || "検索に失敗しました。");
+
+      cnn10LibResults.innerHTML = "";
+      cnn10OpenPreviewRow = null;
+      const episodes = data.episodes || [];
+      const summary = document.createElement("p");
+      summary.className = "text-[11px] text-slate-500";
+      summary.textContent = episodes.length
+        ? `${data.total} 件ヒット${data.total > episodes.length ? `（新しい順に ${episodes.length} 件表示）` : ""}`
+        : "該当する動画がありません。";
+      cnn10LibResults.appendChild(summary);
+      episodes.forEach((episode) => {
+        const shown = episode.published_estimated && episode.published
+          ? { ...episode, published: `${episode.published}頃` }
+          : episode;
+        cnn10LibResults.appendChild(createCnn10EpisodeRow(shown));
+      });
+    } catch (err) {
+      if (requestId !== cnn10LibSearchRequestId) return;
+      cnn10LibResults.textContent = err.message || "検索に失敗しました。";
+    }
+  }
+
   function getSelectedClassId() {
     return classSelect ? classSelect.value.trim() : "";
   }
@@ -1635,6 +1825,14 @@
   if (cnn10Panel) {
     cnn10Panel.addEventListener("click", (e) => {
       if (e.target === cnn10Panel) hideCnn10Panel();
+    });
+  }
+
+  buildCnn10LibraryUi();
+  if (cnn10OpenBtn) {
+    cnn10OpenBtn.addEventListener("click", async () => {
+      const data = await loadCnn10LibraryStatus();
+      if (data?.running) pollCnn10LibraryStatus();
     });
   }
 

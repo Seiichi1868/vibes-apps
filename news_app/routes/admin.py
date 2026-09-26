@@ -24,6 +24,7 @@ from news_app.config import (
 )
 from news_app.services.cnn10 import fetch_cnn10_episodes
 from news_app.services.cnn10_highlight import find_title_segment_in_transcript
+from news_app.services.cnn10_library import get_library_status, search_episodes, start_update_job
 from news_app.services.network import get_public_base_url
 from news_app.services.docx_translate import (
     build_lesson_materials_docx,
@@ -139,6 +140,32 @@ def youtube_highlight():
         highlight = {"ok": False, "error": f"区間推定に失敗しました: {exc}"}
 
     return jsonify({"ok": True, "highlight": highlight})
+
+
+@admin_bp.route("/api/cnn10/library/status", methods=["GET"])
+def cnn10_library_status():
+    return jsonify({"ok": True, **get_library_status()})
+
+
+@admin_bp.route("/api/cnn10/library/update", methods=["POST"])
+def cnn10_library_update():
+    data = request.get_json(silent=True) or {}
+    mode = "full" if data.get("mode") == "full" else "diff"
+    try:
+        result = start_update_job(mode)
+    except OSError as exc:
+        return jsonify({"ok": False, "error": f"更新を開始できませんでした: {exc}"}), 500
+    return jsonify({"ok": True, **result}), 202 if result.get("started") else 200
+
+
+@admin_bp.route("/api/cnn10/library/search", methods=["GET"])
+def cnn10_library_search():
+    query = str(request.args.get("q") or "").strip()
+    try:
+        limit = int(request.args.get("limit") or 50)
+    except ValueError:
+        limit = 50
+    return jsonify({"ok": True, **search_episodes(query, limit=limit)})
 
 
 @admin_bp.route("/")
