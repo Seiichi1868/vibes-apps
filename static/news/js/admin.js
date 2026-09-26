@@ -1087,6 +1087,8 @@
   let cnn10SemanticPollTimer = null;
   let cnn10SemanticRequestId = 0;
   let cnn10SemanticReady = false;
+  let cnn10SemanticYearSelect = null;
+  let cnn10SemanticYearsKey = "";
 
   function buildCnn10SemanticUi() {
     if (!cnn10LibInput || !cnn10LibResults || cnn10SemanticToggle) return;
@@ -1106,8 +1108,15 @@
       "hidden rounded-full border border-violet-200 bg-violet-600 px-2.5 py-0.5 text-[11px] font-semibold text-white hover:bg-violet-500 disabled:opacity-50";
     cnn10SemanticSearchBtn.textContent = "意味で検索";
 
+    cnn10SemanticYearSelect = document.createElement("select");
+    cnn10SemanticYearSelect.className =
+      "hidden rounded-full border border-violet-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-violet-700";
+    cnn10SemanticYearSelect.title = "年度（4月〜翌3月）で絞り込み";
+    cnn10SemanticYearSelect.innerHTML = '<option value="">全年度</option>';
+
     inputRow.insertBefore(toggleLabel, cnn10LibInput.nextSibling);
-    inputRow.insertBefore(cnn10SemanticSearchBtn, toggleLabel.nextSibling);
+    inputRow.insertBefore(cnn10SemanticYearSelect, toggleLabel.nextSibling);
+    inputRow.insertBefore(cnn10SemanticSearchBtn, cnn10SemanticYearSelect.nextSibling);
 
     cnn10SemanticRow = document.createElement("div");
     cnn10SemanticRow.className = "mt-1 hidden flex-wrap items-center gap-2";
@@ -1130,6 +1139,9 @@
     cnn10SemanticToggle.addEventListener("change", () => setCnn10SemanticMode(cnn10SemanticToggle.checked));
     cnn10SemanticSearchBtn.addEventListener("click", runCnn10SemanticSearch);
     cnn10SemanticInitBtn.addEventListener("click", startCnn10SemanticInit);
+    cnn10SemanticYearSelect.addEventListener("change", () => {
+      if (cnn10LibInput.value.trim()) runCnn10SemanticSearch();
+    });
     cnn10LibInput.addEventListener("keydown", (e) => {
       if (cnn10SemanticOn && e.key === "Enter" && !e.isComposing) {
         e.preventDefault();
@@ -1144,6 +1156,7 @@
     cnn10SemanticRow?.classList.toggle("hidden", !cnn10SemanticOn);
     cnn10SemanticRow?.classList.toggle("flex", cnn10SemanticOn);
     cnn10SemanticSearchBtn?.classList.toggle("hidden", !cnn10SemanticOn);
+    cnn10SemanticYearSelect?.classList.toggle("hidden", !cnn10SemanticOn);
     if (cnn10LibInput) {
       cnn10LibInput.placeholder = cnn10SemanticOn
         ? "文章で検索（例: 健康診断の重要性）→ Enter"
@@ -1188,6 +1201,22 @@
       cnn10SemanticInitBtn.textContent = data.ready ? "未準備分を準備" : "意味検索を準備（約30秒）";
     }
     if (cnn10SemanticSearchBtn) cnn10SemanticSearchBtn.disabled = !data.ready;
+    renderCnn10SemanticYears(data.fiscal_years || []);
+  }
+
+  function renderCnn10SemanticYears(years) {
+    if (!cnn10SemanticYearSelect) return;
+    const key = years.join(",");
+    if (key === cnn10SemanticYearsKey) return;
+    cnn10SemanticYearsKey = key;
+    const selected = cnn10SemanticYearSelect.value;
+    cnn10SemanticYearSelect.replaceChildren(new Option("全年度", ""));
+    years.forEach((year) => {
+      const option = new Option(`${year}年度`, String(year));
+      option.title = `${year}年4月〜${year + 1}年3月`;
+      cnn10SemanticYearSelect.appendChild(option);
+    });
+    if (years.map(String).includes(selected)) cnn10SemanticYearSelect.value = selected;
   }
 
   async function loadCnn10SemanticStatus() {
@@ -1244,7 +1273,10 @@
     if (cnn10SemanticSearchBtn) cnn10SemanticSearchBtn.disabled = true;
 
     try {
-      const res = await fetch(`/news/admin/api/cnn10/library/search/semantic?q=${encodeURIComponent(query)}&limit=10`);
+      const year = cnn10SemanticYearSelect?.value || "";
+      const res = await fetch(
+        `/news/admin/api/cnn10/library/search/semantic?q=${encodeURIComponent(query)}&limit=10${year ? `&year=${year}` : ""}`
+      );
       const data = await res.json();
       if (requestId !== cnn10SemanticRequestId) return;
       if (!data.ok) throw new Error(data.error || "意味検索に失敗しました。");
@@ -1253,7 +1285,10 @@
       cnn10OpenPreviewRow = null;
       const header = document.createElement("p");
       header.className = "text-[11px] font-semibold text-violet-700";
-      header.textContent = `意味検索の結果（β・実験的機能）「${query}」に近いタイトル 上位 ${(data.episodes || []).length} 件`;
+      const scope = data.fiscal_year ? `${data.fiscal_year}年度の中で` : "";
+      header.textContent = (data.episodes || []).length
+        ? `意味検索の結果（β・実験的機能）${scope}「${query}」に近いタイトル 上位 ${data.episodes.length} 件`
+        : `意味検索の結果（β・実験的機能）${scope}該当する動画がありません。`;
       cnn10SemanticResults.appendChild(header);
       (data.episodes || []).forEach((episode) => {
         const percent = Math.round((Number(episode.score) || 0) * 100);

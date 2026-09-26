@@ -193,7 +193,11 @@ def cnn10_library_semantic_search():
     except ValueError:
         limit = 10
     try:
-        return jsonify({"ok": True, **semantic_search(query, limit=limit)})
+        fiscal_year = int(request.args.get("year") or 0) or None
+    except ValueError:
+        fiscal_year = None
+    try:
+        return jsonify({"ok": True, **semantic_search(query, limit=limit, fiscal_year=fiscal_year)})
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:
