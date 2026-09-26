@@ -264,8 +264,8 @@ def get_embedding_status() -> dict:
     if job.get("running") and not running:
         job["running"] = False
         job.setdefault("error", "Embedding 化が中断されました。")
-    fiscal_years = {fiscal_year_of(item.get("published")) for item in episodes}
-    fiscal_years.discard(None)
+    years = {year_of(item.get("published")) for item in episodes}
+    years.discard(None)
     return {
         "library_count": len(episodes),
         "embedded_count": embedded,
@@ -273,19 +273,17 @@ def get_embedding_status() -> dict:
         "ready": embedded > 0,
         "running": running,
         "model": EMBEDDING_MODEL,
-        "fiscal_years": sorted(fiscal_years, reverse=True),
+        "years": sorted(years, reverse=True),
         "job": job,
     }
 
 
-def fiscal_year_of(published) -> int | None:
-    """"YYYY-MM-DD" を日本の学校年度（4月始まり）に変換する。"""
-    text = str(published or "")
+def year_of(published) -> int | None:
+    """"YYYY-MM-DD" の年（暦年）。"""
     try:
-        year, month = int(text[:4]), int(text[5:7])
+        return int(str(published or "")[:4])
     except ValueError:
         return None
-    return year if month >= 4 else year - 1
 
 
 # ---------------------------------------------------------------------------
@@ -295,16 +293,16 @@ def fiscal_year_of(published) -> int | None:
 def semantic_search(
     query: str,
     limit: int = SEMANTIC_DEFAULT_LIMIT,
-    fiscal_year: int | None = None,
+    since_year: int | None = None,
 ) -> dict:
     """クエリを Embedding 化し、保存済みタイトルとのコサイン類似度上位を返す。
 
-    fiscal_year を指定すると、その年度（4月〜翌3月）に公開された動画だけから選ぶ。
+    since_year を指定すると、その年の1月1日以降〜最新に公開された動画だけから選ぶ。
     """
     query = str(query or "").strip()
     limit = max(1, min(int(limit or SEMANTIC_DEFAULT_LIMIT), SEMANTIC_MAX_LIMIT))
     if not query:
-        return {"query": query, "episodes": [], "synced": 0, "fiscal_year": fiscal_year}
+        return {"query": query, "episodes": [], "synced": 0, "since_year": since_year}
 
     synced = 0
     if not _is_running():
@@ -328,7 +326,7 @@ def semantic_search(
     episodes_by_id = {
         item["video_id"]: item
         for item in load_library()["episodes"]
-        if fiscal_year is None or fiscal_year_of(item.get("published")) == fiscal_year
+        if since_year is None or (year_of(item.get("published")) or 0) >= since_year
     }
     scored = [
         (sum(map(mul, query_vec, vec)), video_id)
@@ -348,4 +346,4 @@ def semantic_search(
                 "thumbnail_url": cnn10.YOUTUBE_THUMBNAIL_URL.format(video_id=video_id),
             }
         )
-    return {"query": query, "episodes": results, "synced": synced, "fiscal_year": fiscal_year}
+    return {"query": query, "episodes": results, "synced": synced, "since_year": since_year}

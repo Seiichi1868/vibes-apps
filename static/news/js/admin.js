@@ -1111,8 +1111,8 @@
     cnn10SemanticYearSelect = document.createElement("select");
     cnn10SemanticYearSelect.className =
       "hidden rounded-full border border-violet-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-violet-700";
-    cnn10SemanticYearSelect.title = "年度（4月〜翌3月）で絞り込み";
-    cnn10SemanticYearSelect.innerHTML = '<option value="">全年度</option>';
+    cnn10SemanticYearSelect.title = "選んだ年以降〜最新の動画から検索";
+    cnn10SemanticYearSelect.innerHTML = '<option value="">全期間</option>';
 
     inputRow.insertBefore(toggleLabel, cnn10LibInput.nextSibling);
     inputRow.insertBefore(cnn10SemanticYearSelect, toggleLabel.nextSibling);
@@ -1201,7 +1201,7 @@
       cnn10SemanticInitBtn.textContent = data.ready ? "未準備分を準備" : "意味検索を準備（約30秒）";
     }
     if (cnn10SemanticSearchBtn) cnn10SemanticSearchBtn.disabled = !data.ready;
-    renderCnn10SemanticYears(data.fiscal_years || []);
+    renderCnn10SemanticYears(data.years || []);
   }
 
   function renderCnn10SemanticYears(years) {
@@ -1210,11 +1210,9 @@
     if (key === cnn10SemanticYearsKey) return;
     cnn10SemanticYearsKey = key;
     const selected = cnn10SemanticYearSelect.value;
-    cnn10SemanticYearSelect.replaceChildren(new Option("全年度", ""));
+    cnn10SemanticYearSelect.replaceChildren(new Option("全期間", ""));
     years.forEach((year) => {
-      const option = new Option(`${year}年度`, String(year));
-      option.title = `${year}年4月〜${year + 1}年3月`;
-      cnn10SemanticYearSelect.appendChild(option);
+      cnn10SemanticYearSelect.appendChild(new Option(`${year}年以降`, String(year)));
     });
     if (years.map(String).includes(selected)) cnn10SemanticYearSelect.value = selected;
   }
@@ -1273,9 +1271,9 @@
     if (cnn10SemanticSearchBtn) cnn10SemanticSearchBtn.disabled = true;
 
     try {
-      const year = cnn10SemanticYearSelect?.value || "";
+      const since = cnn10SemanticYearSelect?.value || "";
       const res = await fetch(
-        `/news/admin/api/cnn10/library/search/semantic?q=${encodeURIComponent(query)}&limit=10${year ? `&year=${year}` : ""}`
+        `/news/admin/api/cnn10/library/search/semantic?q=${encodeURIComponent(query)}&limit=10${since ? `&since=${since}` : ""}`
       );
       const data = await res.json();
       if (requestId !== cnn10SemanticRequestId) return;
@@ -1285,7 +1283,7 @@
       cnn10OpenPreviewRow = null;
       const header = document.createElement("p");
       header.className = "text-[11px] font-semibold text-violet-700";
-      const scope = data.fiscal_year ? `${data.fiscal_year}年度の中で` : "";
+      const scope = data.since_year ? `${data.since_year}年以降〜最新の中で` : "";
       header.textContent = (data.episodes || []).length
         ? `意味検索の結果（β・実験的機能）${scope}「${query}」に近いタイトル 上位 ${data.episodes.length} 件`
         : `意味検索の結果（β・実験的機能）${scope}該当する動画がありません。`;
