@@ -25,6 +25,7 @@ from news_app.config import (
 from news_app.services.cnn10 import fetch_cnn10_episodes
 from news_app.services.cnn10_highlight import find_title_segment_in_transcript
 from news_app.services.cnn10_library import get_library_status, search_episodes, start_update_job
+from news_app.services.cnn10_embeddings import get_embedding_status, semantic_search, start_embedding_job
 from news_app.services.network import get_public_base_url
 from news_app.services.docx_translate import (
     build_lesson_materials_docx,
@@ -166,6 +167,38 @@ def cnn10_library_search():
     except ValueError:
         limit = 50
     return jsonify({"ok": True, **search_episodes(query, limit=limit)})
+
+
+@admin_bp.route("/api/cnn10/library/embeddings/init", methods=["POST"])
+def cnn10_embeddings_init():
+    try:
+        result = start_embedding_job()
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except OSError as exc:
+        return jsonify({"ok": False, "error": f"意味検索の準備を開始できませんでした: {exc}"}), 500
+    return jsonify({"ok": True, **result}), 202 if result.get("started") else 200
+
+
+@admin_bp.route("/api/cnn10/library/embeddings/status", methods=["GET"])
+def cnn10_embeddings_status():
+    return jsonify({"ok": True, **get_embedding_status()})
+
+
+@admin_bp.route("/api/cnn10/library/search/semantic", methods=["GET"])
+def cnn10_library_semantic_search():
+    query = str(request.args.get("q") or "").strip()
+    try:
+        limit = int(request.args.get("limit") or 10)
+    except ValueError:
+        limit = 10
+    try:
+        return jsonify({"ok": True, **semantic_search(query, limit=limit)})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        logger.exception("cnn10 semantic search failed")
+        return jsonify({"ok": False, "error": f"意味検索に失敗しました: {exc}"}), 502
 
 
 @admin_bp.route("/")

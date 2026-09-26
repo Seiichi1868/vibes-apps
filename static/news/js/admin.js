@@ -1041,7 +1041,7 @@
   }
 
   async function runCnn10LibrarySearch() {
-    if (!cnn10LibInput || !cnn10LibResults) return;
+    if (!cnn10LibInput || !cnn10LibResults || cnn10SemanticOn) return;
     const query = cnn10LibInput.value.trim();
     const requestId = ++cnn10LibSearchRequestId;
     if (!query) {
@@ -1074,6 +1074,207 @@
     } catch (err) {
       if (requestId !== cnn10LibSearchRequestId) return;
       cnn10LibResults.textContent = err.message || "検索に失敗しました。";
+    }
+  }
+
+  let cnn10SemanticOn = false;
+  let cnn10SemanticToggle = null;
+  let cnn10SemanticRow = null;
+  let cnn10SemanticStatus = null;
+  let cnn10SemanticInitBtn = null;
+  let cnn10SemanticSearchBtn = null;
+  let cnn10SemanticResults = null;
+  let cnn10SemanticPollTimer = null;
+  let cnn10SemanticRequestId = 0;
+  let cnn10SemanticReady = false;
+
+  function buildCnn10SemanticUi() {
+    if (!cnn10LibInput || !cnn10LibResults || cnn10SemanticToggle) return;
+    const inputRow = cnn10LibInput.parentElement;
+
+    const toggleLabel = document.createElement("label");
+    toggleLabel.className =
+      "flex cursor-pointer items-center gap-1 rounded-full border border-violet-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-violet-700";
+    cnn10SemanticToggle = document.createElement("input");
+    cnn10SemanticToggle.type = "checkbox";
+    cnn10SemanticToggle.className = "h-3 w-3 accent-violet-600";
+    toggleLabel.append(cnn10SemanticToggle, document.createTextNode("意味検索(β)"));
+
+    cnn10SemanticSearchBtn = document.createElement("button");
+    cnn10SemanticSearchBtn.type = "button";
+    cnn10SemanticSearchBtn.className =
+      "hidden rounded-full border border-violet-200 bg-violet-600 px-2.5 py-0.5 text-[11px] font-semibold text-white hover:bg-violet-500 disabled:opacity-50";
+    cnn10SemanticSearchBtn.textContent = "意味で検索";
+
+    inputRow.insertBefore(toggleLabel, cnn10LibInput.nextSibling);
+    inputRow.insertBefore(cnn10SemanticSearchBtn, toggleLabel.nextSibling);
+
+    cnn10SemanticRow = document.createElement("div");
+    cnn10SemanticRow.className = "mt-1 hidden flex-wrap items-center gap-2";
+    cnn10SemanticStatus = document.createElement("p");
+    cnn10SemanticStatus.className = "text-[10px] text-violet-700";
+    cnn10SemanticInitBtn = document.createElement("button");
+    cnn10SemanticInitBtn.type = "button";
+    cnn10SemanticInitBtn.className =
+      "hidden rounded-full border border-violet-200 bg-white px-2.5 py-0.5 text-[11px] font-semibold text-violet-700 hover:bg-violet-50 disabled:opacity-50";
+    cnn10SemanticInitBtn.textContent = "意味検索を準備（約30秒）";
+    cnn10SemanticRow.append(cnn10SemanticStatus, cnn10SemanticInitBtn);
+
+    cnn10SemanticResults = document.createElement("div");
+    cnn10SemanticResults.className =
+      "mt-2 hidden max-h-[60vh] space-y-2 overflow-y-auto rounded-lg border border-violet-100 bg-violet-50/40 p-2 text-xs";
+
+    cnn10LibStatus.parentNode.insertBefore(cnn10SemanticRow, cnn10LibStatus.nextSibling);
+    cnn10LibResults.parentNode.insertBefore(cnn10SemanticResults, cnn10LibResults.nextSibling);
+
+    cnn10SemanticToggle.addEventListener("change", () => setCnn10SemanticMode(cnn10SemanticToggle.checked));
+    cnn10SemanticSearchBtn.addEventListener("click", runCnn10SemanticSearch);
+    cnn10SemanticInitBtn.addEventListener("click", startCnn10SemanticInit);
+    cnn10LibInput.addEventListener("keydown", (e) => {
+      if (cnn10SemanticOn && e.key === "Enter" && !e.isComposing) {
+        e.preventDefault();
+        runCnn10SemanticSearch();
+      }
+    });
+  }
+
+  function setCnn10SemanticMode(on) {
+    cnn10SemanticOn = !!on;
+    if (cnn10LibSearchTimer) clearTimeout(cnn10LibSearchTimer);
+    cnn10SemanticRow?.classList.toggle("hidden", !cnn10SemanticOn);
+    cnn10SemanticRow?.classList.toggle("flex", cnn10SemanticOn);
+    cnn10SemanticSearchBtn?.classList.toggle("hidden", !cnn10SemanticOn);
+    if (cnn10LibInput) {
+      cnn10LibInput.placeholder = cnn10SemanticOn
+        ? "文章で検索（例: 健康診断の重要性）→ Enter"
+        : "全エピソードをタイトルで検索（例: Mars, election）";
+    }
+    if (cnn10SemanticOn) {
+      cnn10LibResults?.classList.add("hidden");
+      const hasResults = !!cnn10SemanticResults?.childElementCount;
+      cnn10SemanticResults?.classList.toggle("hidden", !hasResults);
+      cnn10List?.classList.toggle("hidden", hasResults);
+      cnn10MoreBtn?.parentElement?.classList.toggle("hidden", hasResults);
+      loadCnn10SemanticStatus();
+    } else {
+      cnn10SemanticResults?.classList.add("hidden");
+      runCnn10LibrarySearch();
+    }
+  }
+
+  function renderCnn10SemanticStatus(data) {
+    if (!cnn10SemanticStatus) return;
+    const job = data.job || {};
+    const running = !!data.running;
+    cnn10SemanticReady = !!data.ready;
+    const needsInit = !data.ready || data.missing_count > 100;
+
+    let text;
+    if (running) {
+      text = `意味検索の準備をしています… ${job.embedded || 0} / ${job.target || data.missing_count || 0} 本`;
+    } else if (!data.library_count) {
+      text = "先にタイトルの蓄積（全エピソードを取得）が必要です。";
+    } else if (!data.ready) {
+      text = "意味検索はまだ準備されていません。";
+    } else {
+      text = `実験的機能 ・ 準備済み ${data.embedded_count.toLocaleString()} 本`;
+      if (data.missing_count) text += `（未準備 ${data.missing_count} 本）`;
+    }
+    if (!running && job.error) text += ` ・ 前回の準備は途中で止まりました（続きから再開できます）`;
+    cnn10SemanticStatus.textContent = text;
+
+    if (cnn10SemanticInitBtn) {
+      cnn10SemanticInitBtn.classList.toggle("hidden", running || !data.library_count || !needsInit);
+      cnn10SemanticInitBtn.textContent = data.ready ? "未準備分を準備" : "意味検索を準備（約30秒）";
+    }
+    if (cnn10SemanticSearchBtn) cnn10SemanticSearchBtn.disabled = !data.ready;
+  }
+
+  async function loadCnn10SemanticStatus() {
+    try {
+      const res = await fetch("/news/admin/api/cnn10/library/embeddings/status");
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "意味検索の状態を取得できませんでした。");
+      renderCnn10SemanticStatus(data);
+      if (data.running) pollCnn10SemanticStatus();
+      return data;
+    } catch (err) {
+      if (cnn10SemanticStatus) cnn10SemanticStatus.textContent = err.message || "意味検索の状態を取得できませんでした。";
+      return null;
+    }
+  }
+
+  function pollCnn10SemanticStatus() {
+    if (cnn10SemanticPollTimer) clearTimeout(cnn10SemanticPollTimer);
+    cnn10SemanticPollTimer = setTimeout(() => {
+      cnn10SemanticPollTimer = null;
+      loadCnn10SemanticStatus();
+    }, 2000);
+  }
+
+  async function startCnn10SemanticInit() {
+    if (cnn10SemanticInitBtn) cnn10SemanticInitBtn.disabled = true;
+    try {
+      const res = await fetch("/news/admin/api/cnn10/library/embeddings/init", { method: "POST" });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "意味検索の準備を開始できませんでした。");
+      renderCnn10SemanticStatus(data);
+      pollCnn10SemanticStatus();
+    } catch (err) {
+      if (cnn10SemanticStatus) cnn10SemanticStatus.textContent = err.message || "意味検索の準備を開始できませんでした。";
+    } finally {
+      if (cnn10SemanticInitBtn) cnn10SemanticInitBtn.disabled = false;
+    }
+  }
+
+  async function runCnn10SemanticSearch() {
+    if (!cnn10SemanticOn || !cnn10LibInput || !cnn10SemanticResults) return;
+    const query = cnn10LibInput.value.trim();
+    if (!query) return;
+    if (!cnn10SemanticReady) {
+      if (cnn10SemanticStatus) cnn10SemanticStatus.textContent = "先に「意味検索を準備」を押してください。";
+      return;
+    }
+    const requestId = ++cnn10SemanticRequestId;
+    cnn10SemanticResults.classList.remove("hidden");
+    cnn10List?.classList.add("hidden");
+    cnn10MoreBtn?.parentElement?.classList.add("hidden");
+    cnn10SemanticResults.innerHTML =
+      '<p class="text-[11px] text-violet-700">意味検索中…</p>';
+    if (cnn10SemanticSearchBtn) cnn10SemanticSearchBtn.disabled = true;
+
+    try {
+      const res = await fetch(`/news/admin/api/cnn10/library/search/semantic?q=${encodeURIComponent(query)}&limit=10`);
+      const data = await res.json();
+      if (requestId !== cnn10SemanticRequestId) return;
+      if (!data.ok) throw new Error(data.error || "意味検索に失敗しました。");
+
+      cnn10SemanticResults.innerHTML = "";
+      cnn10OpenPreviewRow = null;
+      const header = document.createElement("p");
+      header.className = "text-[11px] font-semibold text-violet-700";
+      header.textContent = `意味検索の結果（β・実験的機能）「${query}」に近いタイトル 上位 ${(data.episodes || []).length} 件`;
+      cnn10SemanticResults.appendChild(header);
+      (data.episodes || []).forEach((episode) => {
+        const percent = Math.round((Number(episode.score) || 0) * 100);
+        const date = episode.published
+          ? `${episode.published}${episode.published_estimated ? "頃" : ""}`
+          : "";
+        const row = createCnn10EpisodeRow({
+          ...episode,
+          published: [`類似度 ${percent}%`, date].filter(Boolean).join(" ・ "),
+        });
+        row.classList.add("border-violet-100");
+        cnn10SemanticResults.appendChild(row);
+      });
+      if (data.synced) loadCnn10SemanticStatus();
+    } catch (err) {
+      if (requestId !== cnn10SemanticRequestId) return;
+      cnn10SemanticResults.textContent = err.message || "意味検索に失敗しました。";
+    } finally {
+      if (requestId === cnn10SemanticRequestId && cnn10SemanticSearchBtn) {
+        cnn10SemanticSearchBtn.disabled = !cnn10SemanticReady;
+      }
     }
   }
 
@@ -1833,6 +2034,13 @@
     cnn10OpenBtn.addEventListener("click", async () => {
       const data = await loadCnn10LibraryStatus();
       if (data?.running) pollCnn10LibraryStatus();
+    });
+  }
+
+  buildCnn10SemanticUi();
+  if (cnn10OpenBtn) {
+    cnn10OpenBtn.addEventListener("click", () => {
+      if (cnn10SemanticOn) loadCnn10SemanticStatus();
     });
   }
 
