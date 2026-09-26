@@ -76,6 +76,7 @@ DEFAULT_CLASS_CURRENT = {
     "postview_questions": [],
     "postview_scaffolding_enabled": False,
     "postview_answers_visible": False,
+    "writing_topics": [],
 }
 
 DEFAULT_STATE = {
@@ -261,6 +262,62 @@ def selected_display_questions(raw, *, include_answers: bool = True) -> list[dic
     return items
 
 
+def _normalize_writing_topics(raw) -> list[dict]:
+    """OREO ライティングのトピック。kind は opinion（2択）か question（問い＋理由）。"""
+    if not isinstance(raw, list):
+        return []
+    items: list[dict] = []
+    for i, entry in enumerate(raw):
+        if not isinstance(entry, dict):
+            continue
+        text = str(entry.get("text") or "").strip()[:400]
+        if not text:
+            continue
+        try:
+            topic_id = int(entry.get("id")) if entry.get("id") is not None else i + 1
+        except (TypeError, ValueError):
+            topic_id = i + 1
+        kind = "opinion" if entry.get("kind") == "opinion" else "question"
+        options = entry.get("options") if isinstance(entry.get("options"), list) else []
+        options = [str(opt or "").strip()[:60] for opt in options if str(opt or "").strip()][:2]
+        if kind == "opinion" and len(options) < 2:
+            options = ["Agree", "Disagree"]
+        selected_raw = entry.get("selected", False)
+        if isinstance(selected_raw, str):
+            selected = selected_raw.strip().lower() in {"true", "1", "yes", "on"}
+        else:
+            selected = bool(selected_raw)
+        items.append(
+            {
+                "id": topic_id,
+                "kind": kind,
+                "text": text,
+                "text_ja": str(entry.get("text_ja") or "").strip()[:400],
+                "options": options if kind == "opinion" else [],
+                "selected": selected,
+            }
+        )
+    return items
+
+
+def selected_writing_topics(raw, *, include_japanese: bool = True) -> list[dict]:
+    """選択済みのライティングトピックだけを、表示用の連番付きリストにする。"""
+    items: list[dict] = []
+    for topic in _normalize_writing_topics(raw):
+        if not topic["selected"]:
+            continue
+        item = {
+            "id": len(items) + 1,
+            "kind": topic["kind"],
+            "text": topic["text"],
+            "options": topic["options"],
+        }
+        if include_japanese and topic["text_ja"]:
+            item["text_ja"] = topic["text_ja"]
+        items.append(item)
+    return items
+
+
 def _normalize_vocabulary_item(raw) -> dict | None:
     if not isinstance(raw, dict):
         return None
@@ -382,6 +439,7 @@ def _normalize_current(raw: dict | None) -> dict:
             "postview_questions": _normalize_warmup_questions(raw.get("postview_questions")),
             "postview_scaffolding_enabled": bool(raw.get("postview_scaffolding_enabled", False)),
             "postview_answers_visible": bool(raw.get("postview_answers_visible", False)),
+            "writing_topics": _normalize_writing_topics(raw.get("writing_topics")),
         }
     )
     return current
@@ -421,6 +479,7 @@ def _normalize_class(class_id: str, raw: dict) -> dict:
                 "postview_questions": _normalize_warmup_questions(item.get("postview_questions")),
                 "postview_scaffolding_enabled": bool(item.get("postview_scaffolding_enabled", False)),
                 "postview_answers_visible": bool(item.get("postview_answers_visible", False)),
+                "writing_topics": _normalize_writing_topics(item.get("writing_topics")),
             }
         )
     return {

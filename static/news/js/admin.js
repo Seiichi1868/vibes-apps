@@ -1361,6 +1361,7 @@
     if (postviewScaffoldingEnabledEl) postviewScaffoldingEnabledEl.checked = c.postview_scaffolding_enabled === true;
     if (postviewAnswersVisibleEl) postviewAnswersVisibleEl.checked = c.postview_answers_visible === true;
     renderAdminPostviewPreview(c.postview_questions || []);
+    renderAdminWritingPreview(c.writing_topics || []);
     scriptAutoManaged = false;
     suppressAutoScriptFill = false;
     if (lessonClassId) lessonClassId.value = cls.id;
@@ -3772,6 +3773,193 @@
       } finally {
         postviewGenerateBtn.disabled = false;
         postviewGenerateBtn.textContent = t("aiGeneratePostview");
+      }
+    });
+  }
+
+  const writingGenerateBtn = document.getElementById("writing-generate-btn");
+  const writingGenerateStatus = document.getElementById("writing-generate-status");
+  const writingPreview = document.getElementById("writing-preview");
+  let adminWritingTopics = [];
+  let writingSaveTimer = null;
+  let writingSaving = false;
+
+  function writingTopicFromRaw(raw) {
+    const kind = raw && raw.kind === "opinion" ? "opinion" : "question";
+    const options = Array.isArray(raw && raw.options) ? raw.options.map((o) => String(o || "")) : [];
+    return {
+      id: raw && raw.id,
+      kind,
+      text: String((raw && raw.text) || ""),
+      text_ja: String((raw && raw.text_ja) || ""),
+      options: kind === "opinion" ? [options[0] || "Agree", options[1] || "Disagree"] : [],
+      selected: raw && raw.selected === true,
+    };
+  }
+
+  function renderAdminWritingPreview(topics) {
+    adminWritingTopics = (topics || []).map(writingTopicFromRaw);
+    if (!writingPreview) return;
+    if (!adminWritingTopics.length) {
+      writingPreview.classList.add("hidden");
+      writingPreview.innerHTML = "";
+      return;
+    }
+    const selectedCount = adminWritingTopics.filter((topic) => topic.selected).length;
+    let html = `<p class="mb-1 font-semibold text-slate-600">トピック（スクリーン表示 ${selectedCount} / ${adminWritingTopics.length}）</p>`;
+    html += `<p class="mb-1 text-[9px] text-slate-500">チェックしたトピックが教室スクリーンに出ます（1つだけ選ぶと大きく表示されます）。</p>`;
+    html += `<div class="space-y-1">`;
+    adminWritingTopics.forEach((topic, index) => {
+      const badge = topic.kind === "opinion"
+        ? '<span class="shrink-0 rounded bg-rose-100 px-1 text-[9px] font-bold text-rose-700">2択</span>'
+        : '<span class="shrink-0 rounded bg-amber-100 px-1 text-[9px] font-bold text-amber-700">問い</span>';
+      const dimClass = topic.selected ? "" : " opacity-60";
+      html += `<div class="rounded px-1.5 py-1 ${index % 2 === 0 ? "bg-white/70" : ""}${dimClass}">
+        <div class="flex items-start gap-1.5">
+          <input type="checkbox" class="writing-select-cb shrink-0 mt-1 h-3.5 w-3.5 rounded border-rose-200 text-rose-600"
+            data-index="${index}" ${topic.selected ? "checked" : ""} title="スクリーンに表示">
+          <span class="shrink-0 mt-0.5 font-bold text-rose-700">T${index + 1}.</span>
+          ${badge}
+          <textarea rows="2" class="writing-text-input compact-input min-w-0 flex-1 resize-y text-[10px] py-0.5 leading-snug"
+            data-index="${index}">${esc(topic.text)}</textarea>
+        </div>`;
+      if (topic.kind === "opinion") {
+        html += `<div class="mt-0.5 ml-12 flex items-center gap-1 text-[9px] text-rose-800">
+          <span class="shrink-0 font-semibold">選択肢</span>
+          <input type="text" class="writing-option-input compact-input w-28 text-[10px] py-0.5" data-index="${index}" data-option="0" value="${escAttr(topic.options[0])}">
+          <span>/</span>
+          <input type="text" class="writing-option-input compact-input w-28 text-[10px] py-0.5" data-index="${index}" data-option="1" value="${escAttr(topic.options[1])}">
+        </div>`;
+      }
+      if (topic.text_ja) {
+        html += `<p class="mt-0.5 ml-12 text-[9px] text-slate-500">${esc(topic.text_ja)}</p>`;
+      }
+      html += `</div>`;
+    });
+    html += `</div>`;
+    writingPreview.innerHTML = html;
+    writingPreview.classList.remove("hidden");
+
+    writingPreview.querySelectorAll(".writing-select-cb").forEach((cb) => {
+      cb.addEventListener("change", onWritingSelectionChange);
+    });
+    writingPreview.querySelectorAll(".writing-text-input").forEach((input) => {
+      input.addEventListener("input", (event) => {
+        const topic = adminWritingTopics[Number(event.target.dataset.index)];
+        if (!topic) return;
+        topic.text = event.target.value;
+        scheduleWritingSave();
+      });
+      input.addEventListener("blur", () => saveWritingTopics({ silent: true }));
+    });
+    writingPreview.querySelectorAll(".writing-option-input").forEach((input) => {
+      input.addEventListener("input", (event) => {
+        const topic = adminWritingTopics[Number(event.target.dataset.index)];
+        if (!topic) return;
+        topic.options[Number(event.target.dataset.option)] = event.target.value;
+        scheduleWritingSave();
+      });
+      input.addEventListener("blur", () => saveWritingTopics({ silent: true }));
+    });
+  }
+
+  function scheduleWritingSave() {
+    if (writingSaveTimer) clearTimeout(writingSaveTimer);
+    writingSaveTimer = setTimeout(() => {
+      writingSaveTimer = null;
+      saveWritingTopics({ silent: true });
+    }, 800);
+  }
+
+  async function saveWritingTopics(options) {
+    const silent = options && options.silent;
+    const classId = getSelectedClassId() || (lessonClassId && lessonClassId.value);
+    if (!classId || !adminWritingTopics.length) return true;
+    if (writingSaveTimer) {
+      clearTimeout(writingSaveTimer);
+      writingSaveTimer = null;
+    }
+    writingSaving = true;
+    try {
+      const res = await fetch("/news/admin/api/class/lesson/writing/selection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          class_id: classId,
+          writing_topics: adminWritingTopics.filter((topic) => topic.text.trim()),
+        }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "保存に失敗しました");
+      if (!silent) showMessage(lessonMessage, data.message || "ライティングトピックを保存しました。", false);
+      return true;
+    } catch (err) {
+      showMessage(lessonMessage, err.message || "ライティングトピックの保存に失敗しました。", true);
+      return false;
+    } finally {
+      writingSaving = false;
+    }
+  }
+
+  async function onWritingSelectionChange(event) {
+    if (writingSaving) {
+      event.target.checked = !event.target.checked;
+      return;
+    }
+    const topic = adminWritingTopics[Number(event.target.dataset.index)];
+    if (!topic) return;
+    const previous = topic.selected;
+    topic.selected = event.target.checked;
+    const snapshot = adminWritingTopics.map((item) => ({ ...item, options: [...item.options] }));
+    renderAdminWritingPreview(snapshot);
+    const ok = await saveWritingTopics({ silent: false });
+    if (!ok) {
+      snapshot[Number(event.target.dataset.index)].selected = previous;
+      renderAdminWritingPreview(snapshot);
+    }
+  }
+
+  if (writingGenerateBtn) {
+    writingGenerateBtn.addEventListener("click", async function () {
+      const classId = getSelectedClassId() || (lessonClassId && lessonClassId.value);
+      if (!classId) {
+        showMessage(lessonMessage, "クラスを選択または作成してください。", true);
+        return;
+      }
+      const script = document.getElementById("lesson-script")?.value.trim() || "";
+      if (!script) {
+        showMessage(lessonMessage, "スクリプトを入力してから生成してください。", true);
+        return;
+      }
+      if (
+        adminWritingTopics.length &&
+        !window.confirm("今のトピックは新しく生成した5つに置き換わります。よろしいですか？")
+      ) {
+        return;
+      }
+      writingGenerateBtn.disabled = true;
+      writingGenerateBtn.textContent = "生成中…";
+      if (writingGenerateStatus) {
+        writingGenerateStatus.textContent = "動画に繋がるトピックを考えています…";
+        writingGenerateStatus.classList.remove("hidden");
+      }
+      try {
+        const res = await fetch("/news/admin/api/class/lesson/writing", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ class_id: classId, script }),
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "生成に失敗しました");
+        renderAdminWritingPreview(data.writing_topics || []);
+        showMessage(lessonMessage, data.message || "ライティングトピックを生成しました。", false);
+        if (writingGenerateStatus) writingGenerateStatus.classList.add("hidden");
+      } catch (err) {
+        showMessage(lessonMessage, err.message, true);
+        if (writingGenerateStatus) writingGenerateStatus.textContent = "生成に失敗しました";
+      } finally {
+        writingGenerateBtn.disabled = false;
+        writingGenerateBtn.textContent = "✍️ トピック5つを生成";
       }
     });
   }

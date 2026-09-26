@@ -33,6 +33,7 @@ from news_app.services.storage import (
     script_translation_for_lang,
     appearance_context,
     selected_display_questions,
+    selected_writing_topics,
 )
 from news_app.services.youtube import build_youtube_embed_url
 from news_app.services.youtube_transcript import (
@@ -278,6 +279,7 @@ def _class_screen_payload(class_id: str, origin: str, display_language: str = "j
     warmup_image_url = str(current.get("warmup_image_url") or "").strip()
     warmup_questions = selected_display_questions(current.get("warmup_questions"))
     postview_questions = selected_display_questions(current.get("postview_questions"))
+    writing_topics = selected_writing_topics(current.get("writing_topics"), include_japanese=lang == "ja")
     embed_url = (
         build_youtube_embed_url(
             video_id,
@@ -303,10 +305,12 @@ def _class_screen_payload(class_id: str, origin: str, display_language: str = "j
         "warmup_image_url": warmup_image_url,
         "warmup_questions": warmup_questions,
         "postview_questions": postview_questions,
+        "writing_topics": writing_topics,
         "has_video": bool(video_id),
         "has_vocab": bool(vocabulary_data),
         "has_warmup": bool(warmup_image_url or warmup_questions),
         "has_postview": bool(postview_questions),
+        "has_writing": bool(writing_topics),
     }
 
 

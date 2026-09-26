@@ -25,8 +25,10 @@
   const vocabContent = document.getElementById("vocab-content-screen");
   const warmupContent = document.getElementById("warmup-content-screen");
   const postviewContent = document.getElementById("postview-content-screen");
+  const viewWriting = document.getElementById("view-writing");
+  const writingContent = document.getElementById("writing-content-screen");
 
-  const viewMap = { video: viewVideo, vocab: viewVocab, warmup: viewWarmup, postview: viewPostview };
+  const viewMap = { video: viewVideo, vocab: viewVocab, warmup: viewWarmup, postview: viewPostview, writing: viewWriting };
   const viewButtons = controlsEl ? controlsEl.querySelectorAll("[data-view]") : [];
 
   let currentView = "video";
@@ -435,6 +437,64 @@
     updatePostviewRevealUi();
   }
 
+  function writingTopicFontSize(count) {
+    if (count <= 1) return "clamp(2rem, 6.4vmin, 5.25rem)";
+    if (count <= 2) return "clamp(1.7rem, 5vmin, 4rem)";
+    if (count <= 3) return "clamp(1.45rem, 4vmin, 3.1rem)";
+    return "clamp(1.2rem, 3.1vmin, 2.4rem)";
+  }
+
+  function renderWriting(topics) {
+    if (!writingContent) return;
+    const list = (topics || []).filter(function (topic) { return topic && topic.text; });
+    if (!list.length) {
+      writingContent.innerHTML =
+        '<p class="text-center text-slate-400">' + t("screenNoWriting") + "</p>";
+      return;
+    }
+    writingContent.style.setProperty("--warmup-q-size", writingTopicFontSize(list.length));
+    let html = '<p class="screen-warmup-heading">' + t("screenWritingHeading") + "</p>";
+    html += '<ol class="screen-warmup-list">';
+    list.forEach(function (topic, i) {
+      html += '<li class="screen-writing-item">';
+      html +=
+        '<div class="screen-warmup-q flex items-start gap-[0.35em]">' +
+        '<span class="screen-warmup-num">' + (list.length > 1 ? "T" + (i + 1) + "." : "✍️") + "</span>" +
+        '<span class="screen-warmup-text">' + escHtml(topic.text) + "</span>" +
+        "</div>";
+      if (topic.kind === "opinion" && topic.options && topic.options.length === 2) {
+        html +=
+          '<div class="screen-writing-choices">' +
+          '<span class="screen-writing-choice">' + escHtml(topic.options[0]) + "</span>" +
+          '<span class="screen-writing-or">or</span>' +
+          '<span class="screen-writing-choice">' + escHtml(topic.options[1]) + "</span>" +
+          "</div>";
+      } else {
+        html +=
+          '<div class="screen-writing-choices">' +
+          '<span class="screen-writing-answer-cue">Your answer + Why?</span>' +
+          "</div>";
+      }
+      if (topic.text_ja) {
+        html += '<p class="screen-writing-ja">' + escHtml(topic.text_ja) + "</p>";
+      }
+      html += "</li>";
+    });
+    html += "</ol>";
+    html +=
+      '<div class="screen-writing-oreo">' +
+      '<span class="screen-writing-oreo-step"><b>O</b>Opinion</span>' +
+      '<span class="screen-writing-oreo-arrow">→</span>' +
+      '<span class="screen-writing-oreo-step"><b>R</b>Reason</span>' +
+      '<span class="screen-writing-oreo-arrow">→</span>' +
+      '<span class="screen-writing-oreo-step"><b>E</b>Example</span>' +
+      '<span class="screen-writing-oreo-arrow">→</span>' +
+      '<span class="screen-writing-oreo-step"><b>O</b>Opinion</span>' +
+      '<span class="screen-writing-oreo-words">about 100 words</span>' +
+      "</div>";
+    writingContent.innerHTML = html;
+  }
+
   function setActiveView(view) {
     currentView = view;
     Object.entries(viewMap).forEach(function ([key, el]) {
@@ -453,6 +513,7 @@
       vocab: payload.has_vocab && showAssistive(),
       warmup: payload.has_warmup,
       postview: payload.has_postview,
+      writing: payload.has_writing,
     };
 
     viewButtons.forEach(function (btn) {
@@ -500,6 +561,7 @@
       renderVocab(cls.vocabulary_data || []);
       renderWarmup(cls.warmup_image_url || "", cls.warmup_questions || []);
       renderPostview(cls.postview_questions || []);
+      renderWriting(cls.writing_topics || []);
       configureControls(cls);
       showLoading(false);
     } catch (err) {

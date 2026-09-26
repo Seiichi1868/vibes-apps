@@ -36,6 +36,7 @@ from news_app.services.openai_translate import translate_script
 from news_app.services.openai_vocab import extract_vocabulary_from_script
 from news_app.services.openai_warmup import extract_warmup_from_script
 from news_app.services.openai_postview import extract_postview_from_script
+from news_app.services.openai_writing import extract_writing_topics_from_script
 from news_app.services.storage import (
     DEFAULT_EVALUATION_CRITERIA,
     archive_class_current,
@@ -65,6 +66,7 @@ from news_app.services.storage import (
     _normalize_script_ja_pairs,
     _normalize_vocabulary_data,
     _normalize_warmup_questions,
+    _normalize_writing_topics,
     appearance_context,
     selected_display_questions,
 )
@@ -958,6 +960,84 @@ def api_toggle_postview_answers():
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:
         return jsonify({"ok": False, "error": f"設定の保存に失敗しました: {exc}"}), 500
+
+
+@admin_bp.route("/api/class/lesson/writing", methods=["POST"])
+def api_generate_writing_topics():
+    """スクリプトから OREO ライティング／スピーチ用トピック5つを生成して保存する。"""
+    data = request.get_json(silent=True) or {}
+    class_id = str(data.get("class_id") or get_active_class_id()).strip()
+    if not class_id:
+        return jsonify({"ok": False, "error": "クラスを選択または作成してください。"}), 400
+
+    cls = get_class(class_id)
+    if not cls:
+        return jsonify({"ok": False, "error": "クラスが見つかりません。"}), 404
+
+    current = cls.get("current") or {}
+    script = str(data.get("script") or current.get("script") or "").strip()
+    if not script:
+        return jsonify({"ok": False, "error": "文字起こし（スクリプト）を入力してください。"}), 400
+
+    api_key = get_openai_api_key()
+    if not api_key:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "OpenAI API キーが未設定です。管理画面の設定からキーを保存してください。",
+            }
+        ), 400
+
+    state = load_state()
+    model = resolve_ai_model(state.get("ai_model"))
+    try:
+        result = extract_writing_topics_from_script(script, api_key=api_key, model=model)
+        cls = update_class_current(class_id, {"writing_topics": result["topics"]})
+        return jsonify(
+            {
+                "ok": True,
+                "class": cls,
+                "writing_topics": cls["current"]["writing_topics"],
+                "message": "ライティングトピックを5つ生成しました。スクリーンに出すものにチェックを入れてください。",
+            }
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"ライティングトピックの生成に失敗しました: {exc}"}), 500
+
+
+@admin_bp.route("/api/class/lesson/writing/selection", methods=["POST"])
+def api_update_writing_selection():
+    """ライティングトピックの選択（スクリーン表示）と文言の編集を保存する。"""
+    data = request.get_json(silent=True) or {}
+    class_id = str(data.get("class_id") or get_active_class_id()).strip()
+    if not class_id:
+        return jsonify({"ok": False, "error": "クラスを選択または作成してください。"}), 400
+
+    raw_topics = data.get("writing_topics")
+    if not isinstance(raw_topics, list):
+        return jsonify({"ok": False, "error": "トピックデータが不正です。"}), 400
+
+    if not get_class(class_id):
+        return jsonify({"ok": False, "error": "クラスが見つかりません。"}), 404
+
+    topics = _normalize_writing_topics(raw_topics)
+    try:
+        cls = update_class_current(class_id, {"writing_topics": topics})
+        selected_count = sum(1 for topic in topics if topic["selected"])
+        return jsonify(
+            {
+                "ok": True,
+                "class": cls,
+                "writing_topics": cls["current"]["writing_topics"],
+                "message": f"ライティングトピックを保存しました（スクリーン表示 {selected_count} / {len(topics)}）。",
+            }
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"保存に失敗しました: {exc}"}), 500
 
 
 @admin_bp.route("/api/class/lesson/materials/docx", methods=["POST"])
