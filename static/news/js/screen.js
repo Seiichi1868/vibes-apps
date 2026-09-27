@@ -32,7 +32,10 @@
   const viewButtons = controlsEl ? controlsEl.querySelectorAll("[data-view]") : [];
 
   let currentView = "video";
-  let postviewRevealCount = 0;
+  const questionReveal = {
+    warmup: { questions: [], step: 0, imageUrl: "" },
+    postview: { questions: [], step: 0, imageUrl: "" },
+  };
   let youtubeApiPlayer = null;
   let youtubeApiReadyPromise = null;
   let activePlayerSubtitles = null;
@@ -293,51 +296,80 @@
     vocabContent.innerHTML = html;
   }
 
-  function postviewQuestionFontSize(count) {
-    if (count <= 1) {
-      return "clamp(2.25rem, 7.2vmin, 6rem)";
-    }
-    if (count <= 2) {
-      return "clamp(2rem, 6.2vmin, 5rem)";
-    }
-    if (count <= 3) {
-      return "clamp(1.8rem, 5.4vmin, 4.15rem)";
-    }
-    return "clamp(1.6rem, 4.8vmin, 3.6rem)";
+  function singleQuestionFontSize(hasImage) {
+    const scale = hasImage ? 0.88 : 1;
+    return (
+      "clamp(" +
+      (2.15 * scale).toFixed(2) +
+      "rem, " +
+      (6.8 * scale).toFixed(1) +
+      "vmin, " +
+      (5.6 * scale).toFixed(1) +
+      "rem)"
+    );
   }
 
-  function warmupQuestionFontSize(count, hasImage) {
-    const scale = hasImage ? 0.82 : 1;
-    if (count <= 1) {
-      return "clamp(" + (2 * scale).toFixed(2) + "rem, " + (6.5 * scale).toFixed(1) + "vmin, " + (5.5 * scale).toFixed(1) + "rem)";
-    }
-    if (count <= 2) {
-      return "clamp(" + (1.85 * scale).toFixed(2) + "rem, " + (5.5 * scale).toFixed(1) + "vmin, " + (4.5 * scale).toFixed(1) + "rem)";
-    }
-    if (count <= 3) {
-      return "clamp(" + (1.6 * scale).toFixed(2) + "rem, " + (4.8 * scale).toFixed(1) + "vmin, " + (3.75 * scale).toFixed(1) + "rem)";
-    }
-    return "clamp(" + (1.35 * scale).toFixed(2) + "rem, " + (4 * scale).toFixed(1) + "vmin, " + (3.25 * scale).toFixed(1) + "rem)";
+  function warmupImageMaxHeight() {
+    return "min(28vh, 18rem)";
   }
 
-  function warmupImageMaxHeight(count) {
-    if (count <= 1) return "min(28vh, 18rem)";
-    if (count <= 2) return "min(24vh, 16rem)";
-    return "min(20vh, 14rem)";
+  function questionRevealPieces(questions) {
+    const pieces = [];
+    (questions || []).forEach(function (q, index) {
+      if (!q || !q.text) return;
+      pieces.push({ kind: "question", index: index });
+      if (q.answer) pieces.push({ kind: "answer", index: index });
+    });
+    return pieces;
   }
 
-  function renderWarmup(imageUrl, questions) {
-    if (!warmupContent) return;
-    if (!imageUrl && (!questions || !questions.length)) {
-      warmupContent.innerHTML =
-        '<p class="text-center text-lg text-slate-500">' + t("screenNoWarmup") + "</p>";
+  function questionRevealViewEl(kind) {
+    return kind === "warmup" ? viewWarmup : viewPostview;
+  }
+
+  function questionRevealContentEl(kind) {
+    return kind === "warmup" ? warmupContent : postviewContent;
+  }
+
+  function updateQuestionRevealUi(kind) {
+    const state = questionReveal[kind];
+    const viewEl = questionRevealViewEl(kind);
+    const contentEl = questionRevealContentEl(kind);
+    if (!state || !viewEl || !contentEl) return;
+    const pieces = questionRevealPieces(state.questions);
+    const pending = pieces.length > 0 && state.step < pieces.length;
+    viewEl.classList.toggle("is-reveal-pending", pending);
+    const hint = contentEl.querySelector(".screen-postview-hint");
+    if (!hint) return;
+    if (!pieces.length) {
+      hint.classList.add("hidden");
       return;
     }
-    const qCount = questions ? questions.length : 0;
-    const hasImage = Boolean(imageUrl);
-    warmupContent.style.setProperty("--warmup-q-size", warmupQuestionFontSize(qCount, hasImage));
-    warmupContent.style.setProperty("--warmup-img-max-h", warmupImageMaxHeight(qCount));
+    hint.classList.remove("hidden");
+    hint.textContent = t("screenClickNext", { shown: state.step, total: pieces.length });
+  }
 
+  function renderQuestionReveal(kind) {
+    const state = questionReveal[kind];
+    const contentEl = questionRevealContentEl(kind);
+    if (!state || !contentEl) return;
+    const list = state.questions;
+    const imageUrl = state.imageUrl || "";
+    const emptyKey = kind === "warmup" ? "screenNoWarmup" : "screenNoPostview";
+    const headingKey = kind === "warmup" ? "screenWarmupHeading" : "screenPostviewHeading";
+
+    if (!imageUrl && !list.length) {
+      contentEl.innerHTML = '<p class="text-center text-lg text-slate-500">' + t(emptyKey) + "</p>";
+      const viewEl = questionRevealViewEl(kind);
+      if (viewEl) viewEl.classList.remove("is-reveal-pending");
+      return;
+    }
+
+    const hasImage = Boolean(imageUrl);
+    contentEl.style.setProperty("--warmup-q-size", singleQuestionFontSize(hasImage));
+    contentEl.style.setProperty("--warmup-img-max-h", warmupImageMaxHeight());
+
+    const pieces = questionRevealPieces(list);
     let html = "";
     if (imageUrl) {
       html +=
@@ -345,96 +377,70 @@
         '<img src="' + escHtml(imageUrl) + '" alt="Warmup illustration">' +
         "</div>";
     }
-    if (questions && questions.length) {
-      html += '<p class="screen-warmup-heading">' + t("screenWarmupHeading") + "</p>";
-      html += '<ol class="screen-warmup-list">';
-      questions.forEach(function (q, i) {
-        html +=
-          '<li class="screen-warmup-q flex items-start gap-[0.35em]">' +
-          '<span class="screen-warmup-num">Q' + (i + 1) + ".</span>" +
-          '<span class="screen-warmup-text">' + escHtml(q.text) + "</span>" +
-          "</li>";
-      });
-      html += "</ol>";
-    }
-    warmupContent.innerHTML = html;
-  }
+    html += '<p class="screen-warmup-heading">' + t(headingKey) + "</p>";
 
-  function updatePostviewRevealUi() {
-    if (!postviewContent || !viewPostview) return;
-    const answers = postviewContent.querySelectorAll(".screen-postview-answer");
-    const total = answers.length;
-    const pending = postviewRevealCount < total;
-    viewPostview.classList.toggle("is-answer-pending", pending);
-    const hint = postviewContent.querySelector(".screen-postview-hint");
-    if (!hint) return;
-    if (!total) {
-      hint.classList.add("hidden");
-      return;
-    }
-    hint.classList.remove("hidden");
-    hint.textContent = t("screenClickAnswer", { shown: postviewRevealCount, total: total });
-  }
-
-  function revealNextPostviewAnswer() {
-    if (currentView !== "postview" || !postviewContent) return;
-    const answers = postviewContent.querySelectorAll(".screen-postview-answer");
-    if (postviewRevealCount >= answers.length) return;
-    const el = answers[postviewRevealCount];
-    el.classList.add("is-shown");
-    el.setAttribute("aria-hidden", "false");
-    postviewRevealCount += 1;
-    updatePostviewRevealUi();
-  }
-
-  function hideLastPostviewAnswer() {
-    if (currentView !== "postview" || !postviewContent) return;
-    if (postviewRevealCount <= 0) return;
-    const answers = postviewContent.querySelectorAll(".screen-postview-answer");
-    postviewRevealCount -= 1;
-    const el = answers[postviewRevealCount];
-    if (!el) return;
-    el.classList.remove("is-shown");
-    el.setAttribute("aria-hidden", "true");
-    updatePostviewRevealUi();
-  }
-
-  function renderPostview(questions) {
-    if (!postviewContent) return;
-    postviewRevealCount = 0;
-    const list = (questions || []).filter(function (q) { return q && q.text; });
-    if (!list.length) {
-      postviewContent.innerHTML =
-        '<p class="text-center text-slate-400">' + t("screenNoPostview") + "</p>";
-      if (viewPostview) viewPostview.classList.remove("is-answer-pending");
-      return;
-    }
-    const answerCount = list.filter(function (q) { return q.answer; }).length;
-    postviewContent.style.setProperty("--warmup-q-size", postviewQuestionFontSize(list.length));
-    let html = '<p class="screen-warmup-heading">' + t("screenPostviewHeading") + "</p>";
-    html += '<ol class="screen-warmup-list screen-postview-list">';
-    list.forEach(function (q, i) {
-      html += '<li class="screen-postview-item">';
+    if (pieces.length && state.step > 0) {
+      const piece = pieces[Math.min(state.step, pieces.length) - 1];
+      const q = list[piece.index];
+      html += '<div class="screen-qa-current">';
       html +=
         '<div class="screen-warmup-q flex items-start gap-[0.35em]">' +
-        '<span class="screen-warmup-num">Q' + (i + 1) + ".</span>" +
+        '<span class="screen-warmup-num">Q' + (piece.index + 1) + ".</span>" +
         '<span class="screen-warmup-text">' + escHtml(q.text) + "</span>" +
         "</div>";
-      if (q.answer) {
+      if (piece.kind === "answer") {
         html +=
-          '<p class="screen-postview-answer" aria-hidden="true"><span>' +
+          '<p class="screen-postview-answer is-shown" aria-hidden="false"><span>' +
           '<span class="screen-postview-answer-label">A.</span>' +
           escHtml(q.answer) +
           "</span></p>";
       }
-      html += "</li>";
-    });
-    html += "</ol>";
-    if (answerCount) {
+      html += "</div>";
+    } else if (list.length) {
+      html += '<p class="screen-qa-waiting">' + t("screenClickToStart") + "</p>";
+    }
+
+    if (pieces.length) {
       html += '<p class="screen-postview-hint"></p>';
     }
-    postviewContent.innerHTML = html;
-    updatePostviewRevealUi();
+    contentEl.innerHTML = html;
+    updateQuestionRevealUi(kind);
+  }
+
+  function revealNextQuestionStep(kind) {
+    if (currentView !== kind) return;
+    const state = questionReveal[kind];
+    if (!state) return;
+    const pieces = questionRevealPieces(state.questions);
+    if (state.step >= pieces.length) return;
+    state.step += 1;
+    renderQuestionReveal(kind);
+  }
+
+  function hideLastQuestionStep(kind) {
+    if (currentView !== kind) return;
+    const state = questionReveal[kind];
+    if (!state || state.step <= 0) return;
+    state.step -= 1;
+    renderQuestionReveal(kind);
+  }
+
+  function renderWarmup(imageUrl, questions) {
+    questionReveal.warmup.imageUrl = imageUrl || "";
+    questionReveal.warmup.questions = (questions || []).filter(function (q) {
+      return q && q.text;
+    });
+    questionReveal.warmup.step = 0;
+    renderQuestionReveal("warmup");
+  }
+
+  function renderPostview(questions) {
+    questionReveal.postview.imageUrl = "";
+    questionReveal.postview.questions = (questions || []).filter(function (q) {
+      return q && q.text;
+    });
+    questionReveal.postview.step = 0;
+    renderQuestionReveal("postview");
   }
 
   function writingTopicFontSize(count) {
@@ -576,14 +582,19 @@
     });
   });
 
+  if (viewWarmup) {
+    viewWarmup.addEventListener("click", function () {
+      revealNextQuestionStep("warmup");
+    });
+  }
   if (viewPostview) {
     viewPostview.addEventListener("click", function () {
-      revealNextPostviewAnswer();
+      revealNextQuestionStep("postview");
     });
   }
 
   document.addEventListener("keydown", function (event) {
-    if (currentView !== "postview") return;
+    if (currentView !== "postview" && currentView !== "warmup") return;
     if (event.metaKey || event.ctrlKey || event.altKey) return;
     const key = event.key;
     const showNext = key === " " || key === "Spacebar" || key === "ArrowRight" || key === "ArrowDown" || key === "PageDown" || key === "Enter";
@@ -591,8 +602,8 @@
     if (!showNext && !hidePrev) return;
     if (event.target && event.target.closest && event.target.closest("button, a, input, textarea")) return;
     event.preventDefault();
-    if (hidePrev) hideLastPostviewAnswer();
-    else revealNextPostviewAnswer();
+    if (hidePrev) hideLastQuestionStep(currentView);
+    else revealNextQuestionStep(currentView);
   });
 
   if (fullscreenBtn) {

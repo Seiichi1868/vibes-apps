@@ -242,18 +242,35 @@ def _normalize_warmup_questions(raw) -> list[dict]:
             answer = answer[:400].rstrip()
         if answer:
             item["answer"] = answer
+        raw_order = entry.get("display_order")
+        try:
+            display_order = int(raw_order) if raw_order not in (None, "") else None
+        except (TypeError, ValueError):
+            display_order = None
+        if display_order is not None and display_order > 0:
+            item["display_order"] = display_order
         items.append(item)
     return items
 
 
 def selected_display_questions(raw, *, include_answers: bool = True) -> list[dict]:
-    """選択済みの質問だけを、表示用の連番付きリストにする。"""
-    items: list[dict] = []
-    for q in _normalize_warmup_questions(raw):
+    """選択済みの質問だけを、指定順（なければ元の順）で表示用の連番付きリストにする。"""
+    indexed: list[tuple[int, dict]] = []
+    for index, q in enumerate(_normalize_warmup_questions(raw)):
         text = str(q.get("text") or "").strip()
         if not text or not q.get("selected", True):
             continue
-        item = {"id": len(items) + 1, "text": text}
+        indexed.append((index, q))
+    indexed.sort(
+        key=lambda pair: (
+            pair[1].get("display_order") is None,
+            pair[1].get("display_order") or 0,
+            pair[0],
+        )
+    )
+    items: list[dict] = []
+    for _, q in indexed:
+        item = {"id": len(items) + 1, "text": str(q.get("text") or "").strip()}
         if include_answers:
             answer = str(q.get("answer") or "").strip()
             if answer:

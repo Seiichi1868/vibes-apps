@@ -2929,13 +2929,143 @@
     return adminWarmupQuestions.filter((q) => !q.manual);
   }
 
+  function warmupQuestionFromRaw(q) {
+    const order = Number(q && q.display_order);
+    return {
+      id: q.id,
+      text: q.text || "",
+      answer: q.answer || "",
+      selected: q.selected !== false,
+      manual: q.manual === true,
+      display_order: Number.isFinite(order) && order > 0 ? order : 0,
+    };
+  }
+
+  function questionDisplayOrder(q) {
+    const n = Number(q && q.display_order);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+
+  function syncSelectedDisplayOrders(questions) {
+    const list = questions || [];
+    const selected = list.filter((q) => q.selected !== false && (q.text || "").trim());
+    selected.sort((a, b) => {
+      const ao = questionDisplayOrder(a);
+      const bo = questionDisplayOrder(b);
+      if (ao && bo && ao !== bo) return ao - bo;
+      if (ao && !bo) return -1;
+      if (!ao && bo) return 1;
+      return list.indexOf(a) - list.indexOf(b);
+    });
+    selected.forEach((q, i) => {
+      q.display_order = i + 1;
+    });
+    list.forEach((q) => {
+      if (q.selected === false || !(q.text || "").trim()) q.display_order = 0;
+    });
+  }
+
+  function moveSelectedDisplayOrder(questions, index, delta) {
+    syncSelectedDisplayOrders(questions);
+    const q = questions[index];
+    if (!q || q.selected === false) return false;
+    const current = questionDisplayOrder(q);
+    const target = current + delta;
+    const swap = questions.find((item) => item !== q && item.selected !== false && questionDisplayOrder(item) === target);
+    if (!swap) return false;
+    q.display_order = target;
+    swap.display_order = current;
+    return true;
+  }
+
+  function setSelectedDisplayOrder(questions, index, newOrder) {
+    syncSelectedDisplayOrders(questions);
+    const q = questions[index];
+    if (!q || q.selected === false) return false;
+    const selected = questions.filter((item) => item.selected !== false && (item.text || "").trim());
+    const dest = Math.max(1, Math.min(selected.length, Number(newOrder) || 1));
+    const current = questionDisplayOrder(q);
+    if (dest === current) return false;
+    selected.forEach((item) => {
+      if (item === q) return;
+      const order = questionDisplayOrder(item);
+      if (dest > current && order > current && order <= dest) item.display_order = order - 1;
+      else if (dest < current && order >= dest && order < current) item.display_order = order + 1;
+    });
+    q.display_order = dest;
+    return true;
+  }
+
+  function applyQuestionSelected(questions, index, selected) {
+    const q = questions[index];
+    if (!q) return;
+    q.selected = selected;
+    if (selected) {
+      const max = questions.reduce((m, item) => Math.max(m, questionDisplayOrder(item)), 0);
+      q.display_order = max + 1;
+    } else {
+      q.display_order = 0;
+    }
+    syncSelectedDisplayOrders(questions);
+  }
+
+  function questionOrderControlsHtml(index, q, tone) {
+    if (q.selected === false) return "";
+    const order = questionDisplayOrder(q) || "";
+    const btnClass = tone === "amber"
+      ? "text-amber-700 hover:text-amber-900"
+      : "text-sky-600 hover:text-sky-800";
+    return `<span class="flex shrink-0 items-center gap-0.5" title="${esc(t("displayOrder"))}">
+      <button type="button" class="q-order-btn q-order-up shrink-0 px-0.5 text-[8px] leading-none ${btnClass}" data-index="${index}" aria-label="up">▲</button>
+      <input type="number" min="1" class="q-order-input compact-input w-8 text-center text-[9px] py-0" data-index="${index}" value="${order}" title="${esc(t("displayOrder"))}">
+      <button type="button" class="q-order-btn q-order-down shrink-0 px-0.5 text-[8px] leading-none ${btnClass}" data-index="${index}" aria-label="down">▼</button>
+    </span>`;
+  }
+
+  function bindQuestionOrderControls(root, questions, onChanged) {
+    if (!root) return;
+    root.querySelectorAll(".q-order-up").forEach((btn) => {
+      btn.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const index = Number(btn.dataset.index);
+        if (!Number.isInteger(index)) return;
+        if (moveSelectedDisplayOrder(questions, index, -1)) onChanged();
+      });
+    });
+    root.querySelectorAll(".q-order-down").forEach((btn) => {
+      btn.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const index = Number(btn.dataset.index);
+        if (!Number.isInteger(index)) return;
+        if (moveSelectedDisplayOrder(questions, index, 1)) onChanged();
+      });
+    });
+    root.querySelectorAll(".q-order-input").forEach((input) => {
+      input.addEventListener("click", (event) => event.stopPropagation());
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") event.preventDefault();
+      });
+      input.addEventListener("change", (event) => {
+        event.stopPropagation();
+        const index = Number(input.dataset.index);
+        if (!Number.isInteger(index)) return;
+        if (setSelectedDisplayOrder(questions, index, input.value)) onChanged();
+        else input.value = questionDisplayOrder(questions[index]) || "";
+      });
+    });
+  }
+
   function ensureManualWarmupRow() {
     if (!getManualWarmupQuestions().length) {
       adminWarmupQuestions.push({
         id: nextWarmupQuestionId(),
         text: "",
+        answer: "",
         selected: true,
         manual: true,
+        display_order: 0,
       });
     }
   }
@@ -3223,13 +3353,21 @@
     manualQuestions.forEach((q) => {
       const index = adminWarmupQuestions.indexOf(q);
       const dimClass = q.selected ? "" : " opacity-50";
-      html += `<label class="flex items-center gap-1 rounded px-1 py-0.5 bg-white/70${dimClass} cursor-pointer">
-        <input type="checkbox" class="warmup-manual-select-cb shrink-0 h-3.5 w-3.5 rounded border-sky-200 text-sky-600"
-          data-index="${index}" ${q.selected ? "checked" : ""}>
-        <span class="shrink-0 text-[9px] font-bold text-sky-600">Q${q.id}</span>
-        <input type="text" class="warmup-manual-input compact-input min-w-0 flex-1 text-[10px] py-0.5"
-          data-index="${index}" value="${esc(q.text)}" placeholder="質問（英語）">
-      </label>`;
+      html += `<div class="rounded px-1 py-0.5 bg-white/70${dimClass}">
+        <div class="flex items-center gap-1">
+          <input type="checkbox" class="warmup-manual-select-cb shrink-0 h-3.5 w-3.5 rounded border-sky-200 text-sky-600"
+            data-index="${index}" ${q.selected ? "checked" : ""}>
+          ${questionOrderControlsHtml(index, q, "sky")}
+          <span class="shrink-0 text-[9px] font-bold text-sky-600">Q${q.id}</span>
+          <input type="text" class="warmup-manual-input compact-input min-w-0 flex-1 text-[10px] py-0.5"
+            data-index="${index}" value="${escAttr(q.text)}" placeholder="質問（英語）">
+        </div>
+        <label class="mt-0.5 flex items-center gap-1 pl-5">
+          <span class="shrink-0 text-[9px] font-semibold text-sky-800">${t("modelAnswer")}</span>
+          <input type="text" class="warmup-answer-input compact-input min-w-0 flex-1 text-[10px] py-0.5"
+            data-index="${index}" value="${escAttr(q.answer || "")}" placeholder="${escAttr(t("modelAnswerPlaceholder"))}">
+        </label>
+      </div>`;
     });
     warmupManualRows.innerHTML = html;
 
@@ -3240,6 +3378,8 @@
       input.addEventListener("input", onWarmupManualInputChange);
       input.addEventListener("blur", () => saveWarmupSelection({ silent: true }));
     });
+    bindWarmupAnswerInputs(warmupManualRows);
+    bindQuestionOrderControls(warmupManualRows, adminWarmupQuestions, onWarmupOrderChanged);
   }
 
   function onWarmupManualInputChange(event) {
@@ -3249,12 +3389,38 @@
     scheduleWarmupManualSave();
   }
 
+  function onWarmupAnswerInput(event) {
+    const index = Number(event.target.dataset.index);
+    if (!Number.isInteger(index) || !adminWarmupQuestions[index]) return;
+    adminWarmupQuestions[index].answer = event.target.value;
+    scheduleWarmupManualSave();
+  }
+
+  function bindWarmupAnswerInputs(root) {
+    if (!root) return;
+    root.querySelectorAll(".warmup-answer-input").forEach((input) => {
+      input.addEventListener("input", onWarmupAnswerInput);
+      input.addEventListener("blur", () => saveWarmupSelection({ silent: true }));
+      input.addEventListener("click", (event) => event.stopPropagation());
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") event.preventDefault();
+      });
+    });
+  }
+
+  function onWarmupOrderChanged() {
+    renderAdminWarmupPreview(adminWarmupImageUrl, adminWarmupQuestions);
+    saveWarmupSelection({ silent: true });
+  }
+
   function addManualWarmupRow() {
     adminWarmupQuestions.push({
       id: nextWarmupQuestionId(),
       text: "",
+      answer: "",
       selected: true,
       manual: true,
+      display_order: 0,
     });
     renderWarmupManualRows();
     const inputs = warmupManualRows?.querySelectorAll(".warmup-manual-input") || [];
@@ -3270,19 +3436,13 @@
     if (typeof imageUrl === "string") {
       adminWarmupImageUrl = imageUrl;
     }
-    const incoming = (questions || []).map(function (q) {
-      return {
-        id: q.id,
-        text: q.text || "",
-        selected: q.selected !== false,
-        manual: q.manual === true,
-      };
-    });
+    const incoming = (questions || []).map(warmupQuestionFromRaw);
     const manualFromState = incoming.length
       ? incoming.filter((q) => q.manual)
       : getManualWarmupQuestions();
     const aiFromState = incoming.filter((q) => !q.manual);
     adminWarmupQuestions = [...aiFromState, ...manualFromState];
+    syncSelectedDisplayOrders(adminWarmupQuestions);
 
     const aiQuestions = getAiWarmupQuestions();
     if (!warmupPreview) {
@@ -3294,25 +3454,33 @@
       renderWarmupManualRows();
       return;
     }
-    const selectedCount = aiQuestions.filter(function (q) { return q.selected; }).length;
+    const selectedCount = adminWarmupQuestions.filter((q) => q.selected && (q.text || "").trim()).length;
     let html = "";
     if (adminWarmupImageUrl) {
       html += `<div class="mb-2"><img src="${esc(adminWarmupImageUrl)}" alt="Warmup illustration"
         class="w-full max-h-48 rounded-lg object-contain border border-slate-100 bg-slate-50"></div>`;
     }
     if (aiQuestions.length) {
-      html += `<p class="mb-1 font-semibold text-slate-600">AI生成の導入質問（表示 ${selectedCount} / ${aiQuestions.length} 問）</p>`;
-      html += `<p class="mb-1 text-[9px] text-slate-500">チェックを外した質問は生徒画面に表示されません。</p>`;
+      html += `<p class="mb-1 font-semibold text-slate-600">${t("warmupPreview", { selected: selectedCount, total: adminWarmupQuestions.filter((q) => (q.text || "").trim()).length })}</p>`;
+      html += `<p class="mb-1 text-[9px] text-slate-500">${t("questionOrderHint")}</p>`;
       html += `<div class="space-y-1">`;
       aiQuestions.forEach(function (q) {
         const index = adminWarmupQuestions.indexOf(q);
         const dimClass = q.selected ? "" : " opacity-50";
-        html += `<label class="flex items-start gap-2 rounded px-1.5 py-1 ${index % 2 === 0 ? "bg-white/70" : ""}${dimClass} cursor-pointer">
-          <input type="checkbox" class="warmup-select-cb shrink-0 mt-0.5 h-3.5 w-3.5 rounded border-sky-200 text-sky-600"
-            data-index="${index}" ${q.selected ? "checked" : ""}>
-          <span class="shrink-0 mr-1 text-sky-600 font-bold">Q${q.id}.</span>
-          <span class="text-slate-700 leading-snug">${esc(q.text)}</span>
-        </label>`;
+        html += `<div class="rounded px-1.5 py-1 ${index % 2 === 0 ? "bg-white/70" : ""}${dimClass}">
+          <div class="flex items-start gap-1.5">
+            <input type="checkbox" class="warmup-select-cb shrink-0 mt-0.5 h-3.5 w-3.5 rounded border-sky-200 text-sky-600"
+              data-index="${index}" ${q.selected ? "checked" : ""}>
+            ${questionOrderControlsHtml(index, q, "sky")}
+            <span class="shrink-0 mr-1 text-sky-600 font-bold">Q${q.id}.</span>
+            <span class="text-slate-700 leading-snug">${esc(q.text)}</span>
+          </div>
+          <label class="mt-0.5 ml-6 flex items-center gap-1 text-[9px] text-sky-800">
+            <span class="shrink-0 font-semibold">${t("modelAnswer")}</span>
+            <input type="text" class="warmup-answer-input compact-input min-w-0 flex-1 text-[10px] py-0.5"
+              data-index="${index}" value="${escAttr(q.answer || "")}" placeholder="${escAttr(t("modelAnswerPlaceholder"))}">
+          </label>
+        </div>`;
       });
       html += `</div>`;
     }
@@ -3321,6 +3489,8 @@
     warmupPreview.querySelectorAll(".warmup-select-cb").forEach(function (cb) {
       cb.addEventListener("change", onWarmupSelectionChange);
     });
+    bindWarmupAnswerInputs(warmupPreview);
+    bindQuestionOrderControls(warmupPreview, adminWarmupQuestions, onWarmupOrderChanged);
     renderWarmupManualRows();
   }
 
@@ -3328,6 +3498,7 @@
     const silent = options && options.silent;
     const classId = getSelectedClassId() || (lessonClassId && lessonClassId.value);
     if (!classId) return true;
+    syncSelectedDisplayOrders(adminWarmupQuestions);
     const questionsToSave = adminWarmupQuestions.filter((q) => (q.text || "").trim());
     if (!questionsToSave.length) return true;
     warmupSelectionSaving = true;
@@ -3340,14 +3511,7 @@
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "保存に失敗しました");
       const savedManual = getManualWarmupQuestions();
-      const savedFromServer = (data.warmup_questions || questionsToSave).map(function (q) {
-        return {
-          id: q.id,
-          text: q.text || "",
-          selected: q.selected !== false,
-          manual: q.manual === true,
-        };
-      });
+      const savedFromServer = (data.warmup_questions || questionsToSave).map(warmupQuestionFromRaw);
       const serverManual = savedFromServer.filter((q) => q.manual);
       const serverAi = savedFromServer.filter((q) => !q.manual);
       const draftManual = savedManual.filter((q) => !(q.text || "").trim());
@@ -3373,11 +3537,14 @@
     const index = Number(event.target.dataset.index);
     if (!Number.isInteger(index) || !adminWarmupQuestions[index]) return;
     const previous = adminWarmupQuestions[index].selected;
-    adminWarmupQuestions[index].selected = event.target.checked;
+    const previousOrder = adminWarmupQuestions[index].display_order;
+    applyQuestionSelected(adminWarmupQuestions, index, event.target.checked);
     renderAdminWarmupPreview(adminWarmupImageUrl, adminWarmupQuestions);
     const ok = await saveWarmupSelection({ silent: true });
     if (!ok) {
       adminWarmupQuestions[index].selected = previous;
+      adminWarmupQuestions[index].display_order = previousOrder;
+      syncSelectedDisplayOrders(adminWarmupQuestions);
       renderAdminWarmupPreview(adminWarmupImageUrl, adminWarmupQuestions);
       showMessage(lessonMessage, "質問の表示設定の保存に失敗しました。", true);
     }
@@ -3436,13 +3603,14 @@
         const data = await res.json();
         if (!data.ok) throw new Error(data.error || "生成に失敗しました");
         const preservedManual = getManualWarmupQuestions();
-        const aiQuestions = (data.warmup_questions || []).map((q) => ({
-          id: q.id,
-          text: q.text || "",
+        const aiQuestions = (data.warmup_questions || []).map((q) => warmupQuestionFromRaw({
+          ...q,
+          answer: q.answer || "",
           selected: q.selected !== false,
           manual: false,
         }));
         renderAdminWarmupPreview(data.warmup_image_url || "", [...aiQuestions, ...preservedManual]);
+        saveWarmupSelection({ silent: true });
         showMessage(lessonMessage, data.message || "導入補助を生成しました。", false);
         if (warmupGenerateStatus) warmupGenerateStatus.classList.add("hidden");
       } catch (err) {
@@ -3460,12 +3628,14 @@
   // ── 事後質問（視聴後） ──────────────────────────────────────────
 
   function postviewQuestionFromRaw(q) {
+    const order = Number(q && q.display_order);
     return {
       id: q.id,
       text: q.text || "",
       answer: q.answer || "",
       selected: q.selected !== false,
       manual: q.manual === true,
+      display_order: Number.isFinite(order) && order > 0 ? order : 0,
     };
   }
 
@@ -3494,6 +3664,7 @@
         answer: "",
         selected: true,
         manual: true,
+        display_order: 0,
       });
     }
   }
@@ -3515,13 +3686,14 @@
       const index = adminPostviewQuestions.indexOf(q);
       const dimClass = q.selected ? "" : " opacity-50";
       html += `<div class="rounded px-1 py-0.5 bg-white/70${dimClass}">
-        <label class="flex items-center gap-1 cursor-pointer">
+        <div class="flex items-center gap-1">
           <input type="checkbox" class="postview-manual-select-cb shrink-0 h-3.5 w-3.5 rounded border-amber-200 text-amber-600"
             data-index="${index}" ${q.selected ? "checked" : ""}>
+          ${questionOrderControlsHtml(index, q, "amber")}
           <span class="shrink-0 text-[9px] font-bold text-amber-700">Q${q.id}</span>
           <input type="text" class="postview-manual-input compact-input min-w-0 flex-1 text-[10px] py-0.5"
             data-index="${index}" value="${escAttr(q.text)}" placeholder="質問（英語）">
-        </label>
+        </div>
         <label class="mt-0.5 flex items-center gap-1 pl-5">
           <span class="shrink-0 text-[9px] font-semibold text-amber-800">${t("modelAnswer")}</span>
           <input type="text" class="postview-answer-input compact-input min-w-0 flex-1 text-[10px] py-0.5"
@@ -3538,6 +3710,12 @@
       input.addEventListener("blur", () => savePostviewSelection({ silent: true }));
     });
     bindPostviewAnswerInputs(postviewManualRows);
+    bindQuestionOrderControls(postviewManualRows, adminPostviewQuestions, onPostviewOrderChanged);
+  }
+
+  function onPostviewOrderChanged() {
+    renderAdminPostviewPreview(adminPostviewQuestions);
+    savePostviewSelection({ silent: true });
   }
 
   function onPostviewAnswerInput(event) {
@@ -3573,6 +3751,7 @@
       answer: "",
       selected: true,
       manual: true,
+      display_order: 0,
     });
     renderPostviewManualRows();
     const inputs = postviewManualRows?.querySelectorAll(".postview-manual-input") || [];
@@ -3591,6 +3770,7 @@
       : getManualPostviewQuestions();
     const aiFromState = incoming.filter((q) => !q.manual);
     adminPostviewQuestions = [...aiFromState, ...manualFromState];
+    syncSelectedDisplayOrders(adminPostviewQuestions);
 
     const aiQuestions = getAiPostviewQuestions();
     if (!postviewPreview) {
@@ -3602,20 +3782,22 @@
       renderPostviewManualRows();
       return;
     }
-    const selectedCount = aiQuestions.filter(function (q) { return q.selected; }).length;
-    let html = `<p class="mb-1 font-semibold text-slate-600">${t("postviewPreview", { selected: selectedCount, total: aiQuestions.length })}</p>`;
-    html += `<p class="mb-1 text-[9px] text-slate-500">${t("postviewPreviewHint")}</p>`;
+    const selectedCount = adminPostviewQuestions.filter((q) => q.selected && (q.text || "").trim()).length;
+    const totalCount = adminPostviewQuestions.filter((q) => (q.text || "").trim()).length;
+    let html = `<p class="mb-1 font-semibold text-slate-600">${t("postviewPreview", { selected: selectedCount, total: totalCount })}</p>`;
+    html += `<p class="mb-1 text-[9px] text-slate-500">${t("questionOrderHint")}</p>`;
     html += `<div class="space-y-1">`;
     aiQuestions.forEach(function (q) {
       const index = adminPostviewQuestions.indexOf(q);
       const dimClass = q.selected ? "" : " opacity-50";
       html += `<div class="rounded px-1.5 py-1 ${index % 2 === 0 ? "bg-white/70" : ""}${dimClass}">
-        <label class="flex items-start gap-2 cursor-pointer">
+        <div class="flex items-start gap-1.5">
           <input type="checkbox" class="postview-select-cb shrink-0 mt-0.5 h-3.5 w-3.5 rounded border-amber-200 text-amber-600"
             data-index="${index}" ${q.selected ? "checked" : ""}>
+          ${questionOrderControlsHtml(index, q, "amber")}
           <span class="shrink-0 mr-1 text-amber-700 font-bold">Q${q.id}.</span>
           <span class="text-slate-700 leading-snug">${esc(q.text)}</span>
-        </label>
+        </div>
         <label class="mt-0.5 ml-6 flex items-center gap-1 text-[9px] text-amber-800">
           <span class="shrink-0 font-semibold">${t("modelAnswer")}</span>
           <input type="text" class="postview-answer-input compact-input min-w-0 flex-1 text-[10px] py-0.5"
@@ -3630,6 +3812,7 @@
       cb.addEventListener("change", onPostviewSelectionChange);
     });
     bindPostviewAnswerInputs(postviewPreview);
+    bindQuestionOrderControls(postviewPreview, adminPostviewQuestions, onPostviewOrderChanged);
     renderPostviewManualRows();
   }
 
@@ -3637,6 +3820,7 @@
     const silent = options && options.silent;
     const classId = getSelectedClassId() || (lessonClassId && lessonClassId.value);
     if (!classId) return true;
+    syncSelectedDisplayOrders(adminPostviewQuestions);
     const questionsToSave = adminPostviewQuestions.filter((q) => (q.text || "").trim());
     if (!questionsToSave.length) return true;
     postviewSelectionSaving = true;
@@ -3675,11 +3859,14 @@
     const index = Number(event.target.dataset.index);
     if (!Number.isInteger(index) || !adminPostviewQuestions[index]) return;
     const previous = adminPostviewQuestions[index].selected;
-    adminPostviewQuestions[index].selected = event.target.checked;
+    const previousOrder = adminPostviewQuestions[index].display_order;
+    applyQuestionSelected(adminPostviewQuestions, index, event.target.checked);
     renderAdminPostviewPreview(adminPostviewQuestions);
     const ok = await savePostviewSelection({ silent: true });
     if (!ok) {
       adminPostviewQuestions[index].selected = previous;
+      adminPostviewQuestions[index].display_order = previousOrder;
+      syncSelectedDisplayOrders(adminPostviewQuestions);
       renderAdminPostviewPreview(adminPostviewQuestions);
       showMessage(lessonMessage, "事後質問の表示設定の保存に失敗しました。", true);
     }
@@ -3763,6 +3950,7 @@
         const data = await res.json();
         if (!data.ok) throw new Error(data.error || "生成に失敗しました");
         renderAdminPostviewPreview(data.postview_questions || []);
+        savePostviewSelection({ silent: true });
         showMessage(lessonMessage, data.message || "事後質問を生成しました。", false);
         if (postviewGenerateStatus) postviewGenerateStatus.classList.add("hidden");
       } catch (err) {
