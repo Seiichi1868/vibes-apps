@@ -331,6 +331,13 @@
     return kind === "warmup" ? warmupContent : postviewContent;
   }
 
+  function prefersTouchNav() {
+    return Boolean(
+      window.matchMedia &&
+        (window.matchMedia("(pointer: coarse)").matches || window.matchMedia("(hover: none)").matches)
+    );
+  }
+
   function updateQuestionRevealUi(kind) {
     const state = questionReveal[kind];
     const viewEl = questionRevealViewEl(kind);
@@ -346,7 +353,8 @@
       return;
     }
     hint.classList.remove("hidden");
-    hint.textContent = t("screenClickNext", { shown: state.step, total: pieces.length });
+    const hintKey = prefersTouchNav() ? "screenFlickNext" : "screenClickNext";
+    hint.textContent = t(hintKey, { shown: state.step, total: pieces.length });
   }
 
   function renderQuestionReveal(kind) {
@@ -397,7 +405,10 @@
       }
       html += "</div>";
     } else if (list.length) {
-      html += '<p class="screen-qa-waiting">' + t("screenClickToStart") + "</p>";
+      html +=
+        '<p class="screen-qa-waiting">' +
+        t(prefersTouchNav() ? "screenFlickToStart" : "screenClickToStart") +
+        "</p>";
     }
 
     if (pieces.length) {
@@ -582,16 +593,82 @@
     });
   });
 
-  if (viewWarmup) {
-    viewWarmup.addEventListener("click", function () {
-      revealNextQuestionStep("warmup");
+  function bindQuestionRevealGestures(viewEl, kind) {
+    if (!viewEl) return;
+    let startX = 0;
+    let startY = 0;
+    let tracking = false;
+    let ignoreClick = false;
+
+    viewEl.addEventListener("click", function (event) {
+      if (ignoreClick) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        ignoreClick = false;
+        return;
+      }
+      if (event.target && event.target.closest && event.target.closest("button, a, input, textarea")) return;
+      revealNextQuestionStep(kind);
+    });
+
+    viewEl.addEventListener(
+      "touchstart",
+      function (event) {
+        if (event.touches.length !== 1) {
+          tracking = false;
+          return;
+        }
+        if (event.target && event.target.closest && event.target.closest("button, a, input, textarea")) {
+          tracking = false;
+          return;
+        }
+        const touch = event.touches[0];
+        startX = touch.clientX;
+        startY = touch.clientY;
+        tracking = true;
+      },
+      { passive: true }
+    );
+
+    viewEl.addEventListener(
+      "touchmove",
+      function (event) {
+        if (!tracking || event.touches.length !== 1) return;
+        const touch = event.touches[0];
+        const dx = touch.clientX - startX;
+        const dy = touch.clientY - startY;
+        if (Math.abs(dy) > 16 && Math.abs(dy) > Math.abs(dx) * 1.15) {
+          event.preventDefault();
+        }
+      },
+      { passive: false }
+    );
+
+    viewEl.addEventListener("touchend", function (event) {
+      if (!tracking) return;
+      tracking = false;
+      const touch = event.changedTouches && event.changedTouches[0];
+      if (!touch) return;
+      const dx = touch.clientX - startX;
+      const dy = touch.clientY - startY;
+      const absX = Math.abs(dx);
+      const absY = Math.abs(dy);
+      if (absY < 48 || absY <= absX * 1.2) return;
+      ignoreClick = true;
+      window.setTimeout(function () {
+        ignoreClick = false;
+      }, 400);
+      if (dy < 0) revealNextQuestionStep(kind);
+      else hideLastQuestionStep(kind);
+    });
+
+    viewEl.addEventListener("touchcancel", function () {
+      tracking = false;
     });
   }
-  if (viewPostview) {
-    viewPostview.addEventListener("click", function () {
-      revealNextQuestionStep("postview");
-    });
-  }
+
+  bindQuestionRevealGestures(viewWarmup, "warmup");
+  bindQuestionRevealGestures(viewPostview, "postview");
 
   document.addEventListener("keydown", function (event) {
     if (currentView !== "postview" && currentView !== "warmup") return;
