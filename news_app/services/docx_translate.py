@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import io
+import re
 
 from docx import Document
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
@@ -19,6 +20,42 @@ HEADER_EN_COLOR = RGBColor(0x64, 0x74, 0x8B)
 HEADER_JA_COLOR = RGBColor(0x92, 0x40, 0x0E)
 BODY_EN_COLOR = RGBColor(0x1E, 0x29, 0x3B)
 BODY_JA_COLOR = RGBColor(0x33, 0x41, 0x55)
+
+_MONTH_NAME = (
+    r"(?:January|February|March|April|May|June|July|August|September|October|November|December|"
+    r"Jan\.?|Feb\.?|Mar\.?|Apr\.?|Jun\.?|Jul\.?|Aug\.?|Sept?\.?|Oct\.?|Nov\.?|Dec\.?)"
+)
+_UPLOAD_DATETIME_PATTERNS = (
+    re.compile(
+        rf"\(?{_MONTH_NAME}\s+\d{{1,2}}(?:st|nd|rd|th)?,?\s+\d{{4}}"
+        rf"(?:\s+\d{{1,2}}:\d{{2}}(?::\d{{2}})?(?:\s*[AP]M)?)?\)?",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:?\d{2})?)?\b"
+    ),
+    re.compile(r"\b\d{4}/\d{1,2}/\d{1,2}(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?\b"),
+    re.compile(
+        r"\d{4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日"
+        r"(?:\s*\d{1,2}\s*時(?:\s*\d{1,2}\s*分)?)?"
+    ),
+    re.compile(r"\b\d{1,2}/\d{1,2}/\d{2,4}\b"),
+)
+
+
+def word_video_title(title: str) -> str:
+    """Word に出す動画保存名からアップロード日時を除く。"""
+    text = str(title or "").strip()
+    if not text:
+        return ""
+    stripped = text
+    for pattern in _UPLOAD_DATETIME_PATTERNS:
+        stripped = pattern.sub(" ", stripped)
+    stripped = re.sub(r"[\(\[\{]\s*[\)\]\}]", "", stripped)
+    stripped = re.sub(r"\s*[-–—|:·•,/]+\s*$", "", stripped)
+    stripped = re.sub(r"^\s*[-–—|:·•,/]+\s*", "", stripped)
+    stripped = re.sub(r"\s{2,}", " ", stripped).strip(" -–—|:·•,").strip()
+    return stripped or text
 
 
 def translation_rows(script: str, translation: str, pairs) -> list[dict]:
@@ -109,7 +146,7 @@ def build_script_translation_docx(*, title: str = "", pairs: list[dict]) -> byte
     section.top_margin = Cm(1.6)
     section.bottom_margin = Cm(1.6)
 
-    cleaned_title = str(title or "").strip()
+    cleaned_title = word_video_title(title)
     if cleaned_title:
         heading = doc.add_paragraph()
         heading.paragraph_format.space_after = Pt(12)
@@ -306,7 +343,7 @@ def build_lesson_materials_docx(
     section.bottom_margin = Cm(1.6)
 
     cleaned_lesson_name = str(lesson_name or "").strip()
-    cleaned_title = str(title or "").strip()
+    cleaned_title = word_video_title(title)
     if cleaned_lesson_name:
         heading = doc.add_paragraph()
         heading.paragraph_format.space_after = Pt(2) if cleaned_title else Pt(10)
