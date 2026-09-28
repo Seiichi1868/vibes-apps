@@ -54,6 +54,7 @@ DEFAULT_CLASS_CURRENT = {
     "source_url": "",
     "video_id": "",
     "title": "",
+    "lesson_name": "",
     "start_seconds": 0,
     "end_seconds": 0,
     "script": "",
@@ -434,6 +435,7 @@ def _normalize_current(raw: dict | None) -> dict:
             "source_url": str(raw.get("source_url") or "").strip(),
             "video_id": str(raw.get("video_id") or "").strip(),
             "title": str(raw.get("title") or raw.get("video_title") or "").strip(),
+            "lesson_name": str(raw.get("lesson_name") or "").strip(),
             "start_seconds": _coerce_nonnegative_int(raw.get("start_seconds"), 0),
             "end_seconds": _coerce_nonnegative_int(raw.get("end_seconds"), 0),
             "script": str(raw.get("script") or "").strip(),
@@ -471,6 +473,7 @@ def _normalize_class(class_id: str, raw: dict) -> dict:
         normalized_archive.append(
             {
                 "title": str(item.get("title") or item.get("video_title") or item.get("video_id") or "無題のアーカイブ").strip(),
+                "lesson_name": str(item.get("lesson_name") or "").strip(),
                 "archived_at": str(item.get("archived_at") or _now_iso()),
                 "source_url": str(item.get("source_url") or "").strip(),
                 "video_id": str(item.get("video_id") or "").strip(),
@@ -707,7 +710,7 @@ def update_class_current(class_id: str, current_data: dict, *, require_student_i
     return state["classes"][class_id]
 
 
-def archive_class_current(class_id: str, title: str = "") -> dict:
+def archive_class_current(class_id: str, title: str = "", lesson_name: str = "") -> dict:
     state = load_state()
     if class_id not in state.get("classes", {}):
         raise ValueError("指定されたクラスが見つかりません。")
@@ -721,9 +724,11 @@ def archive_class_current(class_id: str, title: str = "") -> dict:
         or str(current.get("title") or "").strip()
         or (current.get("video_id") or "無題のアーカイブ")
     )
+    saved_lesson_name = (lesson_name or "").strip() or str(current.get("lesson_name") or "").strip()
     archive_item = {
         **deepcopy(current),
         "title": saved_title,
+        "lesson_name": saved_lesson_name,
         "archived_at": _now_iso(),
     }
     cls.setdefault("archive", []).insert(0, archive_item)
@@ -764,8 +769,11 @@ def restore_class_archive(class_id: str, archive_index: int) -> dict:
 
     restored = deepcopy(archive[archive_index])
     restored_title = str(restored.get("title") or "").strip()
+    restored_lesson_name = str(restored.get("lesson_name") or "").strip()
     restored.pop("archived_at", None)
-    cls["current"] = _normalize_current({**restored, "title": restored_title})
+    cls["current"] = _normalize_current(
+        {**restored, "title": restored_title, "lesson_name": restored_lesson_name}
+    )
     save_state(state)
     return cls
 

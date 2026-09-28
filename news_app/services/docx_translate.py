@@ -250,6 +250,7 @@ def _add_question_list(doc, questions: list[dict]) -> None:
 
 def build_lesson_materials_docx(
     *,
+    lesson_name: str = "",
     title: str = "",
     script: str = "",
     pairs: list[dict] | None = None,
@@ -312,20 +313,20 @@ def build_lesson_materials_docx(
     section.top_margin = Cm(1.6)
     section.bottom_margin = Cm(1.6)
 
-    heading = doc.add_paragraph()
-    heading.paragraph_format.space_after = Pt(2)
-    heading_run = heading.add_run("授業教材")
-    _set_run_font(heading_run, size_pt=16, bold=True, color=BODY_EN_COLOR)
-
+    cleaned_lesson_name = str(lesson_name or "").strip()
     cleaned_title = str(title or "").strip()
+    if cleaned_lesson_name:
+        heading = doc.add_paragraph()
+        heading.paragraph_format.space_after = Pt(2) if cleaned_title else Pt(10)
+        heading_run = heading.add_run(cleaned_lesson_name)
+        _set_run_font(heading_run, size_pt=16, bold=True, color=BODY_EN_COLOR)
+
     if cleaned_title:
         subtitle = doc.add_paragraph()
         subtitle.paragraph_format.space_before = Pt(0)
         subtitle.paragraph_format.space_after = Pt(10)
         subtitle_run = subtitle.add_run(cleaned_title)
         _set_run_font(subtitle_run, size_pt=11, color=HEADER_EN_COLOR)
-    else:
-        heading.paragraph_format.space_after = Pt(10)
 
     usable_width = int(section.page_width - section.left_margin - section.right_margin)
     col_width = usable_width // 2

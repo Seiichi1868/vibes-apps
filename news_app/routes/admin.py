@@ -390,10 +390,15 @@ def api_save_lesson():
         title = str(data.get("title") or "").strip()
         if not title:
             title = fetch_youtube_title(url or video_id)
+        if "lesson_name" in data:
+            lesson_name = str(data.get("lesson_name") or "").strip()
+        else:
+            lesson_name = str(existing.get("lesson_name") or "").strip()
         lesson_payload: dict = {
             "source_url": url,
             "video_id": video_id,
             "title": title,
+            "lesson_name": lesson_name,
             "start_seconds": start_sec,
             "end_seconds": end_sec,
             "script": script,
@@ -1047,6 +1052,7 @@ def api_export_lesson_materials_docx():
     class_id = str(data.get("class_id") or get_active_class_id()).strip()
     include = data.get("include") if isinstance(data.get("include"), dict) else {}
     title = str(data.get("title") or "").strip()
+    lesson_name = str(data.get("lesson_name") or "").strip()
     script = str(data.get("script") or "").strip()
     script_ja = str(data.get("script_ja") or "").strip()
     pairs = _normalize_script_ja_pairs(data.get("pairs"))
@@ -1055,6 +1061,8 @@ def api_export_lesson_materials_docx():
     current = (cls or {}).get("current") or {}
     if not title:
         title = str(current.get("title") or "").strip()
+    if not lesson_name:
+        lesson_name = str(current.get("lesson_name") or "").strip()
     if not script:
         script = str(current.get("script") or "").strip()
     if not script_ja:
@@ -1091,6 +1099,7 @@ def api_export_lesson_materials_docx():
     try:
         buf = io.BytesIO(
             build_lesson_materials_docx(
+                lesson_name=lesson_name,
                 title=title,
                 script=script,
                 pairs=pairs,
@@ -1119,12 +1128,15 @@ def api_archive_lesson():
     class_id = str(data.get("class_id") or get_active_class_id()).strip()
     try:
         title = str(data.get("title") or "").strip()
+        lesson_name = str(data.get("lesson_name") or "").strip()
         current = (get_class(class_id) or {}).get("current") or {}
         if not title:
             title = str(current.get("title") or "").strip()
         if not title:
             title = fetch_youtube_title(current.get("source_url") or current.get("video_id") or "")
-        cls = archive_class_current(class_id, title)
+        if not lesson_name:
+            lesson_name = str(current.get("lesson_name") or "").strip()
+        cls = archive_class_current(class_id, title, lesson_name)
         return jsonify(
             {
                 "ok": True,

@@ -25,6 +25,7 @@
   const lessonClassLabel = document.getElementById("lesson-class-label");
   const archiveBtn = document.getElementById("archive-btn");
   const archiveTitle = document.getElementById("archive-title");
+  const lessonNameEl = document.getElementById("lesson-name");
   const archiveSummary = document.getElementById("archive-summary");
   const archiveList = document.getElementById("archive-list");
   const archiveEmptyMessage = document.getElementById("archive-empty-message");
@@ -330,6 +331,14 @@
     const fromArchive = archiveTitle ? archiveTitle.value.trim() : "";
     if (fromArchive) return fromArchive;
     return getLessonTitle();
+  }
+
+  function getLessonName() {
+    return lessonNameEl ? lessonNameEl.value.trim() : "";
+  }
+
+  function setLessonName(name) {
+    if (lessonNameEl) lessonNameEl.value = String(name || "").trim();
   }
 
   function selectCnn10EpisodeForLesson(episode, highlight) {
@@ -1345,6 +1354,7 @@
     suppressAutoScriptFill = true;
     document.getElementById("youtube-url").value = c.source_url || "";
     setLessonTitle(c.title || "");
+    setLessonName(c.lesson_name || "");
     document.getElementById("start-time").value = formatTime(c.start_seconds || 0);
     document.getElementById("end-time").value = formatTime(c.end_seconds || 0);
     document.getElementById("lesson-script").value = c.script || "";
@@ -1478,8 +1488,21 @@
       titleRow.className = "flex min-w-0 items-center gap-1";
 
       const title = document.createElement("p");
-      title.className = "min-w-0 flex-1 truncate font-semibold leading-tight text-slate-700";
-      title.textContent = item.title || item.video_id || "無題のアーカイブ";
+      title.className = "flex min-w-0 flex-1 items-center gap-1 font-semibold leading-tight text-slate-700";
+      const lessonName = String(item.lesson_name || "").trim();
+      const saveName = item.title || item.video_id || "無題のアーカイブ";
+      if (lessonName) {
+        const lessonNameSpan = document.createElement("span");
+        lessonNameSpan.className = "shrink-0 max-w-[46%] truncate text-slate-800";
+        lessonNameSpan.textContent = lessonName;
+        const saveNameSpan = document.createElement("span");
+        saveNameSpan.className = "min-w-0 truncate text-slate-600";
+        saveNameSpan.textContent = saveName;
+        title.append(lessonNameSpan, saveNameSpan);
+      } else {
+        title.classList.add("truncate");
+        title.textContent = saveName;
+      }
 
       const flags = document.createElement("span");
       flags.className = "inline-flex shrink-0 items-center gap-0.5";
@@ -1738,6 +1761,7 @@
         class_id: classId,
         url: document.getElementById("youtube-url").value.trim(),
         title: getLessonTitle(),
+        lesson_name: getLessonName(),
         start_time: document.getElementById("start-time").value.trim(),
         end_time: document.getElementById("end-time").value.trim(),
         script: document.getElementById("lesson-script").value.trim(),
@@ -1786,7 +1810,11 @@
         const res = await fetch("/news/admin/api/class/archive", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ class_id: classId, title: getArchiveSaveName() }),
+          body: JSON.stringify({
+            class_id: classId,
+            title: getArchiveSaveName(),
+            lesson_name: getLessonName(),
+          }),
         });
         const data = await res.json();
         if (!data.ok) throw new Error(data.error || "アーカイブに失敗しました");
@@ -1818,6 +1846,7 @@
         if (!data.ok) throw new Error(data.error || "リセットに失敗しました");
         if (data.class) fillLessonForm(data.class);
         if (archiveTitle) archiveTitle.value = "";
+        setLessonName("");
         showMessage(lessonMessage, data.message || "現在の授業設定をリセットしました。", false);
       } catch (err) {
         showMessage(lessonMessage, err.message, true);
@@ -4164,12 +4193,12 @@
     });
   }
 
-  function materialsDocxFilename(title) {
-    const safe = String(title || "")
+  function materialsDocxFilename(lessonName, title) {
+    const safe = String(lessonName || title || "")
       .replace(/[\\/:*?"<>|]/g, "")
       .replace(/\s+/g, "_")
       .slice(0, 40);
-    return safe ? `授業教材_${safe}.docx` : "授業教材.docx";
+    return safe ? `${safe}.docx` : "lesson_materials.docx";
   }
 
   function showExportMaterialsStatus(message, isError) {
@@ -4199,6 +4228,7 @@
     }
 
     const classId = getSelectedClassId() || (lessonClassId && lessonClassId.value) || "";
+    const lessonName = getLessonName();
     const title = document.getElementById("lesson-title")?.value.trim() || "";
     const script = document.getElementById("lesson-script")?.value.trim() || "";
     const translationText = getLessonTranslationText();
@@ -4219,6 +4249,7 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           class_id: classId,
+          lesson_name: lessonName,
           title,
           script,
           script_ja: translationText,
@@ -4244,7 +4275,7 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = materialsDocxFilename(title);
+      a.download = materialsDocxFilename(lessonName, title);
       document.body.appendChild(a);
       a.click();
       a.remove();
