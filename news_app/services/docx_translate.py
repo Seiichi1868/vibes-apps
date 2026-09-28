@@ -109,20 +109,12 @@ def build_script_translation_docx(*, title: str = "", pairs: list[dict]) -> byte
     section.top_margin = Cm(1.6)
     section.bottom_margin = Cm(1.6)
 
-    heading = doc.add_paragraph()
-    heading.paragraph_format.space_after = Pt(2)
-    heading_run = heading.add_run("原文と和訳")
-    _set_run_font(heading_run, size_pt=16, bold=True, color=BODY_EN_COLOR)
-
     cleaned_title = str(title or "").strip()
     if cleaned_title:
-        subtitle = doc.add_paragraph()
-        subtitle.paragraph_format.space_before = Pt(0)
-        subtitle.paragraph_format.space_after = Pt(10)
-        subtitle_run = subtitle.add_run(cleaned_title)
-        _set_run_font(subtitle_run, size_pt=11, color=HEADER_EN_COLOR)
-    else:
-        heading.paragraph_format.space_after = Pt(10)
+        heading = doc.add_paragraph()
+        heading.paragraph_format.space_after = Pt(12)
+        heading_run = heading.add_run(cleaned_title)
+        _set_run_font(heading_run, size_pt=14, color=BODY_EN_COLOR)
 
     table = doc.add_table(rows=1, cols=2)
     table.style = "Table Grid"
@@ -324,9 +316,9 @@ def build_lesson_materials_docx(
     if cleaned_title:
         subtitle = doc.add_paragraph()
         subtitle.paragraph_format.space_before = Pt(0)
-        subtitle.paragraph_format.space_after = Pt(10)
+        subtitle.paragraph_format.space_after = Pt(12)
         subtitle_run = subtitle.add_run(cleaned_title)
-        _set_run_font(subtitle_run, size_pt=11, color=HEADER_EN_COLOR)
+        _set_run_font(subtitle_run, size_pt=14, color=BODY_EN_COLOR)
 
     usable_width = int(section.page_width - section.left_margin - section.right_margin)
     col_width = usable_width // 2
@@ -334,7 +326,6 @@ def build_lesson_materials_docx(
 
     for name in sections:
         if name == "bilingual":
-            _add_heading(doc, "原文と和訳", first=first_section)
             _add_translation_table(doc, rows, col_width=col_width)
         elif name == "transcript":
             _add_heading(doc, "文字起こし", first=first_section)
