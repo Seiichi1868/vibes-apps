@@ -3015,10 +3015,16 @@
     const btnClass = tone === "amber"
       ? "text-amber-700 hover:text-amber-900"
       : "text-sky-600 hover:text-sky-800";
-    return `<span class="flex shrink-0 items-center gap-0.5" title="${esc(t("displayOrder"))}">
-      <button type="button" class="q-order-btn q-order-up shrink-0 px-0.5 text-[8px] leading-none ${btnClass}" data-index="${index}" aria-label="up">▲</button>
-      <input type="number" min="1" class="q-order-input compact-input w-8 text-center text-[9px] py-0" data-index="${index}" value="${order}" title="${esc(t("displayOrder"))}">
-      <button type="button" class="q-order-btn q-order-down shrink-0 px-0.5 text-[8px] leading-none ${btnClass}" data-index="${index}" aria-label="down">▼</button>
+    const wrapClass = tone === "amber"
+      ? "q-order-wrap q-order-wrap--amber border-amber-200"
+      : "q-order-wrap border-sky-200";
+    const btnLineClass = tone === "amber" ? "border-amber-100" : "border-sky-100";
+    return `<span class="${wrapClass} inline-flex h-[22px] w-[42px] shrink-0 overflow-hidden rounded border bg-white" title="${esc(t("displayOrder"))}">
+      <input type="number" min="1" class="q-order-input w-6 min-w-0 appearance-none border-0 bg-transparent p-0 text-center text-[10px] font-bold leading-[22px] [appearance:textfield] [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none" data-index="${index}" value="${order}" title="${esc(t("displayOrder"))}">
+      <span class="q-order-btns flex w-3.5 shrink-0 flex-col border-l ${btnLineClass}">
+        <button type="button" class="q-order-btn q-order-up flex h-1/2 items-center justify-center p-0 text-[7px] leading-none ${btnClass}" data-index="${index}" aria-label="up">▲</button>
+        <button type="button" class="q-order-btn q-order-down flex h-1/2 items-center justify-center p-0 text-[7px] leading-none ${btnClass}" data-index="${index}" aria-label="down">▼</button>
+      </span>
     </span>`;
   }
 
