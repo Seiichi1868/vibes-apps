@@ -326,6 +326,12 @@
     return archiveTitle ? archiveTitle.value.trim() : "";
   }
 
+  function getArchiveSaveName() {
+    const fromArchive = archiveTitle ? archiveTitle.value.trim() : "";
+    if (fromArchive) return fromArchive;
+    return getLessonTitle();
+  }
+
   function selectCnn10EpisodeForLesson(episode, highlight) {
     const urlEl = document.getElementById("youtube-url");
     const startEl = document.getElementById("start-time");
@@ -1780,7 +1786,7 @@
         const res = await fetch("/news/admin/api/class/archive", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ class_id: classId, title: getLessonTitle() }),
+          body: JSON.stringify({ class_id: classId, title: getArchiveSaveName() }),
         });
         const data = await res.json();
         if (!data.ok) throw new Error(data.error || "アーカイブに失敗しました");

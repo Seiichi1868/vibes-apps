@@ -716,10 +716,15 @@ def archive_class_current(class_id: str, title: str = "") -> dict:
     if not (current.get("script") or "").strip() and not (current.get("video_id") or "").strip():
         raise ValueError("アーカイブする授業データがありません。URL またはスクリプトを設定してください。")
 
+    saved_title = (
+        (title or "").strip()
+        or str(current.get("title") or "").strip()
+        or (current.get("video_id") or "無題のアーカイブ")
+    )
     archive_item = {
-        "title": (title or "").strip() or (current.get("video_id") or "無題のアーカイブ"),
-        "archived_at": _now_iso(),
         **deepcopy(current),
+        "title": saved_title,
+        "archived_at": _now_iso(),
     }
     cls.setdefault("archive", []).insert(0, archive_item)
     update_submission_lesson_title(
