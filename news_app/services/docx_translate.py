@@ -20,6 +20,7 @@ HEADER_EN_COLOR = RGBColor(0x64, 0x74, 0x8B)
 HEADER_JA_COLOR = RGBColor(0x92, 0x40, 0x0E)
 BODY_EN_COLOR = RGBColor(0x1E, 0x29, 0x3B)
 BODY_JA_COLOR = RGBColor(0x33, 0x41, 0x55)
+LESSON_NAME_COLOR = RGBColor(0x33, 0x41, 0x55)
 
 _MONTH_NAME = (
     r"(?:January|February|March|April|May|June|July|August|September|October|November|December|"
@@ -348,14 +349,14 @@ def build_lesson_materials_docx(
         heading = doc.add_paragraph()
         heading.paragraph_format.space_after = Pt(2) if cleaned_title else Pt(10)
         heading_run = heading.add_run(cleaned_lesson_name)
-        _set_run_font(heading_run, size_pt=16, bold=True, color=BODY_EN_COLOR)
+        _set_run_font(heading_run, size_pt=13, color=LESSON_NAME_COLOR)
 
     if cleaned_title:
         subtitle = doc.add_paragraph()
         subtitle.paragraph_format.space_before = Pt(0)
         subtitle.paragraph_format.space_after = Pt(12)
         subtitle_run = subtitle.add_run(cleaned_title)
-        _set_run_font(subtitle_run, size_pt=14, color=BODY_EN_COLOR)
+        _set_run_font(subtitle_run, size_pt=16, color=BODY_EN_COLOR)
 
     usable_width = int(section.page_width - section.left_margin - section.right_margin)
     col_width = usable_width // 2
