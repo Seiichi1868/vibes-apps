@@ -813,7 +813,7 @@ def api_toggle_warmup_scaffolding():
                 "ok": True,
                 "class": cls,
                 "warmup_scaffolding_enabled": enabled,
-                "message": "導入補助を有効にしました。" if enabled else "導入補助を無効にしました。",
+                "message": "ウォームアップを有効にしました。" if enabled else "ウォームアップを無効にしました。",
             }
         )
     except ValueError as exc:
@@ -865,18 +865,18 @@ def api_generate_postview():
                 "ok": True,
                 "class": cls,
                 "postview_questions": questions,
-                "message": f"事後質問 {q_count} 問と模範解答を生成しました。",
+                "message": f"ディスカッション {q_count} 問と模範解答を生成しました。",
             }
         )
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:
-        return jsonify({"ok": False, "error": f"事後質問の生成に失敗しました: {exc}"}), 500
+        return jsonify({"ok": False, "error": f"ディスカッションの生成に失敗しました: {exc}"}), 500
 
 
 @admin_bp.route("/api/class/lesson/postview/selection", methods=["POST"])
 def api_update_postview_selection():
-    """事後質問の表示/非表示（選択状態）を保存する。"""
+    """ディスカッション質問の表示/非表示（選択状態）を保存する。"""
     data = request.get_json(silent=True) or {}
     class_id = str(data.get("class_id") or get_active_class_id()).strip()
     if not class_id:
@@ -898,7 +898,7 @@ def api_update_postview_selection():
                 "ok": True,
                 "class": cls,
                 "postview_questions": postview_questions,
-                "message": f"事後質問の表示設定を保存しました（表示 {selected_count} / {len(postview_questions)} 問）。",
+                "message": f"ディスカッションの表示設定を保存しました（表示 {selected_count} / {len(postview_questions)} 問）。",
             }
         )
     except ValueError as exc:
@@ -909,7 +909,7 @@ def api_update_postview_selection():
 
 @admin_bp.route("/api/class/lesson/postview/toggle", methods=["POST"])
 def api_toggle_postview_scaffolding():
-    """生徒画面への事後質問表示の on/off を切り替える。"""
+    """生徒画面へのディスカッション表示の on/off を切り替える。"""
     data = request.get_json(silent=True) or {}
     class_id = str(data.get("class_id") or get_active_class_id()).strip()
     if not class_id:
@@ -926,7 +926,7 @@ def api_toggle_postview_scaffolding():
                 "ok": True,
                 "class": cls,
                 "postview_scaffolding_enabled": enabled,
-                "message": "事後質問を有効にしました。" if enabled else "事後質問を無効にしました。",
+                "message": "ディスカッションを有効にしました。" if enabled else "ディスカッションを無効にしました。",
             }
         )
     except ValueError as exc:
@@ -937,7 +937,7 @@ def api_toggle_postview_scaffolding():
 
 @admin_bp.route("/api/class/lesson/postview/answers", methods=["POST"])
 def api_toggle_postview_answers():
-    """生徒画面に事後質問の模範解答を出すかどうかを保存する。"""
+    """生徒画面にディスカッションの模範解答を出すかどうかを保存する。"""
     data = request.get_json(silent=True) or {}
     class_id = str(data.get("class_id") or get_active_class_id()).strip()
     if not class_id:
@@ -1047,7 +1047,7 @@ def api_update_writing_selection():
 
 @admin_bp.route("/api/class/lesson/materials/docx", methods=["POST"])
 def api_export_lesson_materials_docx():
-    """文字起こし・和訳・語彙・事前/事後質問を選んで Word 出力する。"""
+    """文字起こし・和訳・語彙・ウォームアップ/ディスカッションを選んで Word 出力する。"""
     data = request.get_json(silent=True) or {}
     class_id = str(data.get("class_id") or get_active_class_id()).strip()
     include = data.get("include") if isinstance(data.get("include"), dict) else {}

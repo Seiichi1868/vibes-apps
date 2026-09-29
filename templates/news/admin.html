@@ -484,7 +484,7 @@
             スクリーンURLコピー
           </button>
         </div>
-        <p class="mt-1 text-[10px] text-slate-500" data-i18n="screenHint">投影用：管理画面で選択した動画・単語・導入質問・事後質問を全画面表示します。</p>
+        <p class="mt-1 text-[10px] text-slate-500" data-i18n="screenHint">投影用：管理画面で選択した動画・単語・ウォームアップ・ディスカッションを全画面表示します。</p>
       </section>
 
       <section class="admin-archive-panel glass-panel shrink-0 rounded-xl p-2.5 lg:min-h-0 lg:flex-1 lg:overflow-hidden">
@@ -492,7 +492,7 @@
           <summary id="archive-summary" class="shrink-0 text-sm font-semibold text-slate-800">アーカイブ（0 件）</summary>
           <div class="admin-archive-body">
             <p class="mt-1 text-[9px] leading-tight text-slate-400" data-i18n="archiveAssistLegend">
-              V 語彙補助 · I 導入補助 · P 事後質問（色付き＝生成済み）
+              V 語彙補助 · W ウォームアップ · D ディスカッション（色付き＝生成済み）
             </p>
             <ul id="archive-list" class="mt-2 max-h-60 space-y-1 overflow-y-auto text-[10px] text-slate-600 lg:max-h-none lg:overflow-visible">
             </ul>
@@ -693,7 +693,7 @@
 
         <!-- ── 導入補助 AI（Warmup Scaffolding） ── -->
         <details class="compact-details shrink-0 rounded-lg border border-sky-100/70 bg-sky-50/30 px-2.5 py-2">
-          <summary class="text-[11px] font-semibold text-sky-800/80">🎨 導入補助（Warmup Scaffolding）</summary>
+          <summary class="text-[11px] font-semibold text-sky-800/80" data-i18n="warmupAssist">🎨 ウォームアップ</summary>
           <div class="mt-1.5 space-y-1.5">
             <p class="text-[9px] text-slate-500" data-i18n="warmupHint">動画視聴前の質問と模範解答です。教室スクリーンではクリックするたびに、質問と解答が一つずつ表示されます。↑ で戻れます。</p>
             <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -725,7 +725,7 @@
 
         <!-- ── 事後質問（視聴後の会話練習） ── -->
         <details class="compact-details shrink-0 rounded-lg border border-amber-100/70 bg-amber-50/30 px-2.5 py-2">
-          <summary class="text-[11px] font-semibold text-amber-800/80" data-i18n="postviewAssist">💬 事後質問（視聴後の会話練習）</summary>
+          <summary class="text-[11px] font-semibold text-amber-800/80" data-i18n="postviewAssist">💬 ディスカッション</summary>
           <div class="mt-1.5 space-y-1.5">
             <p class="text-[9px] text-slate-500" data-i18n="postviewHint">動画視聴後の質問と模範解答です。教室スクリーンではクリックするたびに、質問と解答が一つずつ表示されます。↑ で戻れます。</p>
             <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -799,11 +799,11 @@
               </label>
               <label class="flex items-center gap-1.5 cursor-pointer">
                 <input type="checkbox" id="export-include-warmup" class="h-3.5 w-3.5 rounded border-teal-200 text-teal-600" checked>
-                <span data-i18n="exportWarmup">事前質問</span>
+                <span data-i18n="exportWarmup">ウォームアップ</span>
               </label>
               <label class="flex items-center gap-1.5 cursor-pointer">
                 <input type="checkbox" id="export-include-postview" class="h-3.5 w-3.5 rounded border-teal-200 text-teal-600" checked>
-                <span data-i18n="exportPostview">事後質問</span>
+                <span data-i18n="exportPostview">ディスカッション</span>
               </label>
             </div>
             <button type="button" id="export-materials-docx-btn"
@@ -931,7 +931,7 @@
   window.ADMIN_WARMUP_QUESTIONS = {{ (current.warmup_questions or [])|tojson }};
   window.ADMIN_POSTVIEW_QUESTIONS = {{ (current.postview_questions or [])|tojson }};
 </script>
-<script src="{{ url_for('static', filename='news/js/i18n.js', v='20260928b') }}"></script>
+<script src="{{ url_for('static', filename='news/js/i18n.js', v='20260929a') }}"></script>
 <script src="{{ url_for('static', filename='news/js/youtube-transcript.js', v='20260904i') }}"></script>
-<script src="{{ url_for('static', filename='news/js/admin.js', v='20260928e') }}"></script>
+<script src="{{ url_for('static', filename='news/js/admin.js', v='20260929a') }}"></script>
 {% endblock %}

@@ -78,7 +78,7 @@ def extract_postview_from_script(
     """
     script = str(script or "").strip()
     if not script:
-        raise ValueError("スクリプトが空です。事後質問を生成するには英語スクリプトが必要です。")
+        raise ValueError("スクリプトが空です。ディスカッションを生成するには英語スクリプトが必要です。")
     if not api_key:
         raise ValueError(
             "OpenAI API キーが未設定です。"
@@ -112,6 +112,6 @@ def extract_postview_from_script(
             }
         )
     if len(questions) < 5:
-        raise ValueError("事後質問と模範解答を5問分生成できませんでした。もう一度お試しください。")
+        raise ValueError("ディスカッションの質問と模範解答を5問分生成できませんでした。もう一度お試しください。")
 
     return {"questions": questions}

@@ -387,10 +387,10 @@ def build_lesson_materials_docx(
             ]
             _add_vocab_table(doc, vocab_items, col_widths=vocab_widths)
         elif name == "warmup":
-            _add_heading(doc, "事前質問（動画を見る前に）", first=first_section)
+            _add_heading(doc, "ウォームアップ", first=first_section)
             _add_question_list(doc, warmup_items)
         elif name == "postview":
-            _add_heading(doc, "事後質問（動画を見た後に）", first=first_section)
+            _add_heading(doc, "ディスカッション", first=first_section)
             _add_question_list(doc, postview_items)
         first_section = False
 

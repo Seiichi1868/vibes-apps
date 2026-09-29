@@ -1508,8 +1508,8 @@
       flags.className = "inline-flex shrink-0 items-center gap-0.5";
       flags.append(
         createAssistFlag("V", archiveHasVocab(item), t("archiveAssistVocab")),
-        createAssistFlag("I", archiveHasIntro(item), t("archiveAssistIntro")),
-        createAssistFlag("P", archiveHasPostview(item), t("archiveAssistPostview")),
+        createAssistFlag("W", archiveHasIntro(item), t("archiveAssistIntro")),
+        createAssistFlag("D", archiveHasPostview(item), t("archiveAssistPostview")),
       );
       titleRow.append(title, flags);
 
@@ -3608,7 +3608,7 @@
         });
         const data = await res.json();
         if (!data.ok) throw new Error(data.error || "保存に失敗しました");
-        showMessage(lessonMessage, data.message || "導入補助の設定を保存しました。", false);
+        showMessage(lessonMessage, data.message || "ウォームアップの設定を保存しました。", false);
       } catch (err) {
         showMessage(lessonMessage, err.message, true);
         warmupScaffoldingEnabledEl.checked = !enabled;
@@ -3652,7 +3652,7 @@
         }));
         renderAdminWarmupPreview(data.warmup_image_url || "", [...aiQuestions, ...preservedManual]);
         saveWarmupSelection({ silent: true });
-        showMessage(lessonMessage, data.message || "導入補助を生成しました。", false);
+        showMessage(lessonMessage, data.message || "ウォームアップを生成しました。", false);
         if (warmupGenerateStatus) warmupGenerateStatus.classList.add("hidden");
       } catch (err) {
         showMessage(lessonMessage, err.message, true);
@@ -3881,7 +3881,7 @@
       adminPostviewQuestions = [...serverAi, ...serverManual, ...draftManual];
       if (!silent) {
         renderAdminPostviewPreview(adminPostviewQuestions);
-        showMessage(lessonMessage, data.message || "事後質問の表示設定を保存しました。", false);
+        showMessage(lessonMessage, data.message || "ディスカッションの表示設定を保存しました。", false);
       }
       return true;
     } catch (err) {
@@ -3909,7 +3909,7 @@
       adminPostviewQuestions[index].display_order = previousOrder;
       syncSelectedDisplayOrders(adminPostviewQuestions);
       renderAdminPostviewPreview(adminPostviewQuestions);
-      showMessage(lessonMessage, "事後質問の表示設定の保存に失敗しました。", true);
+      showMessage(lessonMessage, "ディスカッションの表示設定の保存に失敗しました。", true);
     }
   }
 
@@ -3930,7 +3930,7 @@
         });
         const data = await res.json();
         if (!data.ok) throw new Error(data.error || "保存に失敗しました");
-        showMessage(lessonMessage, data.message || "事後質問の設定を保存しました。", false);
+        showMessage(lessonMessage, data.message || "ディスカッションの設定を保存しました。", false);
       } catch (err) {
         showMessage(lessonMessage, err.message, true);
         postviewScaffoldingEnabledEl.checked = !enabled;
@@ -3992,7 +3992,7 @@
         if (!data.ok) throw new Error(data.error || "生成に失敗しました");
         renderAdminPostviewPreview(data.postview_questions || []);
         savePostviewSelection({ silent: true });
-        showMessage(lessonMessage, data.message || "事後質問を生成しました。", false);
+        showMessage(lessonMessage, data.message || "ディスカッションを生成しました。", false);
         if (postviewGenerateStatus) postviewGenerateStatus.classList.add("hidden");
       } catch (err) {
         showMessage(lessonMessage, err.message, true);
