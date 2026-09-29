@@ -512,6 +512,27 @@
     writingContent.innerHTML = html;
   }
 
+  function getAvailableViews() {
+    const views = [];
+    viewButtons.forEach(function (btn) {
+      const view = btn.dataset.view;
+      if (!view || btn.disabled || btn.classList.contains("hidden")) return;
+      views.push(view);
+    });
+    return views;
+  }
+
+  function goAdjacentView(delta) {
+    const views = getAvailableViews();
+    if (views.length < 2) return false;
+    let index = views.indexOf(currentView);
+    if (index < 0) index = 0;
+    const next = views[(index + delta + views.length) % views.length];
+    if (!next || next === currentView) return false;
+    setActiveView(next);
+    return true;
+  }
+
   function setActiveView(view) {
     currentView = view;
     Object.entries(viewMap).forEach(function ([key, el]) {
@@ -521,6 +542,7 @@
     viewButtons.forEach(function (btn) {
       btn.classList.toggle("is-active", btn.dataset.view === view);
     });
+    if (screenApp) screenApp.classList.toggle("is-video-view", view === "video");
   }
 
   function configureControls(payload) {
@@ -593,91 +615,111 @@
     });
   });
 
-  function bindQuestionRevealGestures(viewEl, kind) {
+  function bindQuestionRevealClick(viewEl, kind) {
     if (!viewEl) return;
-    let startX = 0;
-    let startY = 0;
-    let tracking = false;
-    let ignoreClick = false;
-
     viewEl.addEventListener("click", function (event) {
-      if (ignoreClick) {
+      if (ignoreQuestionClick) {
         event.preventDefault();
         event.stopImmediatePropagation();
-        ignoreClick = false;
+        ignoreQuestionClick = false;
         return;
       }
       if (event.target && event.target.closest && event.target.closest("button, a, input, textarea")) return;
       revealNextQuestionStep(kind);
     });
+  }
 
-    viewEl.addEventListener(
-      "touchstart",
-      function (event) {
-        if (event.touches.length !== 1) {
-          tracking = false;
-          return;
-        }
-        if (event.target && event.target.closest && event.target.closest("button, a, input, textarea")) {
-          tracking = false;
-          return;
-        }
-        const touch = event.touches[0];
-        startX = touch.clientX;
-        startY = touch.clientY;
-        tracking = true;
-      },
-      { passive: true }
-    );
+  bindQuestionRevealClick(viewWarmup, "warmup");
+  bindQuestionRevealClick(viewPostview, "postview");
 
-    viewEl.addEventListener(
-      "touchmove",
-      function (event) {
-        if (!tracking || event.touches.length !== 1) return;
-        const touch = event.touches[0];
-        const dx = touch.clientX - startX;
-        const dy = touch.clientY - startY;
-        if (Math.abs(dy) > 16 && Math.abs(dy) > Math.abs(dx) * 1.15) {
-          event.preventDefault();
-        }
-      },
-      { passive: false }
-    );
+  let swipeStartX = 0;
+  let swipeStartY = 0;
+  let swipeTracking = false;
+  let ignoreQuestionClick = false;
 
-    viewEl.addEventListener("touchend", function (event) {
-      if (!tracking) return;
-      tracking = false;
-      const touch = event.changedTouches && event.changedTouches[0];
-      if (!touch) return;
-      const dx = touch.clientX - startX;
-      const dy = touch.clientY - startY;
-      const absX = Math.abs(dx);
-      const absY = Math.abs(dy);
-      if (absY < 48 || absY <= absX * 1.2) return;
-      ignoreClick = true;
-      window.setTimeout(function () {
-        ignoreClick = false;
-      }, 400);
-      if (dy < 0) revealNextQuestionStep(kind);
-      else hideLastQuestionStep(kind);
-    });
+  function suppressQuestionClick() {
+    ignoreQuestionClick = true;
+    window.setTimeout(function () {
+      ignoreQuestionClick = false;
+    }, 400);
+  }
 
-    viewEl.addEventListener("touchcancel", function () {
-      tracking = false;
+  function onScreenTouchStart(event) {
+    if (event.touches.length !== 1) {
+      swipeTracking = false;
+      return;
+    }
+    if (event.target && event.target.closest && event.target.closest("button, a, input, textarea")) {
+      swipeTracking = false;
+      return;
+    }
+    const touch = event.touches[0];
+    swipeStartX = touch.clientX;
+    swipeStartY = touch.clientY;
+    swipeTracking = true;
+  }
+
+  function onScreenTouchMove(event) {
+    if (!swipeTracking || event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    const dx = touch.clientX - swipeStartX;
+    const dy = touch.clientY - swipeStartY;
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+    const isQuestionView = currentView === "warmup" || currentView === "postview";
+    if (absX > 16 && absX > absY * 1.15) {
+      event.preventDefault();
+      return;
+    }
+    if (isQuestionView && absY > 16 && absY > absX * 1.15) {
+      event.preventDefault();
+    }
+  }
+
+  function onScreenTouchEnd(event) {
+    if (!swipeTracking) return;
+    swipeTracking = false;
+    const touch = event.changedTouches && event.changedTouches[0];
+    if (!touch) return;
+    const dx = touch.clientX - swipeStartX;
+    const dy = touch.clientY - swipeStartY;
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+    const isQuestionView = currentView === "warmup" || currentView === "postview";
+    if (absX >= 48 && absX > absY * 1.2) {
+      suppressQuestionClick();
+      goAdjacentView(dx < 0 ? 1 : -1);
+      return;
+    }
+    if (!isQuestionView) return;
+    if (absY < 48 || absY <= absX * 1.2) return;
+    suppressQuestionClick();
+    if (dy < 0) revealNextQuestionStep(currentView);
+    else hideLastQuestionStep(currentView);
+  }
+
+  if (screenApp) {
+    screenApp.addEventListener("touchstart", onScreenTouchStart, { passive: true });
+    screenApp.addEventListener("touchmove", onScreenTouchMove, { passive: false });
+    screenApp.addEventListener("touchend", onScreenTouchEnd);
+    screenApp.addEventListener("touchcancel", function () {
+      swipeTracking = false;
     });
   }
 
-  bindQuestionRevealGestures(viewWarmup, "warmup");
-  bindQuestionRevealGestures(viewPostview, "postview");
-
   document.addEventListener("keydown", function (event) {
-    if (currentView !== "postview" && currentView !== "warmup") return;
     if (event.metaKey || event.ctrlKey || event.altKey) return;
+    if (event.target && event.target.closest && event.target.closest("button, a, input, textarea")) return;
     const key = event.key;
-    const showNext = key === " " || key === "Spacebar" || key === "ArrowRight" || key === "ArrowDown" || key === "PageDown" || key === "Enter";
+    if (key === "ArrowLeft" || key === "ArrowRight") {
+      event.preventDefault();
+      goAdjacentView(key === "ArrowRight" ? 1 : -1);
+      return;
+    }
+    if (currentView !== "postview" && currentView !== "warmup") return;
+    const showNext = key === " " || key === "Spacebar" || key === "ArrowDown" || key === "PageDown" || key === "Enter";
     const hidePrev = key === "ArrowUp" || key === "PageUp";
     if (!showNext && !hidePrev) return;
-    if (event.target && event.target.closest && event.target.closest("button, a, input, textarea")) return;
     event.preventDefault();
     if (hidePrev) hideLastQuestionStep(currentView);
     else revealNextQuestionStep(currentView);
