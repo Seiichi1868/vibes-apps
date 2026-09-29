@@ -48,7 +48,7 @@
 ## データ
 
 JSON: `data/debate/sessions/<id>.json` 音声: `data/debate/audio/<id>/`
-設定: `data/debate/settings.json`（背景・透過・transcription_mode・judge_model_mode・opponent_model_mode）
+設定: `data/debate/settings.json`（背景・透過・transcription_mode・judge_model_mode・opponent_model_mode・poi_protected_sec）
 書き込みは `get_session_lock(session_id)` で直列化。`save_session` は tmp→replace。
 パート status: `not_started` → `recording` → `transcribing` → `needs_review` → `confirmed`
 ジャッジ: `idle` → `judging` → `done`/`error`
@@ -63,7 +63,7 @@ JSON: `data/debate/sessions/<id>.json` 音声: `data/debate/audio/<id>/`
 - 止め方の文言は **「停止して保存」**（realtimeは「停止して確定」）。生徒向けに「アップロード」は出さない。内部関数名 `upload_part_audio` はそのままでよい
 - 失敗メッセージも「保存に失敗／タイムアウト」
 - 合図音: 残り1分1回 / 30秒2回 / 超過後連打
-- **POI**: 建設的スピーチ（PM/LO/MG/MO）のみ。Reply（LOR/PMR）は不可。最初と最後の1分は保護時間。申し出→スピーカーが受理/却下（無応答約8秒で却下）。受理後最長15秒。録音も持ち時間も止まらない（POIは同一音声に入る）。一時停止はPOI対応中は不可。
+- **POI**: 建設的スピーチ（PM/LO/MG/MO）のみ。Reply（LOR/PMR）は不可。保護時間は管理画面スライダー（0＝無し、既定60秒、最大90秒、最初と最後）。申し出→スピーカーが受理/却下（無応答約8秒で却下）。受理後最長15秒。録音も持ち時間も止まらない（POIは同一音声に入る）。一時停止はPOI対応中は不可。
 - ライブ音量+参考字幕は表示専用。保存される文字起こしはAならWhisper、BならWeb Speech
 - 停止直後に IndexedDB へも保存（`static/debate/js/local-audio.js`）。確認画面は **同じ端末の録音を先に再生**、なければサーバーURL
 - 「保存して中断」は録音中不可。トップへ戻り、同じ端末から再開
@@ -86,7 +86,7 @@ Whisper: `debate/transcription.py`（短タイムアウト）。ジョブ: `tran
 
 ## 管理
 
-`/debate/admin` はリンク開放。パスワード必須は `transcription_mode`・`judge_model_mode`・`opponent_model_mode`（`DEBATE_ADMIN_PASSWORD` 既定2479）。セッション一覧・コピー・備考・削除あり。コピー時ジャッジはリセット、音声（AI音声含む）は複製。
+`/debate/admin` はリンク開放。パスワード必須は `transcription_mode`・`judge_model_mode`・`opponent_model_mode`（`DEBATE_ADMIN_PASSWORD` 既定2479）。背景・透過・POI保護時間はパスワード不要。セッション一覧・コピー・備考・削除あり。コピー時ジャッジはリセット、音声（AI音声含む）は複製。
 
 ## ファイル案内（必要なときだけ開け）
 
@@ -114,4 +114,4 @@ Whisper: `debate/transcription.py`（短タイムアウト）。ジョブ: `tran
 6. オープニングタイトルは1行、PDAなし
 7. 論題はプルダウン、生徒名なし
 8. 配色は news 同様の淡い緑ガラス
-9. POIは建設的スピーチのみ。保護時間は最初と最後の1分。POI中も持ち時間は止まらない。最長15秒。Replyでは不可。回数で勝敗を変えない。
+9. POIは建設的スピーチのみ。保護時間は管理画面で変更（0＝無し、既定60秒）。POI中も持ち時間は止まらない。最長15秒。Replyでは不可。回数で勝敗を変えない。

@@ -61,9 +61,13 @@ GOV_PARTS = ("PM", "MG", "PMR")
 OPP_PARTS = ("LO", "MO", "LOR")
 
 # POI（Point of Information）: 建設的スピーチのみ。Reply（LOR/PMR）は不可。
-# 保護時間は最初と最後の1分。POI中もスピーカーの持ち時間は止まらない。
+# 保護時間の既定は最初と最後の1分。管理画面のスライダーで 0（無し）〜90秒に変更できる。
+# POI中もスピーカーの持ち時間は止まらない。
 POI_ALLOWED_PARTS = ("PM", "LO", "MG", "MO")
 POI_PROTECTED_SEC = 60
+POI_PROTECTED_SEC_MIN = 0
+POI_PROTECTED_SEC_MAX = 90
+POI_PROTECTED_SEC_STEP = 5
 POI_DURATION_SEC = 15
 POI_OFFER_TIMEOUT_SEC = 8
 POI_STATUSES = ("accepted", "declined", "timeout")

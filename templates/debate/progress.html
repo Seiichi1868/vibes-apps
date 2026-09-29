@@ -30,9 +30,9 @@
   </div>
   <p class="text-[0.7rem] text-slate-400 mt-2">
     {% if session.mode == 'solo' %}
-    自分のパートを確定すると、相手AIが次の発話を準備します。前のパートが終わるまで次の録音はできません。途中で閉じても、同じ端末のトップ画面から再開できます。建設的スピーチ（PM/LO/MG/MO）では、最初と最後の1分を除き<strong class="text-slate-500">POI</strong>（短い質問）を練習できます。
+    自分のパートを確定すると、相手AIが次の発話を準備します。前のパートが終わるまで次の録音はできません。途中で閉じても、同じ端末のトップ画面から再開できます。建設的スピーチ（PM/LO/MG/MO）では、{{ poi_config.introClause }}<strong class="text-slate-500">POI</strong>（短い質問）を練習できます。
     {% else %}
-    各パートは録音・保存のたびに自動保存されます。文字起こし中でも<strong class="text-slate-500">次のパートの録音はすぐ始められます</strong>。騒音などで止めたいときは<strong class="text-slate-500">一時停止</strong>すると経過時間も止まります。建設的スピーチ（PM/LO/MG/MO）では、最初と最後の1分を除き相手が<strong class="text-slate-500">POI</strong>（短い質問）を出せます。ReplyではPOI不可です。途中で閉じても、同じ端末のトップ画面から再開できます。
+    各パートは録音・保存のたびに自動保存されます。文字起こし中でも<strong class="text-slate-500">次のパートの録音はすぐ始められます</strong>。騒音などで止めたいときは<strong class="text-slate-500">一時停止</strong>すると経過時間も止まります。建設的スピーチ（PM/LO/MG/MO）では、{{ poi_config.introClause }}相手が<strong class="text-slate-500">POI</strong>（短い質問）を出せます。ReplyではPOI不可です。途中で閉じても、同じ端末のトップ画面から再開できます。
     {% endif %}
   </p>
   <div id="save-toast" class="hidden mt-2 text-xs font-medium text-emerald-700"></div>
@@ -127,7 +127,7 @@
         <span data-poi-count class="text-xs font-medium text-slate-500">申し出 0 · 受理 0</span>
       </div>
       <p data-poi-hint class="text-[0.65rem] text-slate-400 mt-1.5">
-        相手側が押します。最初と最後の1分は保護時間です。POI中もスピーカーの持ち時間は止まりません（最長15秒）。
+        相手側が押します。{% if poi_config.protectedSec %}最初と最後の{{ poi_config.protectedLabel }}は保護時間です。{% else %}保護時間はありません。{% endif %}POI中もスピーカーの持ち時間は止まりません（最長15秒）。
       </p>
       <div data-poi-overlay class="hidden poi-overlay mt-3 rounded-xl px-4 py-3">
         <div data-poi-overlay-offered class="hidden">
@@ -273,7 +273,7 @@
   window.DEBATE_AI_TEXT_VISIBLE_DEFAULT = {{ ai_text_visible_default | tojson }};
   window.DEBATE_POI = {{ poi_config | tojson }};
 </script>
-<script src="{{ url_for('static', filename='debate/js/progress.js', v='20260929a') }}"></script>
+<script src="{{ url_for('static', filename='debate/js/progress.js', v='20260929b') }}"></script>
 {% if session.mode == 'solo' %}
 <script src="{{ url_for('static', filename='debate/js/solo.js', v='20260921a') }}"></script>
 {% endif %}

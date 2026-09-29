@@ -17,6 +17,26 @@
     offerTimeoutSec: 8,
   };
 
+  function poiProtectedSec() {
+    const n = Number(POI_CONFIG.protectedSec);
+    return Number.isFinite(n) ? Math.max(0, n) : 60;
+  }
+
+  function formatPoiProtectedLabel(sec) {
+    if (sec <= 0) return "無し";
+    if (sec % 60 === 0) return `${sec / 60}分`;
+    if (sec > 60) return `${Math.floor(sec / 60)}分${sec % 60}秒`;
+    return `${sec}秒`;
+  }
+
+  function poiProtectedHint() {
+    const sec = poiProtectedSec();
+    if (sec <= 0) {
+      return "相手側が押します。保護時間はありません。POI中もスピーカーの持ち時間は止まりません（最長15秒）。";
+    }
+    return `相手側が押します。最初と最後の${formatPoiProtectedLabel(sec)}は保護時間です。POI中もスピーカーの持ち時間は止まりません（最長15秒）。`;
+  }
+
   const cards = Array.from(document.querySelectorAll(".part-card"));
   const staleBanner = document.getElementById("stale-recording-banner");
   const modeFallbackBanner = document.getElementById("mode-fallback-banner");
@@ -359,10 +379,12 @@
     if (state.poiPhase === "offered") return "offered";
     if (state.poiPhase === "active") return "active";
     if (state.timerPaused) return "paused";
+    const protectedSec = poiProtectedSec();
+    if (protectedSec <= 0) return "open";
     const elapsed = getElapsedSeconds(part);
     const timeLimit = Number(card.dataset.timeLimit || 0);
     const remaining = timeLimit - elapsed;
-    if (elapsed < (POI_CONFIG.protectedSec || 60) || remaining <= (POI_CONFIG.protectedSec || 60)) {
+    if (elapsed < protectedSec || remaining <= protectedSec) {
       return "protected";
     }
     return "open";
@@ -501,10 +523,13 @@
     const state = cardState.get(part) || {};
     const status = card.dataset.status;
     if (status === "recording" && state.poiPhase === "offered") {
-      const remaining = Number(card.dataset.timeLimit || 0) - getElapsedSeconds(part);
-      if (remaining <= (POI_CONFIG.protectedSec || 60)) {
-        closePoiOffer(card, "timeout");
-        return;
+      const protectedSec = poiProtectedSec();
+      if (protectedSec > 0) {
+        const remaining = Number(card.dataset.timeLimit || 0) - getElapsedSeconds(part);
+        if (remaining <= protectedSec) {
+          closePoiOffer(card, "timeout");
+          return;
+        }
       }
     }
     const pois = Array.isArray(state.pois) ? state.pois : readStoredPois(card);
@@ -520,6 +545,8 @@
 
     const recording = status === "recording";
     panel.classList.toggle("hidden", !recording);
+    const hintEl = panel.querySelector("[data-poi-hint]");
+    if (hintEl) hintEl.textContent = poiProtectedHint();
     if (countEl) countEl.textContent = `申し出 ${offered} · 受理 ${accepted}`;
 
     const labels = {

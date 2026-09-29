@@ -30,7 +30,6 @@ from debate.config import (
     POI_ALLOWED_PARTS,
     POI_DURATION_SEC,
     POI_OFFER_TIMEOUT_SEC,
-    POI_PROTECTED_SEC,
     STATUS_LABELS,
     ensure_dirs,
 )
@@ -154,9 +153,19 @@ def _background_context() -> dict:
 
 
 def _poi_config() -> dict:
+    from debate.settings import (
+        clamp_poi_protected_sec,
+        format_poi_protected_label,
+        load_settings,
+        poi_protected_intro_clause,
+    )
+
+    protected = clamp_poi_protected_sec(load_settings().get("poi_protected_sec"))
     return {
         "allowedParts": list(POI_ALLOWED_PARTS),
-        "protectedSec": POI_PROTECTED_SEC,
+        "protectedSec": protected,
+        "protectedLabel": format_poi_protected_label(protected),
+        "introClause": poi_protected_intro_clause(protected),
         "durationSec": POI_DURATION_SEC,
         "offerTimeoutSec": POI_OFFER_TIMEOUT_SEC,
     }

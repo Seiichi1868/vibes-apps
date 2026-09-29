@@ -11,6 +11,10 @@ from pathlib import Path
 from debate.config import (
     DATA_DIR,
     JUDGE_MODEL_OVERRIDE,
+    POI_PROTECTED_SEC,
+    POI_PROTECTED_SEC_MAX,
+    POI_PROTECTED_SEC_MIN,
+    POI_PROTECTED_SEC_STEP,
     ensure_dirs,
 )
 from debate.judge_models import (
@@ -42,6 +46,7 @@ DEFAULT_SETTINGS = {
     "transcription_mode": "batch",
     "judge_model_mode": DEFAULT_JUDGE_MODEL_MODE,
     "opponent_model_mode": DEFAULT_JUDGE_MODEL_MODE,
+    "poi_protected_sec": POI_PROTECTED_SEC,
 }
 
 
@@ -63,6 +68,34 @@ def resolve_opponent_model(mode: str | None = None) -> str:
         stored = load_settings().get("opponent_model_mode", DEFAULT_JUDGE_MODEL_MODE)
         selected = resolve_judge_model_mode(stored, fallback_mode=DEFAULT_JUDGE_MODEL_MODE)
     return resolve_judge_model_id(selected)
+
+
+def clamp_poi_protected_sec(value, default: int = POI_PROTECTED_SEC) -> int:
+    try:
+        n = int(round(float(value)))
+    except (TypeError, ValueError):
+        n = default
+    step = POI_PROTECTED_SEC_STEP or 1
+    n = int(round(n / step) * step)
+    return max(POI_PROTECTED_SEC_MIN, min(POI_PROTECTED_SEC_MAX, n))
+
+
+def format_poi_protected_label(sec) -> str:
+    n = clamp_poi_protected_sec(sec)
+    if n <= 0:
+        return "無し"
+    if n % 60 == 0:
+        return f"{n // 60}分"
+    if n > 60:
+        return f"{n // 60}分{n % 60}秒"
+    return f"{n}秒"
+
+
+def poi_protected_intro_clause(sec) -> str:
+    n = clamp_poi_protected_sec(sec)
+    if n <= 0:
+        return "保護時間はなく、スピーチ中いつでも"
+    return f"最初と最後の{format_poi_protected_label(n)}を除き"
 
 
 def _clamp_opacity(value, default: float = DEFAULT_BACKGROUND_OPACITY) -> float:
@@ -100,6 +133,9 @@ def _normalize(raw: dict | None) -> dict:
         data["opponent_model_mode"] = opponent_mode
     elif opponent_mode:
         data["opponent_model_mode"] = DEFAULT_JUDGE_MODEL_MODE
+
+    if "poi_protected_sec" in raw:
+        data["poi_protected_sec"] = clamp_poi_protected_sec(raw.get("poi_protected_sec"))
 
     return data
 

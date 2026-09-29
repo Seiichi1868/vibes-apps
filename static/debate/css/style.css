@@ -318,6 +318,10 @@ body {
   width: 4.5rem;
   height: 0.25rem;
 }
+.poi-protected-slider {
+  width: 8.5rem;
+  height: 0.25rem;
+}
 
 /* ── 管理画面：ジャッジモデル選択（Speaking Lab管理画面と同レイアウト） ── */
 .debate-mode-options {

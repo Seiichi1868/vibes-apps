@@ -56,6 +56,24 @@
         value="{{ (background_opacity * 100)|round|int }}"
         class="bg-opacity-slider accent-teal-600">
     </div>
+    </div>
+</section>
+
+<section class="glass-card rounded-xl px-3 py-2.5 mb-4">
+  <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+    <span class="text-[0.65rem] font-semibold text-slate-400 shrink-0">POI保護時間</span>
+    <p class="text-[0.65rem] text-slate-500">
+      建設的スピーチの最初と最後。0で保護時間なし。
+    </p>
+    <div class="flex items-center gap-2 ml-auto shrink-0">
+      <label for="poi-protected-slider" class="text-[0.65rem] text-slate-600 whitespace-nowrap font-semibold">
+        <span id="poi-protected-value">{{ poi_protected_label }}</span>
+      </label>
+      <input id="poi-protected-slider" type="range"
+        min="{{ poi_protected_min }}" max="{{ poi_protected_max }}" step="{{ poi_protected_step }}"
+        value="{{ poi_protected_sec }}"
+        class="poi-protected-slider accent-teal-600">
+    </div>
   </div>
 </section>
 
@@ -125,5 +143,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='debate/js/admin.js', v='20260924a') }}"></script>
+<script src="{{ url_for('static', filename='debate/js/admin.js', v='20260929b') }}"></script>
 {% endblock %}

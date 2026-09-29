@@ -5,11 +5,18 @@ from pathlib import Path
 from flask import Blueprint, current_app, jsonify, render_template, request, send_from_directory
 
 from debate.judge_models import public_judge_model_modes, resolve_judge_model_mode
+from debate.config import (
+    POI_PROTECTED_SEC_MAX,
+    POI_PROTECTED_SEC_MIN,
+    POI_PROTECTED_SEC_STEP,
+)
 from debate.settings import (
     BACKGROUND_PRESETS,
     DEFAULT_BACKGROUND_OPACITY,
     TRANSCRIPTION_MODES,
     _clamp_opacity,
+    clamp_poi_protected_sec,
+    format_poi_protected_label,
     load_settings,
     resolve_background,
     resolve_judge_model,
@@ -33,10 +40,16 @@ def _password_ok(payload: dict) -> bool:
 def _settings_response(settings: dict) -> dict:
     judge_mode = resolve_judge_model_mode(settings.get("judge_model_mode"))
     opponent_mode = resolve_judge_model_mode(settings.get("opponent_model_mode"))
+    poi_protected_sec = clamp_poi_protected_sec(settings.get("poi_protected_sec"))
     return {
         "ok": True,
         **settings,
         **resolve_background(settings.get("background_id")),
+        "poi_protected_sec": poi_protected_sec,
+        "poi_protected_label": format_poi_protected_label(poi_protected_sec),
+        "poi_protected_min": POI_PROTECTED_SEC_MIN,
+        "poi_protected_max": POI_PROTECTED_SEC_MAX,
+        "poi_protected_step": POI_PROTECTED_SEC_STEP,
         "judge_model": resolve_judge_model(judge_mode),
         "judge_model_modes": public_judge_model_modes(),
         "opponent_model": resolve_opponent_model(opponent_mode),
@@ -60,11 +73,17 @@ def web_app_manifest():
 def admin_page():
     settings = load_settings()
     bg = resolve_background(settings.get("background_id"))
+    poi_protected_sec = clamp_poi_protected_sec(settings.get("poi_protected_sec"))
     return render_template(
         "debate/admin.html",
         backgrounds=BACKGROUND_PRESETS,
         background=bg,
         background_opacity=settings.get("background_opacity", DEFAULT_BACKGROUND_OPACITY),
+        poi_protected_sec=poi_protected_sec,
+        poi_protected_label=format_poi_protected_label(poi_protected_sec),
+        poi_protected_min=POI_PROTECTED_SEC_MIN,
+        poi_protected_max=POI_PROTECTED_SEC_MAX,
+        poi_protected_step=POI_PROTECTED_SEC_STEP,
     )
 
 
@@ -85,6 +104,8 @@ def admin_settings():
             updates["background_id"] = bg_id
     if "background_opacity" in payload:
         updates["background_opacity"] = _clamp_opacity(payload.get("background_opacity"))
+    if "poi_protected_sec" in payload:
+        updates["poi_protected_sec"] = clamp_poi_protected_sec(payload.get("poi_protected_sec"))
     if "transcription_mode" in payload:
         mode = str(payload.get("transcription_mode") or "")
         if mode in TRANSCRIPTION_MODES:

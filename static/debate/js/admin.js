@@ -13,6 +13,8 @@ const pageBgLayer = document.getElementById("page-bg-layer");
 const bgPicker = document.getElementById("bg-picker");
 const bgOpacitySlider = document.getElementById("bg-opacity-slider");
 const bgOpacityValue = document.getElementById("bg-opacity-value");
+const poiProtectedSlider = document.getElementById("poi-protected-slider");
+const poiProtectedValue = document.getElementById("poi-protected-value");
 const judgeModelPicker = document.getElementById("judge-model-picker");
 const judgeModelCurrent = document.getElementById("judge-model-current");
 const opponentModelPicker = document.getElementById("opponent-model-picker");
@@ -80,6 +82,25 @@ function applyBackgroundOpacity(opacity) {
 function getBackgroundOpacityFromSlider() {
   const percent = parseInt(bgOpacitySlider?.value, 10);
   return Number.isFinite(percent) ? percent / 100 : 0.32;
+}
+
+function formatPoiProtectedLabel(sec) {
+  const n = Number(sec);
+  if (!Number.isFinite(n) || n <= 0) return "無し";
+  if (n % 60 === 0) return `${n / 60}分`;
+  if (n > 60) return `${Math.floor(n / 60)}分${n % 60}秒`;
+  return `${n}秒`;
+}
+
+function getPoiProtectedSecFromSlider() {
+  const n = parseInt(poiProtectedSlider?.value, 10);
+  return Number.isFinite(n) ? n : 60;
+}
+
+function applyPoiProtectedSec(sec, label) {
+  const n = Number.isFinite(Number(sec)) ? Number(sec) : 60;
+  if (poiProtectedSlider) poiProtectedSlider.value = String(n);
+  if (poiProtectedValue) poiProtectedValue.textContent = label || formatPoiProtectedLabel(n);
 }
 
 function applyBackground(bgId, imageUrl) {
@@ -207,11 +228,30 @@ async function loadSettingsIntoUI() {
   const activeBtn = bgPicker?.querySelector(`.bg-pick-btn[data-bg-id="${data.background_id}"]`);
   applyBackground(data.background_id, activeBtn?.dataset.bgImage);
   applyBackgroundOpacity(data.background_opacity ?? 0.32);
+  applyPoiProtectedSec(data.poi_protected_sec ?? 60, data.poi_protected_label);
   applyTranscriptionMode(data.transcription_mode ?? "batch");
   renderJudgeModelOptions(data.judge_model_modes || [], data.judge_model_mode || "5.6-luna");
   applyJudgeModelMode(data.judge_model_mode || "5.6-luna", data.judge_model);
   renderOpponentModelOptions(data.judge_model_modes || [], data.opponent_model_mode || "5.6-luna");
   applyOpponentModelMode(data.opponent_model_mode || "5.6-luna", data.opponent_model);
+}
+
+function schedulePoiProtectedSave() {
+  applyPoiProtectedSec(getPoiProtectedSecFromSlider());
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    try {
+      const saved = await saveSettings({
+        poi_protected_sec: getPoiProtectedSecFromSlider(),
+      });
+      applyPoiProtectedSec(saved.poi_protected_sec ?? 60, saved.poi_protected_label);
+      if (statusMessage) statusMessage.textContent = "保存しました";
+      hideLockMessage();
+    } catch (err) {
+      if (statusMessage) statusMessage.textContent = "";
+      showLockMessage(err.message);
+    }
+  }, 300);
 }
 
 function scheduleBackgroundSave() {
@@ -560,6 +600,10 @@ opponentModelPicker?.addEventListener("change", () => {
 bgOpacitySlider?.addEventListener("input", () => {
   applyBackgroundOpacity(getBackgroundOpacityFromSlider());
   scheduleBackgroundSave();
+});
+
+poiProtectedSlider?.addEventListener("input", () => {
+  schedulePoiProtectedSave();
 });
 
 transcriptionModePicker?.addEventListener("change", () => {
