@@ -296,7 +296,7 @@
       screenNoVocab: "表示する単語がありません。管理画面で語彙を選択してください。",
       screenNoWarmup: "表示するウォームアップがありません。管理画面で質問を選択してください。",
       screenWarmupHeading: "動画を見る前に考えてみよう",
-      screenPostviewHeading: "動画を見た後に話し合おう",
+      screenPostviewHeading: "動画を見た後で考えてみよう",
       screenClickAnswer: "↓ で次へ　↑ で戻す（{shown}/{total}）",
       screenClickNext: "↓ で次へ　↑ で戻す（{shown}/{total}）",
       screenClickToStart: "クリックまたは ↓ で質問を表示",
