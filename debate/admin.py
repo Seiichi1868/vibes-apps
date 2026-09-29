@@ -40,13 +40,16 @@ def _password_ok(payload: dict) -> bool:
 def _settings_response(settings: dict) -> dict:
     judge_mode = resolve_judge_model_mode(settings.get("judge_model_mode"))
     opponent_mode = resolve_judge_model_mode(settings.get("opponent_model_mode"))
-    poi_protected_sec = clamp_poi_protected_sec(settings.get("poi_protected_sec"))
+    start_sec = clamp_poi_protected_sec(settings.get("poi_protected_start_sec"))
+    end_sec = clamp_poi_protected_sec(settings.get("poi_protected_end_sec"))
     return {
         "ok": True,
         **settings,
         **resolve_background(settings.get("background_id")),
-        "poi_protected_sec": poi_protected_sec,
-        "poi_protected_label": format_poi_protected_label(poi_protected_sec),
+        "poi_protected_start_sec": start_sec,
+        "poi_protected_end_sec": end_sec,
+        "poi_protected_start_label": format_poi_protected_label(start_sec),
+        "poi_protected_end_label": format_poi_protected_label(end_sec),
         "poi_protected_min": POI_PROTECTED_SEC_MIN,
         "poi_protected_max": POI_PROTECTED_SEC_MAX,
         "poi_protected_step": POI_PROTECTED_SEC_STEP,
@@ -73,14 +76,17 @@ def web_app_manifest():
 def admin_page():
     settings = load_settings()
     bg = resolve_background(settings.get("background_id"))
-    poi_protected_sec = clamp_poi_protected_sec(settings.get("poi_protected_sec"))
+    start_sec = clamp_poi_protected_sec(settings.get("poi_protected_start_sec"))
+    end_sec = clamp_poi_protected_sec(settings.get("poi_protected_end_sec"))
     return render_template(
         "debate/admin.html",
         backgrounds=BACKGROUND_PRESETS,
         background=bg,
         background_opacity=settings.get("background_opacity", DEFAULT_BACKGROUND_OPACITY),
-        poi_protected_sec=poi_protected_sec,
-        poi_protected_label=format_poi_protected_label(poi_protected_sec),
+        poi_protected_start_sec=start_sec,
+        poi_protected_end_sec=end_sec,
+        poi_protected_start_label=format_poi_protected_label(start_sec),
+        poi_protected_end_label=format_poi_protected_label(end_sec),
         poi_protected_min=POI_PROTECTED_SEC_MIN,
         poi_protected_max=POI_PROTECTED_SEC_MAX,
         poi_protected_step=POI_PROTECTED_SEC_STEP,
@@ -104,8 +110,10 @@ def admin_settings():
             updates["background_id"] = bg_id
     if "background_opacity" in payload:
         updates["background_opacity"] = _clamp_opacity(payload.get("background_opacity"))
-    if "poi_protected_sec" in payload:
-        updates["poi_protected_sec"] = clamp_poi_protected_sec(payload.get("poi_protected_sec"))
+    if "poi_protected_start_sec" in payload:
+        updates["poi_protected_start_sec"] = clamp_poi_protected_sec(payload.get("poi_protected_start_sec"))
+    if "poi_protected_end_sec" in payload:
+        updates["poi_protected_end_sec"] = clamp_poi_protected_sec(payload.get("poi_protected_end_sec"))
     if "transcription_mode" in payload:
         mode = str(payload.get("transcription_mode") or "")
         if mode in TRANSCRIPTION_MODES:

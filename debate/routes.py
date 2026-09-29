@@ -158,14 +158,20 @@ def _poi_config() -> dict:
         format_poi_protected_label,
         load_settings,
         poi_protected_intro_clause,
+        poi_protected_hint_clause,
     )
 
-    protected = clamp_poi_protected_sec(load_settings().get("poi_protected_sec"))
+    settings = load_settings()
+    start_sec = clamp_poi_protected_sec(settings.get("poi_protected_start_sec"))
+    end_sec = clamp_poi_protected_sec(settings.get("poi_protected_end_sec"))
     return {
         "allowedParts": list(POI_ALLOWED_PARTS),
-        "protectedSec": protected,
-        "protectedLabel": format_poi_protected_label(protected),
-        "introClause": poi_protected_intro_clause(protected),
+        "protectedStartSec": start_sec,
+        "protectedEndSec": end_sec,
+        "protectedStartLabel": format_poi_protected_label(start_sec),
+        "protectedEndLabel": format_poi_protected_label(end_sec),
+        "introClause": poi_protected_intro_clause(start_sec, end_sec),
+        "hintClause": poi_protected_hint_clause(start_sec, end_sec),
         "durationSec": POI_DURATION_SEC,
         "offerTimeoutSec": POI_OFFER_TIMEOUT_SEC,
     }

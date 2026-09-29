@@ -88,7 +88,7 @@ speaker が "ai" のパートはタイムマネジメントの対象外です（
 
 # POI（Point of Information）
 PM / LO / MG / MO では、保護時間を除き相手がPOIを出せます。
-保護時間は payload の poi_protected_sec（スピーチの最初と最後、秒）。0 なら保護時間なしです。
+保護時間は payload の poi_protected_start_sec（最初）と poi_protected_end_sec（最後）。0 ならその側は保護なしです。
 LOR / PMR（Reply）ではPOIは不可です。POI中もスピーカーの持ち時間は止まりません。1回あたり最長15秒です。
 payload の各パートに poi（allowed / offered / accepted / events）が付きます。
 - 勝敗判定と standing points の根拠に、POIの回数は使わないでください。
@@ -163,10 +163,14 @@ _ARGUMENT_STATUSES = {"standing", "knocked_down", "extended"}
 _SIDES = {"Gov", "Opp"}
 
 
-def _poi_protected_sec() -> int:
+def _poi_protected_times() -> tuple[int, int]:
     from debate.settings import clamp_poi_protected_sec, load_settings
 
-    return clamp_poi_protected_sec(load_settings().get("poi_protected_sec"))
+    settings = load_settings()
+    return (
+        clamp_poi_protected_sec(settings.get("poi_protected_start_sec")),
+        clamp_poi_protected_sec(settings.get("poi_protected_end_sec")),
+    )
 
 
 def _get_client():
@@ -213,10 +217,12 @@ def build_judge_payload(session: dict) -> dict:
                 },
             }
         )
+    start_sec, end_sec = _poi_protected_times()
     return {
         "motion": session.get("motion", ""),
         "speaker_roles": PART_ROLES,
-        "poi_protected_sec": _poi_protected_sec(),
+        "poi_protected_start_sec": start_sec,
+        "poi_protected_end_sec": end_sec,
         "expected_flow": {
             "regular_points": "各陣営 Point 1 と Point 2 のみ。Point 3 以降は加点しない。",
             "gov_point_1": "PMで詳しく展開し、LOの反論のあとMGが再構築・防御する。",

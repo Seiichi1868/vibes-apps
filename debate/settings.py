@@ -46,7 +46,8 @@ DEFAULT_SETTINGS = {
     "transcription_mode": "batch",
     "judge_model_mode": DEFAULT_JUDGE_MODEL_MODE,
     "opponent_model_mode": DEFAULT_JUDGE_MODEL_MODE,
-    "poi_protected_sec": POI_PROTECTED_SEC,
+    "poi_protected_start_sec": POI_PROTECTED_SEC,
+    "poi_protected_end_sec": POI_PROTECTED_SEC,
 }
 
 
@@ -91,11 +92,52 @@ def format_poi_protected_label(sec) -> str:
     return f"{n}秒"
 
 
-def poi_protected_intro_clause(sec) -> str:
-    n = clamp_poi_protected_sec(sec)
-    if n <= 0:
+def poi_protected_hint_clause(start_sec, end_sec=None) -> str:
+    start = clamp_poi_protected_sec(start_sec)
+    end = start if end_sec is None else clamp_poi_protected_sec(end_sec)
+    if start <= 0 and end <= 0:
+        return "保護時間はありません。"
+    if start > 0 and end > 0:
+        if start == end:
+            return f"最初と最後の{format_poi_protected_label(start)}は保護時間です。"
+        return f"最初の{format_poi_protected_label(start)}と最後の{format_poi_protected_label(end)}は保護時間です。"
+    if start > 0:
+        return f"最初の{format_poi_protected_label(start)}は保護時間です。"
+    return f"最後の{format_poi_protected_label(end)}は保護時間です。"
+
+
+def poi_protected_intro_clause(start_sec, end_sec=None) -> str:
+    start = clamp_poi_protected_sec(start_sec)
+    end = start if end_sec is None else clamp_poi_protected_sec(end_sec)
+    if start <= 0 and end <= 0:
         return "保護時間はなく、スピーチ中いつでも"
-    return f"最初と最後の{format_poi_protected_label(n)}を除き"
+    if start > 0 and end > 0:
+        if start == end:
+            return f"最初と最後の{format_poi_protected_label(start)}を除き"
+        return f"最初の{format_poi_protected_label(start)}と最後の{format_poi_protected_label(end)}を除き"
+    if start > 0:
+        return f"最初の{format_poi_protected_label(start)}を除き"
+    return f"最後の{format_poi_protected_label(end)}を除き"
+
+
+def resolve_poi_protected_times(raw: dict | None) -> tuple[int, int]:
+    data = raw if isinstance(raw, dict) else {}
+    legacy = None
+    if "poi_protected_sec" in data:
+        legacy = clamp_poi_protected_sec(data.get("poi_protected_sec"))
+    start_default = POI_PROTECTED_SEC if legacy is None else legacy
+    end_default = POI_PROTECTED_SEC if legacy is None else legacy
+    start = (
+        clamp_poi_protected_sec(data.get("poi_protected_start_sec"))
+        if "poi_protected_start_sec" in data
+        else start_default
+    )
+    end = (
+        clamp_poi_protected_sec(data.get("poi_protected_end_sec"))
+        if "poi_protected_end_sec" in data
+        else end_default
+    )
+    return start, end
 
 
 def _clamp_opacity(value, default: float = DEFAULT_BACKGROUND_OPACITY) -> float:
@@ -134,8 +176,9 @@ def _normalize(raw: dict | None) -> dict:
     elif opponent_mode:
         data["opponent_model_mode"] = DEFAULT_JUDGE_MODEL_MODE
 
-    if "poi_protected_sec" in raw:
-        data["poi_protected_sec"] = clamp_poi_protected_sec(raw.get("poi_protected_sec"))
+    start_sec, end_sec = resolve_poi_protected_times(raw)
+    data["poi_protected_start_sec"] = start_sec
+    data["poi_protected_end_sec"] = end_sec
 
     return data
 

@@ -13,8 +13,10 @@ const pageBgLayer = document.getElementById("page-bg-layer");
 const bgPicker = document.getElementById("bg-picker");
 const bgOpacitySlider = document.getElementById("bg-opacity-slider");
 const bgOpacityValue = document.getElementById("bg-opacity-value");
-const poiProtectedSlider = document.getElementById("poi-protected-slider");
-const poiProtectedValue = document.getElementById("poi-protected-value");
+const poiProtectedStartSlider = document.getElementById("poi-protected-start-slider");
+const poiProtectedStartValue = document.getElementById("poi-protected-start-value");
+const poiProtectedEndSlider = document.getElementById("poi-protected-end-slider");
+const poiProtectedEndValue = document.getElementById("poi-protected-end-value");
 const judgeModelPicker = document.getElementById("judge-model-picker");
 const judgeModelCurrent = document.getElementById("judge-model-current");
 const opponentModelPicker = document.getElementById("opponent-model-picker");
@@ -92,15 +94,34 @@ function formatPoiProtectedLabel(sec) {
   return `${n}秒`;
 }
 
-function getPoiProtectedSecFromSlider() {
-  const n = parseInt(poiProtectedSlider?.value, 10);
-  return Number.isFinite(n) ? n : 60;
+function getPoiProtectedSecFromSlider(slider, fallback) {
+  const n = parseInt(slider?.value, 10);
+  return Number.isFinite(n) ? n : fallback;
 }
 
-function applyPoiProtectedSec(sec, label) {
-  const n = Number.isFinite(Number(sec)) ? Number(sec) : 60;
-  if (poiProtectedSlider) poiProtectedSlider.value = String(n);
-  if (poiProtectedValue) poiProtectedValue.textContent = label || formatPoiProtectedLabel(n);
+function applyPoiProtectedSide(slider, valueEl, sec, label, fallback) {
+  const n = Number.isFinite(Number(sec)) ? Number(sec) : fallback;
+  if (slider) slider.value = String(n);
+  if (valueEl) valueEl.textContent = label || formatPoiProtectedLabel(n);
+}
+
+function applyPoiProtectedTimes(data) {
+  const start = data?.poi_protected_start_sec ?? data?.poi_protected_sec ?? 60;
+  const end = data?.poi_protected_end_sec ?? data?.poi_protected_sec ?? 60;
+  applyPoiProtectedSide(
+    poiProtectedStartSlider,
+    poiProtectedStartValue,
+    start,
+    data?.poi_protected_start_label,
+    60
+  );
+  applyPoiProtectedSide(
+    poiProtectedEndSlider,
+    poiProtectedEndValue,
+    end,
+    data?.poi_protected_end_label,
+    60
+  );
 }
 
 function applyBackground(bgId, imageUrl) {
@@ -228,7 +249,7 @@ async function loadSettingsIntoUI() {
   const activeBtn = bgPicker?.querySelector(`.bg-pick-btn[data-bg-id="${data.background_id}"]`);
   applyBackground(data.background_id, activeBtn?.dataset.bgImage);
   applyBackgroundOpacity(data.background_opacity ?? 0.32);
-  applyPoiProtectedSec(data.poi_protected_sec ?? 60, data.poi_protected_label);
+  applyPoiProtectedTimes(data);
   applyTranscriptionMode(data.transcription_mode ?? "batch");
   renderJudgeModelOptions(data.judge_model_modes || [], data.judge_model_mode || "5.6-luna");
   applyJudgeModelMode(data.judge_model_mode || "5.6-luna", data.judge_model);
@@ -237,14 +258,18 @@ async function loadSettingsIntoUI() {
 }
 
 function schedulePoiProtectedSave() {
-  applyPoiProtectedSec(getPoiProtectedSecFromSlider());
+  applyPoiProtectedTimes({
+    poi_protected_start_sec: getPoiProtectedSecFromSlider(poiProtectedStartSlider, 60),
+    poi_protected_end_sec: getPoiProtectedSecFromSlider(poiProtectedEndSlider, 60),
+  });
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
     try {
       const saved = await saveSettings({
-        poi_protected_sec: getPoiProtectedSecFromSlider(),
+        poi_protected_start_sec: getPoiProtectedSecFromSlider(poiProtectedStartSlider, 60),
+        poi_protected_end_sec: getPoiProtectedSecFromSlider(poiProtectedEndSlider, 60),
       });
-      applyPoiProtectedSec(saved.poi_protected_sec ?? 60, saved.poi_protected_label);
+      applyPoiProtectedTimes(saved);
       if (statusMessage) statusMessage.textContent = "保存しました";
       hideLockMessage();
     } catch (err) {
@@ -602,7 +627,10 @@ bgOpacitySlider?.addEventListener("input", () => {
   scheduleBackgroundSave();
 });
 
-poiProtectedSlider?.addEventListener("input", () => {
+poiProtectedStartSlider?.addEventListener("input", () => {
+  schedulePoiProtectedSave();
+});
+poiProtectedEndSlider?.addEventListener("input", () => {
   schedulePoiProtectedSave();
 });
 

@@ -127,7 +127,7 @@
         <span data-poi-count class="text-xs font-medium text-slate-500">申し出 0 · 受理 0</span>
       </div>
       <p data-poi-hint class="text-[0.65rem] text-slate-400 mt-1.5">
-        相手側が押します。{% if poi_config.protectedSec %}最初と最後の{{ poi_config.protectedLabel }}は保護時間です。{% else %}保護時間はありません。{% endif %}POI中もスピーカーの持ち時間は止まりません（最長15秒）。
+        相手側が押します。{{ poi_config.hintClause }}POI中もスピーカーの持ち時間は止まりません（最長15秒）。
       </p>
       <div data-poi-overlay class="hidden poi-overlay mt-3 rounded-xl px-4 py-3">
         <div data-poi-overlay-offered class="hidden">
@@ -273,7 +273,7 @@
   window.DEBATE_AI_TEXT_VISIBLE_DEFAULT = {{ ai_text_visible_default | tojson }};
   window.DEBATE_POI = {{ poi_config | tojson }};
 </script>
-<script src="{{ url_for('static', filename='debate/js/progress.js', v='20260929b') }}"></script>
+<script src="{{ url_for('static', filename='debate/js/progress.js', v='20260929c') }}"></script>
 {% if session.mode == 'solo' %}
 <script src="{{ url_for('static', filename='debate/js/solo.js', v='20260921a') }}"></script>
 {% endif %}

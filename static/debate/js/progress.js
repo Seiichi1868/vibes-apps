@@ -12,14 +12,25 @@
   const SPEECH_SUPPORTED = Boolean(SpeechRecognitionImpl);
   const POI_CONFIG = window.DEBATE_POI || {
     allowedParts: ["PM", "LO", "MG", "MO"],
-    protectedSec: 60,
+    protectedStartSec: 60,
+    protectedEndSec: 60,
     durationSec: 15,
     offerTimeoutSec: 8,
   };
 
-  function poiProtectedSec() {
-    const n = Number(POI_CONFIG.protectedSec);
-    return Number.isFinite(n) ? Math.max(0, n) : 60;
+  function poiProtectedSideSec(key, fallbackKey) {
+    const n = Number(POI_CONFIG[key]);
+    if (Number.isFinite(n)) return Math.max(0, n);
+    const legacy = Number(POI_CONFIG[fallbackKey]);
+    return Number.isFinite(legacy) ? Math.max(0, legacy) : 60;
+  }
+
+  function poiProtectedStartSec() {
+    return poiProtectedSideSec("protectedStartSec", "protectedSec");
+  }
+
+  function poiProtectedEndSec() {
+    return poiProtectedSideSec("protectedEndSec", "protectedSec");
   }
 
   function formatPoiProtectedLabel(sec) {
@@ -30,11 +41,19 @@
   }
 
   function poiProtectedHint() {
-    const sec = poiProtectedSec();
-    if (sec <= 0) {
-      return "相手側が押します。保護時間はありません。POI中もスピーカーの持ち時間は止まりません（最長15秒）。";
+    const start = poiProtectedStartSec();
+    const end = poiProtectedEndSec();
+    let clause = "保護時間はありません。";
+    if (start > 0 && end > 0) {
+      clause = start === end
+        ? `最初と最後の${formatPoiProtectedLabel(start)}は保護時間です。`
+        : `最初の${formatPoiProtectedLabel(start)}と最後の${formatPoiProtectedLabel(end)}は保護時間です。`;
+    } else if (start > 0) {
+      clause = `最初の${formatPoiProtectedLabel(start)}は保護時間です。`;
+    } else if (end > 0) {
+      clause = `最後の${formatPoiProtectedLabel(end)}は保護時間です。`;
     }
-    return `相手側が押します。最初と最後の${formatPoiProtectedLabel(sec)}は保護時間です。POI中もスピーカーの持ち時間は止まりません（最長15秒）。`;
+    return `相手側が押します。${clause}POI中もスピーカーの持ち時間は止まりません（最長15秒）。`;
   }
 
   const cards = Array.from(document.querySelectorAll(".part-card"));
@@ -379,14 +398,13 @@
     if (state.poiPhase === "offered") return "offered";
     if (state.poiPhase === "active") return "active";
     if (state.timerPaused) return "paused";
-    const protectedSec = poiProtectedSec();
-    if (protectedSec <= 0) return "open";
+    const startSec = poiProtectedStartSec();
+    const endSec = poiProtectedEndSec();
     const elapsed = getElapsedSeconds(part);
     const timeLimit = Number(card.dataset.timeLimit || 0);
     const remaining = timeLimit - elapsed;
-    if (elapsed < protectedSec || remaining <= protectedSec) {
-      return "protected";
-    }
+    if (elapsed < startSec) return "protected";
+    if (endSec > 0 && remaining <= endSec) return "protected";
     return "open";
   }
 
@@ -523,10 +541,10 @@
     const state = cardState.get(part) || {};
     const status = card.dataset.status;
     if (status === "recording" && state.poiPhase === "offered") {
-      const protectedSec = poiProtectedSec();
-      if (protectedSec > 0) {
+      const endSec = poiProtectedEndSec();
+      if (endSec > 0) {
         const remaining = Number(card.dataset.timeLimit || 0) - getElapsedSeconds(part);
-        if (remaining <= protectedSec) {
+        if (remaining <= endSec) {
           closePoiOffer(card, "timeout");
           return;
         }
