@@ -9,7 +9,7 @@ import os
 import re
 import time
 
-from debate.config import PART_ORDER, PART_ROLES
+from debate.config import PART_ORDER, PART_ROLES, POI_ALLOWED_PARTS
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +85,14 @@ Point 2 の理由・具体例は、GovはPM+MG、OppはLO+MOをセットで見�
 システム側で計算済みのelapsed_sec / time_limit_secが渡されるので、判定不要です。
 超過が著しい場合のみ、part_feedbackで軽く言及してください。
 speaker が "ai" のパートはタイムマネジメントの対象外です（elapsed_sec は null）。
+
+# POI（Point of Information）
+PM / LO / MG / MO では、保護時間（最初と最後の1分）を除き相手がPOIを出せます。
+LOR / PMR（Reply）ではPOIは不可です。POI中もスピーカーの持ち時間は止まりません。1回あたり最長15秒です。
+payload の各パートに poi（allowed / offered / accepted / events）が付きます。
+- 勝敗判定と standing points の根拠に、POIの回数は使わないでください。
+- POIを出さなかった／取らなかったことを減点しないでください（授業練習のため任意です）。
+- 文字起こしからPOIの質問と応答が読み取れる場合のみ、part_feedbackで短く触れてよいです。
 
 # 話者について
 一部のパートは練習用AIが担当しています。payload の各パートに speaker ("human" または "ai") が付きます。
@@ -180,6 +188,8 @@ def build_judge_payload(session: dict) -> dict:
         part_data = parts_by_name.get(part_name) or {}
         speaker = part_data.get("speaker") or "human"
         elapsed = None if speaker == "ai" else part_data.get("elapsed_sec")
+        pois = part_data.get("pois") if isinstance(part_data.get("pois"), list) else []
+        accepted = sum(1 for item in pois if isinstance(item, dict) and item.get("status") == "accepted")
         parts_payload.append(
             {
                 "part": part_name,
@@ -188,6 +198,12 @@ def build_judge_payload(session: dict) -> dict:
                 "transcript_edited": part_data.get("transcript_edited", ""),
                 "elapsed_sec": elapsed,
                 "time_limit_sec": part_data.get("time_limit_sec"),
+                "poi": {
+                    "allowed": part_name in POI_ALLOWED_PARTS,
+                    "offered": len(pois),
+                    "accepted": accepted,
+                    "events": pois,
+                },
             }
         )
     return {

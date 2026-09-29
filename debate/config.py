@@ -60,6 +60,14 @@ DEFAULT_AI_DIFFICULTY = "normal"
 GOV_PARTS = ("PM", "MG", "PMR")
 OPP_PARTS = ("LO", "MO", "LOR")
 
+# POI（Point of Information）: 建設的スピーチのみ。Reply（LOR/PMR）は不可。
+# 保護時間は最初と最後の1分。POI中もスピーカーの持ち時間は止まらない。
+POI_ALLOWED_PARTS = ("PM", "LO", "MG", "MO")
+POI_PROTECTED_SEC = 60
+POI_DURATION_SEC = 15
+POI_OFFER_TIMEOUT_SEC = 8
+POI_STATUSES = ("accepted", "declined", "timeout")
+
 MAX_AUDIO_BYTES = 25 * 1024 * 1024  # Whisper API の上限に合わせる
 ALLOWED_AUDIO_EXTENSIONS = {"webm", "wav", "mp3", "m4a", "ogg", "mp4", "mpeg", "mpga"}
 

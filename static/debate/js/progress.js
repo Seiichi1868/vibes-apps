@@ -10,6 +10,12 @@
     : ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
   const SpeechRecognitionImpl = window.SpeechRecognition || window.webkitSpeechRecognition;
   const SPEECH_SUPPORTED = Boolean(SpeechRecognitionImpl);
+  const POI_CONFIG = window.DEBATE_POI || {
+    allowedParts: ["PM", "LO", "MG", "MO"],
+    protectedSec: 60,
+    durationSec: 15,
+    offerTimeoutSec: 8,
+  };
 
   const cards = Array.from(document.querySelectorAll(".part-card"));
   const staleBanner = document.getElementById("stale-recording-banner");
@@ -317,6 +323,242 @@
     return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   }
 
+  function isPoiPart(part) {
+    return (POI_CONFIG.allowedParts || []).includes(part);
+  }
+
+  function readStoredPois(card) {
+    try {
+      const parsed = JSON.parse(card.dataset.pois || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function writeStoredPois(card, pois) {
+    card.dataset.pois = JSON.stringify(pois || []);
+  }
+
+  function poiCounts(pois) {
+    const list = Array.isArray(pois) ? pois : [];
+    const accepted = list.filter((item) => item && item.status === "accepted").length;
+    return { offered: list.length, accepted };
+  }
+
+  function formatPoiSummary(pois) {
+    const { offered, accepted } = poiCounts(pois);
+    if (!offered) return "";
+    return `POI 申し出 ${offered} · 受理 ${accepted}`;
+  }
+
+  function poiWindowKind(card) {
+    const part = card.dataset.part;
+    if (!isPoiPart(part) || card.dataset.status !== "recording") return "hidden";
+    const state = cardState.get(part) || {};
+    if (state.poiPhase === "offered") return "offered";
+    if (state.poiPhase === "active") return "active";
+    if (state.timerPaused) return "paused";
+    const elapsed = getElapsedSeconds(part);
+    const timeLimit = Number(card.dataset.timeLimit || 0);
+    const remaining = timeLimit - elapsed;
+    if (elapsed < (POI_CONFIG.protectedSec || 60) || remaining <= (POI_CONFIG.protectedSec || 60)) {
+      return "protected";
+    }
+    return "open";
+  }
+
+  function playPoiCue(kind) {
+    if (kind === "offer") playBeepSequence(3, 0.16);
+    else if (kind === "accept") playBeep(0, 1046, 0.18, 0.32);
+    else playBeep(0, 523, 0.12, 0.28);
+  }
+
+  function clearPoiTimers(state) {
+    if (state.offerTimeoutId) {
+      clearTimeout(state.offerTimeoutId);
+      state.offerTimeoutId = null;
+    }
+    if (state.activeTimeoutId) {
+      clearTimeout(state.activeTimeoutId);
+      state.activeTimeoutId = null;
+    }
+  }
+
+  function recordPoiEvent(card, event) {
+    const part = card.dataset.part;
+    const state = cardState.get(part) || {};
+    if (!Array.isArray(state.pois)) state.pois = [];
+    state.pois.push(event);
+    cardState.set(part, state);
+    writeStoredPois(card, state.pois);
+  }
+
+  function closePoiOffer(card, status) {
+    const part = card.dataset.part;
+    const state = cardState.get(part) || {};
+    if (state.poiPhase !== "offered") return;
+    clearPoiTimers(state);
+    const offeredAt = state.poiOfferedAtSec ?? getElapsedSeconds(part);
+    state.poiPhase = null;
+    state.poiOfferedAtSec = null;
+    cardState.set(part, state);
+    recordPoiEvent(card, {
+      offered_at_sec: offeredAt,
+      status,
+      duration_sec: 0,
+      ended_at_sec: offeredAt,
+    });
+    if (status !== "accepted") playPoiCue("decline");
+    updatePoiUi(card);
+  }
+
+  function endActivePoi(card) {
+    const part = card.dataset.part;
+    const state = cardState.get(part) || {};
+    if (state.poiPhase !== "active") return;
+    clearPoiTimers(state);
+    const offeredAt = state.poiOfferedAtSec ?? getElapsedSeconds(part);
+    const startedAt = state.poiActiveStartedAt || Date.now();
+    const duration = Math.max(1, Math.min(
+      POI_CONFIG.durationSec || 15,
+      Math.round((Date.now() - startedAt) / 1000)
+    ));
+    const endedAt = getElapsedSeconds(part);
+    state.poiPhase = null;
+    state.poiOfferedAtSec = null;
+    state.poiActiveStartedAt = null;
+    cardState.set(part, state);
+    recordPoiEvent(card, {
+      offered_at_sec: offeredAt,
+      status: "accepted",
+      duration_sec: duration,
+      ended_at_sec: endedAt,
+    });
+    playPoiCue("decline");
+    updatePoiUi(card);
+  }
+
+  function finalizePoiOnStop(card) {
+    const part = card.dataset.part;
+    const state = cardState.get(part) || {};
+    if (state.poiPhase === "offered") closePoiOffer(card, "declined");
+    else if (state.poiPhase === "active") endActivePoi(card);
+  }
+
+  function offerPoi(card) {
+    const part = card.dataset.part;
+    if (poiWindowKind(card) !== "open") return;
+    const state = cardState.get(part) || {};
+    state.poiPhase = "offered";
+    state.poiOfferedAtSec = getElapsedSeconds(part);
+    clearPoiTimers(state);
+    state.offerTimeoutId = setTimeout(() => {
+      closePoiOffer(card, "timeout");
+    }, (POI_CONFIG.offerTimeoutSec || 8) * 1000);
+    cardState.set(part, state);
+    playPoiCue("offer");
+    setError(card, "");
+    updatePoiUi(card);
+  }
+
+  function acceptPoi(card) {
+    const part = card.dataset.part;
+    const state = cardState.get(part) || {};
+    if (state.poiPhase !== "offered") return;
+    clearPoiTimers(state);
+    state.poiPhase = "active";
+    state.poiActiveStartedAt = Date.now();
+    state.activeTimeoutId = setTimeout(() => {
+      endActivePoi(card);
+    }, (POI_CONFIG.durationSec || 15) * 1000);
+    cardState.set(part, state);
+    playPoiCue("accept");
+    updatePoiUi(card);
+  }
+
+  function resetPoiRuntime(card) {
+    const part = card.dataset.part;
+    const state = cardState.get(part) || {};
+    clearPoiTimers(state);
+    state.poiPhase = null;
+    state.poiOfferedAtSec = null;
+    state.poiActiveStartedAt = null;
+    state.pois = [];
+    cardState.set(part, state);
+    writeStoredPois(card, []);
+  }
+
+  function updatePoiUi(card) {
+    const panel = card.querySelector("[data-poi-panel]");
+    const summary = card.querySelector("[data-poi-summary]");
+    if (!panel) {
+      if (summary) summary.classList.add("hidden");
+      return;
+    }
+
+    const part = card.dataset.part;
+    const state = cardState.get(part) || {};
+    const status = card.dataset.status;
+    if (status === "recording" && state.poiPhase === "offered") {
+      const remaining = Number(card.dataset.timeLimit || 0) - getElapsedSeconds(part);
+      if (remaining <= (POI_CONFIG.protectedSec || 60)) {
+        closePoiOffer(card, "timeout");
+        return;
+      }
+    }
+    const pois = Array.isArray(state.pois) ? state.pois : readStoredPois(card);
+    const { offered, accepted } = poiCounts(pois);
+    const kind = poiWindowKind(card);
+    const windowEl = panel.querySelector("[data-poi-window]");
+    const offerBtn = panel.querySelector("[data-poi-offer]");
+    const countEl = panel.querySelector("[data-poi-count]");
+    const overlay = panel.querySelector("[data-poi-overlay]");
+    const offeredView = panel.querySelector("[data-poi-overlay-offered]");
+    const activeView = panel.querySelector("[data-poi-overlay-active]");
+    const countdownEl = panel.querySelector("[data-poi-countdown]");
+
+    const recording = status === "recording";
+    panel.classList.toggle("hidden", !recording);
+    if (countEl) countEl.textContent = `申し出 ${offered} · 受理 ${accepted}`;
+
+    const labels = {
+      hidden: "保護時間",
+      protected: "保護時間",
+      paused: "一時停止中",
+      open: "POI可",
+      offered: "POI待ち",
+      active: "POI進行中",
+    };
+    if (windowEl) {
+      windowEl.textContent = labels[kind] || "保護時間";
+      windowEl.className = `poi-window-pill poi-window-${kind}`;
+    }
+    if (offerBtn) {
+      const canOffer = kind === "open";
+      offerBtn.disabled = !canOffer;
+      offerBtn.classList.toggle("is-open", canOffer);
+    }
+
+    const showOverlay = recording && (kind === "offered" || kind === "active");
+    overlay?.classList.toggle("hidden", !showOverlay);
+    offeredView?.classList.toggle("hidden", kind !== "offered");
+    activeView?.classList.toggle("hidden", kind !== "active");
+    if (kind === "active" && countdownEl && state.poiActiveStartedAt) {
+      const remain = Math.max(
+        0,
+        Math.ceil((POI_CONFIG.durationSec || 15) - (Date.now() - state.poiActiveStartedAt) / 1000)
+      );
+      countdownEl.textContent = `0:${String(remain).padStart(2, "0")}`;
+    }
+
+    if (summary) {
+      const text = !recording ? formatPoiSummary(pois) : "";
+      summary.textContent = text;
+      summary.classList.toggle("hidden", !text);
+    }
+  }
+
   function setError(card, message) {
     const el = card.querySelector(".part-error");
     if (!message) {
@@ -466,6 +708,7 @@
 
     cardState.set(part, state);
     refreshOverallProgress();
+    updatePoiUi(card);
   }
 
   function freezeElapsed(part) {
@@ -549,6 +792,7 @@
         }, 1000);
       }
       cardState.set(part, s);
+      updatePoiUi(card);
     }, 500);
 
     state.intervalId = intervalId;
@@ -562,6 +806,7 @@
     state.timerPaused = false;
     state.cuesFired = { oneMin: false, thirtySec: false };
     cardState.set(part, state);
+    resetPoiRuntime(card);
     startTimerInterval(card);
   }
 
@@ -703,6 +948,10 @@
 
   function handlePauseClick(card) {
     const state = cardState.get(card.dataset.part) || {};
+    if (state.poiPhase) {
+      setError(card, "POIの対応が終わるまで一時停止できません。");
+      return;
+    }
     if (state.timerPaused) resumeRecording(card);
     else pauseRecording(card);
   }
@@ -728,6 +977,7 @@
     }
     cardState.set(part, state);
     hideLiveMonitor(card);
+    updatePoiUi(card);
   }
 
   async function submitRealtimeTranscript(card, transcriptRaw, elapsedSec) {
@@ -737,7 +987,11 @@
       const res = await fetch(`/debate/api/sessions/${SESSION_ID}/parts/${part}/transcript`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transcript_raw: transcriptRaw, elapsed_sec: elapsedSec }),
+        body: JSON.stringify({
+          transcript_raw: transcriptRaw,
+          elapsed_sec: elapsedSec,
+          pois: (cardState.get(part) || {}).speakingPois || [],
+        }),
       });
       const data = await res.json();
 
@@ -767,10 +1021,12 @@
 
   function handleStopClick(card) {
     const part = card.dataset.part;
+    finalizePoiOnStop(card);
     const state = cardState.get(part) || {};
     const mode = state.recordingMode || getEffectiveMode();
     const elapsedSec = getElapsedSeconds(part);
     state.speakingElapsedSec = elapsedSec;
+    state.speakingPois = Array.isArray(state.pois) ? state.pois.slice() : [];
     cardState.set(part, state);
 
     if (mode === "realtime") {
@@ -884,6 +1140,8 @@
     formData.append("audio", blob, `${part}.${extensionFor(mimeType)}`);
     const elapsedSec = (cardState.get(part) || {}).speakingElapsedSec;
     if (elapsedSec != null) formData.append("elapsed_sec", String(elapsedSec));
+    const pois = (cardState.get(part) || {}).speakingPois;
+    if (pois) formData.append("pois", JSON.stringify(pois));
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
@@ -994,6 +1252,8 @@
       window.DebateLocalAudio?.remove(SESSION_ID, part);
       card.dataset.status = data.status;
       card.dataset.elapsed = "";
+      writeStoredPois(card, []);
+      resetPoiRuntime(card);
       setError(card, "");
       renderCard(card);
     } catch (err) {
@@ -1017,6 +1277,7 @@
         window.DebateLocalAudio?.remove(SESSION_ID, part);
         card.dataset.status = data.status;
         card.dataset.elapsed = "";
+        writeStoredPois(card, []);
         renderCard(card);
         staleBanner.classList.remove("hidden");
       }
@@ -1033,6 +1294,10 @@
     card.querySelector(".btn-reset").addEventListener("click", () => handleResetClick(card));
     card.querySelector(".btn-review").addEventListener("click", () => handleReviewClick(card));
     card.querySelector(".btn-save")?.addEventListener("click", () => handleSavePartClick(card));
+    card.querySelector("[data-poi-offer]")?.addEventListener("click", () => offerPoi(card));
+    card.querySelector("[data-poi-accept]")?.addEventListener("click", () => acceptPoi(card));
+    card.querySelector("[data-poi-decline]")?.addEventListener("click", () => closePoiOffer(card, "declined"));
+    card.querySelector("[data-poi-end]")?.addEventListener("click", () => endActivePoi(card));
 
     if (card.dataset.status === "recording") {
       // ページ再読み込みでMediaRecorderの実体は失われているため、サーバー側もリセットする

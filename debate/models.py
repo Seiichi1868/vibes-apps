@@ -6,6 +6,8 @@ from debate.config import (
     DEFAULT_AI_DIFFICULTY,
     PART_DEFS,
     PART_ORDER,
+    POI_DURATION_SEC,
+    POI_STATUSES,
 )
 
 JST = timezone(timedelta(hours=9))
@@ -34,6 +36,7 @@ def new_part(part: str, *, speaker: str = "human") -> dict:
         "end_time": None,
         "time_limit_sec": defaults["time_limit_sec"],
         "elapsed_sec": None,
+        "pois": [],
         "status": "not_started",
         "generation_status": "idle" if is_ai else None,
         "generation_error": None,
@@ -149,4 +152,47 @@ def normalize_session(session: dict | None) -> dict | None:
             part_data.setdefault("generation_error", None)
             part_data.setdefault("tts_status", None)
             part_data.setdefault("tts_audio_file", None)
+        part_data["pois"] = normalize_pois(part_data.get("pois"))
     return session
+
+
+def normalize_pois(raw) -> list:
+    """POI記録を安全なリストに正規化する。文字列JSONも受け付ける。"""
+    if isinstance(raw, str):
+        import json
+
+        try:
+            raw = json.loads(raw)
+        except (TypeError, ValueError):
+            return []
+    if not isinstance(raw, list):
+        return []
+
+    out = []
+    for item in raw[:20]:
+        if not isinstance(item, dict):
+            continue
+        status = str(item.get("status") or "").strip()
+        if status not in POI_STATUSES:
+            continue
+        try:
+            offered_at = int(item.get("offered_at_sec", 0) or 0)
+        except (TypeError, ValueError):
+            continue
+        try:
+            duration = int(item.get("duration_sec", 0) or 0)
+        except (TypeError, ValueError):
+            duration = 0
+        try:
+            ended_at = int(item.get("ended_at_sec", offered_at) or offered_at)
+        except (TypeError, ValueError):
+            ended_at = offered_at
+        out.append(
+            {
+                "offered_at_sec": max(0, offered_at),
+                "status": status,
+                "duration_sec": max(0, min(duration, POI_DURATION_SEC + 5)),
+                "ended_at_sec": max(0, ended_at),
+            }
+        )
+    return out

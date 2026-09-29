@@ -27,11 +27,15 @@ from debate.config import (
     PART_LABELS,
     PART_ORDER,
     PART_ROLES,
+    POI_ALLOWED_PARTS,
+    POI_DURATION_SEC,
+    POI_OFFER_TIMEOUT_SEC,
+    POI_PROTECTED_SEC,
     STATUS_LABELS,
     ensure_dirs,
 )
 from debate.judge_jobs import start_judge_job
-from debate.models import new_judge_result, new_session, now_iso
+from debate.models import new_judge_result, new_session, normalize_pois, now_iso
 from debate.settings import load_settings, resolve_background
 from debate.solo import (
     CONFLICT,
@@ -149,12 +153,22 @@ def _background_context() -> dict:
     }
 
 
+def _poi_config() -> dict:
+    return {
+        "allowedParts": list(POI_ALLOWED_PARTS),
+        "protectedSec": POI_PROTECTED_SEC,
+        "durationSec": POI_DURATION_SEC,
+        "offerTimeoutSec": POI_OFFER_TIMEOUT_SEC,
+    }
+
+
 def _part_meta() -> dict:
     return {
         part: {
             "label": PART_LABELS[part],
             "role": PART_ROLES[part],
             "guide": PART_GUIDES[part],
+            "poi_allowed": part in POI_ALLOWED_PARTS,
         }
         for part in PART_ORDER
     }
@@ -269,6 +283,7 @@ def progress_screen(session_id):
         part_order=PART_ORDER,
         status_labels=STATUS_LABELS,
         ai_text_visible_default=AI_TEXT_VISIBLE_DEFAULT,
+        poi_config=_poi_config(),
         **_background_context(),
     )
 
@@ -289,6 +304,7 @@ def start_part(session_id, part):
         part_data["start_time"] = datetime.now(JST).isoformat(timespec="seconds")
         part_data["end_time"] = None
         part_data["elapsed_sec"] = None
+        part_data["pois"] = []
         part_data["status"] = "recording"
         save_session(session)
         return jsonify(part_data)
@@ -378,6 +394,7 @@ def upload_part_audio(session_id, part):
         part_data["elapsed_sec"] = _resolve_elapsed_sec(
             part_data, request.form.get("elapsed_sec"), end_time
         )
+        part_data["pois"] = normalize_pois(request.form.get("pois"))
 
         part_data["status"] = "transcribing"
         part_data["transcription_mode"] = "batch"
@@ -417,6 +434,7 @@ def submit_part_transcript(session_id, part):
         part_data["elapsed_sec"] = _resolve_elapsed_sec(
             part_data, payload.get("elapsed_sec"), end_time
         )
+        part_data["pois"] = normalize_pois(payload.get("pois"))
 
         part_data["status"] = "needs_review"
         save_session(session)
@@ -542,6 +560,7 @@ def reset_part(session_id, part):
                 "start_time": None,
                 "end_time": None,
                 "elapsed_sec": None,
+                "pois": [],
                 "status": "not_started",
             }
         )

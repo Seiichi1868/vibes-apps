@@ -46,6 +46,26 @@
     </div>
   </div>
 
+  {% set pois = part.pois or [] %}
+  {% if pois %}
+  {% set accepted_pois = pois | selectattr('status', 'equalto', 'accepted') | list %}
+  <div class="mb-4 rounded-xl border border-rose-100 bg-rose-50/70 px-3 py-2.5">
+    <p class="text-xs font-semibold text-rose-800">
+      POI 申し出 {{ pois | length }} · 受理 {{ accepted_pois | length }}
+    </p>
+    <ul class="mt-1.5 space-y-0.5 text-[0.7rem] text-slate-600">
+      {% for poi in pois %}
+      <li>
+        {{ '%d:%02d' % (poi.offered_at_sec // 60, poi.offered_at_sec % 60) }} —
+        {% if poi.status == 'accepted' %}受理（{{ poi.duration_sec }}秒）
+        {% elif poi.status == 'timeout' %}応答なし（却下）
+        {% else %}却下{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
   {% if part.transcript_raw %}
   <details class="mb-4 text-sm">
     <summary class="cursor-pointer font-semibold text-slate-600">Whisperによる文字起こし（原文）を表示</summary>

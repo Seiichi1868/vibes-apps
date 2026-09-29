@@ -179,6 +179,10 @@
         <span class="text-sm font-bold text-slate-800">{{ part_meta[pf.part].label }}</span>
         {% if part_data %}<span class="status-pill side-badge-{{ part_data.side }}">{{ part_data.side }}</span>{% endif %}
         {% if session.mode == 'solo' %}<span class="text-[0.65rem] font-semibold text-teal-800">あなたのパート</span>{% endif %}
+        {% set pois = (part_data.pois if part_data else None) or [] %}
+        {% if pois %}
+        <span class="text-[0.65rem] text-slate-400">POI 受理 {{ pois | selectattr('status', 'equalto', 'accepted') | list | length }}/{{ pois | length }}</span>
+        {% endif %}
       </div>
       <p class="text-sm text-slate-600 leading-relaxed">{{ pf.comment or '（コメントなし）' }}</p>
     </div>

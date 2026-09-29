@@ -30,9 +30,9 @@
   </div>
   <p class="text-[0.7rem] text-slate-400 mt-2">
     {% if session.mode == 'solo' %}
-    自分のパートを確定すると、相手AIが次の発話を準備します。前のパートが終わるまで次の録音はできません。途中で閉じても、同じ端末のトップ画面から再開できます。
+    自分のパートを確定すると、相手AIが次の発話を準備します。前のパートが終わるまで次の録音はできません。途中で閉じても、同じ端末のトップ画面から再開できます。建設的スピーチ（PM/LO/MG/MO）では、最初と最後の1分を除き<strong class="text-slate-500">POI</strong>（短い質問）を練習できます。
     {% else %}
-    各パートは録音・保存のたびに自動保存されます。文字起こし中でも<strong class="text-slate-500">次のパートの録音はすぐ始められます</strong>。騒音などで止めたいときは<strong class="text-slate-500">一時停止</strong>すると経過時間も止まります。途中で閉じても、同じ端末のトップ画面から再開できます。
+    各パートは録音・保存のたびに自動保存されます。文字起こし中でも<strong class="text-slate-500">次のパートの録音はすぐ始められます</strong>。騒音などで止めたいときは<strong class="text-slate-500">一時停止</strong>すると経過時間も止まります。建設的スピーチ（PM/LO/MG/MO）では、最初と最後の1分を除き相手が<strong class="text-slate-500">POI</strong>（短い質問）を出せます。ReplyではPOI不可です。途中で閉じても、同じ端末のトップ画面から再開できます。
     {% endif %}
   </p>
   <div id="save-toast" class="hidden mt-2 text-xs font-medium text-emerald-700"></div>
@@ -66,6 +66,8 @@
     data-elapsed="{{ part.elapsed_sec if part.elapsed_sec is not none else '' }}"
     data-transcript-error="{{ part.transcript_error or '' }}"
     data-end-time="{{ part.end_time or '' }}"
+    data-poi-allowed="{{ '1' if meta.poi_allowed else '0' }}"
+    data-pois='{{ (part.pois or []) | tojson }}'
   >
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div class="flex items-start gap-3">
@@ -114,6 +116,47 @@
         一時停止中です。経過時間は止まっています。環境が整ったら「録音を再開」を押してください。
       </p>
     </div>
+    {% if meta.poi_allowed %}
+    <div class="hidden mt-4 poi-panel" data-poi-panel>
+      <div class="flex flex-wrap items-center gap-2">
+        <span data-poi-window class="poi-window-pill">保護時間</span>
+        <button type="button" data-poi-offer
+          class="btn-poi px-4 py-2 rounded-lg bg-rose-600 text-white text-sm font-bold shadow hover:bg-rose-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none">
+          POI
+        </button>
+        <span data-poi-count class="text-xs font-medium text-slate-500">申し出 0 · 受理 0</span>
+      </div>
+      <p data-poi-hint class="text-[0.65rem] text-slate-400 mt-1.5">
+        相手側が押します。最初と最後の1分は保護時間です。POI中もスピーカーの持ち時間は止まりません（最長15秒）。
+      </p>
+      <div data-poi-overlay class="hidden poi-overlay mt-3 rounded-xl px-4 py-3">
+        <div data-poi-overlay-offered class="hidden">
+          <p class="text-[0.68rem] font-bold uppercase tracking-wide text-rose-700">Point of Information</p>
+          <p class="text-sm text-slate-700 mt-1">相手が質問を申し出ています。スピーカーは受理または却下してください。</p>
+          <div class="flex flex-wrap gap-2 mt-3">
+            <button type="button" data-poi-accept
+              class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold shadow hover:bg-emerald-700 transition-colors">
+              受理（Yes, please）
+            </button>
+            <button type="button" data-poi-decline
+              class="px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors">
+              却下（No, thank you）
+            </button>
+          </div>
+        </div>
+        <div data-poi-overlay-active class="hidden">
+          <p class="text-[0.68rem] font-bold uppercase tracking-wide text-rose-700">POI 進行中</p>
+          <p class="poi-countdown mt-1" data-poi-countdown>0:15</p>
+          <p class="text-xs text-slate-600 mt-1">質問は15秒以内。スピーカーの持ち時間は止まっていません。</p>
+          <button type="button" data-poi-end
+            class="mt-3 px-4 py-2 rounded-lg border border-rose-200 bg-white text-rose-700 text-sm font-semibold hover:bg-rose-50 transition-colors">
+            POI終了
+          </button>
+        </div>
+      </div>
+    </div>
+    <p data-poi-summary class="hidden mt-3 text-xs font-medium text-slate-500"></p>
+    {% endif %}
     {% endif %}
 
     <div class="flex flex-wrap items-center gap-2 mt-4{% if part.speaker == 'ai' %} hidden{% endif %}" data-human-controls>
@@ -228,8 +271,9 @@
   window.DEBATE_AI_DIFFICULTY = {{ (session.ai_difficulty or '') | tojson }};
   window.DEBATE_PART_ORDER = {{ part_order | tojson }};
   window.DEBATE_AI_TEXT_VISIBLE_DEFAULT = {{ ai_text_visible_default | tojson }};
+  window.DEBATE_POI = {{ poi_config | tojson }};
 </script>
-<script src="{{ url_for('static', filename='debate/js/progress.js', v='20260919g') }}"></script>
+<script src="{{ url_for('static', filename='debate/js/progress.js', v='20260929a') }}"></script>
 {% if session.mode == 'solo' %}
 <script src="{{ url_for('static', filename='debate/js/solo.js', v='20260921a') }}"></script>
 {% endif %}
