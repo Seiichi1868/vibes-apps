@@ -178,11 +178,13 @@
     object-fit: contain;
   }
   #view-warmup.is-reveal-pending,
-  #view-postview.is-reveal-pending {
+  #view-postview.is-reveal-pending,
+  #view-writing.is-reveal-pending {
     cursor: pointer;
   }
   #view-warmup,
-  #view-postview {
+  #view-postview,
+  #view-writing {
     touch-action: none;
     overscroll-behavior: none;
   }
@@ -382,6 +384,6 @@
   window.SCREEN_INITIAL_CLASS_ID = {{ initial_class_id|tojson }};
   window.SCREEN_CLASSES = {{ classes|tojson }};
 </script>
-<script src="{{ url_for('static', filename='news/js/i18n.js', v='20260929b') }}"></script>
-<script src="{{ url_for('static', filename='news/js/screen.js', v='20260929c') }}"></script>
+<script src="{{ url_for('static', filename='news/js/i18n.js', v='20260929d') }}"></script>
+<script src="{{ url_for('static', filename='news/js/screen.js', v='20260929d') }}"></script>
 {% endblock %}

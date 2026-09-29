@@ -36,6 +36,7 @@
     warmup: { questions: [], step: 0, imageUrl: "" },
     postview: { questions: [], step: 0, imageUrl: "" },
   };
+  const writingReveal = { topics: [], step: 0 };
   let youtubeApiPlayer = null;
   let youtubeApiReadyPromise = null;
   let activePlayerSubtitles = null;
@@ -331,6 +332,10 @@
     return kind === "warmup" ? warmupContent : postviewContent;
   }
 
+  function isStepRevealView(view) {
+    return view === "warmup" || view === "postview" || view === "writing";
+  }
+
   function prefersTouchNav() {
     return Boolean(
       window.matchMedia &&
@@ -454,51 +459,12 @@
     renderQuestionReveal("postview");
   }
 
-  function writingTopicFontSize(count) {
-    if (count <= 1) return "clamp(2rem, 6.4vmin, 5.25rem)";
-    if (count <= 2) return "clamp(1.7rem, 5vmin, 4rem)";
-    if (count <= 3) return "clamp(1.45rem, 4vmin, 3.1rem)";
-    return "clamp(1.2rem, 3.1vmin, 2.4rem)";
+  function writingTopicFontSize() {
+    return "clamp(2rem, 6.4vmin, 5.25rem)";
   }
 
-  function renderWriting(topics) {
-    if (!writingContent) return;
-    const list = (topics || []).filter(function (topic) { return topic && topic.text; });
-    if (!list.length) {
-      writingContent.innerHTML =
-        '<p class="text-center text-slate-400">' + t("screenNoWriting") + "</p>";
-      return;
-    }
-    writingContent.style.setProperty("--warmup-q-size", writingTopicFontSize(list.length));
-    let html = '<p class="screen-warmup-heading">' + t("screenWritingHeading") + "</p>";
-    html += '<ol class="screen-warmup-list">';
-    list.forEach(function (topic, i) {
-      html += '<li class="screen-writing-item">';
-      html +=
-        '<div class="screen-warmup-q flex items-start gap-[0.35em]">' +
-        '<span class="screen-warmup-num">' + (list.length > 1 ? "T" + (i + 1) + "." : "✍️") + "</span>" +
-        '<span class="screen-warmup-text">' + escHtml(topic.text) + "</span>" +
-        "</div>";
-      if (topic.kind === "opinion" && topic.options && topic.options.length === 2) {
-        html +=
-          '<div class="screen-writing-choices">' +
-          '<span class="screen-writing-choice">' + escHtml(topic.options[0]) + "</span>" +
-          '<span class="screen-writing-or">or</span>' +
-          '<span class="screen-writing-choice">' + escHtml(topic.options[1]) + "</span>" +
-          "</div>";
-      } else {
-        html +=
-          '<div class="screen-writing-choices">' +
-          '<span class="screen-writing-answer-cue">Your answer + Why?</span>' +
-          "</div>";
-      }
-      if (topic.text_ja) {
-        html += '<p class="screen-writing-ja">' + escHtml(topic.text_ja) + "</p>";
-      }
-      html += "</li>";
-    });
-    html += "</ol>";
-    html +=
+  function writingOreoHtml() {
+    return (
       '<div class="screen-writing-oreo">' +
       '<span class="screen-writing-oreo-step"><b>O</b>Opinion</span>' +
       '<span class="screen-writing-oreo-arrow">→</span>' +
@@ -508,8 +474,101 @@
       '<span class="screen-writing-oreo-arrow">→</span>' +
       '<span class="screen-writing-oreo-step"><b>O</b>Opinion</span>' +
       '<span class="screen-writing-oreo-words">about 100 words</span>' +
+      "</div>"
+    );
+  }
+
+  function writingTopicBodyHtml(topic, index) {
+    let html = '<div class="screen-writing-item">';
+    html +=
+      '<div class="screen-warmup-q flex items-start gap-[0.35em]">' +
+      '<span class="screen-warmup-num">T' + (index + 1) + ".</span>" +
+      '<span class="screen-warmup-text">' + escHtml(topic.text) + "</span>" +
       "</div>";
+    if (topic.kind === "opinion" && topic.options && topic.options.length === 2) {
+      html +=
+        '<div class="screen-writing-choices">' +
+        '<span class="screen-writing-choice">' + escHtml(topic.options[0]) + "</span>" +
+        '<span class="screen-writing-or">or</span>' +
+        '<span class="screen-writing-choice">' + escHtml(topic.options[1]) + "</span>" +
+        "</div>";
+    } else {
+      html +=
+        '<div class="screen-writing-choices">' +
+        '<span class="screen-writing-answer-cue">Your answer + Why?</span>' +
+        "</div>";
+    }
+    if (topic.text_ja) {
+      html += '<p class="screen-writing-ja">' + escHtml(topic.text_ja) + "</p>";
+    }
+    html += "</div>";
+    return html;
+  }
+
+  function updateWritingRevealUi() {
+    if (!viewWriting || !writingContent) return;
+    const total = writingReveal.topics.length;
+    const pending = total > 0 && writingReveal.step < total;
+    viewWriting.classList.toggle("is-reveal-pending", pending);
+    const hint = writingContent.querySelector(".screen-postview-hint");
+    if (!hint) return;
+    if (!total) {
+      hint.classList.add("hidden");
+      return;
+    }
+    hint.classList.remove("hidden");
+    const hintKey = prefersTouchNav() ? "screenFlickNext" : "screenClickNext";
+    hint.textContent = t(hintKey, { shown: writingReveal.step, total: total });
+  }
+
+  function renderWritingReveal() {
+    if (!writingContent) return;
+    const list = writingReveal.topics;
+    if (!list.length) {
+      writingContent.innerHTML =
+        '<p class="text-center text-slate-400">' + t("screenNoWriting") + "</p>";
+      if (viewWriting) viewWriting.classList.remove("is-reveal-pending");
+      return;
+    }
+    writingContent.style.setProperty("--warmup-q-size", writingTopicFontSize());
+    let html = '<p class="screen-warmup-heading">' + t("screenWritingHeading") + "</p>";
+    if (writingReveal.step > 0) {
+      const index = Math.min(writingReveal.step, list.length) - 1;
+      html += '<div class="screen-qa-current">';
+      html += writingTopicBodyHtml(list[index], index);
+      html += "</div>";
+    } else {
+      html +=
+        '<p class="screen-qa-waiting">' +
+        t(prefersTouchNav() ? "screenFlickWritingToStart" : "screenWritingToStart") +
+        "</p>";
+    }
+    html += writingOreoHtml();
+    html += '<p class="screen-postview-hint"></p>';
     writingContent.innerHTML = html;
+    updateWritingRevealUi();
+  }
+
+  function revealNextWritingStep() {
+    if (currentView !== "writing") return;
+    if (writingReveal.step >= writingReveal.topics.length) return;
+    writingReveal.step += 1;
+    renderWritingReveal();
+  }
+
+  function hideLastWritingStep() {
+    if (currentView !== "writing") return;
+    if (writingReveal.step <= 0) return;
+    writingReveal.step -= 1;
+    renderWritingReveal();
+  }
+
+  function renderWriting(topics) {
+    writingReveal.topics = (topics || []).filter(function (topic) {
+      return topic && topic.text;
+    });
+    writingReveal.step = 0;
+    renderWritingReveal();
   }
 
   function getAvailableViews() {
@@ -567,6 +626,8 @@
     const defaultView =
       (availability.video && "video") ||
       (availability.warmup && "warmup") ||
+      (availability.postview && "postview") ||
+      (availability.writing && "writing") ||
       (availability.vocab && "vocab") ||
       "video";
     setActiveView(defaultView);
@@ -631,6 +692,18 @@
 
   bindQuestionRevealClick(viewWarmup, "warmup");
   bindQuestionRevealClick(viewPostview, "postview");
+  if (viewWriting) {
+    viewWriting.addEventListener("click", function (event) {
+      if (ignoreQuestionClick) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        ignoreQuestionClick = false;
+        return;
+      }
+      if (event.target && event.target.closest && event.target.closest("button, a, input, textarea")) return;
+      revealNextWritingStep();
+    });
+  }
 
   let swipeStartX = 0;
   let swipeStartY = 0;
@@ -666,12 +739,12 @@
     const dy = touch.clientY - swipeStartY;
     const absX = Math.abs(dx);
     const absY = Math.abs(dy);
-    const isQuestionView = currentView === "warmup" || currentView === "postview";
+    const isStepView = isStepRevealView(currentView);
     if (absX > 16 && absX > absY * 1.15) {
       event.preventDefault();
       return;
     }
-    if (isQuestionView && absY > 16 && absY > absX * 1.15) {
+    if (isStepView && absY > 16 && absY > absX * 1.15) {
       event.preventDefault();
     }
   }
@@ -685,15 +758,19 @@
     const dy = touch.clientY - swipeStartY;
     const absX = Math.abs(dx);
     const absY = Math.abs(dy);
-    const isQuestionView = currentView === "warmup" || currentView === "postview";
     if (absX >= 48 && absX > absY * 1.2) {
       suppressQuestionClick();
       goAdjacentView(dx < 0 ? 1 : -1);
       return;
     }
-    if (!isQuestionView) return;
+    if (!isStepRevealView(currentView)) return;
     if (absY < 48 || absY <= absX * 1.2) return;
     suppressQuestionClick();
+    if (currentView === "writing") {
+      if (dy < 0) revealNextWritingStep();
+      else hideLastWritingStep();
+      return;
+    }
     if (dy < 0) revealNextQuestionStep(currentView);
     else hideLastQuestionStep(currentView);
   }
@@ -714,6 +791,15 @@
     if (key === "ArrowLeft" || key === "ArrowRight") {
       event.preventDefault();
       goAdjacentView(key === "ArrowRight" ? 1 : -1);
+      return;
+    }
+    if (currentView === "writing") {
+      const showNext = key === " " || key === "Spacebar" || key === "ArrowDown" || key === "PageDown" || key === "Enter";
+      const hidePrev = key === "ArrowUp" || key === "PageUp";
+      if (!showNext && !hidePrev) return;
+      event.preventDefault();
+      if (hidePrev) hideLastWritingStep();
+      else revealNextWritingStep();
       return;
     }
     if (currentView !== "postview" && currentView !== "warmup") return;

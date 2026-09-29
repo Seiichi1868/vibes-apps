@@ -305,25 +305,41 @@ def _normalize_writing_topics(raw) -> list[dict]:
             selected = selected_raw.strip().lower() in {"true", "1", "yes", "on"}
         else:
             selected = bool(selected_raw)
-        items.append(
-            {
-                "id": topic_id,
-                "kind": kind,
-                "text": text,
-                "text_ja": str(entry.get("text_ja") or "").strip()[:400],
-                "options": options if kind == "opinion" else [],
-                "selected": selected,
-            }
-        )
+        item = {
+            "id": topic_id,
+            "kind": kind,
+            "text": text,
+            "text_ja": str(entry.get("text_ja") or "").strip()[:400],
+            "options": options if kind == "opinion" else [],
+            "selected": selected,
+        }
+        raw_order = entry.get("display_order")
+        try:
+            display_order = int(raw_order) if raw_order not in (None, "") else None
+        except (TypeError, ValueError):
+            display_order = None
+        if display_order is not None and display_order > 0:
+            item["display_order"] = display_order
+        items.append(item)
     return items
 
 
 def selected_writing_topics(raw, *, include_japanese: bool = True) -> list[dict]:
-    """選択済みのライティングトピックだけを、表示用の連番付きリストにする。"""
-    items: list[dict] = []
-    for topic in _normalize_writing_topics(raw):
+    """選択済みのライティングトピックだけを、指定順（なければ元の順）で表示用の連番付きリストにする。"""
+    indexed: list[tuple[int, dict]] = []
+    for index, topic in enumerate(_normalize_writing_topics(raw)):
         if not topic["selected"]:
             continue
+        indexed.append((index, topic))
+    indexed.sort(
+        key=lambda pair: (
+            pair[1].get("display_order") is None,
+            pair[1].get("display_order") or 0,
+            pair[0],
+        )
+    )
+    items: list[dict] = []
+    for _, topic in indexed:
         item = {
             "id": len(items) + 1,
             "kind": topic["kind"],

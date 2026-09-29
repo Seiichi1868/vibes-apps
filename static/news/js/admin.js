@@ -3049,11 +3049,15 @@
     const order = questionDisplayOrder(q) || "";
     const btnClass = tone === "amber"
       ? "text-amber-700 hover:text-amber-900"
+      : tone === "rose"
+      ? "text-rose-700 hover:text-rose-900"
       : "text-sky-600 hover:text-sky-800";
     const wrapClass = tone === "amber"
       ? "q-order-wrap q-order-wrap--amber border-amber-200"
+      : tone === "rose"
+      ? "q-order-wrap q-order-wrap--rose border-rose-200"
       : "q-order-wrap border-sky-200";
-    const btnLineClass = tone === "amber" ? "border-amber-100" : "border-sky-100";
+    const btnLineClass = tone === "amber" ? "border-amber-100" : tone === "rose" ? "border-rose-100" : "border-sky-100";
     return `<span class="${wrapClass} inline-flex h-[22px] w-[42px] shrink-0 overflow-hidden rounded border bg-white" title="${esc(t("displayOrder"))}">
       <input type="number" min="1" class="q-order-input w-6 min-w-0 appearance-none border-0 bg-transparent p-0 text-center text-[10px] font-bold leading-[22px] [appearance:textfield] [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none" data-index="${index}" value="${order}" title="${esc(t("displayOrder"))}">
       <span class="q-order-btns flex w-3.5 shrink-0 flex-col border-l ${btnLineClass}">
@@ -4016,6 +4020,7 @@
   function writingTopicFromRaw(raw) {
     const kind = raw && raw.kind === "opinion" ? "opinion" : "question";
     const options = Array.isArray(raw && raw.options) ? raw.options.map((o) => String(o || "")) : [];
+    const order = Number(raw && raw.display_order);
     return {
       id: raw && raw.id,
       kind,
@@ -4023,20 +4028,28 @@
       text_ja: String((raw && raw.text_ja) || ""),
       options: kind === "opinion" ? [options[0] || "Agree", options[1] || "Disagree"] : [],
       selected: raw && raw.selected === true,
+      display_order: Number.isFinite(order) && order > 0 ? order : 0,
     };
+  }
+
+  function onWritingOrderChanged() {
+    renderAdminWritingPreview(adminWritingTopics);
+    saveWritingTopics({ silent: true });
   }
 
   function renderAdminWritingPreview(topics) {
     adminWritingTopics = (topics || []).map(writingTopicFromRaw);
+    syncSelectedDisplayOrders(adminWritingTopics);
     if (!writingPreview) return;
     if (!adminWritingTopics.length) {
       writingPreview.classList.add("hidden");
       writingPreview.innerHTML = "";
       return;
     }
-    const selectedCount = adminWritingTopics.filter((topic) => topic.selected).length;
-    let html = `<p class="mb-1 font-semibold text-slate-600">トピック（スクリーン表示 ${selectedCount} / ${adminWritingTopics.length}）</p>`;
-    html += `<p class="mb-1 text-[9px] text-slate-500">チェックしたトピックが教室スクリーンに出ます（1つだけ選ぶと大きく表示されます）。</p>`;
+    const selectedCount = adminWritingTopics.filter((topic) => topic.selected && topic.text.trim()).length;
+    const totalCount = adminWritingTopics.filter((topic) => topic.text.trim()).length;
+    let html = `<p class="mb-1 font-semibold text-slate-600">${t("writingPreview", { selected: selectedCount, total: totalCount })}</p>`;
+    html += `<p class="mb-1 text-[9px] text-slate-500">${t("writingOrderHint")}</p>`;
     html += `<div class="space-y-1">`;
     adminWritingTopics.forEach((topic, index) => {
       const badge = topic.kind === "opinion"
@@ -4047,6 +4060,7 @@
         <div class="flex items-start gap-1.5">
           <input type="checkbox" class="writing-select-cb shrink-0 mt-1 h-3.5 w-3.5 rounded border-rose-200 text-rose-600"
             data-index="${index}" ${topic.selected ? "checked" : ""} title="スクリーンに表示">
+          ${questionOrderControlsHtml(index, topic, "rose")}
           <span class="shrink-0 mt-0.5 font-bold text-rose-700">T${index + 1}.</span>
           ${badge}
           <textarea rows="2" class="writing-text-input compact-input min-w-0 flex-1 resize-y text-[10px] py-0.5 leading-snug"
@@ -4072,6 +4086,7 @@
     writingPreview.querySelectorAll(".writing-select-cb").forEach((cb) => {
       cb.addEventListener("change", onWritingSelectionChange);
     });
+    bindQuestionOrderControls(writingPreview, adminWritingTopics, onWritingOrderChanged);
     writingPreview.querySelectorAll(".writing-text-input").forEach((input) => {
       input.addEventListener("input", (event) => {
         const topic = adminWritingTopics[Number(event.target.dataset.index)];
@@ -4109,6 +4124,7 @@
       writingSaveTimer = null;
     }
     writingSaving = true;
+    syncSelectedDisplayOrders(adminWritingTopics);
     try {
       const res = await fetch("/news/admin/api/class/lesson/writing/selection", {
         method: "POST",
@@ -4135,16 +4151,18 @@
       event.target.checked = !event.target.checked;
       return;
     }
-    const topic = adminWritingTopics[Number(event.target.dataset.index)];
-    if (!topic) return;
-    const previous = topic.selected;
-    topic.selected = event.target.checked;
-    const snapshot = adminWritingTopics.map((item) => ({ ...item, options: [...item.options] }));
-    renderAdminWritingPreview(snapshot);
+    const index = Number(event.target.dataset.index);
+    if (!Number.isInteger(index) || !adminWritingTopics[index]) return;
+    const previous = adminWritingTopics[index].selected;
+    const previousOrder = adminWritingTopics[index].display_order;
+    applyQuestionSelected(adminWritingTopics, index, event.target.checked);
+    renderAdminWritingPreview(adminWritingTopics);
     const ok = await saveWritingTopics({ silent: false });
     if (!ok) {
-      snapshot[Number(event.target.dataset.index)].selected = previous;
-      renderAdminWritingPreview(snapshot);
+      adminWritingTopics[index].selected = previous;
+      adminWritingTopics[index].display_order = previousOrder;
+      syncSelectedDisplayOrders(adminWritingTopics);
+      renderAdminWritingPreview(adminWritingTopics);
     }
   }
 
