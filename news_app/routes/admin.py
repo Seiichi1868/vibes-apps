@@ -46,6 +46,7 @@ from news_app.services.storage import (
     delete_class_archive,
     delete_submission,
     get_active_class_id,
+    get_archive_item,
     get_class,
     get_roster,
     get_submission,
@@ -1251,9 +1252,15 @@ def screen_link():
     if not class_id:
         return jsonify({"ok": False, "error": "クラスを選択してください。"}), 400
 
+    archive_id = (request.args.get("archive_id") or "").strip()
     base = get_public_base_url(request)
-    link = f"{base}/news/screen/?class={class_id}"
-    return jsonify({"ok": True, "link": link, "class_id": class_id})
+    if archive_id:
+        if not get_archive_item(class_id, archive_id):
+            return jsonify({"ok": False, "error": "指定されたアーカイブが見つかりません。"}), 404
+        link = f"{base}/news/screen/?class={class_id}&archive={archive_id}"
+    else:
+        link = f"{base}/news/screen/?class={class_id}"
+    return jsonify({"ok": True, "link": link, "class_id": class_id, "archive_id": archive_id})
 
 
 # ── 名簿アップロード ──────────────────────────────────────────

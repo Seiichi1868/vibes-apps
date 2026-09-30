@@ -633,7 +633,7 @@
     setActiveView(defaultView);
   }
 
-  async function loadScreen(classId) {
+  async function loadScreen(classId, archiveId) {
     if (!classId) {
       showError(t("screenNoClass"));
       return;
@@ -646,7 +646,9 @@
     }
 
     try {
-      const res = await fetch("/news/api/screen?class_id=" + encodeURIComponent(classId));
+      let url = "/news/api/screen?class_id=" + encodeURIComponent(classId);
+      if (archiveId) url += "&archive=" + encodeURIComponent(archiveId);
+      const res = await fetch(url);
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || t("screenLoadFail"));
 
@@ -655,7 +657,11 @@
       }
 
       const cls = data.class;
-      if (classLabel) classLabel.textContent = cls.name || "";
+      if (classLabel) {
+        const name = cls.name || "";
+        const lesson = String(cls.lesson_title || "").trim();
+        classLabel.textContent = lesson ? name + " · " + lesson : name;
+      }
 
       await setVideoPlayer(cls.video);
       renderVocab(cls.vocabulary_data || []);
@@ -830,5 +836,6 @@
 
   const urlParams = new URLSearchParams(window.location.search);
   const classId = urlParams.get("class") || window.SCREEN_INITIAL_CLASS_ID || "";
-  loadScreen(classId);
+  const archiveId = urlParams.get("archive") || window.SCREEN_INITIAL_ARCHIVE_ID || "";
+  loadScreen(classId, archiveId);
 })();

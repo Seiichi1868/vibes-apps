@@ -24,6 +24,7 @@ from news_app.services.transcription import transcribe_audio
 from news_app.services.storage import (
     current_lesson_identity,
     get_active_class_id,
+    get_archive_item,
     get_class,
     get_evaluation_rubric,
     list_classes,
@@ -256,30 +257,26 @@ def _class_public_payload(class_id: str, origin: str, display_language: str = "j
     }
 
 
-def _class_screen_payload(class_id: str, origin: str, display_language: str = "ja") -> dict | None:
-    """教室スクリーン投影向け。管理画面で選択した語彙・導入質問をそのまま返す。"""
-    cls = get_class(class_id)
-    if not cls:
-        return None
-    current = cls.get("current") or {}
+def _screen_lesson_view(lesson: dict, origin: str, display_language: str) -> dict:
+    """授業データ（現在の設定またはアーカイブ）を教室スクリーン用に整形する。"""
     lang = resolve_display_language(display_language)
     show_assistive = lang != "en"
-    video_id = (current.get("video_id") or "").strip()
-    start_sec = int(current.get("start_seconds") or 0)
-    end_sec = int(current.get("end_seconds") or 0)
-    subtitles_enabled = bool(current.get("subtitles_enabled", False))
+    video_id = (lesson.get("video_id") or "").strip()
+    start_sec = int(lesson.get("start_seconds") or 0)
+    end_sec = int(lesson.get("end_seconds") or 0)
+    subtitles_enabled = bool(lesson.get("subtitles_enabled", False))
     vocabulary_data = (
         vocabulary_for_student(
-            current.get("vocabulary_data") if isinstance(current.get("vocabulary_data"), list) else [],
+            lesson.get("vocabulary_data") if isinstance(lesson.get("vocabulary_data"), list) else [],
             lang,
         )
         if show_assistive
         else []
     )
-    warmup_image_url = str(current.get("warmup_image_url") or "").strip()
-    warmup_questions = selected_display_questions(current.get("warmup_questions"))
-    postview_questions = selected_display_questions(current.get("postview_questions"))
-    writing_topics = selected_writing_topics(current.get("writing_topics"), include_japanese=lang == "ja")
+    warmup_image_url = str(lesson.get("warmup_image_url") or "").strip()
+    warmup_questions = selected_display_questions(lesson.get("warmup_questions"))
+    postview_questions = selected_display_questions(lesson.get("postview_questions"))
+    writing_topics = selected_writing_topics(lesson.get("writing_topics"), include_japanese=lang == "ja")
     embed_url = (
         build_youtube_embed_url(
             video_id,
@@ -292,8 +289,6 @@ def _class_screen_payload(class_id: str, origin: str, display_language: str = "j
         else ""
     )
     return {
-        "id": cls["id"],
-        "name": cls["name"],
         "video": {
             "video_id": video_id,
             "start_seconds": start_sec,
@@ -311,6 +306,35 @@ def _class_screen_payload(class_id: str, origin: str, display_language: str = "j
         "has_warmup": bool(warmup_image_url or warmup_questions),
         "has_postview": bool(postview_questions),
         "has_writing": bool(writing_topics),
+    }
+
+
+def _class_screen_payload(
+    class_id: str,
+    origin: str,
+    display_language: str = "ja",
+    archive_id: str = "",
+) -> dict | None:
+    """教室スクリーン投影向け。archive_id があればそのアーカイブを、なければ現在の授業設定を返す。"""
+    cls = get_class(class_id)
+    if not cls:
+        return None
+    archive_id = str(archive_id or "").strip()
+    lesson_title = ""
+    if archive_id:
+        lesson = get_archive_item(class_id, archive_id)
+        if lesson is None:
+            raise LookupError(archive_id)
+        lesson_name = str(lesson.get("lesson_name") or "").strip()
+        title = str(lesson.get("title") or "").strip()
+        lesson_title = " · ".join(part for part in (lesson_name, title) if part)
+    else:
+        lesson = cls.get("current") or {}
+    return {
+        "id": cls["id"],
+        "name": cls["name"],
+        "lesson_title": lesson_title,
+        **_screen_lesson_view(lesson, origin, display_language),
     }
 
 
@@ -362,10 +386,12 @@ def api_classes():
 @main_bp.route("/screen/")
 def screen():
     class_id = (request.args.get("class") or get_active_class_id()).strip()
+    archive_id = (request.args.get("archive") or "").strip()
     classes = list_classes()
     return render_template(
         "news/screen.html",
         initial_class_id=class_id,
+        initial_archive_id=archive_id,
         classes=classes,
         page_origin=request.host_url.rstrip("/"),
         **appearance_context(),
@@ -381,7 +407,11 @@ def screen_config():
     origin = request.host_url.rstrip("/")
     state = load_state()
     display_language = resolve_display_language(state.get("display_language"))
-    payload = _class_screen_payload(class_id, origin, display_language)
+    archive_id = (request.args.get("archive") or request.args.get("archive_id") or "").strip()
+    try:
+        payload = _class_screen_payload(class_id, origin, display_language, archive_id=archive_id)
+    except LookupError:
+        return jsonify({"ok": False, "error": "指定されたアーカイブが見つかりません。"}), 404
     if not payload:
         return jsonify({"ok": False, "error": "クラスが見つかりません。"}), 404
 

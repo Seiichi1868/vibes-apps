@@ -1400,10 +1400,10 @@
     if (copyScreenLinkBtn) copyScreenLinkBtn.disabled = !enabled;
   }
 
-  async function fetchScreenLink(classId) {
-    const res = await fetch(
-      `/news/admin/api/screen-link?class_id=${encodeURIComponent(classId)}`
-    );
+  async function fetchScreenLink(classId, archiveId) {
+    let url = `/news/admin/api/screen-link?class_id=${encodeURIComponent(classId)}`;
+    if (archiveId) url += `&archive_id=${encodeURIComponent(archiveId)}`;
+    const res = await fetch(url);
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || "スクリーンリンクの取得に失敗しました");
     return data.link;
@@ -1477,6 +1477,7 @@
       const li = document.createElement("li");
       li.className = "rounded border border-teal-100/80 bg-white/50 px-1.5 py-1";
       li.dataset.archiveIndex = String(index);
+      li.dataset.archiveId = item.archive_id || "";
 
       const row = document.createElement("div");
       row.className = "flex min-w-0 items-center gap-1.5";
@@ -1523,7 +1524,23 @@
       row.appendChild(textWrap);
 
       const actions = document.createElement("div");
-      actions.className = "flex shrink-0 items-center gap-1";
+      actions.className = "flex shrink-0 flex-wrap items-center justify-end gap-1";
+
+      const openScreenBtnItem = document.createElement("button");
+      openScreenBtnItem.type = "button";
+      openScreenBtnItem.className = "open-archive-screen-btn rounded border border-violet-100 bg-white/80 px-1.5 py-0.5 text-[9px] font-semibold leading-none text-violet-700 hover:bg-violet-50";
+      openScreenBtnItem.textContent = t("archiveOpenScreen");
+      openScreenBtnItem.title = t("archiveOpenScreenTitle");
+
+      const copyScreenBtnItem = document.createElement("button");
+      copyScreenBtnItem.type = "button";
+      copyScreenBtnItem.className = "copy-archive-screen-btn rounded border border-violet-100 bg-white/80 px-1.5 py-0.5 text-[9px] font-semibold leading-none text-violet-700 hover:bg-violet-50";
+      copyScreenBtnItem.textContent = t("archiveCopyScreenUrl");
+      copyScreenBtnItem.title = t("archiveCopyScreenUrlTitle");
+      if (!item.archive_id) {
+        openScreenBtnItem.disabled = true;
+        copyScreenBtnItem.disabled = true;
+      }
 
       const restoreBtn = document.createElement("button");
       restoreBtn.type = "button";
@@ -1535,7 +1552,7 @@
       deleteBtn.className = "delete-archive-btn rounded border border-red-100 bg-white/80 px-1.5 py-0.5 text-[9px] font-semibold leading-none text-red-600 hover:bg-red-50";
       deleteBtn.textContent = "削除";
 
-      actions.append(restoreBtn, deleteBtn);
+      actions.append(openScreenBtnItem, copyScreenBtnItem, restoreBtn, deleteBtn);
 
       const copyTargets = adminClasses.filter((c) => c.id !== currentClassId);
       if (copyTargets.length) {
@@ -1863,10 +1880,35 @@
       const itemEl = btn.closest("li");
       const classId = getSelectedClassId();
       const archiveIndex = parseInt(itemEl && itemEl.dataset.archiveIndex, 10);
+      const archiveId = (itemEl && itemEl.dataset.archiveId) || "";
       if (!classId || !Number.isFinite(archiveIndex)) return;
 
       btn.disabled = true;
       try {
+        if (btn.classList.contains("open-archive-screen-btn")) {
+          if (!archiveId) throw new Error("このアーカイブのスクリーンリンクを発行できません。");
+          const link = await fetchScreenLink(classId, archiveId);
+          window.open(link, "_blank", "noopener,noreferrer");
+          return;
+        }
+
+        if (btn.classList.contains("copy-archive-screen-btn")) {
+          if (!archiveId) throw new Error("このアーカイブのスクリーンリンクを発行できません。");
+          const link = await fetchScreenLink(classId, archiveId);
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(link);
+          } else {
+            prompt("教室スクリーン URL:", link);
+            return;
+          }
+          const prev = btn.textContent;
+          btn.textContent = t("archiveScreenCopied");
+          setTimeout(() => {
+            btn.textContent = prev;
+          }, 1200);
+          return;
+        }
+
         if (btn.classList.contains("restore-archive-btn")) {
           if (!confirm("現在設定されている動画やスクリプトなどは上書きされます。アーカイブの内容を設定画面に戻しますか？")) {
             return;

@@ -484,7 +484,7 @@
             スクリーンURLコピー
           </button>
         </div>
-        <p class="mt-1 text-[10px] text-slate-500" data-i18n="screenHint">投影用：管理画面で選択した動画・単語・ウォームアップ・ディスカッションを全画面表示します。</p>
+        <p class="mt-1 text-[10px] text-slate-500" data-i18n="screenHint">投影用：いまの授業設定、またはアーカイブから発行したリンクの動画・単語・ウォームアップ・ディスカッションを全画面表示します。</p>
       </section>
 
       <section class="admin-archive-panel glass-panel shrink-0 rounded-xl p-2.5 lg:min-h-0 lg:flex-1 lg:overflow-hidden">
@@ -493,6 +493,9 @@
           <div class="admin-archive-body">
             <p class="mt-1 text-[9px] leading-tight text-slate-400" data-i18n="archiveAssistLegend">
               V 語彙補助 · W ウォームアップ · D ディスカッション（色付き＝生成済み）
+            </p>
+            <p class="mt-0.5 text-[9px] leading-tight text-slate-400" data-i18n="archiveScreenHint">
+              「画面」「URL」は、そのアーカイブを教室スクリーンに出します。授業設定に入っていなくても使えます。
             </p>
             <ul id="archive-list" class="mt-2 max-h-60 space-y-1 overflow-y-auto text-[10px] text-slate-600 lg:max-h-none lg:overflow-visible">
             </ul>
@@ -931,7 +934,7 @@
   window.ADMIN_WARMUP_QUESTIONS = {{ (current.warmup_questions or [])|tojson }};
   window.ADMIN_POSTVIEW_QUESTIONS = {{ (current.postview_questions or [])|tojson }};
 </script>
-<script src="{{ url_for('static', filename='news/js/i18n.js', v='20260929d') }}"></script>
+<script src="{{ url_for('static', filename='news/js/i18n.js', v='20260930b') }}"></script>
 <script src="{{ url_for('static', filename='news/js/youtube-transcript.js', v='20260904i') }}"></script>
-<script src="{{ url_for('static', filename='news/js/admin.js', v='20260929d') }}"></script>
+<script src="{{ url_for('static', filename='news/js/admin.js', v='20260930b') }}"></script>
 {% endblock %}

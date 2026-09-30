@@ -1,3 +1,4 @@
+import hashlib
 import json
 import re
 import threading
@@ -480,6 +481,43 @@ def _normalize_current(raw: dict | None) -> dict:
     return current
 
 
+def _archive_fingerprint(item: dict) -> str:
+    """保存済みアーカイブに ID が無いとき、内容から同じ ID を再現する。"""
+    raw = "|".join(
+        [
+            str(item.get("archived_at") or ""),
+            str(item.get("video_id") or ""),
+            str(item.get("start_seconds") or 0),
+            str(item.get("end_seconds") or 0),
+            str(item.get("title") or ""),
+            str(item.get("lesson_name") or ""),
+        ]
+    )
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
+
+
+def _assign_archive_ids(items: list[dict]) -> None:
+    used: set[str] = set()
+    for item in items:
+        existing = str(item.get("archive_id") or "").strip()
+        if existing and existing not in used:
+            item["archive_id"] = existing
+            used.add(existing)
+            continue
+        base = _archive_fingerprint(item)
+        candidate = base
+        suffix = 2
+        while candidate in used:
+            candidate = f"{base}-{suffix}"
+            suffix += 1
+        item["archive_id"] = candidate
+        used.add(candidate)
+
+
+def _new_archive_id() -> str:
+    return uuid.uuid4().hex[:12]
+
+
 def _normalize_class(class_id: str, raw: dict) -> dict:
     archive = raw.get("archive") if isinstance(raw.get("archive"), list) else []
     normalized_archive = []
@@ -516,8 +554,10 @@ def _normalize_class(class_id: str, raw: dict) -> dict:
                 "postview_scaffolding_enabled": bool(item.get("postview_scaffolding_enabled", False)),
                 "postview_answers_visible": bool(item.get("postview_answers_visible", False)),
                 "writing_topics": _normalize_writing_topics(item.get("writing_topics")),
+                "archive_id": str(item.get("archive_id") or "").strip(),
             }
         )
+    _assign_archive_ids(normalized_archive)
     return {
         "id": class_id,
         "name": str(raw.get("name") or class_id).strip() or class_id,
@@ -625,9 +665,20 @@ def load_state() -> dict:
         needs_migration = isinstance(data, dict) and "video" in data and not (
             isinstance(data.get("classes"), dict) and data.get("classes")
         )
+        needs_archive_ids = False
+        if isinstance(data, dict):
+            for cls in (data.get("classes") or {}).values():
+                if not isinstance(cls, dict):
+                    continue
+                for item in cls.get("archive") or []:
+                    if isinstance(item, dict) and not str(item.get("archive_id") or "").strip():
+                        needs_archive_ids = True
+                        break
+                if needs_archive_ids:
+                    break
         normalized = _normalize_state(data)
 
-    if needs_migration:
+    if needs_migration or needs_archive_ids:
         # 旧形式 JSON を安全に新形式へ書き換え（初回読み込み時のみ）
         save_state(normalized)
 
@@ -672,6 +723,19 @@ def list_classes() -> list[dict]:
 def get_class(class_id: str) -> dict | None:
     state = load_state()
     return state.get("classes", {}).get(class_id)
+
+
+def get_archive_item(class_id: str, archive_id: str) -> dict | None:
+    archive_id = str(archive_id or "").strip()
+    if not archive_id:
+        return None
+    cls = get_class(class_id)
+    if not cls:
+        return None
+    for item in cls.get("archive") or []:
+        if str(item.get("archive_id") or "") == archive_id:
+            return item
+    return None
 
 
 def get_active_class_id() -> str:
@@ -746,6 +810,7 @@ def archive_class_current(class_id: str, title: str = "", lesson_name: str = "")
         "title": saved_title,
         "lesson_name": saved_lesson_name,
         "archived_at": _now_iso(),
+        "archive_id": _new_archive_id(),
     }
     cls.setdefault("archive", []).insert(0, archive_item)
     update_submission_lesson_title(
@@ -787,6 +852,7 @@ def restore_class_archive(class_id: str, archive_index: int) -> dict:
     restored_title = str(restored.get("title") or "").strip()
     restored_lesson_name = str(restored.get("lesson_name") or "").strip()
     restored.pop("archived_at", None)
+    restored.pop("archive_id", None)
     cls["current"] = _normalize_current(
         {**restored, "title": restored_title, "lesson_name": restored_lesson_name}
     )
@@ -827,6 +893,7 @@ def copy_class_archive(class_id: str, archive_index: int, target_class_id: str) 
 
     archive_item = deepcopy(source_archive[archive_index])
     archive_item["archived_at"] = _now_iso()
+    archive_item["archive_id"] = _new_archive_id()
     classes[target_class_id].setdefault("archive", []).insert(0, archive_item)
     save_state(state)
     return classes[class_id], classes[target_class_id]
