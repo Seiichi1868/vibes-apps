@@ -40,11 +40,17 @@ from debate.solo import (
     CONFLICT,
     generation_guard,
     generation_view,
+    included_part_names,
     initial_generation_part,
+    is_practice,
     next_generation_targets,
     normalize_difficulty,
     normalize_user_side,
+    parse_practice_roles,
     part_is_ai,
+    part_is_omitted,
+    practice_focus_side,
+    practice_scope_label,
     recording_guard,
     session_mode,
 )
@@ -238,11 +244,19 @@ def create_session():
 
     user_side = None
     ai_difficulty = None
+    practice_roles = None
     if mode == "solo":
         user_side = normalize_user_side(payload.get("user_side"), allow_random=True)
         if not user_side:
             return jsonify({"error": "陣営は Gov / Opp / ランダムから選んでください。"}), 400
         ai_difficulty = normalize_difficulty(payload.get("ai_difficulty"))
+    elif mode == "practice":
+        practice_roles, role_error = parse_practice_roles(payload.get("part_roles"))
+        if role_error:
+            return jsonify({"error": role_error}), 400
+        user_side = practice_focus_side(practice_roles or [])
+        if any(role == "ai" for _, role in practice_roles or []):
+            ai_difficulty = normalize_difficulty(payload.get("ai_difficulty"))
 
     session = new_session(
         motion,
@@ -250,10 +264,11 @@ def create_session():
         mode=mode,
         user_side=user_side,
         ai_difficulty=ai_difficulty,
+        practice_roles=practice_roles,
     )
     save_session(session)
 
-    if mode == "solo":
+    if mode in ("solo", "practice"):
         from debate.solo_jobs import start_generation_job
 
         first_ai = initial_generation_part(session)
@@ -291,14 +306,16 @@ def progress_screen(session_id):
         return render_template(
             "debate/not_found.html", session_id=session_id, **_background_context()
         ), 404
+    active_order = included_part_names(session)
     return render_template(
         "debate/progress.html",
         session=session,
         part_meta=_part_meta(),
-        part_order=PART_ORDER,
+        part_order=active_order,
         status_labels=STATUS_LABELS,
         ai_text_visible_default=AI_TEXT_VISIBLE_DEFAULT,
         poi_config=_poi_config(),
+        practice_label=practice_scope_label(session) if is_practice(session) else "",
         **_background_context(),
     )
 
@@ -512,7 +529,7 @@ def review_screen(session_id, part):
         return render_template(
             "debate/not_found.html", session_id=session_id, **_background_context()
         ), 404
-    if part_is_ai(part_data):
+    if part_is_ai(part_data) or part_is_omitted(part_data):
         return redirect(url_for("debate.progress_screen", session_id=session_id))
     return render_template(
         "debate/review.html",
@@ -533,6 +550,8 @@ def confirm_part(session_id, part):
         part_data = get_part(session, part)
         if not part_data:
             return jsonify({"error": f"不明なパート: {part}"}), 400
+        if part_is_omitted(part_data):
+            return jsonify({"error": "このパートは練習範囲に含まれていません。"}), CONFLICT
         if part_is_ai(part_data):
             return jsonify({"error": "相手AIのパートは確認画面から確定できません。"}), CONFLICT
 
@@ -561,6 +580,8 @@ def reset_part(session_id, part):
         part_data = get_part(session, part)
         if not part_data:
             return jsonify({"error": f"不明なパート: {part}"}), 400
+        if part_is_omitted(part_data):
+            return jsonify({"error": "このパートは練習範囲に含まれていません。"}), CONFLICT
         if part_is_ai(part_data):
             return jsonify({"error": "相手AIのパートはリセットできません。"}), CONFLICT
 
@@ -664,7 +685,11 @@ def _unconfirmed_parts(session: dict) -> list[str]:
     return [
         part_data["part"]
         for part_data in session.get("parts", [])
-        if part_data.get("status") != "confirmed" or not str(part_data.get("transcript_edited") or "").strip()
+        if not part_is_omitted(part_data)
+        and (
+            part_data.get("status") != "confirmed"
+            or not str(part_data.get("transcript_edited") or "").strip()
+        )
     ]
 
 
@@ -678,14 +703,11 @@ def start_judge(session_id):
 
         missing = _unconfirmed_parts(session)
         if missing:
-            return (
-                jsonify(
-                    {
-                        "error": f"すべてのパートを確定してから実行してください（未確定: {', '.join(missing)}）。"
-                    }
-                ),
-                400,
-            )
+            if is_practice(session):
+                message = f"選んだパートを確定してから評価してください（未確定: {', '.join(missing)}）。"
+            else:
+                message = f"すべてのパートを確定してから実行してください（未確定: {', '.join(missing)}）。"
+            return jsonify({"error": message}), 400
 
         judge_result = new_judge_result()
         judge_result["status"] = "judging"
@@ -737,8 +759,9 @@ def judge_screen(session_id):
         "debate/judge.html",
         session=session,
         part_meta=_part_meta(),
-        part_order=PART_ORDER,
+        part_order=included_part_names(session),
         unconfirmed_parts=_unconfirmed_parts(session),
+        practice_label=practice_scope_label(session) if is_practice(session) else "",
         **_background_context(),
     )
 

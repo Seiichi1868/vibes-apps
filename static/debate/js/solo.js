@@ -4,7 +4,7 @@
   const TEXT_KEY = "debate_solo_text_visible";
   const DEFAULT_TEXT_VISIBLE = window.DEBATE_AI_TEXT_VISIBLE_DEFAULT !== false;
 
-  if (window.DEBATE_MODE !== "solo") return;
+  if (window.DEBATE_MODE !== "solo" && window.DEBATE_MODE !== "practice") return;
 
   const cards = Array.from(document.querySelectorAll(".part-card"));
   /** @type {HTMLAudioElement|null} */
@@ -300,7 +300,7 @@
         needs_review: "bg-sky-400",
         confirmed: "bg-emerald-500",
       };
-      dot.className = `h-1.5 rounded-full step-dot ${colorByStatus[status] || "bg-slate-200"}`;
+      dot.className = `h-1.5 flex-1 rounded-full step-dot ${colorByStatus[status] || "bg-slate-200"}`;
     });
 
     cards.forEach((card) => {

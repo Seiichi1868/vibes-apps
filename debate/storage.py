@@ -162,10 +162,20 @@ def update_session_notes(session_id: str, notes: str) -> dict | None:
 def session_summary(data: dict, *, mtime: float | None = None, include_notes: bool = False) -> dict:
     """セッション1件の一覧用サマリー。"""
     parts = data.get("parts", [])
-    confirmed = sum(1 for part in parts if part.get("status") == "confirmed")
+    countable = [
+        part
+        for part in parts
+        if isinstance(part, dict)
+        and part.get("included") is not False
+        and part.get("speaker") != "none"
+        and part.get("status") != "omitted"
+    ]
+    if not countable:
+        countable = [part for part in parts if isinstance(part, dict)]
+    confirmed = sum(1 for part in countable if part.get("status") == "confirmed")
     in_progress = sum(
         1
-        for part in parts
+        for part in countable
         if part.get("status") in ("recording", "transcribing", "needs_review")
     )
     updated_at = data.get("updated_at") or data.get("created_at") or ""
@@ -189,7 +199,10 @@ def session_summary(data: dict, *, mtime: float | None = None, include_notes: bo
         "updated_at": updated_at,
         "confirmed_parts": confirmed,
         "in_progress_parts": in_progress,
-        "total_parts": len(parts),
+        "total_parts": len(countable),
+        "included_parts": [part.get("part") for part in countable]
+        if (data.get("mode") or "") == "practice"
+        else None,
         "judge_status": judge_result.get("status", "idle"),
         "judge_winner": judge_result.get("winner"),
         "judge_model": judge_model_label,

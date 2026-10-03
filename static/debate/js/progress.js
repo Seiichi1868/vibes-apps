@@ -662,7 +662,7 @@
         needs_review: "bg-sky-400",
         confirmed: "bg-emerald-500",
       };
-      dot.className = `h-1.5 rounded-full step-dot ${colorByStatus[status] || "bg-slate-200"}`;
+      dot.className = `h-1.5 flex-1 rounded-full step-dot ${colorByStatus[status] || "bg-slate-200"}`;
     });
 
     allDoneSection.classList.toggle("hidden", confirmed !== total);

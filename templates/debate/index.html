@@ -83,7 +83,7 @@
   <form id="motion-form" class="space-y-5">
     <div>
       <p class="text-sm font-semibold text-slate-700 mb-1.5">モード</p>
-      <div class="grid sm:grid-cols-2 gap-2" id="mode-picker">
+      <div class="grid md:grid-cols-3 gap-2" id="mode-picker">
         <label class="panel-soft flex items-start gap-3 rounded-xl px-4 py-3 cursor-pointer hover:border-teal-200/80 transition-colors">
           <input type="radio" name="debate_mode" value="duo" class="mt-1 accent-teal-600" checked>
           <span>
@@ -96,6 +96,13 @@
           <span>
             <span class="block text-sm font-semibold text-slate-800">Solo Practice（1人練習）</span>
             <span class="block text-xs text-slate-500 mt-0.5">1人が片方を担当し、相手3パートはAIが話します</span>
+          </span>
+        </label>
+        <label class="panel-soft flex items-start gap-3 rounded-xl px-4 py-3 cursor-pointer hover:border-teal-200/80 transition-colors">
+          <input type="radio" name="debate_mode" value="practice" class="mt-1 accent-teal-600">
+          <span>
+            <span class="block text-sm font-semibold text-slate-800">パート練習</span>
+            <span class="block text-xs text-slate-500 mt-0.5">練習するパートを自分かAIで選び、そこまで評価します</span>
           </span>
         </label>
       </div>
@@ -114,6 +121,33 @@
       <div>
         <label for="solo-difficulty" class="block text-sm font-semibold text-slate-700 mb-1.5">相手AIの強さ</label>
         <select id="solo-difficulty"
+          class="w-full rounded-xl border border-teal-100 bg-white/80 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand">
+          <option value="easy">easy（やさしい）</option>
+          <option value="normal" selected>normal（ふつう）</option>
+          <option value="hard">hard（つよい）</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="practice-options" class="hidden space-y-4 rounded-xl border border-teal-100 bg-white/50 px-4 py-4">
+      <div>
+        <p class="text-sm font-semibold text-slate-700">練習する範囲</p>
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+          PMから順に「自分」か「AI」を選びます。「やらない」にしたパート以降は進まず、そこまでの内容だけを評価します。途中のパートは飛ばせません。自分が話すパートが1つ必要です。
+        </p>
+      </div>
+      <div class="flex flex-wrap gap-2" id="practice-presets">
+        <button type="button" data-practice-preset="pm" class="px-3 py-1.5 rounded-full border border-teal-200 bg-white text-xs font-semibold text-teal-800 hover:bg-emerald-50">PMだけ</button>
+        <button type="button" data-practice-preset="lo" class="px-3 py-1.5 rounded-full border border-teal-200 bg-white text-xs font-semibold text-teal-800 hover:bg-emerald-50">LOだけ（PMはAI）</button>
+        <button type="button" data-practice-preset="mg" class="px-3 py-1.5 rounded-full border border-teal-200 bg-white text-xs font-semibold text-teal-800 hover:bg-emerald-50">MGまで</button>
+        <button type="button" data-practice-preset="mo" class="px-3 py-1.5 rounded-full border border-teal-200 bg-white text-xs font-semibold text-teal-800 hover:bg-emerald-50">MOまで</button>
+      </div>
+      <div id="practice-parts" class="space-y-2"></div>
+      <p id="practice-summary" class="text-xs font-medium text-slate-600"></p>
+      <p id="practice-error" class="hidden text-xs font-medium text-rose-600"></p>
+      <div id="practice-difficulty-wrap" class="hidden">
+        <label for="practice-difficulty" class="block text-sm font-semibold text-slate-700 mb-1.5">相手AIの強さ</label>
+        <select id="practice-difficulty"
           class="w-full rounded-xl border border-teal-100 bg-white/80 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand">
           <option value="easy">easy（やさしい）</option>
           <option value="normal" selected>normal（ふつう）</option>
@@ -173,5 +207,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='debate/js/index.js', v='20260919b') }}"></script>
+<script src="{{ url_for('static', filename='debate/js/index.js', v='20261003a') }}"></script>
 {% endblock %}

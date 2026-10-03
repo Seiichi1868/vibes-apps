@@ -58,8 +58,11 @@
     const solo = session.mode === "solo"
       ? ` · Solo Practice ${session.user_side || ""} / ${session.ai_difficulty || ""}`
       : "";
+    const practice = session.mode === "practice"
+      ? ` · パート練習 ${(session.included_parts || []).join("→")}`
+      : "";
     const meta = savedAt
-      ? `<p class="text-[0.68rem] text-slate-400 mt-0.5">${escapeHtml(savedAt)}${escapeHtml(mode)}${escapeHtml(solo)}</p>`
+      ? `<p class="text-[0.68rem] text-slate-400 mt-0.5">${escapeHtml(savedAt)}${escapeHtml(mode)}${escapeHtml(solo)}${escapeHtml(practice)}</p>`
       : "";
     return `
       <li>

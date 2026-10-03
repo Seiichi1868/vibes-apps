@@ -26,6 +26,7 @@ def new_part(part: str, *, speaker: str = "human") -> dict:
         "part_order": defaults["part_order"],
         "speaker_name": "",
         "speaker": "ai" if is_ai else "human",
+        "included": True,
         "audio_url": "",
         "transcript_raw": "",
         "transcript_edited": "",
@@ -78,6 +79,19 @@ def new_judge_result() -> dict:
     }
 
 
+def new_omitted_part(part: str) -> dict:
+    data = new_part(part, speaker="human")
+    data["speaker"] = "none"
+    data["included"] = False
+    data["status"] = "omitted"
+    data["generation_status"] = None
+    data["generation_error"] = None
+    data["tts_status"] = None
+    data["tts_error"] = None
+    data["tts_audio_file"] = None
+    return data
+
+
 def new_session(
     motion: str,
     speaker_name: str = "",
@@ -85,14 +99,29 @@ def new_session(
     mode: str = "duo",
     user_side: str | None = None,
     ai_difficulty: str | None = None,
+    practice_roles: list[tuple[str, str]] | None = None,
 ) -> dict:
-    session_mode = "solo" if str(mode or "").strip().lower() == "solo" else "duo"
-    side = user_side if session_mode == "solo" else None
-    difficulty = ai_difficulty if session_mode == "solo" else None
+    raw_mode = str(mode or "").strip().lower()
+    if raw_mode == "solo":
+        session_mode = "solo"
+    elif raw_mode == "practice":
+        session_mode = "practice"
+    else:
+        session_mode = "duo"
+    side = user_side if session_mode in ("solo", "practice") else None
+    difficulty = ai_difficulty if session_mode in ("solo", "practice") else None
     if session_mode == "solo":
         from debate.solo import speaker_for_part
 
         parts = [new_part(part, speaker=speaker_for_part(side or "Gov", part)) for part in PART_ORDER]
+    elif session_mode == "practice":
+        assigned = {part: speaker for part, speaker in (practice_roles or [])}
+        parts = []
+        for part in PART_ORDER:
+            if part in assigned:
+                parts.append(new_part(part, speaker=assigned[part]))
+            else:
+                parts.append(new_omitted_part(part))
     else:
         parts = [new_part(part) for part in PART_ORDER]
     if speaker_name:
@@ -108,7 +137,7 @@ def new_session(
         "copied_from_session_id": "",
         "mode": session_mode,
         "user_side": side,
-        "ai_difficulty": difficulty if session_mode == "solo" else None,
+        "ai_difficulty": difficulty if session_mode in ("solo", "practice") else None,
         "parts": parts,
         "judge_result": new_judge_result(),
     }
@@ -118,24 +147,41 @@ def normalize_session(session: dict | None) -> dict | None:
     """欠けている mode 等を duo 互換で補う。読み込み時のみ。ファイルは書き換えない。"""
     if not isinstance(session, dict):
         return session
-    if str(session.get("mode") or "").strip().lower() != "solo":
-        session["mode"] = "duo"
-        session.setdefault("user_side", None)
-        session.setdefault("ai_difficulty", None)
-    else:
+    raw_mode = str(session.get("mode") or "").strip().lower()
+    if raw_mode == "solo":
         session["mode"] = "solo"
         if session.get("ai_difficulty") not in ("easy", "normal", "hard"):
             session["ai_difficulty"] = DEFAULT_AI_DIFFICULTY
         if session.get("user_side") not in ("Gov", "Opp"):
             session["user_side"] = "Gov"
+    elif raw_mode == "practice":
+        session["mode"] = "practice"
+        session.setdefault("user_side", None)
+        if session.get("ai_difficulty") not in ("easy", "normal", "hard", None):
+            session["ai_difficulty"] = DEFAULT_AI_DIFFICULTY
+    else:
+        session["mode"] = "duo"
+        session.setdefault("user_side", None)
+        session.setdefault("ai_difficulty", None)
 
-    from debate.solo import speaker_for_part
+    from debate.solo import part_is_omitted, speaker_for_part
 
     user_side = session.get("user_side") if session["mode"] == "solo" else None
     for part_data in session.get("parts") or []:
         if not isinstance(part_data, dict):
             continue
         part_name = part_data.get("part")
+        if session["mode"] == "practice" and part_is_omitted(part_data):
+            part_data["speaker"] = "none"
+            part_data["included"] = False
+            if part_data.get("status") in (None, "", "not_started"):
+                part_data["status"] = "omitted"
+            part_data.setdefault("generation_status", None)
+            part_data.setdefault("generation_error", None)
+            part_data.setdefault("tts_status", None)
+            part_data.setdefault("tts_audio_file", None)
+            part_data["pois"] = normalize_pois(part_data.get("pois"))
+            continue
         if "speaker" not in part_data:
             if session["mode"] == "solo" and user_side and part_name:
                 part_data["speaker"] = speaker_for_part(user_side, part_name)

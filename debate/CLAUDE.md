@@ -46,6 +46,16 @@
 - ジョブ: `debate/solo_jobs.py`（judge_jobs と同じ起動方式）。生成: `debate/opponent.py`。TTS: `debate/tts.py`。ガード: `debate/solo.py`。
 - 対戦AIはジャッジと別プロンプト。`opponent.py` の硬い制約で PM/LO は P2 を名前＋一文まで（本論は MG/MO）。難易度の「両方反論」より分担が優先。
 
+## パート練習（Part Practice）
+
+ソロの隣の第3モード。コード値 `"practice"`。UIは「パート練習」。通常対戦とソロは壊さない。
+
+- 各パートを `human` / `ai` / 未選択。PMから連続した担当だけが範囲。未選択のあとで担当を付けるのは不可。自分が話すパートが1つ以上必要。
+- 未選択パートは `speaker=none`・`status=omitted`・`included=false`。進行画面にもジャッジにも出さない。評価は選んだ範囲が全部 `confirmed` になったときだけ。
+- 例: PMだけ自分。LOだけなら PM=AI → LO=自分。MG以降を未選択にすればそこまで。
+- AIの生成・TTS・順番ロックはソロと同じ経路（`uses_partner_flow`）。範囲の先頭がAIなら作成直後に生成する。
+- ジャッジは範囲が6パート未満のときだけ `PARTIAL_PRACTICE_ADDENDUM` を足す。未実施の役割は減点しない。片方の陣営しか無いときは winner を出さない。全文の通常・ソロ判定プロンプトは変えない。
+
 ## データ
 
 JSON: `data/debate/sessions/<id>.json` 音声: `data/debate/audio/<id>/`

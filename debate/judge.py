@@ -159,6 +159,21 @@ AIが使ったモデル名には触れないでください。
   ]
 }"""
 
+# パート練習で範囲が6パート未満のときだけ足す。通常対戦・ソロの全文ジャッジには付けない。
+PARTIAL_PRACTICE_ADDENDUM = """
+
+# 今回は途中までのパート練習です
+payload.parts に含まれるパートだけが実施されています。それ以外のパートは行われていません。
+- 未実施パートの役割を誰かが果たしていないことを減点しないでください。
+- Gov Point 2 の詳細は、MG が今回の範囲に無いなら PM の概要のままでよく、減点しません。
+- Opp Point 2 の詳細は、MO が範囲に無いなら LO の概要のままでよく、減点しません。
+- 後続パートが範囲外であるだけを理由に knocked_down にしないでください。実施済みの中で有効な反論があり、実施済みの範囲で防御がないときだけ knocked_down にしてください。
+- 片方の陣営しか発言していない場合、winner は null にしてください。
+- part_feedback は payload.parts にあるパートだけ書いてください。human は生徒への改善提案、ai は相手の発話の短い要約に留めてください。
+- overall_feedback は、生徒（speaker が human）のパートをどう良くするかを中心にしてください。
+- scores は実施された human の発話に対する評価です。
+"""
+
 _ARGUMENT_STATUSES = {"standing", "knocked_down", "extended"}
 _SIDES = {"Gov", "Opp"}
 
@@ -191,11 +206,23 @@ def _is_reasoning_model(model: str) -> bool:
     return name.startswith(("o1", "o3", "o4"))
 
 
-def build_judge_payload(session: dict) -> dict:
-    """6パートのpart/side/transcript_edited/elapsed_sec/time_limit_secを1つのJSONにまとめる。"""
+def _judge_part_names(session: dict) -> list[str]:
+    """通常・ソロは6パート。パート練習は選ばれた範囲だけ。"""
+    if str(session.get("mode") or "") != "practice":
+        return list(PART_ORDER)
+    from debate.solo import part_is_omitted
+
     parts_by_name = {p.get("part"): p for p in session.get("parts", [])}
+    return [name for name in PART_ORDER if not part_is_omitted(parts_by_name.get(name))]
+
+
+def build_judge_payload(session: dict) -> dict:
+    """採点対象パートの transcript を1つのJSONにまとめる。"""
+    parts_by_name = {p.get("part"): p for p in session.get("parts", [])}
+    part_names = _judge_part_names(session)
+    partial = str(session.get("mode") or "") == "practice" and part_names != list(PART_ORDER)
     parts_payload = []
-    for part_name in PART_ORDER:
+    for part_name in part_names:
         part_data = parts_by_name.get(part_name) or {}
         speaker = part_data.get("speaker") or "human"
         elapsed = None if speaker == "ai" else part_data.get("elapsed_sec")
@@ -218,9 +245,9 @@ def build_judge_payload(session: dict) -> dict:
             }
         )
     start_sec, end_sec = _poi_protected_times()
-    return {
+    payload = {
         "motion": session.get("motion", ""),
-        "speaker_roles": PART_ROLES,
+        "speaker_roles": PART_ROLES if not partial else {name: PART_ROLES.get(name, "") for name in part_names},
         "poi_protected_start_sec": start_sec,
         "poi_protected_end_sec": end_sec,
         "expected_flow": {
@@ -232,6 +259,10 @@ def build_judge_payload(session: dict) -> dict:
         },
         "parts": parts_payload,
     }
+    if partial:
+        payload["partial_practice"] = True
+        payload["included_parts"] = part_names
+    return payload
 
 
 def _extract_text(completion) -> str:
@@ -371,13 +402,16 @@ def run_judge(session: dict) -> dict:
     judge_model = resolve_judge_model(judge_mode)
     judge_model_info = resolve_judge_model_metadata(judge_mode)
     payload = build_judge_payload(session)
+    system_prompt = JUDGE_SYSTEM_PROMPT
+    if payload.get("partial_practice"):
+        system_prompt += PARTIAL_PRACTICE_ADDENDUM
     user_content = json.dumps(payload, ensure_ascii=False, indent=2)
 
     kwargs: dict = {
         "model": judge_model,
         "response_format": {"type": "json_object"},
         "messages": [
-            {"role": "system", "content": JUDGE_SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content},
         ],
     }

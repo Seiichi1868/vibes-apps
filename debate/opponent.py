@@ -14,6 +14,7 @@ from debate.config import (
     DEFAULT_AI_DIFFICULTY,
     OPPONENT_MAX_RETRIES,
     OPPONENT_TIMEOUT_SEC,
+    PART_DEFS,
     PART_GUIDES,
     PART_ORDER,
     PART_ROLES,
@@ -170,13 +171,35 @@ def build_opponent_input(session: dict, part: str) -> dict:
         if name == part:
             break
         part_data = get_part(session, name) or {}
+        speaker = str(part_data.get("speaker") or "human")
+        if speaker == "none" or part_data.get("status") == "omitted" or part_data.get("included") is False:
+            continue
         prior.append(
             {
                 "part": name,
                 "side": part_data.get("side"),
-                "speaker": part_data.get("speaker") or "human",
+                "speaker": speaker,
                 "transcript": str(part_data.get("transcript_edited") or "").strip(),
             }
+        )
+
+    speaking_side = (PART_DEFS.get(part) or {}).get("side") or ai_side
+    if session.get("mode") == "practice":
+        human_parts = [
+            item.get("part")
+            for item in session.get("parts") or []
+            if item.get("speaker") == "human" and item.get("included") is not False
+        ]
+        speaker_intro = (
+            f"You are speaking as {speaking_side} in the {part} speech.\n"
+            "This is a partial practice. Follow this part's normal role even if later speeches "
+            "are not in the round.\n"
+            f"The student will deliver: {', '.join(human_parts) or 'none'}."
+        )
+    else:
+        speaker_intro = (
+            f"You are speaking as {ai_side} in the {part} speech.\n"
+            f"The student is {user_side}."
         )
 
     low, high = WORD_TARGETS.get(part, (300, 380))
@@ -190,6 +213,7 @@ def build_opponent_input(session: dict, part: str) -> dict:
         "point_split_rule": POINT_SPLIT_RULES.get(part, ""),
         "target_words": {"min": low, "max": high},
         "difficulty": difficulty,
+        "speaker_intro": speaker_intro,
         "prior_speeches": prior,
     }
 
@@ -208,8 +232,7 @@ def _user_prompt(payload: dict) -> str:
     high = payload["target_words"]["max"]
     return (
         f"Motion: {payload.get('motion')}\n"
-        f"You are speaking as {payload.get('ai_side')} in the {payload.get('part')} speech.\n"
-        f"The student is {payload.get('user_side')}.\n"
+        f"{payload.get('speaker_intro')}\n"
         f"Part role: {payload.get('part_role')}\n"
         f"Speech shape: {payload.get('part_guide')}\n"
         f"Point-split rule (mandatory; overrides difficulty and word count): "
