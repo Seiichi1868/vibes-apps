@@ -14,6 +14,7 @@ from debate.config import (
     DEFAULT_AI_DIFFICULTY,
     OPPONENT_MAX_RETRIES,
     OPPONENT_TIMEOUT_SEC,
+    PART_GUIDES,
     PART_ORDER,
     PART_ROLES,
     VALID_DIFFICULTIES,
@@ -35,22 +36,65 @@ WORD_TARGETS = {
 DIFFICULTY_INSTRUCTIONS = {
     "easy": """Difficulty: easy
 Control argument strength only. English must remain grammatically correct and natural.
-- Rebuttal coverage: rebut only one of the opponent's main points. Leave the other largely unaddressed.
+- Rebuttal coverage: rebut only one opponent point that this part is allowed to rebut. Leave the rest unaddressed.
 - Depth: give a claim and a reason. Use almost no concrete examples.
-- Defence: after being rebutted, leave at least one of your own points undefended.
-- Language: simple vocabulary and shorter sentences. Never add grammar mistakes or awkward phrasing.""",
+- Defence: after being rebutted, leave at least one of your own in-role points undefended.
+- Language: simple vocabulary and shorter sentences. Never add grammar mistakes or awkward phrasing.
+- Never use difficulty as a reason to develop Point 2 early or to rebut a point reserved for a later speech.""",
     "normal": """Difficulty: normal
 Control argument strength only. English must remain grammatically correct and natural.
-- Rebuttal coverage: rebut both of the opponent's main points.
-- Depth: include claim, reason, and a concrete example.
-- Defence: reconstruct and defend your main points after they are attacked.
-- Language: standard parliamentary debate phrasing.""",
+- Rebuttal coverage: rebut only the opponent points assigned to this part. Do not rebut both sides' Point 2 just to look complete.
+- Depth: for the point this part must develop, include claim, reason, and a concrete example.
+- Defence: reconstruct and defend the point this part is responsible for defending.
+- Language: standard parliamentary debate phrasing.
+- Never use difficulty as a reason to develop Point 2 early or to rebut a point reserved for a later speech.""",
     "hard": """Difficulty: hard
 Control argument strength only. English must remain grammatically correct and natural.
-- Rebuttal coverage: rebut both of the opponent's main points, and also attack an unstated assumption or missing burden.
-- Depth: include claim, reason, concrete example, and explicit comparative weighing (whose harm/impact is larger and why).
-- Defence: defend all of your points and point out the weakness of the opponent's replies.
-- Language: use debate terms such as comparative weighing and burden of proof naturally. Do not make the English worse.""",
+- Rebuttal coverage: strongly rebut the opponent points assigned to this part, and attack an unstated assumption or missing burden on those same points only.
+- Depth: for the point this part must develop, include claim, reason, concrete example, and explicit comparative weighing.
+- Defence: defend the point this part is responsible for and show why the opponent's reply is weaker.
+- Language: use debate terms such as comparative weighing and burden of proof naturally. Do not make the English worse.
+- Never use difficulty as a reason to develop Point 2 early or to rebut a point reserved for a later speech.""",
+}
+
+# 授業フローの2論点分担。難易度より優先する。
+POINT_SPLIT_RULES = {
+    "PM": (
+        "Announce exactly two Government points by keyword or short label. "
+        "Fully explain Point 1 only. "
+        "For Point 2, say the name and at most one short preview sentence. "
+        "Do not give a second reason, mechanism, example, or impact for Point 2. "
+        "Leave the full explanation of Point 2 for MG. "
+        "If you need more words, spend them on the definition and Point 1, never on Point 2."
+    ),
+    "LO": (
+        "Reconstruct and rebut the Government case, focusing on Government Point 1. "
+        "A one-sentence note on Government Point 2 is enough; do not treat that preview as a full argument. "
+        "Announce exactly two Opposition points by keyword or short label. "
+        "Fully explain Opposition Point 1 only. "
+        "For Opposition Point 2, say the name and at most one short preview sentence. "
+        "Do not give a second reason, mechanism, example, or impact for Opposition Point 2. "
+        "Leave the full explanation of Opposition Point 2 for MO. "
+        "If you need more words, spend them on the Government rebuttal and Opposition Point 1."
+    ),
+    "MG": (
+        "Rebut Opposition Point 1, reconstruct Government Point 1, then fully develop Government Point 2. "
+        "This is the first time Government Point 2 may be explained in depth. "
+        "Do not fully rebut Opposition Point 2; it has only been named. Leave that to PMR."
+    ),
+    "MO": (
+        "Rebut Government Point 1, reconstruct Opposition Point 1, then fully develop Opposition Point 2. "
+        "This is the first time Opposition Point 2 may be explained in depth. "
+        "Do not open a third Opposition point."
+    ),
+    "LOR": (
+        "Summarise the clash and why Opposition is ahead. "
+        "Do not introduce new points, and do not newly develop a point that was only previewed."
+    ),
+    "PMR": (
+        "First rebut Opposition Point 2 in full, then summarise why Government is ahead. "
+        "Do not introduce new points."
+    ),
 }
 
 
@@ -63,12 +107,16 @@ Write only the spoken speech in plain English. Do not include:
 
 Keep paragraph breaks so the student can follow which point you are answering.
 
-Hard role constraints:
+Hard role constraints (these beat difficulty and word-count targets):
 - Each side has exactly two regular points (Point 1 and Point 2). Never create a third point.
+- PM and LO must NOT develop Point 2. They only name it. The full case for Government Point 2 is MG. The full case for Opposition Point 2 is MO.
+- "Name Point 2" means a keyword or short label, plus at most one short sentence. No second reason, no example, no impact calculus.
+- Do not pad Point 2 to hit the word count. Extra length goes to definition, rebuttal, or Point 1.
+- Difficulty never authorises an early Point 2 explanation or an out-of-role rebuttal.
 - LOR and PMR must not introduce new points.
 - PMR must first rebut Opposition Point 2, then summarise.
 
-Match the assigned part's role exactly.
+Follow the assigned part's point-split rule exactly.
 """
 
 
@@ -138,6 +186,8 @@ def build_opponent_input(session: dict, part: str) -> dict:
         "ai_side": ai_side,
         "part": part,
         "part_role": PART_ROLES.get(part, ""),
+        "part_guide": PART_GUIDES.get(part, ""),
+        "point_split_rule": POINT_SPLIT_RULES.get(part, ""),
         "target_words": {"min": low, "max": high},
         "difficulty": difficulty,
         "prior_speeches": prior,
@@ -161,7 +211,10 @@ def _user_prompt(payload: dict) -> str:
         f"You are speaking as {payload.get('ai_side')} in the {payload.get('part')} speech.\n"
         f"The student is {payload.get('user_side')}.\n"
         f"Part role: {payload.get('part_role')}\n"
-        f"Target length: {low}-{high} words.\n\n"
+        f"Speech shape: {payload.get('part_guide')}\n"
+        f"Point-split rule (mandatory; overrides difficulty and word count): "
+        f"{payload.get('point_split_rule')}\n"
+        f"Target length: {low}-{high} words. Do not use extra words to develop a point this part must only name.\n\n"
         f"{difficulty_block}\n\n"
         f"Confirmed speeches so far, in order:\n{prior_block}\n\n"
         "Write the full speech now."

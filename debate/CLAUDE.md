@@ -44,6 +44,7 @@
 - AIパートは録音なし。`status=confirmed`・`elapsed_sec=null`。確認画面は進行へリダイレクト。
 - 音声: サーバーTTS（`data/debate/audio/<id>/ai_<part>.mp3`）。IndexedDB 対象外。Range 対応。自動再生しない。
 - ジョブ: `debate/solo_jobs.py`（judge_jobs と同じ起動方式）。生成: `debate/opponent.py`。TTS: `debate/tts.py`。ガード: `debate/solo.py`。
+- 対戦AIはジャッジと別プロンプト。`opponent.py` の硬い制約で PM/LO は P2 を名前＋一文まで（本論は MG/MO）。難易度の「両方反論」より分担が優先。
 
 ## データ
 
