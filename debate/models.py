@@ -160,9 +160,19 @@ def normalize_session(session: dict | None) -> dict | None:
         if session.get("ai_difficulty") not in ("easy", "normal", "hard", None):
             session["ai_difficulty"] = DEFAULT_AI_DIFFICULTY
     else:
-        session["mode"] = "duo"
-        session.setdefault("user_side", None)
-        session.setdefault("ai_difficulty", None)
+        from debate.solo import part_is_omitted
+
+        parts = session.get("parts") or []
+        has_omitted = any(isinstance(p, dict) and part_is_omitted(p) for p in parts)
+        if has_omitted:
+            session["mode"] = "practice"
+            session.setdefault("user_side", None)
+            if session.get("ai_difficulty") not in ("easy", "normal", "hard", None):
+                session["ai_difficulty"] = DEFAULT_AI_DIFFICULTY
+        else:
+            session["mode"] = "duo"
+            session.setdefault("user_side", None)
+            session.setdefault("ai_difficulty", None)
 
     from debate.solo import part_is_omitted, speaker_for_part
 

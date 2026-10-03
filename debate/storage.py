@@ -192,6 +192,14 @@ def session_summary(data: dict, *, mtime: float | None = None, include_notes: bo
         judge_model_label = judge_model_info.get("model") or ""
     if not judge_model_label:
         judge_model_label = judge_result.get("model", "")
+    from debate.solo import included_part_names, is_practice, practice_scope_label, session_mode
+
+    debate_mode = session_mode(data)
+    mode_labels = {
+        "duo": "通常の対戦",
+        "solo": "Solo Practice",
+        "practice": "パート練習",
+    }
     summary = {
         "session_id": data.get("session_id"),
         "motion": data.get("motion"),
@@ -200,15 +208,15 @@ def session_summary(data: dict, *, mtime: float | None = None, include_notes: bo
         "confirmed_parts": confirmed,
         "in_progress_parts": in_progress,
         "total_parts": len(countable),
-        "included_parts": [part.get("part") for part in countable]
-        if (data.get("mode") or "") == "practice"
-        else None,
+        "included_parts": included_part_names(data) if is_practice(data) else None,
+        "practice_scope": practice_scope_label(data) if is_practice(data) else "",
         "judge_status": judge_result.get("status", "idle"),
         "judge_winner": judge_result.get("winner"),
         "judge_model": judge_model_label,
         "judge_transcription_mode": judge_result.get("transcription_mode", ""),
         "transcription_mode": summarize_transcription_mode(data),
-        "mode": data.get("mode") or "duo",
+        "mode": debate_mode,
+        "mode_label": mode_labels.get(debate_mode, mode_labels["duo"]),
         "user_side": data.get("user_side"),
         "ai_difficulty": data.get("ai_difficulty"),
     }

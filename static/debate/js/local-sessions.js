@@ -1,7 +1,26 @@
 (() => {
   const STORAGE_KEY = "debate_local_session_ids";
   const MAX_IDS = 20;
-  const MODE_LABELS = { batch: "モードA", realtime: "モードB", mixed: "混在" };
+  const TRANSCRIPTION_LABELS = { batch: "モードA", realtime: "モードB", mixed: "混在" };
+  const DEBATE_MODE_LABELS = {
+    duo: "通常の対戦",
+    solo: "Solo Practice",
+    practice: "パート練習",
+  };
+
+  function formatDebateModeLine(session) {
+    const mode = session.mode === "solo" || session.mode === "practice" ? session.mode : "duo";
+    let label = session.mode_label || DEBATE_MODE_LABELS[mode] || DEBATE_MODE_LABELS.duo;
+    if (mode === "solo") {
+      const side = session.user_side ? ` ${session.user_side}` : "";
+      const diff = session.ai_difficulty ? ` / ${session.ai_difficulty}` : "";
+      label = `${label}${side}${diff}`;
+    } else if (mode === "practice") {
+      const scope = session.practice_scope || (session.included_parts || []).join("→");
+      if (scope) label = `${label} · ${scope}`;
+    }
+    return ` · ディベート: ${label}`;
+  }
 
   function loadIds() {
     try {
@@ -52,26 +71,30 @@
 
   function renderRow(session) {
     const savedAt = formatSavedAt(session.updated_at || session.created_at);
-    const mode = session.transcription_mode
-      ? ` · 文字起こし: ${MODE_LABELS[session.transcription_mode] || session.transcription_mode}`
+    const debateMode = formatDebateModeLine(session);
+    const transcription = session.transcription_mode
+      ? ` · 文字起こし: ${TRANSCRIPTION_LABELS[session.transcription_mode] || session.transcription_mode}`
       : "";
-    const solo = session.mode === "solo"
-      ? ` · Solo Practice ${session.user_side || ""} / ${session.ai_difficulty || ""}`
-      : "";
-    const practice = session.mode === "practice"
-      ? ` · パート練習 ${(session.included_parts || []).join("→")}`
-      : "";
+    const modeBadge =
+      session.mode === "practice"
+        ? `<span class="status-pill shrink-0 text-[0.65rem]">パート練習</span>`
+        : session.mode === "solo"
+          ? `<span class="status-pill shrink-0 text-[0.65rem]">Solo</span>`
+          : "";
     const meta = savedAt
-      ? `<p class="text-[0.68rem] text-slate-400 mt-0.5">${escapeHtml(savedAt)}${escapeHtml(mode)}${escapeHtml(solo)}${escapeHtml(practice)}</p>`
+      ? `<p class="text-[0.68rem] text-slate-400 mt-0.5">${escapeHtml(savedAt)}${escapeHtml(debateMode)}${escapeHtml(transcription)}</p>`
       : "";
     return `
       <li>
         <a
           href="/debate/session/${encodeURIComponent(session.session_id)}"
-          class="panel-soft flex items-center justify-between rounded-xl px-4 py-3 text-sm hover:border-teal-200/80 hover:bg-emerald-50/40 transition-colors"
+          class="panel-soft flex items-center justify-between gap-2 rounded-xl px-4 py-3 text-sm hover:border-teal-200/80 hover:bg-emerald-50/40 transition-colors"
         >
-          <div class="min-w-0 pr-4">
-            <p class="truncate text-slate-700">${escapeHtml(session.motion || "（論題なし）")}</p>
+          <div class="min-w-0 pr-2 flex-1">
+            <div class="flex items-center gap-2 min-w-0">
+              ${modeBadge}
+              <p class="truncate text-slate-700">${escapeHtml(session.motion || "（論題なし）")}</p>
+            </div>
             ${meta}
           </div>
           <span class="shrink-0 text-xs font-semibold text-slate-500">

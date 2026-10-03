@@ -371,8 +371,8 @@ function renderSessions(sessions) {
       const modeLabel = s.mode === "solo"
         ? `Solo ${escapeHtml(s.user_side || "")} / ${escapeHtml(s.ai_difficulty || "")}`
         : s.mode === "practice"
-          ? `パート練習 ${escapeHtml((s.included_parts || []).join("→"))}`
-          : "通常";
+          ? `パート練習 ${escapeHtml(s.practice_scope || (s.included_parts || []).join("→"))}`
+          : escapeHtml(s.mode_label || "通常の対戦");
       const modeMeta = `<span><span class="session-row__meta-key">モード</span> ${modeLabel}</span>`;
 
       let judgeLabel = "";
