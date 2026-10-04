@@ -41,6 +41,13 @@ def _password_ok(payload: dict) -> bool:
     return str(payload.get("admin_password") or "") == ADMIN_PASSWORD
 
 
+def _protected_payload():
+    payload = request.get_json(silent=True) or {}
+    if not _password_ok(payload):
+        return None, (jsonify({"ok": False, "error": "管理パスワードが違います。"}), 403)
+    return payload, None
+
+
 def _settings_response(settings: dict) -> dict:
     judge_mode = resolve_judge_model_mode(settings.get("judge_model_mode"))
     opponent_mode = resolve_judge_model_mode(settings.get("opponent_model_mode"))
@@ -148,7 +155,9 @@ def admin_list_affiliations():
 
 @debate_admin_bp.route("/api/affiliations", methods=["POST"])
 def admin_add_affiliation():
-    payload = request.get_json(silent=True) or {}
+    payload, denied = _protected_payload()
+    if denied:
+        return denied
     items, error = add_affiliation(str(payload.get("name") or ""))
     if error:
         return jsonify({"ok": False, "error": error}), 400
@@ -157,7 +166,9 @@ def admin_add_affiliation():
 
 @debate_admin_bp.route("/api/affiliations/<affiliation_id>", methods=["POST"])
 def admin_rename_affiliation(affiliation_id):
-    payload = request.get_json(silent=True) or {}
+    payload, denied = _protected_payload()
+    if denied:
+        return denied
     items, error = rename_affiliation(affiliation_id, str(payload.get("name") or ""))
     if error:
         status = 404 if error == "所属が見つかりません。" else 400
@@ -167,6 +178,9 @@ def admin_rename_affiliation(affiliation_id):
 
 @debate_admin_bp.route("/api/affiliations/<affiliation_id>/delete", methods=["POST"])
 def admin_delete_affiliation(affiliation_id):
+    _payload, denied = _protected_payload()
+    if denied:
+        return denied
     items, error = delete_affiliation(affiliation_id)
     if error:
         return jsonify({"ok": False, "error": error}), 404
@@ -205,6 +219,9 @@ def admin_update_session_notes(session_id):
 
 @debate_admin_bp.route("/api/sessions/<session_id>/delete", methods=["POST"])
 def admin_delete_session(session_id):
+    _payload, denied = _protected_payload()
+    if denied:
+        return denied
     deleted = delete_session(session_id)
     if not deleted:
         return jsonify({"ok": False, "error": "セッションが見つかりません。"}), 404

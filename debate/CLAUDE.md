@@ -98,7 +98,7 @@ Whisper: `debate/transcription.py`（短タイムアウト）。ジョブ: `tran
 
 ## 管理
 
-`/debate/admin` はリンク開放。パスワード必須は `transcription_mode`・`judge_model_mode`・`opponent_model_mode`（`DEBATE_ADMIN_PASSWORD` 既定2479）。背景・透過・POI保護時間・所属の追加/変更/削除はパスワード不要。セッション一覧・コピー・備考・削除あり。一覧は所属を表示し、更新日時／所属でソート可。コピー時ジャッジはリセット、音声（AI音声含む）は複製。所属もコピー先へ引き継ぐ。
+`/debate/admin` はリンク開放。パスワード必須は `transcription_mode`・`judge_model_mode`・`opponent_model_mode`・所属の追加/変更/削除・セッション削除（`DEBATE_ADMIN_PASSWORD` 既定2479）。背景・透過・POI保護時間はパスワード不要。セッション一覧・コピー・備考は閲覧・編集可。一覧は所属を表示し、所属フィルターと更新日時／所属ソートがある。コピー時ジャッジはリセット、音声（AI音声含む）は複製。所属もコピー先へ引き継ぐ。
 
 ## ファイル案内（必要なときだけ開け）
 

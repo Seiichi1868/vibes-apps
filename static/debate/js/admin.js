@@ -25,14 +25,20 @@ const sessionsList = document.getElementById("sessions-list");
 const sessionsCount = document.getElementById("sessions-count");
 const sessionsRefreshBtn = document.getElementById("sessions-refresh-btn");
 const sessionsSort = document.getElementById("sessions-sort");
+const sessionsFilter = document.getElementById("sessions-filter");
 const affiliationsList = document.getElementById("affiliations-list");
 const affiliationsCount = document.getElementById("affiliations-count");
 const affiliationAddForm = document.getElementById("affiliation-add-form");
+const affiliationEditor = document.getElementById("affiliation-editor");
 const affiliationNameInput = document.getElementById("affiliation-name-input");
 const affiliationAddBtn = document.getElementById("affiliation-add-btn");
+const affiliationLockHint = document.getElementById("affiliation-lock-hint");
 const transcriptionModePicker = document.getElementById("transcription-mode-picker");
 
 const SESSIONS_SORT_KEY = "debate_admin_sessions_sort";
+const SESSIONS_FILTER_KEY = "debate_admin_sessions_filter";
+const FILTER_UNSET = "";
+const FILTER_NONE = "__none__";
 
 let unlocked = false;
 let saveTimer = null;
@@ -41,7 +47,9 @@ let currentBackgroundId = null;
 let currentJudgeModelMode = "5.6-luna";
 let currentOpponentModelMode = "5.6-luna";
 let allSessions = [];
+let allAffiliations = [];
 let currentSessionsSort = "updated";
+let currentAffiliationFilter = FILTER_UNSET;
 
 function getStoredPassword() {
   try {
@@ -71,6 +79,21 @@ function applyUnlockUI() {
     sensitiveSettings.classList.remove("opacity-50", "pointer-events-none");
     sensitiveSettings.removeAttribute("aria-disabled");
   }
+  syncProtectedControls();
+  renderAffiliations(allAffiliations);
+  renderVisibleSessions();
+}
+
+function syncProtectedControls() {
+  affiliationLockHint?.classList.toggle("hidden", unlocked);
+  affiliationEditor?.classList.toggle("hidden", !unlocked);
+}
+
+function requireUnlocked(actionLabel) {
+  if (unlocked) return true;
+  showLockMessage(`${actionLabel}には管理パスワードが必要です。下の管理設定で解除してください。`);
+  passwordInput?.focus();
+  return false;
 }
 
 function showLockMessage(msg) {
@@ -452,26 +475,66 @@ function sessionRowHtml(s) {
             class="session-row__btn session-row__btn--resume">再開</a>
           <button type="button" class="session-row__btn session-row__btn--copy btn-copy-session"
             data-session-id="${escapeHtml(s.session_id)}">コピー</button>
-          <button type="button" class="session-row__btn session-row__btn--delete btn-delete-session"
-            data-session-id="${escapeHtml(s.session_id)}">削除</button>
+          ${unlocked ? `<button type="button" class="session-row__btn session-row__btn--delete btn-delete-session"
+            data-session-id="${escapeHtml(s.session_id)}">削除</button>` : ""}
         </div>
       </div>
     </div>
   `;
 }
 
-function renderSessions(sessions) {
+function filteredSessions(sessions) {
+  if (currentAffiliationFilter === FILTER_NONE) {
+    return sessions.filter((session) => !affiliationLabel(session));
+  }
+  if (!currentAffiliationFilter) return sessions;
+  return sessions.filter((session) => affiliationLabel(session) === currentAffiliationFilter);
+}
+
+function refreshAffiliationFilterOptions() {
+  if (!sessionsFilter) return;
+  const names = new Set(allAffiliations.map((item) => String(item.name || "").trim()).filter(Boolean));
+  allSessions.forEach((session) => {
+    const name = affiliationLabel(session);
+    if (name) names.add(name);
+  });
+  const sortedNames = [...names].sort((a, b) => a.localeCompare(b, "ja"));
+  const hasNone = allSessions.some((session) => !affiliationLabel(session));
+  const previous = currentAffiliationFilter;
+  const options = [`<option value="${FILTER_UNSET}">すべて</option>`]
+    .concat(sortedNames.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`));
+  if (hasNone) {
+    options.push(`<option value="${FILTER_NONE}">未選択</option>`);
+  }
+  sessionsFilter.innerHTML = options.join("");
+  const valid = previous === FILTER_UNSET
+    || previous === FILTER_NONE && hasNone
+    || sortedNames.includes(previous);
+  currentAffiliationFilter = valid ? previous : FILTER_UNSET;
+  sessionsFilter.value = currentAffiliationFilter;
+}
+
+function renderVisibleSessions() {
   if (!sessionsList) return;
-  allSessions = Array.isArray(sessions) ? sessions : [];
-  if (sessionsCount) sessionsCount.textContent = `${allSessions.length}件`;
+  refreshAffiliationFilterOptions();
+  const visible = filteredSessions(allSessions);
+  if (sessionsCount) {
+    sessionsCount.textContent = currentAffiliationFilter
+      ? `${visible.length}件 / 全${allSessions.length}件`
+      : `${allSessions.length}件`;
+  }
 
   if (!allSessions.length) {
     sessionsList.innerHTML = '<p class="text-sm text-slate-400">保存されたセッションはありません。</p>';
     return;
   }
+  if (!visible.length) {
+    sessionsList.innerHTML = '<p class="text-sm text-slate-400">この所属のセッションはありません。</p>';
+    return;
+  }
 
-  const ordered = sortedSessions(allSessions);
-  if (currentSessionsSort !== "affiliation") {
+  const ordered = sortedSessions(visible);
+  if (currentSessionsSort !== "affiliation" || currentAffiliationFilter) {
     sessionsList.innerHTML = ordered.map(sessionRowHtml).join("");
     return;
   }
@@ -500,13 +563,28 @@ function renderSessions(sessions) {
     .join("");
 }
 
+function renderSessions(sessions) {
+  if (!sessionsList) return;
+  allSessions = Array.isArray(sessions) ? sessions : [];
+  renderVisibleSessions();
+}
+
 function applySessionsSort(sort) {
   currentSessionsSort = sort === "affiliation" ? "affiliation" : "updated";
   if (sessionsSort) sessionsSort.value = currentSessionsSort;
   try {
     sessionStorage.setItem(SESSIONS_SORT_KEY, currentSessionsSort);
   } catch (_) {}
-  renderSessions(allSessions);
+  renderVisibleSessions();
+}
+
+function applyAffiliationFilter(value) {
+  currentAffiliationFilter = value === FILTER_NONE ? FILTER_NONE : String(value || FILTER_UNSET);
+  if (sessionsFilter) sessionsFilter.value = currentAffiliationFilter;
+  try {
+    sessionStorage.setItem(SESSIONS_FILTER_KEY, currentAffiliationFilter);
+  } catch (_) {}
+  renderVisibleSessions();
 }
 
 async function loadSessions() {
@@ -524,23 +602,28 @@ async function loadSessions() {
 
 function renderAffiliations(items) {
   if (!affiliationsList) return;
-  const affiliations = Array.isArray(items) ? items : [];
-  if (affiliationsCount) affiliationsCount.textContent = `${affiliations.length}件`;
-  if (!affiliations.length) {
-    affiliationsList.innerHTML = '<p class="text-sm text-slate-400">まだ所属がありません。下の欄から追加してください。</p>';
+  allAffiliations = Array.isArray(items) ? items : [];
+  if (affiliationsCount) affiliationsCount.textContent = `${allAffiliations.length}件`;
+  syncProtectedControls();
+  if (!allAffiliations.length) {
+    affiliationsList.innerHTML = unlocked
+      ? '<p class="text-sm text-slate-400">まだ所属がありません。下の欄から追加してください。</p>'
+      : '<p class="text-sm text-slate-400">まだ所属がありません。</p>';
+    refreshAffiliationFilterOptions();
     return;
   }
-  affiliationsList.innerHTML = affiliations
+  affiliationsList.innerHTML = allAffiliations
     .map((item) => `
       <div class="flex items-center gap-2 rounded-lg border border-teal-100/80 bg-white/60 px-3 py-1.5">
         <span class="min-w-0 flex-1 text-sm font-medium text-slate-700 truncate">${escapeHtml(item.name)}</span>
-        <button type="button" class="session-row__btn session-row__btn--copy btn-rename-affiliation"
+        ${unlocked ? `<button type="button" class="session-row__btn session-row__btn--copy btn-rename-affiliation"
           data-affiliation-id="${escapeHtml(item.id)}" data-affiliation-name="${escapeHtml(item.name)}">変更</button>
         <button type="button" class="session-row__btn session-row__btn--delete btn-delete-affiliation"
-          data-affiliation-id="${escapeHtml(item.id)}" data-affiliation-name="${escapeHtml(item.name)}">削除</button>
+          data-affiliation-id="${escapeHtml(item.id)}" data-affiliation-name="${escapeHtml(item.name)}">削除</button>` : ""}
       </div>
     `)
     .join("");
+  refreshAffiliationFilterOptions();
 }
 
 async function loadAffiliations() {
@@ -558,9 +641,11 @@ async function loadAffiliations() {
 
 sessionsRefreshBtn?.addEventListener("click", loadSessions);
 sessionsSort?.addEventListener("change", () => applySessionsSort(sessionsSort.value));
+sessionsFilter?.addEventListener("change", () => applyAffiliationFilter(sessionsFilter.value));
 
 affiliationAddForm?.addEventListener("submit", async (e) => {
   e.preventDefault();
+  if (!requireUnlocked("所属の追加")) return;
   const name = affiliationNameInput?.value.trim() || "";
   if (!name) {
     showLockMessage("所属名を入力してください");
@@ -572,11 +657,12 @@ affiliationAddForm?.addEventListener("submit", async (e) => {
     const res = await fetch("/debate/admin/api/affiliations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, admin_password: getAdminPassword() }),
     });
     const data = await res.json();
     if (!res.ok || !data.ok) throw new Error(data.error || "所属の追加に失敗しました");
     renderAffiliations(data.affiliations || []);
+    renderVisibleSessions();
     if (affiliationNameInput) affiliationNameInput.value = "";
     if (statusMessage) statusMessage.textContent = "所属を追加しました";
     hideLockMessage();
@@ -591,6 +677,7 @@ affiliationAddForm?.addEventListener("submit", async (e) => {
 affiliationsList?.addEventListener("click", async (e) => {
   const renameBtn = e.target.closest(".btn-rename-affiliation");
   if (renameBtn) {
+    if (!requireUnlocked("所属の変更")) return;
     const affiliationId = renameBtn.dataset.affiliationId;
     const currentName = renameBtn.dataset.affiliationName || "";
     const nextName = window.prompt("所属名を変更", currentName);
@@ -604,11 +691,12 @@ affiliationsList?.addEventListener("click", async (e) => {
       const res = await fetch(`/debate/admin/api/affiliations/${encodeURIComponent(affiliationId)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, admin_password: getAdminPassword() }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || "所属の変更に失敗しました");
       renderAffiliations(data.affiliations || []);
+      renderVisibleSessions();
       if (statusMessage) statusMessage.textContent = "所属名を変更しました";
       hideLockMessage();
     } catch (err) {
@@ -620,6 +708,7 @@ affiliationsList?.addEventListener("click", async (e) => {
 
   const deleteBtn = e.target.closest(".btn-delete-affiliation");
   if (!deleteBtn) return;
+  if (!requireUnlocked("所属の削除")) return;
   const affiliationId = deleteBtn.dataset.affiliationId;
   const name = deleteBtn.dataset.affiliationName || "この所属";
   if (!window.confirm(`「${name}」を削除しますか？すでに保存されたセッションの所属表示は残ります。`)) return;
@@ -627,11 +716,12 @@ affiliationsList?.addEventListener("click", async (e) => {
     const res = await fetch(`/debate/admin/api/affiliations/${encodeURIComponent(affiliationId)}/delete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ admin_password: getAdminPassword() }),
     });
     const data = await res.json();
     if (!res.ok || !data.ok) throw new Error(data.error || "所属の削除に失敗しました");
     renderAffiliations(data.affiliations || []);
+    renderVisibleSessions();
     if (statusMessage) statusMessage.textContent = "所属を削除しました";
     hideLockMessage();
   } catch (err) {
@@ -705,6 +795,7 @@ sessionsList?.addEventListener("click", async (e) => {
 
   const btn = e.target.closest(".btn-delete-session");
   if (!btn) return;
+  if (!requireUnlocked("セッションの削除")) return;
 
   const sessionId = btn.dataset.sessionId;
   if (!window.confirm("このセッションの録音・文字起こしデータを完全に削除します。よろしいですか？")) return;
@@ -715,7 +806,7 @@ sessionsList?.addEventListener("click", async (e) => {
     const res = await fetch(`/debate/admin/api/sessions/${encodeURIComponent(sessionId)}/delete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ admin_password: getAdminPassword() }),
     });
     const data = await res.json();
     if (!res.ok || !data.ok) throw new Error(data.error || "削除に失敗しました");
@@ -843,6 +934,13 @@ transcriptionModePicker?.addEventListener("change", () => {
     currentSessionsSort = "updated";
   }
   if (sessionsSort) sessionsSort.value = currentSessionsSort;
+
+  try {
+    const storedFilter = sessionStorage.getItem(SESSIONS_FILTER_KEY);
+    currentAffiliationFilter = storedFilter || FILTER_UNSET;
+  } catch (_) {
+    currentAffiliationFilter = FILTER_UNSET;
+  }
 
   try {
     await loadSettingsIntoUI();
