@@ -1,0 +1,154 @@
+{% extends "toolbox/base.html" %}
+{% block title %}ALT理解確認 · Toolbox{% endblock %}
+{% block body %}
+<section class="tb-tool tb-talk" data-display-root>
+  <div data-view="settings">
+    <h1 class="tb-tool-title">ALT理解確認</h1>
+    <p class="tb-warn-note">生徒の氏名や個人情報は入力しないでください。音声は保存しません。ALTの同意を得て使ってください。</p>
+    <form id="tb-talk-settings" class="tb-form">
+      <label>レベル
+        <select name="level">
+          {% for level in levels %}
+          <option value="{{ level }}" {% if level == 'A2' %}selected{% endif %}>CEFR {{ level }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>問題数
+        <input name="count" type="number" min="3" max="8" value="5">
+      </label>
+      <label class="tb-check"><input name="include_inference" type="checkbox"> 推論問題を1問含める</label>
+      <label>補足指示（任意）
+        <textarea name="notes" rows="2" placeholder="例: 過去形を意識した問題を多めに"></textarea>
+      </label>
+      <label>キーワード（任意・固有名詞のヒント）
+        <input name="keywords" placeholder="例: Kyoto, soccer">
+      </label>
+      <label>文字起こし方式
+        <select name="stt_mode">
+          <option value="whisper" selected>高精度（Whisper）</option>
+          <option value="browser">高速・ブラウザのみ</option>
+        </select>
+      </label>
+      <label class="tb-check"><input name="review_transcript" type="checkbox"> 文字起こしを確認・修正してから生成</label>
+      <label class="tb-check"><input name="show_live" type="checkbox"> ライブ文字起こしを画面に表示</label>
+      <label class="tb-check"><input name="parallel_browser" type="checkbox" {% if parallel_browser_stt %}checked{% endif %}> ブラウザ文字起こしを並行して使う</label>
+      <p class="tb-note">ブラウザ文字起こしは、音声がブラウザ提供元のサーバーで処理されます。</p>
+      <label>待機画面の英文
+        <input name="wait_prompt" value="Talk with your partner. What did you hear?">
+      </label>
+      <label>入力マイク
+        <select name="mic" id="tb-mic"></select>
+      </label>
+      <div class="tb-actions">
+        <button class="tb-btn" type="button" id="tb-mic-test">マイクテスト</button>
+        <button class="tb-btn tb-btn-primary" type="button" data-go="record">録音する</button>
+        <button class="tb-btn" type="button" data-go="file">音声ファイル</button>
+        <button class="tb-btn" type="button" data-go="paste">テキスト貼り付け</button>
+        <button class="tb-btn" type="button" data-go="history">履歴</button>
+      </div>
+      <div id="tb-mic-meter" class="tb-meter" hidden><span></span></div>
+      <p id="tb-mic-msg" class="tb-muted"></p>
+    </form>
+  </div>
+
+  <div data-view="record" hidden>
+    <p class="tb-listening">Listening</p>
+    <p class="tb-timer-face tb-talk-clock" id="tb-rec-clock">00:00</p>
+    <div class="tb-meter" id="tb-rec-meter"><span></span></div>
+    <p id="tb-rec-msg" class="tb-muted"></p>
+    <p id="tb-live" class="tb-live" hidden></p>
+    <div class="tb-actions">
+      <button class="tb-btn tb-btn-primary tb-btn-lg" type="button" id="tb-stop">停止</button>
+      <button class="tb-btn" type="button" id="tb-cancel-rec">キャンセル</button>
+    </div>
+  </div>
+
+  <div data-view="file" hidden>
+    <h2>音声ファイル</h2>
+    <input id="tb-file" type="file" accept="audio/*,video/webm,video/mp4">
+    <div class="tb-actions">
+      <button class="tb-btn tb-btn-primary" type="button" id="tb-file-go">文字起こしして作る</button>
+      <button class="tb-btn" type="button" data-go="settings">戻る</button>
+    </div>
+  </div>
+
+  <div data-view="paste" hidden>
+    <h2>テキスト貼り付け</h2>
+    <textarea id="tb-paste" rows="8" placeholder="英文を貼り付け"></textarea>
+    <div class="tb-actions">
+      <button class="tb-btn tb-btn-primary" type="button" id="tb-paste-go">問題を作る</button>
+      <button class="tb-btn" type="button" data-go="settings">戻る</button>
+    </div>
+  </div>
+
+  <div data-view="review" hidden>
+    <h2>文字起こしの確認</h2>
+    <textarea id="tb-review" rows="8"></textarea>
+    <div class="tb-actions">
+      <button class="tb-btn tb-btn-primary" type="button" id="tb-review-go">この内容で作る</button>
+      <button class="tb-btn" type="button" data-go="settings">戻る</button>
+    </div>
+  </div>
+
+  <div data-view="wait" hidden>
+    <p class="tb-wait-status" id="tb-wait-status">準備しています</p>
+    <p class="tb-muted" id="tb-wait-clock">0:00</p>
+    <p class="tb-wait-prompt" id="tb-wait-prompt">Talk with your partner. What did you hear?</p>
+    <div class="tb-actions">
+      <button class="tb-btn tb-btn-primary tb-btn-lg" type="button" id="tb-start-qs" hidden>Start ▶</button>
+      <button class="tb-btn" type="button" id="tb-choose-qs" hidden>問題を選ぶ</button>
+      <button class="tb-btn" type="button" id="tb-retry-send" hidden>再送信</button>
+    </div>
+    <p class="tb-error" id="tb-wait-error" hidden></p>
+  </div>
+
+  <div data-view="select" hidden>
+    <h2>出す問題を選ぶ</h2>
+    <p class="tb-note">ミラーリングでは問題文が見えます。通常はすぐ開始してください。項目をタップすると文面が見えます。</p>
+    <ul id="tb-select-list" class="tb-select-list"></ul>
+    <div class="tb-actions">
+      <button class="tb-btn tb-btn-primary tb-btn-lg" type="button" id="tb-start-selected">Start ▶</button>
+    </div>
+  </div>
+
+  <div data-view="play" hidden>
+    <p class="tb-progress" id="tb-q-progress">1/5</p>
+    <p class="tb-question" id="tb-question"></p>
+    <p class="tb-answer" id="tb-answer" hidden></p>
+    <p class="tb-evidence" id="tb-evidence" hidden></p>
+    <div class="tb-actions tb-teacher-actions">
+      <button class="tb-btn" type="button" id="tb-skip">この問題をスキップ</button>
+      <button class="tb-btn" type="button" id="tb-regen">この問題を作り直す</button>
+      <button class="tb-btn" type="button" data-display-enter>表示モード</button>
+    </div>
+  </div>
+
+  <div data-view="end" hidden>
+    <h2>終了</h2>
+    <p class="tb-ok">履歴に保存済みです。</p>
+    <ul id="tb-end-list" class="tb-end-list"></ul>
+    <div class="tb-actions">
+      <button class="tb-btn tb-btn-primary" type="button" data-go="record">もう一度録音</button>
+      <button class="tb-btn" type="button" data-go="settings">設定に戻る</button>
+      <button class="tb-btn is-disabled" type="button" disabled>Word出力（準備中）</button>
+      <button class="tb-btn is-disabled" type="button" disabled>PDF出力（準備中）</button>
+    </div>
+  </div>
+
+  <div data-view="history" hidden>
+    <h2>履歴</h2>
+    <ul id="tb-history-list" class="tb-history-list">
+      {% for session in sessions %}
+      <li data-id="{{ session.id }}">
+        <button type="button" data-open="{{ session.id }}">{{ session.title }}</button>
+        <button type="button" data-del="{{ session.id }}">削除</button>
+      </li>
+      {% endfor %}
+    </ul>
+    <button class="tb-btn" type="button" data-go="settings">戻る</button>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='toolbox/js/talk_check.js', v=toolbox_cache) }}"></script>
+{% endblock %}

@@ -1,0 +1,154 @@
+{% extends "toolbox/base.html" %}
+{% block title %}管理画面 · Toolbox{% endblock %}
+{% block body %}
+<section class="tb-admin">
+  <h1>管理画面</h1>
+  <p class="tb-lead">重要操作はパスワードの再入力が必要です（15分間有効）。</p>
+
+  <h2>ユーザー管理</h2>
+  <form id="tb-user-form" class="tb-inline-form">
+    <input name="username" placeholder="ユーザー名" required>
+    <input name="password" type="password" placeholder="パスワード（10文字以上）" minlength="10" required>
+    <select name="role">
+      <option value="teacher">teacher</option>
+      <option value="admin">admin</option>
+    </select>
+    <button class="tb-btn tb-btn-primary" type="submit">作成</button>
+  </form>
+  <div class="tb-table-wrap">
+    <table class="tb-table" id="tb-user-table">
+      <thead><tr><th>ユーザー</th><th>役割</th><th>状態</th><th>最終ログイン</th><th></th></tr></thead>
+      <tbody>
+        {% for user in users %}
+        <tr data-user="{{ user.id }}">
+          <td>{{ user.username }}</td>
+          <td>{{ user.role }}</td>
+          <td>{{ "有効" if user.is_active else "停止" }}</td>
+          <td>{{ user.last_login_at or "—" }}</td>
+          <td class="tb-row-actions">
+            <button type="button" data-act="toggle" data-active="{{ 1 if user.is_active else 0 }}">{{ "停止" if user.is_active else "有効化" }}</button>
+            <button type="button" data-act="reset">再発行</button>
+            <button type="button" data-act="delete">削除</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <h2>ツール公開設定</h2>
+  <ul class="tb-tool-toggles">
+    {% for tool in tools %}
+    <li>
+      <span>{{ tool.name }}</span>
+      <label class="tb-switch">
+        <input type="checkbox" data-tool="{{ tool.id }}" {% if tool_settings[tool.id].enabled %}checked{% endif %}>
+        <span>公開</span>
+      </label>
+    </li>
+    {% endfor %}
+  </ul>
+
+  <h2>利用状況</h2>
+  <p>今日 {{ usage.today.count }} 回 / 約 ${{ "%.4f"|format(usage.today.est_cost_usd) }}　・　今月 {{ usage.month.count }} 回 / 約 ${{ "%.4f"|format(usage.month.est_cost_usd) }}</p>
+  <p>本日の使用 ${{ "%.4f"|format(usage.used_today_usd) }} / 上限 ${{ "%.2f"|format(usage.daily_limit_usd) }}</p>
+  <div class="tb-split">
+    <div>
+      <h3>ユーザー別（今月）</h3>
+      <ul>
+        {% for uid, row in usage.by_user_month.items() %}
+        <li>{{ user_names.get(uid, uid) }}: {{ row.count }}回 / ${{ "%.4f"|format(row.est_cost_usd) }}</li>
+        {% else %}
+        <li>まだ記録がありません。</li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div>
+      <h3>ツール別（今月）</h3>
+      <ul>
+        {% for tool_id, row in usage.by_tool_month.items() %}
+        <li>{{ tool_id }}: {{ row.count }}回 / ${{ "%.4f"|format(row.est_cost_usd) }}</li>
+        {% else %}
+        <li>まだ記録がありません。</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <h2>設定</h2>
+  <form id="tb-limit-form" class="tb-inline-form">
+    <label>1日の利用上限（USD）
+      <input name="daily_limit_usd" type="number" step="0.1" min="0" value="{{ settings.daily_limit_usd }}">
+    </label>
+    <label class="tb-check">
+      <input name="parallel_browser_stt" type="checkbox" {% if settings.parallel_browser_stt %}checked{% endif %}>
+      ブラウザ文字起こしの並行実行を既定で使う
+    </label>
+    <button class="tb-btn tb-btn-primary" type="submit">保存</button>
+  </form>
+
+  <h2>モデル選択 <span class="tb-badge tb-badge-mute">参考値（実測ではありません）</span></h2>
+  <p class="tb-note">性能スコアとコスパは参考値です。実測の所要時間・平均費用は別列です。価格未設定のモデルは選べません。</p>
+  <div class="tb-sorts">
+    <span>並び替え:</span>
+    <button type="button" data-sort="cost">推定費用</button>
+    <button type="button" data-sort="latency">所要時間</button>
+    <button type="button" data-sort="quality">性能</button>
+  </div>
+
+  <h3>文字起こし用</h3>
+  <div class="tb-table-wrap">
+    <table class="tb-table tb-model-table" data-kind="transcribe">
+      <thead>
+        <tr>
+          <th>選択</th><th>モデル</th><th>価格</th><th>1回あたり推定</th>
+          <th>実測の平均所要時間</th><th>実測の平均費用</th>
+          <th>性能スコア（参考値）</th><th>コスパ（目安）</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in transcribe_models %}
+        {% include "toolbox/_model_row.html" %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <h3>問題生成用</h3>
+  <div class="tb-table-wrap">
+    <table class="tb-table tb-model-table" data-kind="generate">
+      <thead>
+        <tr>
+          <th>選択</th><th>モデル</th><th>価格</th><th>1回あたり推定</th>
+          <th>実測の平均所要時間</th><th>実測の平均費用</th>
+          <th>性能スコア（参考値）</th><th>コスパ（目安）</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in generate_models %}
+        {% include "toolbox/_model_row.html" %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <h2>既存アプリ連携</h2>
+  <p class="tb-note">今後ここに追加します。音読・News・ディベートなどとの連携は、今回はまだありません。</p>
+</section>
+
+<div class="tb-modal" id="tb-reauth" hidden>
+  <form class="tb-card tb-narrow" id="tb-reauth-form">
+    <h2>パスワード再入力</h2>
+    <p>重要な操作を続けるには、いまのパスワードが必要です。</p>
+    <input name="password" type="password" required>
+    <p class="tb-error" id="tb-reauth-error" hidden></p>
+    <div class="tb-row-actions">
+      <button class="tb-btn tb-btn-primary" type="submit">確認</button>
+      <button class="tb-btn" type="button" id="tb-reauth-cancel">キャンセル</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='toolbox/js/admin.js', v=toolbox_cache) }}"></script>
+{% endblock %}

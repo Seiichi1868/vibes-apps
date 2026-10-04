@@ -1,0 +1,15 @@
+{% set clickable = tool.enabled %}
+<article class="tb-card-tool{% if not tool.enabled %} is-off{% endif %}" data-scene="{{ tool.scene }}">
+  {% if clickable %}
+  <a class="tb-card-link" href="{{ url_for(tool.route) }}">
+  {% else %}
+  <div class="tb-card-link">
+  {% endif %}
+    <span class="tb-icon tb-icon-{{ tool.icon }}" aria-hidden="true"></span>
+    <span class="tb-card-name">{{ tool.name }}</span>
+    {% if tool.uses_ai %}<span class="tb-badge">AI</span>{% endif %}
+    {% if not tool.enabled %}<span class="tb-badge tb-badge-mute">非公開</span>{% endif %}
+    <p>{{ tool.description }}</p>
+  {% if clickable %}</a>{% else %}</div>{% endif %}
+  <button class="tb-star{% if tool.favorite %} is-on{% endif %}" type="button" data-tool="{{ tool.id }}" aria-label="お気に入り">★</button>
+</article>

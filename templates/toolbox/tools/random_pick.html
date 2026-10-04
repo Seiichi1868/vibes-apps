@@ -1,0 +1,35 @@
+{% extends "toolbox/base.html" %}
+{% block title %}ランダム指名 · Toolbox{% endblock %}
+{% block body %}
+<section class="tb-tool" data-display-root>
+  <h1 class="tb-tool-title">ランダム指名</h1>
+  <div class="tb-inline-form">
+    <label>クラス
+      <select id="tb-class"></select>
+    </label>
+    <button class="tb-btn" type="button" id="tb-class-new">新規</button>
+    <button class="tb-btn" type="button" id="tb-class-edit">編集</button>
+    <button class="tb-btn" type="button" id="tb-class-dup">複製</button>
+    <button class="tb-btn" type="button" id="tb-class-del">削除</button>
+  </div>
+  <p class="tb-note">氏名は使いません。番号だけを指名します。欠席はマスをタップ。</p>
+  <div id="tb-grid" class="tb-grid"></div>
+  <div class="tb-inline-form">
+    <label>同時指名
+      <select id="tb-count">
+        <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+      </select>
+    </label>
+    <button class="tb-btn tb-btn-primary tb-btn-lg" type="button" id="tb-pick">指名</button>
+    <button class="tb-btn" type="button" id="tb-undo">直前を取り消す</button>
+    <button class="tb-btn" type="button" id="tb-clear">全リセット</button>
+    <button class="tb-btn" type="button" data-display-enter>表示モード</button>
+  </div>
+  <p class="tb-pick-result" id="tb-result">—</p>
+  <p class="tb-muted" id="tb-history">履歴: なし</p>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>window.TOOLBOX_CLASSES = {{ classes|tojson }};</script>
+<script src="{{ url_for('static', filename='toolbox/js/random_pick.js', v=toolbox_cache) }}"></script>
+{% endblock %}

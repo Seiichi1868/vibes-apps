@@ -1,0 +1,58 @@
+body.tb-display-on .tb-top,
+body.tb-display-on .tb-blank-btn {
+  display: none;
+}
+
+body.tb-display-on .tb-main {
+  width: min(1100px, calc(100% - 16px));
+}
+
+body.tb-display-on .tb-tool {
+  min-height: calc(100vh - 24px);
+  padding: 16px;
+}
+
+body.tb-display-on .tb-tool-title,
+body.tb-display-on .tb-teacher-actions,
+body.tb-display-on .tb-presets,
+body.tb-display-on .tb-inline-form,
+body.tb-display-on .tb-note,
+body.tb-display-on .tb-muted {
+  opacity: 0.22;
+}
+
+body.tb-display-on .tb-timer-face,
+body.tb-display-on .tb-pick-result,
+body.tb-display-on .tb-question,
+body.tb-display-on .tb-wait-prompt,
+body.tb-display-on .tb-listening {
+  font-size: clamp(2.4rem, 12vw, 10rem);
+  color: #111;
+}
+
+.tb-display-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+  opacity: 0.28;
+  z-index: 35;
+}
+.tb-display-bar:hover,
+.tb-display-bar.is-hot {
+  opacity: 0.9;
+}
+.tb-display-bar button {
+  min-height: 40px;
+  min-width: 40px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(233, 239, 223, 0.9);
+  cursor: pointer;
+}
+.tb-display-bar[hidden] { display: none; }

@@ -1,0 +1,30 @@
+:root {
+  --tb-bg: #e9efdf;
+  --tb-card: #ffffff;
+  --tb-accent: #7cb342;
+  --tb-accent-dark: #689f38;
+  --tb-accent-light: #c8e6a0;
+  --tb-text: #2b2b2b;
+  --tb-muted: #8a8a8a;
+  --tb-line: #d5ddc8;
+  --tb-danger-soft: #f5c6b3;
+  --tb-danger-text: #8a4b32;
+  --tb-warn-soft: #f8e3b8;
+  --tb-warn-text: #7a5a1e;
+  --tb-ok-soft: #d7efc3;
+  --tb-ok-text: #3d6b1f;
+  --tb-radius: 16px;
+  --tb-radius-pill: 999px;
+  --tb-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  --tb-tap: 48px;
+  --tb-font: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", sans-serif;
+  --tb-space: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

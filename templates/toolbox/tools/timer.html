@@ -1,0 +1,29 @@
+{% extends "toolbox/base.html" %}
+{% block title %}タイマー · Toolbox{% endblock %}
+{% block body %}
+<section class="tb-tool tb-timer" data-display-root>
+  <h1 class="tb-tool-title">タイマー</h1>
+  <div class="tb-timer-face" id="tb-timer-face" aria-live="polite">01:00</div>
+  <div class="tb-presets">
+    <button type="button" data-sec="30">30秒</button>
+    <button type="button" data-sec="60">1分</button>
+    <button type="button" data-sec="120">2分</button>
+    <button type="button" data-sec="180">3分</button>
+    <button type="button" data-sec="300">5分</button>
+  </div>
+  <div class="tb-inline-form">
+    <label>分 <input id="tb-min" type="number" min="0" max="99" value="1"></label>
+    <label>秒 <input id="tb-sec" type="number" min="0" max="59" value="0"></label>
+    <button class="tb-btn" type="button" id="tb-set">セット</button>
+  </div>
+  <div class="tb-actions">
+    <button class="tb-btn tb-btn-primary tb-btn-lg" type="button" id="tb-start">開始</button>
+    <button class="tb-btn tb-btn-lg" type="button" id="tb-reset">リセット</button>
+    <button class="tb-btn" type="button" id="tb-mute">ミュート</button>
+    <button class="tb-btn" type="button" data-display-enter>表示モード</button>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='toolbox/js/timer.js', v=toolbox_cache) }}"></script>
+{% endblock %}

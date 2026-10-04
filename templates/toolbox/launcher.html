@@ -1,0 +1,34 @@
+{% extends "toolbox/base.html" %}
+{% block title %}Toolbox{% endblock %}
+{% block body %}
+<section class="tb-launcher">
+  {% if favorites %}
+  <h2>お気に入り</h2>
+  <div class="tb-cards">
+    {% for tool in favorites %}
+    {% include "toolbox/_tool_card.html" %}
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if recent %}
+  <h2>最近使った</h2>
+  <div class="tb-cards">
+    {% for tool in recent %}
+    {% include "toolbox/_tool_card.html" %}
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="tb-tabs" role="tablist">
+    {% for tab in scene_tabs %}
+    <button class="tb-tab{% if tab.id == 'all' %} is-active{% endif %}" type="button" data-scene="{{ tab.id }}">{{ tab.label }}</button>
+    {% endfor %}
+  </div>
+  <div class="tb-cards" id="tb-all-tools">
+    {% for tool in tools %}
+    {% include "toolbox/_tool_card.html" %}
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

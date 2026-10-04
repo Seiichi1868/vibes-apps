@@ -64,3 +64,7 @@ data/conjugate/sessions/*
 # Vibe Speak Trigger: 録音データ・セッションデータ（data/trigger/*.json は上の *.json ルールで除外済み）
 data/trigger/audio/*
 data/trigger/sessions/*
+
+# Toolbox: 一時音声・理解確認セッション（data/toolbox/*.json は上の *.json ルールで除外済み）
+data/toolbox/audio_tmp/*
+data/toolbox/talk_sessions/*

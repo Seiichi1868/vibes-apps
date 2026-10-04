@@ -1,0 +1,9 @@
+{% extends "toolbox/base.html" %}
+{% block title %}非公開 · Toolbox{% endblock %}
+{% block body %}
+<section class="tb-card tb-narrow">
+  <h1>ツールを開けません</h1>
+  <p class="tb-lead">{{ message }}</p>
+  <a class="tb-btn tb-btn-primary" href="{{ url_for('toolbox.launcher') }}">ランチャーへ戻る</a>
+</section>
+{% endblock %}

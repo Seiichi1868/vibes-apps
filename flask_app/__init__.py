@@ -66,6 +66,7 @@ def create_app(config_class=Config):
     from level_check import create_level_check_blueprints
     from conjugate import create_conjugate_blueprints
     from trigger import create_trigger_blueprints
+    from toolbox import create_toolbox_blueprints, register_cli
 
     app.register_blueprint(main_bp)
     app.register_blueprint(public_bp, url_prefix="/public")
@@ -89,6 +90,10 @@ def create_app(config_class=Config):
     trigger_bps = create_trigger_blueprints()
     app.register_blueprint(trigger_bps["main"])
     app.register_blueprint(trigger_bps["admin"])
+
+    toolbox_bps = create_toolbox_blueprints()
+    app.register_blueprint(toolbox_bps["main"])
+    register_cli(app)
     app.register_blueprint(gate_bp, url_prefix="/api")
     app.register_blueprint(grammar_bp, url_prefix="/api")
     app.register_blueprint(ocr_bp, url_prefix="/api")
