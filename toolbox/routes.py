@@ -84,7 +84,7 @@ def _inject():
         "admin_reauth_ok": admin_reauth_ok(),
         "login_required_enabled": login_is_required(),
         "is_guest": bool(user and user.get("is_guest")),
-        "toolbox_cache": "20261004d",
+        "toolbox_cache": "20261004e",
     }
 
 

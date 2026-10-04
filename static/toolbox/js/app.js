@@ -38,20 +38,47 @@
 
   const blank = document.getElementById("tb-blank");
   const blankBtn = document.getElementById("tb-blank-btn");
+  function isBlank() {
+    return !!(blank && !blank.hidden);
+  }
   function setBlank(on) {
     if (!blank) return;
     blank.hidden = !on;
+    if (on && document.activeElement && document.activeElement.blur) {
+      document.activeElement.blur();
+    }
+    if (window.ToolboxDisplay && typeof window.ToolboxDisplay.syncBlank === "function") {
+      window.ToolboxDisplay.syncBlank(!!on);
+    }
   }
   function toggleBlank() {
     if (!blank) return;
     setBlank(blank.hidden);
   }
+  function clearBlank(ev) {
+    if (!isBlank()) return false;
+    if (ev) {
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+    }
+    setBlank(false);
+    return true;
+  }
   blankBtn?.addEventListener("click", toggleBlank);
+  blank?.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    setBlank(false);
+  });
   window.toolboxToggleBlank = toggleBlank;
   window.toolboxSetBlank = setBlank;
+  window.toolboxIsBlank = isBlank;
 
   document.addEventListener("keydown", (ev) => {
     if (ev.target && /INPUT|TEXTAREA|SELECT/.test(ev.target.tagName)) return;
+    if (isBlank() && (ev.key === "Enter" || ev.key === " " || ev.key === "Escape")) {
+      clearBlank(ev);
+      return;
+    }
     if (ev.key === "b" || ev.key === "B") {
       ev.preventDefault();
       toggleBlank();

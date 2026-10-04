@@ -28,8 +28,8 @@ TOOLS: list[dict] = [
     },
     {
         "id": "talk_check",
-        "name": "ALT理解確認",
-        "description": "スピーチを録音し、理解確認の質問を作る。",
+        "name": "スピーチ理解度チェック",
+        "description": "スピーチを録音し、理解度チェックの質問を作る。",
         "icon": "mic",
         "scene": "展開",
         "route": "toolbox.talk_check_page",

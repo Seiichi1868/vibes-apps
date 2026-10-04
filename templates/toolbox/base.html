@@ -11,7 +11,7 @@
   {% block head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
-  <div id="tb-blank" class="tb-blank" hidden>画面を隠しています</div>
+  <div id="tb-blank" class="tb-blank" hidden role="button" tabindex="0">画面を隠しています · タップまたは Enter で戻る</div>
   <header class="tb-top">
     <a class="tb-brand" href="{{ url_for('toolbox.launcher') }}">Toolbox</a>
     {% if current_user %}

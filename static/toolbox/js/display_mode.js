@@ -71,8 +71,12 @@
     }
   }
 
+  function syncBlank(on) {
+    display.blank = !!on;
+  }
+
   function toggleBlank() {
-    display.blank = !display.blank;
+    syncBlank(!(window.toolboxIsBlank ? window.toolboxIsBlank() : display.blank));
     window.toolboxSetBlank && window.toolboxSetBlank(display.blank);
   }
 
@@ -84,20 +88,17 @@
     });
     document.addEventListener("keydown", (ev) => {
       if (ev.target && /INPUT|TEXTAREA|SELECT/.test(ev.target.tagName)) return;
+      if (window.toolboxIsBlank && window.toolboxIsBlank()) return;
       if (ev.key === "f" || ev.key === "F") {
         ev.preventDefault();
         if (display.on) toggleFullscreen();
         else enter();
       }
       if (ev.key === "Escape") {
-        if (display.blank) {
-          toggleBlank();
-          return;
-        }
         if (display.on) exit();
       }
       if (!display.on) return;
-      if (ev.key === " " || ev.key === "ArrowRight" || ev.key === "ArrowDown") {
+      if (ev.key === " " || ev.key === "Enter" || ev.key === "ArrowRight" || ev.key === "ArrowDown") {
         ev.preventDefault();
         display.onNext && display.onNext();
       }
@@ -110,6 +111,7 @@
     if (root) {
       root.addEventListener("click", (ev) => {
         if (!display.on) return;
+        if (window.toolboxIsBlank && window.toolboxIsBlank()) return;
         if (ev.target.closest("button, a, input, select, textarea, label")) return;
         display.onNext && display.onNext();
       });
@@ -122,5 +124,12 @@
     }, { passive: true });
   }
 
-  window.ToolboxDisplay = { init, enter, exit, toggleBlank };
+  window.ToolboxDisplay = {
+    init,
+    enter,
+    exit,
+    toggleBlank,
+    syncBlank,
+    isOn() { return display.on; },
+  };
 })();

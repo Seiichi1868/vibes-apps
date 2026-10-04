@@ -283,9 +283,10 @@ h1, h2, h3 { margin: 0 0 12px; }
   line-height: 1.4;
   margin: 32px 0;
 }
-.tb-question { font-size: clamp(1.6rem, 4.5vw, 2.6rem); line-height: 1.35; }
+.tb-play-stage { display: grid; gap: 12px; }
+.tb-question { font-size: clamp(1.6rem, 4.5vw, 2.6rem); line-height: 1.35; margin: 0; }
 .tb-answer {
-  margin-top: 20px;
+  margin: 0;
   padding: 16px;
   background: var(--tb-ok-soft);
   border-radius: 12px;
@@ -325,6 +326,7 @@ h1, h2, h3 { margin: 0 0 12px; }
   place-items: center;
   color: #bbb;
   font-size: 14px;
+  cursor: pointer;
 }
 .tb-blank[hidden] { display: none; }
 

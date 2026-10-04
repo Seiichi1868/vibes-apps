@@ -1,3 +1,7 @@
+body.tb-display-on {
+  padding-bottom: 0;
+}
+
 body.tb-display-on .tb-top,
 body.tb-display-on .tb-blank-btn {
   display: none;
@@ -23,11 +27,71 @@ body.tb-display-on .tb-muted {
 
 body.tb-display-on .tb-timer-face,
 body.tb-display-on .tb-pick-result,
-body.tb-display-on .tb-question,
 body.tb-display-on .tb-wait-prompt,
 body.tb-display-on .tb-listening {
   font-size: clamp(2.4rem, 12vw, 10rem);
   color: #111;
+}
+
+body.tb-display-on [data-view="play"]:not([hidden]) {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  background: var(--tb-bg, #e9efdf);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+body.tb-display-on [data-view="play"]:not([hidden]) .tb-progress {
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  margin: 0;
+  z-index: 1;
+}
+
+body.tb-display-on [data-view="play"]:not([hidden]) .tb-play-stage {
+  flex: 1;
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  min-height: 0;
+  gap: 0;
+}
+
+body.tb-display-on [data-view="play"]:not([hidden]) .tb-play-q,
+body.tb-display-on [data-view="play"]:not([hidden]) .tb-play-a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  overflow: auto;
+  padding: 28px 28px 48px;
+}
+
+body.tb-display-on [data-view="play"]:not([hidden]) .tb-play-q {
+  border-bottom: 1px solid rgba(17, 17, 17, 0.08);
+}
+
+body.tb-display-on [data-view="play"]:not([hidden]) .tb-question,
+body.tb-display-on [data-view="play"]:not([hidden]) .tb-answer {
+  font-size: clamp(1.25rem, 4.2vmin, 2.6rem);
+  line-height: 1.35;
+  text-align: center;
+  max-width: min(1100px, 92%);
+  color: #111;
+}
+
+body.tb-display-on [data-view="play"]:not([hidden]) .tb-answer {
+  background: transparent;
+  padding: 0;
+}
+
+body.tb-display-on [data-view="play"]:not([hidden]) .tb-teacher-actions {
+  display: none;
 }
 
 .tb-display-bar {

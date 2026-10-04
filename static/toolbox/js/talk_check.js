@@ -552,20 +552,32 @@
     )).join("");
   }
 
+  function displayOn() {
+    return !!(window.ToolboxDisplay && window.ToolboxDisplay.isOn && window.ToolboxDisplay.isOn());
+  }
+
   views.play.addEventListener("click", (ev) => {
+    if (window.toolboxIsBlank && window.toolboxIsBlank()) return;
+    if (displayOn()) return;
     if (ev.target.closest("button, a, input, select, textarea, label")) return;
     stepNext();
   });
 
   document.addEventListener("keydown", (ev) => {
+    if (window.toolboxIsBlank && window.toolboxIsBlank()) return;
     if (state.view !== "play" && state.view !== "wait") return;
     if (ev.target && /INPUT|TEXTAREA|SELECT/.test(ev.target.tagName)) return;
+    if (ev.key === "e" || ev.key === "E") {
+      const evd = document.getElementById("tb-evidence");
+      if (evd && state.view === "play") evd.hidden = !evd.hidden;
+    }
+    if (displayOn()) return;
     if ((ev.key === " " || ev.key === "Enter") && state.view === "wait") {
       const start = document.getElementById("tb-start-qs");
       if (!start.hidden) start.click();
     }
     if (state.view === "play") {
-      if (ev.key === " " || ev.key === "ArrowRight" || ev.key === "ArrowDown") {
+      if (ev.key === " " || ev.key === "Enter" || ev.key === "ArrowRight" || ev.key === "ArrowDown") {
         ev.preventDefault();
         stepNext();
       }
@@ -573,10 +585,6 @@
         ev.preventDefault();
         stepPrev();
       }
-    }
-    if (ev.key === "e" || ev.key === "E") {
-      const evd = document.getElementById("tb-evidence");
-      if (evd && state.view === "play") evd.hidden = !evd.hidden;
     }
   });
 
