@@ -155,9 +155,7 @@ def admin_list_affiliations():
 
 @debate_admin_bp.route("/api/affiliations", methods=["POST"])
 def admin_add_affiliation():
-    payload, denied = _protected_payload()
-    if denied:
-        return denied
+    payload = request.get_json(silent=True) or {}
     items, error = add_affiliation(str(payload.get("name") or ""))
     if error:
         return jsonify({"ok": False, "error": error}), 400

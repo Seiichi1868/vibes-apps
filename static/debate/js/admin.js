@@ -29,7 +29,6 @@ const sessionsFilter = document.getElementById("sessions-filter");
 const affiliationsList = document.getElementById("affiliations-list");
 const affiliationsCount = document.getElementById("affiliations-count");
 const affiliationAddForm = document.getElementById("affiliation-add-form");
-const affiliationEditor = document.getElementById("affiliation-editor");
 const affiliationNameInput = document.getElementById("affiliation-name-input");
 const affiliationAddBtn = document.getElementById("affiliation-add-btn");
 const affiliationLockHint = document.getElementById("affiliation-lock-hint");
@@ -86,7 +85,6 @@ function applyUnlockUI() {
 
 function syncProtectedControls() {
   affiliationLockHint?.classList.toggle("hidden", unlocked);
-  affiliationEditor?.classList.toggle("hidden", !unlocked);
 }
 
 function requireUnlocked(actionLabel) {
@@ -606,9 +604,7 @@ function renderAffiliations(items) {
   if (affiliationsCount) affiliationsCount.textContent = `${allAffiliations.length}件`;
   syncProtectedControls();
   if (!allAffiliations.length) {
-    affiliationsList.innerHTML = unlocked
-      ? '<p class="text-sm text-slate-400">まだ所属がありません。下の欄から追加してください。</p>'
-      : '<p class="text-sm text-slate-400">まだ所属がありません。</p>';
+    affiliationsList.innerHTML = '<p class="text-sm text-slate-400">まだ所属がありません。下の欄から追加してください。</p>';
     refreshAffiliationFilterOptions();
     return;
   }
@@ -645,7 +641,6 @@ sessionsFilter?.addEventListener("change", () => applyAffiliationFilter(sessions
 
 affiliationAddForm?.addEventListener("submit", async (e) => {
   e.preventDefault();
-  if (!requireUnlocked("所属の追加")) return;
   const name = affiliationNameInput?.value.trim() || "";
   if (!name) {
     showLockMessage("所属名を入力してください");
@@ -657,7 +652,7 @@ affiliationAddForm?.addEventListener("submit", async (e) => {
     const res = await fetch("/debate/admin/api/affiliations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, admin_password: getAdminPassword() }),
+      body: JSON.stringify({ name }),
     });
     const data = await res.json();
     if (!res.ok || !data.ok) throw new Error(data.error || "所属の追加に失敗しました");
