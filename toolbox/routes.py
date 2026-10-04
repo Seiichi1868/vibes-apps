@@ -10,8 +10,10 @@ from toolbox.auth import (
     check_csrf,
     current_csrf,
     current_user,
+    ensure_guest_user,
     inject_auth_cookie,
     load_request_user,
+    login_is_required,
     login_required,
     password_ok,
     public_current_user,
@@ -51,7 +53,12 @@ def _before():
         return None
     if _admin_path():
         return check_csrf()
-    if not current_user():
+    if not login_is_required():
+        if not current_user():
+            ensure_guest_user()
+        return check_csrf()
+    user = current_user()
+    if not user or user.get("is_guest"):
         csrf_error = check_csrf()
         if csrf_error:
             return csrf_error
@@ -75,7 +82,9 @@ def _inject():
         "is_admin": admin_panel_ok() or bool(user and user.get("role") == "admin"),
         "admin_panel_ok": admin_panel_ok(),
         "admin_reauth_ok": admin_reauth_ok(),
-        "toolbox_cache": "20261004c",
+        "login_required_enabled": login_is_required(),
+        "is_guest": bool(user and user.get("is_guest")),
+        "toolbox_cache": "20261004d",
     }
 
 
@@ -87,7 +96,10 @@ def tool_required(tool_id: str):
         def wrapped(*args, **kwargs):
             user = current_user()
             if not user:
-                return redirect(url_for("toolbox.login", next=request.path))
+                if not login_is_required():
+                    user = ensure_guest_user()
+                else:
+                    return redirect(url_for("toolbox.login", next=request.path))
             if not is_tool_enabled(tool_id):
                 message = "このツールはいま公開されていません。管理画面でオンにしてください。"
                 if request.path.startswith("/toolbox/api/"):
@@ -119,7 +131,11 @@ def launcher_tools(user: dict) -> list[dict]:
 
 @main_bp.route("/login", methods=["GET", "POST"])
 def login():
-    if current_user() and request.method == "GET":
+    if not login_is_required():
+        if not current_user():
+            ensure_guest_user()
+        return redirect(url_for("toolbox.launcher"))
+    if current_user() and not current_user().get("is_guest") and request.method == "GET":
         return redirect(url_for("toolbox.launcher"))
     error = None
     if request.method == "POST":
@@ -168,10 +184,12 @@ def change_password():
     from toolbox.auth import hash_password
     from toolbox.storage import save_user
 
+    user = current_user()
+    if not user or user.get("is_guest"):
+        return redirect(url_for("toolbox.launcher"))
     error = None
     ok_message = None
     if request.method == "POST":
-        user = current_user()
         current = request.form.get("current_password") or ""
         new_password = request.form.get("new_password") or ""
         confirm = request.form.get("confirm_password") or ""

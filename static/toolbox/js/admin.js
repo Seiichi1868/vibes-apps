@@ -95,6 +95,7 @@
       method: "POST",
       body: JSON.stringify({
         daily_limit_usd: Number(fd.get("daily_limit_usd")),
+        login_required_enabled: fd.get("login_required_enabled") === "on",
         parallel_browser_stt: fd.get("parallel_browser_stt") === "on",
       }),
     }).then(() => alert("保存しました。")));

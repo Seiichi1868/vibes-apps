@@ -257,6 +257,8 @@ def admin_save_settings():
             return jsonify({"ok": False, "error": "1日の上限は数字で入力してください。"}), 400
     if "parallel_browser_stt" in payload:
         updates["parallel_browser_stt"] = bool(payload["parallel_browser_stt"])
+    if "login_required_enabled" in payload:
+        updates["login_required_enabled"] = bool(payload["login_required_enabled"])
     if "assume_transcribe_sec" in payload:
         try:
             updates["assume_transcribe_sec"] = max(10, int(payload["assume_transcribe_sec"]))

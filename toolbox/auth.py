@@ -87,6 +87,40 @@ def current_user() -> dict | None:
     return getattr(g, "toolbox_user", None)
 
 
+def login_is_required() -> bool:
+    from toolbox.storage import get_setting
+
+    return bool(get_setting("login_required_enabled", False))
+
+
+def is_guest_user(user: dict | None = None) -> bool:
+    return bool((user or current_user() or {}).get("is_guest"))
+
+
+def ensure_guest_user() -> dict:
+    user = current_user()
+    if user:
+        return user
+    from toolbox.storage import new_id, now_iso, save_user
+
+    user = {
+        "id": new_id(),
+        "username": f"guest_{new_id()[:6]}",
+        "password_hash": "",
+        "role": "teacher",
+        "is_active": True,
+        "is_guest": True,
+        "created_at": now_iso(),
+        "last_login_at": now_iso(),
+    }
+    save_user(user)
+    session = dict(getattr(g, "toolbox_session", {}) or {})
+    session["uid"] = user["id"]
+    g.toolbox_session = session
+    g.toolbox_user = user
+    return user
+
+
 def wants_json() -> bool:
     if request.path.startswith("/toolbox/api/") or request.path.startswith("/toolbox/admin/api/"):
         return True
@@ -204,8 +238,12 @@ def check_csrf() -> object | None:
 def login_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
+        if not login_is_required():
+            if not current_user():
+                ensure_guest_user()
+            return view(*args, **kwargs)
         user = current_user()
-        if not user:
+        if not user or user.get("is_guest"):
             if wants_json():
                 return jsonify({"ok": False, "error": "ログインしてください。"}), 401
             return redirect(url_for("toolbox.login", next=request.path))

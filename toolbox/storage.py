@@ -16,6 +16,7 @@ from toolbox.config import (
     DEFAULT_ASSUME_TRANSCRIBE_SEC,
     DEFAULT_DAILY_LIMIT_USD,
     DEFAULT_GENERATE_MODEL,
+    DEFAULT_LOGIN_REQUIRED,
     DEFAULT_PARALLEL_BROWSER_STT,
     DEFAULT_TRANSCRIBE_MODEL,
     FAVORITES_FILE,
@@ -134,6 +135,7 @@ def public_user(user: dict) -> dict:
         "is_active": bool(user.get("is_active")),
         "created_at": user.get("created_at"),
         "last_login_at": user.get("last_login_at"),
+        "is_guest": bool(user.get("is_guest")),
     }
 
 
@@ -306,6 +308,7 @@ DEFAULT_APP_SETTINGS = {
     "assume_input_tokens": DEFAULT_ASSUME_INPUT_TOKENS,
     "assume_output_tokens": DEFAULT_ASSUME_OUTPUT_TOKENS,
     "parallel_browser_stt": DEFAULT_PARALLEL_BROWSER_STT,
+    "login_required_enabled": DEFAULT_LOGIN_REQUIRED,
     "model_overrides": {},
 }
 

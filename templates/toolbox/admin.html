@@ -3,7 +3,7 @@
 {% block body %}
 <section class="tb-admin">
   <h1>管理画面</h1>
-  <p class="tb-lead">重要操作は管理パスワード（2479）の再入力が必要です（15分間有効）。</p>
+  <p class="tb-lead">重要操作は管理パスワードの再入力が必要です（15分間有効）。</p>
 
   <h2>ユーザー管理</h2>
   <form id="tb-user-form" class="tb-inline-form">
@@ -80,6 +80,11 @@
     <label>1日の利用上限（USD）
       <input name="daily_limit_usd" type="number" step="0.1" min="0" value="{{ settings.daily_limit_usd }}">
     </label>
+    <label class="tb-check">
+      <input name="login_required_enabled" type="checkbox" {% if settings.login_required_enabled %}checked{% endif %}>
+      教員ログインを必須にする
+    </label>
+    <p class="tb-note">オフのあいだは、ランチャーと各ツールにログインなしで入れます（検証用）。</p>
     <label class="tb-check">
       <input name="parallel_browser_stt" type="checkbox" {% if settings.parallel_browser_stt %}checked{% endif %}>
       ブラウザ文字起こしの並行実行を既定で使う
