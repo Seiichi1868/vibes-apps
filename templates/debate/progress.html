@@ -16,6 +16,10 @@
   <div class="flex flex-wrap items-center justify-between gap-3 mt-3">
     <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500">
       <span>Session: {{ session.session_id[:8] }}…</span>
+      {% if session.affiliation %}
+      <span>&middot;</span>
+      <span>所属: {{ session.affiliation }}</span>
+      {% endif %}
       <span>&middot;</span>
       <span id="overall-progress-label"></span>
       {% if session.mode == 'solo' %}

@@ -10,6 +10,7 @@
   const form = document.getElementById("motion-form");
   const motionPicker = document.getElementById("motion-picker");
   const motionInput = document.getElementById("motion-input");
+  const affiliationPicker = document.getElementById("affiliation-picker");
   const startBtn = document.getElementById("start-btn");
   const errorBox = document.getElementById("form-error");
   const soloOptions = document.getElementById("solo-options");
@@ -208,7 +209,21 @@
       return;
     }
 
-    const payload = { motion };
+    const affiliationId = affiliationPicker?.value.trim() || "";
+    const hasAffiliationOptions = Boolean(
+      affiliationPicker && Array.from(affiliationPicker.options).some((option) => option.value.trim())
+    );
+    if (!hasAffiliationOptions) {
+      showError("所属がまだ登録されていません。管理画面で所属を追加してください。");
+      return;
+    }
+    if (!affiliationId) {
+      showError("所属を選択してください。");
+      affiliationPicker?.focus();
+      return;
+    }
+
+    const payload = { motion, affiliation_id: affiliationId };
     const mode = selectedMode();
     if (mode === "solo") {
       payload.mode = "solo";

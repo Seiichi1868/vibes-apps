@@ -15,9 +15,13 @@ from debate.settings import (
     DEFAULT_BACKGROUND_OPACITY,
     TRANSCRIPTION_MODES,
     _clamp_opacity,
+    add_affiliation,
     clamp_poi_protected_sec,
+    delete_affiliation,
     format_poi_protected_label,
+    list_affiliations,
     load_settings,
+    rename_affiliation,
     resolve_background,
     resolve_judge_model,
     resolve_opponent_model,
@@ -134,6 +138,39 @@ def admin_settings():
         return jsonify({"ok": False, "error": "管理パスワードが違います。"}), 403
 
     return jsonify(_settings_response(update_settings(**updates)))
+
+
+# ── 所属（生徒がディベート開始時に選ぶ選択肢） ────────────────
+@debate_admin_bp.route("/api/affiliations", methods=["GET"])
+def admin_list_affiliations():
+    return jsonify({"ok": True, "affiliations": list_affiliations()})
+
+
+@debate_admin_bp.route("/api/affiliations", methods=["POST"])
+def admin_add_affiliation():
+    payload = request.get_json(silent=True) or {}
+    items, error = add_affiliation(str(payload.get("name") or ""))
+    if error:
+        return jsonify({"ok": False, "error": error}), 400
+    return jsonify({"ok": True, "affiliations": items})
+
+
+@debate_admin_bp.route("/api/affiliations/<affiliation_id>", methods=["POST"])
+def admin_rename_affiliation(affiliation_id):
+    payload = request.get_json(silent=True) or {}
+    items, error = rename_affiliation(affiliation_id, str(payload.get("name") or ""))
+    if error:
+        status = 404 if error == "所属が見つかりません。" else 400
+        return jsonify({"ok": False, "error": error}), status
+    return jsonify({"ok": True, "affiliations": items})
+
+
+@debate_admin_bp.route("/api/affiliations/<affiliation_id>/delete", methods=["POST"])
+def admin_delete_affiliation(affiliation_id):
+    items, error = delete_affiliation(affiliation_id)
+    if error:
+        return jsonify({"ok": False, "error": error}), 404
+    return jsonify({"ok": True, "affiliations": items})
 
 
 # ── 保存済みセッション一覧（途中まで進めたディベートの再開・削除） ──────

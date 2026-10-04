@@ -203,6 +203,8 @@ def session_summary(data: dict, *, mtime: float | None = None, include_notes: bo
     summary = {
         "session_id": data.get("session_id"),
         "motion": data.get("motion"),
+        "affiliation_id": str(data.get("affiliation_id") or ""),
+        "affiliation": str(data.get("affiliation") or ""),
         "created_at": data.get("created_at"),
         "updated_at": updated_at,
         "confirmed_parts": confirmed,

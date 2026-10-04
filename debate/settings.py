@@ -5,6 +5,7 @@ GTECアプリの管理画面と同様の考え方だが、依存関係を持た�
 """
 import json
 import threading
+import uuid
 from copy import deepcopy
 from pathlib import Path
 
@@ -48,7 +49,11 @@ DEFAULT_SETTINGS = {
     "opponent_model_mode": DEFAULT_JUDGE_MODEL_MODE,
     "poi_protected_start_sec": POI_PROTECTED_SEC,
     "poi_protected_end_sec": POI_PROTECTED_SEC,
+    "affiliations": [],
 }
+
+MAX_AFFILIATION_NAME_LEN = 40
+MAX_AFFILIATIONS = 50
 
 
 def resolve_judge_model(mode: str | None = None) -> str:
@@ -179,6 +184,7 @@ def _normalize(raw: dict | None) -> dict:
     start_sec, end_sec = resolve_poi_protected_times(raw)
     data["poi_protected_start_sec"] = start_sec
     data["poi_protected_end_sec"] = end_sec
+    data["affiliations"] = _normalize_affiliations(raw.get("affiliations"))
 
     return data
 
@@ -223,3 +229,83 @@ def update_settings(**kwargs) -> dict:
 def public_settings() -> dict:
     settings = load_settings()
     return {**settings, **resolve_background(settings.get("background_id"))}
+
+
+def _normalize_affiliation_name(name) -> str:
+    return str(name or "").strip()[:MAX_AFFILIATION_NAME_LEN]
+
+
+def _normalize_affiliations(raw) -> list[dict]:
+    if not isinstance(raw, list):
+        return []
+    out = []
+    seen_ids: set[str] = set()
+    seen_names: set[str] = set()
+    for item in raw[:MAX_AFFILIATIONS]:
+        if isinstance(item, str):
+            name = _normalize_affiliation_name(item)
+            affiliation_id = ""
+        elif isinstance(item, dict):
+            name = _normalize_affiliation_name(item.get("name"))
+            affiliation_id = str(item.get("id") or "").strip()
+        else:
+            continue
+        if not name or name in seen_names:
+            continue
+        if not affiliation_id or affiliation_id in seen_ids:
+            affiliation_id = str(uuid.uuid4())
+        seen_ids.add(affiliation_id)
+        seen_names.add(name)
+        out.append({"id": affiliation_id, "name": name})
+    return out
+
+
+def list_affiliations() -> list[dict]:
+    return list(load_settings().get("affiliations") or [])
+
+
+def get_affiliation(affiliation_id: str) -> dict | None:
+    wanted = str(affiliation_id or "").strip()
+    if not wanted:
+        return None
+    for item in list_affiliations():
+        if item.get("id") == wanted:
+            return item
+    return None
+
+
+def add_affiliation(name: str) -> tuple[list[dict], str | None]:
+    cleaned = _normalize_affiliation_name(name)
+    if not cleaned:
+        return list_affiliations(), "所属名を入力してください。"
+    current = list_affiliations()
+    if len(current) >= MAX_AFFILIATIONS:
+        return current, f"所属は{MAX_AFFILIATIONS}件までです。"
+    if any(item.get("name") == cleaned for item in current):
+        return current, "同じ名前の所属がすでにあります。"
+    current.append({"id": str(uuid.uuid4()), "name": cleaned})
+    return update_settings(affiliations=current)["affiliations"], None
+
+
+def rename_affiliation(affiliation_id: str, name: str) -> tuple[list[dict], str | None]:
+    cleaned = _normalize_affiliation_name(name)
+    if not cleaned:
+        return list_affiliations(), "所属名を入力してください。"
+    wanted = str(affiliation_id or "").strip()
+    current = list_affiliations()
+    target = next((item for item in current if item.get("id") == wanted), None)
+    if not target:
+        return current, "所属が見つかりません。"
+    if any(item.get("id") != wanted and item.get("name") == cleaned for item in current):
+        return current, "同じ名前の所属がすでにあります。"
+    target["name"] = cleaned
+    return update_settings(affiliations=current)["affiliations"], None
+
+
+def delete_affiliation(affiliation_id: str) -> tuple[list[dict], str | None]:
+    wanted = str(affiliation_id or "").strip()
+    current = list_affiliations()
+    next_items = [item for item in current if item.get("id") != wanted]
+    if len(next_items) == len(current):
+        return current, "所属が見つかりません。"
+    return update_settings(affiliations=next_items)["affiliations"], None

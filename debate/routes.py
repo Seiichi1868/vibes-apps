@@ -35,7 +35,7 @@ from debate.config import (
 )
 from debate.judge_jobs import start_judge_job
 from debate.models import new_judge_result, new_session, normalize_pois, now_iso
-from debate.settings import load_settings, resolve_background
+from debate.settings import get_affiliation, list_affiliations, load_settings, resolve_background
 from debate.solo import (
     CONFLICT,
     generation_guard,
@@ -226,6 +226,7 @@ def index():
     return render_template(
         "debate/index.html",
         default_motions=DEFAULT_MOTIONS,
+        affiliations=list_affiliations(),
         **_background_context(),
     )
 
@@ -241,6 +242,13 @@ def create_session():
         return jsonify({"error": "論題（motion）を入力してください。"}), 400
     if len(motion) > 500:
         return jsonify({"error": "論題は500文字以内で入力してください。"}), 400
+
+    affiliations = list_affiliations()
+    if not affiliations:
+        return jsonify({"error": "所属がまだ登録されていません。管理画面で所属を追加してください。"}), 400
+    affiliation = get_affiliation(str(payload.get("affiliation_id") or ""))
+    if not affiliation:
+        return jsonify({"error": "所属を選択してください。"}), 400
 
     user_side = None
     ai_difficulty = None
@@ -265,6 +273,8 @@ def create_session():
         user_side=user_side,
         ai_difficulty=ai_difficulty,
         practice_roles=practice_roles,
+        affiliation_id=affiliation["id"],
+        affiliation=affiliation["name"],
     )
     save_session(session)
 

@@ -13,7 +13,7 @@
 
 | URL | 役割 |
 |-----|------|
-| `/debate/` | 論題選択（プルダウン+自由入力）。名前入力なし。news風オープニング約2秒 |
+| `/debate/` | 論題選択（プルダウン+自由入力）→所属を選択して開始。名前入力なし。news風オープニング約2秒 |
 | `/debate/session/<id>` | 6パート進行（録音・一時停止・保存・確認） |
 | `/debate/session/<id>/parts/<part>/review` | 文字起こし確認・確定 |
 | `/debate/session/<id>/judge` | AIジャッジ結果 |
@@ -59,7 +59,8 @@
 ## データ
 
 JSON: `data/debate/sessions/<id>.json` 音声: `data/debate/audio/<id>/`
-設定: `data/debate/settings.json`（背景・透過・transcription_mode・judge_model_mode・opponent_model_mode・poi_protected_start_sec・poi_protected_end_sec）
+設定: `data/debate/settings.json`（背景・透過・transcription_mode・judge_model_mode・opponent_model_mode・poi_protected_start_sec・poi_protected_end_sec・affiliations）
+セッションに `affiliation` / `affiliation_id` を保存。所属選択肢の変更・削除後も、既存セッションの所属名は残す。
 書き込みは `get_session_lock(session_id)` で直列化。`save_session` は tmp→replace。
 パート status: `not_started` → `recording` → `transcribing` → `needs_review` → `confirmed`
 ジャッジ: `idle` → `judging` → `done`/`error`
@@ -97,7 +98,7 @@ Whisper: `debate/transcription.py`（短タイムアウト）。ジョブ: `tran
 
 ## 管理
 
-`/debate/admin` はリンク開放。パスワード必須は `transcription_mode`・`judge_model_mode`・`opponent_model_mode`（`DEBATE_ADMIN_PASSWORD` 既定2479）。背景・透過・POI保護時間はパスワード不要。セッション一覧・コピー・備考・削除あり。コピー時ジャッジはリセット、音声（AI音声含む）は複製。
+`/debate/admin` はリンク開放。パスワード必須は `transcription_mode`・`judge_model_mode`・`opponent_model_mode`（`DEBATE_ADMIN_PASSWORD` 既定2479）。背景・透過・POI保護時間・所属の追加/変更/削除はパスワード不要。セッション一覧・コピー・備考・削除あり。一覧は所属を表示し、更新日時／所属でソート可。コピー時ジャッジはリセット、音声（AI音声含む）は複製。所属もコピー先へ引き継ぐ。
 
 ## ファイル案内（必要なときだけ開け）
 
@@ -123,6 +124,6 @@ Whisper: `debate/transcription.py`（短タイムアウト）。ジョブ: `tran
 4. 生徒向け「アップロード」→「保存」
 5. ジャッジは授業フローの2論点分担に従う
 6. オープニングタイトルは1行、PDAなし
-7. 論題はプルダウン、生徒名なし
+7. 論題はプルダウン、生徒名なし。開始前に管理画面で作った所属を必須選択
 8. 配色は news 同様の淡い緑ガラス
 9. POIは建設的スピーチのみ。保護時間は開始側・終了側を管理画面で別々に変更（0＝無し、既定各60秒）。POI中も持ち時間は止まらない。最長15秒。Replyでは不可。回数で勝敗を変えない。

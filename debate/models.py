@@ -100,6 +100,8 @@ def new_session(
     user_side: str | None = None,
     ai_difficulty: str | None = None,
     practice_roles: list[tuple[str, str]] | None = None,
+    affiliation_id: str = "",
+    affiliation: str = "",
 ) -> dict:
     raw_mode = str(mode or "").strip().lower()
     if raw_mode == "solo":
@@ -135,6 +137,8 @@ def new_session(
         "updated_at": now_iso(),
         "admin_notes": "",
         "copied_from_session_id": "",
+        "affiliation_id": str(affiliation_id or "").strip(),
+        "affiliation": str(affiliation or "").strip(),
         "mode": session_mode,
         "user_side": side,
         "ai_difficulty": difficulty if session_mode in ("solo", "practice") else None,
@@ -147,6 +151,8 @@ def normalize_session(session: dict | None) -> dict | None:
     """欠けている mode 等を duo 互換で補う。読み込み時のみ。ファイルは書き換えない。"""
     if not isinstance(session, dict):
         return session
+    session.setdefault("affiliation_id", "")
+    session.setdefault("affiliation", "")
     raw_mode = str(session.get("mode") or "").strip().lower()
     if raw_mode == "solo":
         session["mode"] = "solo"

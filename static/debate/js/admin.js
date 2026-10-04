@@ -24,7 +24,15 @@ const opponentModelCurrent = document.getElementById("opponent-model-current");
 const sessionsList = document.getElementById("sessions-list");
 const sessionsCount = document.getElementById("sessions-count");
 const sessionsRefreshBtn = document.getElementById("sessions-refresh-btn");
+const sessionsSort = document.getElementById("sessions-sort");
+const affiliationsList = document.getElementById("affiliations-list");
+const affiliationsCount = document.getElementById("affiliations-count");
+const affiliationAddForm = document.getElementById("affiliation-add-form");
+const affiliationNameInput = document.getElementById("affiliation-name-input");
+const affiliationAddBtn = document.getElementById("affiliation-add-btn");
 const transcriptionModePicker = document.getElementById("transcription-mode-picker");
+
+const SESSIONS_SORT_KEY = "debate_admin_sessions_sort";
 
 let unlocked = false;
 let saveTimer = null;
@@ -32,6 +40,8 @@ let notesSaveTimers = new Map();
 let currentBackgroundId = null;
 let currentJudgeModelMode = "5.6-luna";
 let currentOpponentModelMode = "5.6-luna";
+let allSessions = [];
+let currentSessionsSort = "updated";
 
 function getStoredPassword() {
   try {
@@ -327,7 +337,9 @@ function escapeHtml(str) {
   return String(str || "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function splitDateTime(iso) {
@@ -344,91 +356,157 @@ function splitDateTime(iso) {
   }
 }
 
+function sessionUpdatedAt(session) {
+  const stamp = session?.updated_at || session?.created_at || "";
+  const time = Date.parse(stamp);
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function affiliationLabel(session) {
+  return String(session?.affiliation || "").trim();
+}
+
+function sortedSessions(sessions) {
+  const copy = [...sessions];
+  if (currentSessionsSort === "affiliation") {
+    copy.sort((a, b) => {
+      const an = affiliationLabel(a);
+      const bn = affiliationLabel(b);
+      if (!an && !bn) return sessionUpdatedAt(b) - sessionUpdatedAt(a);
+      if (!an) return 1;
+      if (!bn) return -1;
+      const cmp = an.localeCompare(bn, "ja");
+      if (cmp !== 0) return cmp;
+      return sessionUpdatedAt(b) - sessionUpdatedAt(a);
+    });
+    return copy;
+  }
+  copy.sort((a, b) => sessionUpdatedAt(b) - sessionUpdatedAt(a));
+  return copy;
+}
+
+function sessionRowHtml(s) {
+  const dt = splitDateTime(s.updated_at || s.created_at);
+  const done = s.confirmed_parts === s.total_parts && s.total_parts > 0;
+  const progressLabel = done
+    ? `<span class="text-emerald-600 font-semibold">完了</span>`
+    : `<span>${s.confirmed_parts}/${s.total_parts} 確定</span>` +
+      (s.in_progress_parts ? ` ・ <span class="text-amber-600">${s.in_progress_parts} 進行中</span>` : "");
+
+  const transcriptionLabelMap = { batch: "モードA", realtime: "モードB", mixed: "混在" };
+  const transcriptionLabel = transcriptionLabelMap[s.transcription_mode] || "";
+  const transcriptionMeta = transcriptionLabel
+    ? `<span><span class="session-row__meta-key">文字起こし</span> ${transcriptionLabel}</span>`
+    : "";
+
+  const modeLabel = s.mode === "solo"
+    ? `Solo ${escapeHtml(s.user_side || "")} / ${escapeHtml(s.ai_difficulty || "")}`
+    : s.mode === "practice"
+      ? `パート練習 ${escapeHtml(s.practice_scope || (s.included_parts || []).join("→"))}`
+      : escapeHtml(s.mode_label || "通常の対戦");
+  const modeMeta = `<span><span class="session-row__meta-key">モード</span> ${modeLabel}</span>`;
+  const affiliationMeta = `<span><span class="session-row__meta-key">所属</span> ${escapeHtml(affiliationLabel(s) || "未選択")}</span>`;
+
+  let judgeLabel = "";
+  if (s.judge_status === "done") {
+    const modelLabel = s.judge_model ? escapeHtml(s.judge_model) : "";
+    judgeLabel =
+      `<span class="text-teal-700 font-semibold">判定: ${escapeHtml(s.judge_winner || "-")}勝利</span>` +
+      (modelLabel ? ` <span class="text-slate-400">(${modelLabel})</span>` : "");
+  } else if (s.judge_status === "judging") {
+    judgeLabel = `<span class="text-amber-600">ジャッジ実行中…</span>`;
+  } else if (s.judge_status === "error") {
+    judgeLabel = `<span class="text-rose-600">ジャッジ失敗</span>`;
+  }
+
+  const copyBadge = s.copied_from_session_id
+    ? `<span class="text-violet-600 font-semibold">コピー</span>`
+    : "";
+
+  return `
+    <div class="session-row" data-session-id="${escapeHtml(s.session_id)}">
+      <div class="session-row__main">
+        <div class="session-row__body">
+          <p class="session-row__title">${escapeHtml(s.motion)}</p>
+          <div class="session-row__meta">
+            ${affiliationMeta}
+            <span><span class="session-row__meta-key">日付</span> ${escapeHtml(dt.date)}</span>
+            <span><span class="session-row__meta-key">時刻</span> ${escapeHtml(dt.time)}</span>
+            <span>${progressLabel}</span>
+            ${modeMeta}
+            ${transcriptionMeta}
+            ${copyBadge ? `<span>${copyBadge}</span>` : ""}
+            ${judgeLabel ? `<span>${judgeLabel}</span>` : ""}
+          </div>
+          <div class="session-row__notes">
+            <span class="session-row__notes-label">備考</span>
+            <input type="text" class="session-notes-input session-row__notes-input"
+              data-session-id="${escapeHtml(s.session_id)}"
+              value="${escapeHtml(s.admin_notes || "")}"
+              maxlength="200"
+              placeholder="例: Luna比較用コピー">
+          </div>
+        </div>
+        <div class="session-row__actions">
+          <a href="/debate/session/${encodeURIComponent(s.session_id)}"
+            class="session-row__btn session-row__btn--resume">再開</a>
+          <button type="button" class="session-row__btn session-row__btn--copy btn-copy-session"
+            data-session-id="${escapeHtml(s.session_id)}">コピー</button>
+          <button type="button" class="session-row__btn session-row__btn--delete btn-delete-session"
+            data-session-id="${escapeHtml(s.session_id)}">削除</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderSessions(sessions) {
   if (!sessionsList) return;
-  if (sessionsCount) sessionsCount.textContent = `${sessions.length}件`;
+  allSessions = Array.isArray(sessions) ? sessions : [];
+  if (sessionsCount) sessionsCount.textContent = `${allSessions.length}件`;
 
-  if (!sessions.length) {
+  if (!allSessions.length) {
     sessionsList.innerHTML = '<p class="text-sm text-slate-400">保存されたセッションはありません。</p>';
     return;
   }
 
-  const rows = sessions
-    .map((s) => {
-      const dt = splitDateTime(s.updated_at || s.created_at);
-      const done = s.confirmed_parts === s.total_parts && s.total_parts > 0;
-      const progressLabel = done
-        ? `<span class="text-emerald-600 font-semibold">完了</span>`
-        : `<span>${s.confirmed_parts}/${s.total_parts} 確定</span>` +
-          (s.in_progress_parts ? ` ・ <span class="text-amber-600">${s.in_progress_parts} 進行中</span>` : "");
+  const ordered = sortedSessions(allSessions);
+  if (currentSessionsSort !== "affiliation") {
+    sessionsList.innerHTML = ordered.map(sessionRowHtml).join("");
+    return;
+  }
 
-      const transcriptionLabelMap = { batch: "モードA", realtime: "モードB", mixed: "混在" };
-      const transcriptionLabel = transcriptionLabelMap[s.transcription_mode] || "";
-      const transcriptionMeta = transcriptionLabel
-        ? `<span><span class="session-row__meta-key">文字起こし</span> ${transcriptionLabel}</span>`
-        : "";
+  const groups = [];
+  ordered.forEach((session) => {
+    const key = affiliationLabel(session) || "未選択";
+    const last = groups[groups.length - 1];
+    if (!last || last.key !== key) {
+      groups.push({ key, sessions: [session] });
+      return;
+    }
+    last.sessions.push(session);
+  });
 
-      const modeLabel = s.mode === "solo"
-        ? `Solo ${escapeHtml(s.user_side || "")} / ${escapeHtml(s.ai_difficulty || "")}`
-        : s.mode === "practice"
-          ? `パート練習 ${escapeHtml(s.practice_scope || (s.included_parts || []).join("→"))}`
-          : escapeHtml(s.mode_label || "通常の対戦");
-      const modeMeta = `<span><span class="session-row__meta-key">モード</span> ${modeLabel}</span>`;
-
-      let judgeLabel = "";
-      if (s.judge_status === "done") {
-        const modelLabel = s.judge_model ? escapeHtml(s.judge_model) : "";
-        judgeLabel =
-          `<span class="text-teal-700 font-semibold">判定: ${escapeHtml(s.judge_winner || "-")}勝利</span>` +
-          (modelLabel ? ` <span class="text-slate-400">(${modelLabel})</span>` : "");
-      } else if (s.judge_status === "judging") {
-        judgeLabel = `<span class="text-amber-600">ジャッジ実行中…</span>`;
-      } else if (s.judge_status === "error") {
-        judgeLabel = `<span class="text-rose-600">ジャッジ失敗</span>`;
-      }
-
-      const copyBadge = s.copied_from_session_id
-        ? `<span class="text-violet-600 font-semibold">コピー</span>`
-        : "";
-
+  sessionsList.innerHTML = groups
+    .map((group, index) => {
+      const headingClass = index === 0 ? "text-[0.7rem] font-semibold text-teal-700 mb-1" : "text-[0.7rem] font-semibold text-teal-700 mt-3 mb-1";
       return `
-        <div class="session-row" data-session-id="${escapeHtml(s.session_id)}">
-          <div class="session-row__main">
-            <div class="session-row__body">
-              <p class="session-row__title">${escapeHtml(s.motion)}</p>
-              <div class="session-row__meta">
-                <span><span class="session-row__meta-key">日付</span> ${escapeHtml(dt.date)}</span>
-                <span><span class="session-row__meta-key">時刻</span> ${escapeHtml(dt.time)}</span>
-                <span>${progressLabel}</span>
-                ${modeMeta}
-                ${transcriptionMeta}
-                ${copyBadge ? `<span>${copyBadge}</span>` : ""}
-                ${judgeLabel ? `<span>${judgeLabel}</span>` : ""}
-              </div>
-              <div class="session-row__notes">
-                <span class="session-row__notes-label">備考</span>
-                <input type="text" class="session-notes-input session-row__notes-input"
-                  data-session-id="${escapeHtml(s.session_id)}"
-                  value="${escapeHtml(s.admin_notes || "")}"
-                  maxlength="200"
-                  placeholder="例: Luna比較用コピー">
-              </div>
-            </div>
-            <div class="session-row__actions">
-              <a href="/debate/session/${encodeURIComponent(s.session_id)}"
-                class="session-row__btn session-row__btn--resume">再開</a>
-              <button type="button" class="session-row__btn session-row__btn--copy btn-copy-session"
-                data-session-id="${escapeHtml(s.session_id)}">コピー</button>
-              <button type="button" class="session-row__btn session-row__btn--delete btn-delete-session"
-                data-session-id="${escapeHtml(s.session_id)}">削除</button>
-            </div>
-          </div>
+        <div>
+          <p class="${headingClass}">${escapeHtml(group.key)} · ${group.sessions.length}件</p>
+          <div class="space-y-1.5">${group.sessions.map(sessionRowHtml).join("")}</div>
         </div>
       `;
     })
     .join("");
+}
 
-  sessionsList.innerHTML = rows;
+function applySessionsSort(sort) {
+  currentSessionsSort = sort === "affiliation" ? "affiliation" : "updated";
+  if (sessionsSort) sessionsSort.value = currentSessionsSort;
+  try {
+    sessionStorage.setItem(SESSIONS_SORT_KEY, currentSessionsSort);
+  } catch (_) {}
+  renderSessions(allSessions);
 }
 
 async function loadSessions() {
@@ -444,7 +522,123 @@ async function loadSessions() {
   }
 }
 
+function renderAffiliations(items) {
+  if (!affiliationsList) return;
+  const affiliations = Array.isArray(items) ? items : [];
+  if (affiliationsCount) affiliationsCount.textContent = `${affiliations.length}件`;
+  if (!affiliations.length) {
+    affiliationsList.innerHTML = '<p class="text-sm text-slate-400">まだ所属がありません。下の欄から追加してください。</p>';
+    return;
+  }
+  affiliationsList.innerHTML = affiliations
+    .map((item) => `
+      <div class="flex items-center gap-2 rounded-lg border border-teal-100/80 bg-white/60 px-3 py-1.5">
+        <span class="min-w-0 flex-1 text-sm font-medium text-slate-700 truncate">${escapeHtml(item.name)}</span>
+        <button type="button" class="session-row__btn session-row__btn--copy btn-rename-affiliation"
+          data-affiliation-id="${escapeHtml(item.id)}" data-affiliation-name="${escapeHtml(item.name)}">変更</button>
+        <button type="button" class="session-row__btn session-row__btn--delete btn-delete-affiliation"
+          data-affiliation-id="${escapeHtml(item.id)}" data-affiliation-name="${escapeHtml(item.name)}">削除</button>
+      </div>
+    `)
+    .join("");
+}
+
+async function loadAffiliations() {
+  if (!affiliationsList) return;
+  affiliationsList.innerHTML = '<p class="text-sm text-slate-400">読み込み中...</p>';
+  try {
+    const res = await fetch("/debate/admin/api/affiliations");
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "所属一覧の取得に失敗しました");
+    renderAffiliations(data.affiliations || []);
+  } catch (err) {
+    affiliationsList.innerHTML = `<p class="text-sm text-rose-600">${escapeHtml(err.message)}</p>`;
+  }
+}
+
 sessionsRefreshBtn?.addEventListener("click", loadSessions);
+sessionsSort?.addEventListener("change", () => applySessionsSort(sessionsSort.value));
+
+affiliationAddForm?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = affiliationNameInput?.value.trim() || "";
+  if (!name) {
+    showLockMessage("所属名を入力してください");
+    affiliationNameInput?.focus();
+    return;
+  }
+  if (affiliationAddBtn) affiliationAddBtn.disabled = true;
+  try {
+    const res = await fetch("/debate/admin/api/affiliations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || "所属の追加に失敗しました");
+    renderAffiliations(data.affiliations || []);
+    if (affiliationNameInput) affiliationNameInput.value = "";
+    if (statusMessage) statusMessage.textContent = "所属を追加しました";
+    hideLockMessage();
+  } catch (err) {
+    if (statusMessage) statusMessage.textContent = "";
+    showLockMessage(err.message);
+  } finally {
+    if (affiliationAddBtn) affiliationAddBtn.disabled = false;
+  }
+});
+
+affiliationsList?.addEventListener("click", async (e) => {
+  const renameBtn = e.target.closest(".btn-rename-affiliation");
+  if (renameBtn) {
+    const affiliationId = renameBtn.dataset.affiliationId;
+    const currentName = renameBtn.dataset.affiliationName || "";
+    const nextName = window.prompt("所属名を変更", currentName);
+    if (nextName === null) return;
+    const name = nextName.trim();
+    if (!name) {
+      showLockMessage("所属名を入力してください");
+      return;
+    }
+    try {
+      const res = await fetch(`/debate/admin/api/affiliations/${encodeURIComponent(affiliationId)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || "所属の変更に失敗しました");
+      renderAffiliations(data.affiliations || []);
+      if (statusMessage) statusMessage.textContent = "所属名を変更しました";
+      hideLockMessage();
+    } catch (err) {
+      if (statusMessage) statusMessage.textContent = "";
+      showLockMessage(err.message);
+    }
+    return;
+  }
+
+  const deleteBtn = e.target.closest(".btn-delete-affiliation");
+  if (!deleteBtn) return;
+  const affiliationId = deleteBtn.dataset.affiliationId;
+  const name = deleteBtn.dataset.affiliationName || "この所属";
+  if (!window.confirm(`「${name}」を削除しますか？すでに保存されたセッションの所属表示は残ります。`)) return;
+  try {
+    const res = await fetch(`/debate/admin/api/affiliations/${encodeURIComponent(affiliationId)}/delete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || "所属の削除に失敗しました");
+    renderAffiliations(data.affiliations || []);
+    if (statusMessage) statusMessage.textContent = "所属を削除しました";
+    hideLockMessage();
+  } catch (err) {
+    if (statusMessage) statusMessage.textContent = "";
+    showLockMessage(err.message);
+  }
+});
 
 function scheduleNotesSave(sessionId, notes) {
   if (!sessionId) return;
@@ -643,10 +837,18 @@ transcriptionModePicker?.addEventListener("change", () => {
 
 (async function initAdminPage() {
   try {
+    const storedSort = sessionStorage.getItem(SESSIONS_SORT_KEY);
+    currentSessionsSort = storedSort === "affiliation" ? "affiliation" : "updated";
+  } catch (_) {
+    currentSessionsSort = "updated";
+  }
+  if (sessionsSort) sessionsSort.value = currentSessionsSort;
+
+  try {
     await loadSettingsIntoUI();
   } catch (err) {
     showLockMessage(err.message);
   }
-  await loadSessions();
+  await Promise.all([loadAffiliations(), loadSessions()]);
   await restoreUnlockFromStorage();
 })();

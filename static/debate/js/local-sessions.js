@@ -72,6 +72,7 @@
   function renderRow(session) {
     const savedAt = formatSavedAt(session.updated_at || session.created_at);
     const debateMode = formatDebateModeLine(session);
+    const affiliation = session.affiliation ? ` · 所属: ${session.affiliation}` : "";
     const transcription = session.transcription_mode
       ? ` · 文字起こし: ${TRANSCRIPTION_LABELS[session.transcription_mode] || session.transcription_mode}`
       : "";
@@ -82,7 +83,7 @@
           ? `<span class="status-pill shrink-0 text-[0.65rem]">Solo</span>`
           : "";
     const meta = savedAt
-      ? `<p class="text-[0.68rem] text-slate-400 mt-0.5">${escapeHtml(savedAt)}${escapeHtml(debateMode)}${escapeHtml(transcription)}</p>`
+      ? `<p class="text-[0.68rem] text-slate-400 mt-0.5">${escapeHtml(savedAt)}${escapeHtml(affiliation)}${escapeHtml(debateMode)}${escapeHtml(transcription)}</p>`
       : "";
     return `
       <li>

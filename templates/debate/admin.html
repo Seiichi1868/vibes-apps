@@ -17,8 +17,38 @@
 
 <section class="glass-card rounded-2xl p-5 md:p-6 mb-4">
   <div class="flex items-center justify-between gap-2 mb-2">
+    <h2 class="font-bold text-slate-800">所属</h2>
+    <span id="affiliations-count" class="text-xs text-slate-400"></span>
+  </div>
+  <p class="text-xs text-slate-500 mb-3 leading-snug">
+    生徒は論題のあとで、ここで登録した所属から1つ選んでディベートを始めます。クラス名や学年などを追加してください。
+  </p>
+  <div id="affiliations-list" class="space-y-1.5 mb-3">
+    <p class="text-sm text-slate-400">読み込み中...</p>
+  </div>
+  <form id="affiliation-add-form" class="flex flex-wrap items-center gap-2">
+    <input id="affiliation-name-input" type="text" maxlength="40"
+      placeholder="例: 1年A組"
+      class="flex-1 min-w-[10rem] text-sm rounded-lg border border-teal-100 bg-white/80 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand">
+    <button type="submit" id="affiliation-add-btn"
+      class="text-xs px-3 py-1.5 rounded-full bg-brand text-white font-semibold hover:bg-brand-dark transition-colors">
+      追加
+    </button>
+  </form>
+</section>
+
+<section class="glass-card rounded-2xl p-5 md:p-6 mb-4">
+  <div class="flex items-center justify-between gap-2 mb-2">
     <h2 class="font-bold text-slate-800">保存済みセッション</h2>
     <div class="flex items-center gap-2">
+      <label for="sessions-sort" class="flex items-center gap-1 text-[0.65rem] text-slate-400">
+        並び替え
+        <select id="sessions-sort"
+          class="text-xs rounded-full border border-slate-200 bg-white/80 px-2.5 py-1 text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand">
+          <option value="updated">更新日時順</option>
+          <option value="affiliation">所属順</option>
+        </select>
+      </label>
       <span id="sessions-count" class="text-xs text-slate-400"></span>
       <button id="sessions-refresh-btn" type="button"
         class="text-xs px-2.5 py-1 rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">
@@ -152,5 +182,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='debate/js/admin.js', v='20261003b') }}"></script>
+<script src="{{ url_for('static', filename='debate/js/admin.js', v='20261004a') }}"></script>
 {% endblock %}
