@@ -4,6 +4,7 @@ from __future__ import annotations
 from flask import Blueprint, g, jsonify, redirect, render_template, request, url_for
 
 from toolbox.auth import (
+    admin_panel_ok,
     admin_reauth_ok,
     authenticate,
     check_csrf,
@@ -14,7 +15,9 @@ from toolbox.auth import (
     login_required,
     password_ok,
     public_current_user,
+    set_admin_panel_unlock,
     set_admin_reauth,
+    verify_admin_panel_password,
     verify_password,
     write_session_cookie,
 )
@@ -31,22 +34,28 @@ from toolbox.storage import (
 
 main_bp = Blueprint("toolbox", __name__, url_prefix="/toolbox")
 
-PUBLIC_ENDPOINTS = {"toolbox.login"}
+PUBLIC_ENDPOINTS = {"toolbox.login", "toolbox.admin_page", "toolbox.admin_unlock"}
+
+
+def _admin_path() -> bool:
+    path = request.path
+    return path == "/toolbox/admin" or path.startswith("/toolbox/admin/")
 
 
 @main_bp.before_request
 def _before():
     load_request_user()
     if request.endpoint in PUBLIC_ENDPOINTS:
-        csrf_error = check_csrf()
-        return csrf_error
+        return check_csrf()
     if request.endpoint == "toolbox.static":
         return None
+    if _admin_path():
+        return check_csrf()
     if not current_user():
         csrf_error = check_csrf()
         if csrf_error:
             return csrf_error
-        if request.path.startswith("/toolbox/api/") or request.path.startswith("/toolbox/admin/api/"):
+        if request.path.startswith("/toolbox/api/"):
             return jsonify({"ok": False, "error": "ログインしてください。"}), 401
         return redirect(url_for("toolbox.login", next=request.path))
     return check_csrf()
@@ -63,9 +72,10 @@ def _inject():
     return {
         "csrf_token": current_csrf(),
         "current_user": public_current_user(),
-        "is_admin": bool(user and user.get("role") == "admin"),
+        "is_admin": admin_panel_ok() or bool(user and user.get("role") == "admin"),
+        "admin_panel_ok": admin_panel_ok(),
         "admin_reauth_ok": admin_reauth_ok(),
-        "toolbox_cache": "20261004b",
+        "toolbox_cache": "20261004c",
     }
 
 

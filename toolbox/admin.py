@@ -4,16 +4,19 @@ from __future__ import annotations
 import secrets
 from datetime import date
 
-from flask import jsonify, render_template, request
+from flask import g, jsonify, redirect, render_template, request, url_for
 from werkzeug.security import generate_password_hash
 
 from toolbox.auth import (
-    admin_required,
+    admin_panel_ok,
+    admin_panel_required,
     current_user,
     password_ok,
     require_admin_reauth,
+    set_admin_panel_unlock,
     set_admin_reauth,
-    verify_password,
+    verify_admin_panel_password,
+    wants_json,
 )
 from toolbox.cli import USERNAME_RE
 from toolbox.config import MIN_PASSWORD_LEN
@@ -82,9 +85,30 @@ def _model_rows(kind: str) -> list[dict]:
     return rows
 
 
+@main_bp.route("/admin/unlock", methods=["POST"])
+def admin_unlock():
+    password = request.form.get("password") or ""
+    if request.is_json:
+        payload = request.get_json(silent=True) or {}
+        password = payload.get("password") or password
+    if not verify_admin_panel_password(password):
+        if wants_json():
+            return jsonify({"ok": False, "error": "管理パスワードが違います。"}), 403
+        return render_template(
+            "toolbox/admin_gate.html",
+            error="管理パスワードが違います。",
+        ), 403
+    g.toolbox_session = set_admin_panel_unlock(g.toolbox_session)
+    g.toolbox_session = set_admin_reauth(g.toolbox_session)
+    if wants_json():
+        return jsonify({"ok": True})
+    return redirect(url_for("toolbox.admin_page"))
+
+
 @main_bp.route("/admin/")
-@admin_required
 def admin_page():
+    if not admin_panel_ok():
+        return render_template("toolbox/admin_gate.html", error=None)
     users = [public_user(user) for user in list_users()]
     user_names = {user["id"]: user["username"] for user in users}
     summary = usage_summary()
@@ -102,20 +126,18 @@ def admin_page():
 
 
 @main_bp.route("/admin/api/reauth", methods=["POST"])
-@admin_required
+@admin_panel_required
 def admin_reauth():
-    from flask import g
-
     payload = request.get_json(silent=True) or {}
     password = payload.get("password") or ""
-    if not verify_password(current_user(), password):
-        return jsonify({"ok": False, "error": "パスワードが違います。"}), 403
+    if not verify_admin_panel_password(password):
+        return jsonify({"ok": False, "error": "管理パスワードが違います。"}), 403
     g.toolbox_session = set_admin_reauth(g.toolbox_session)
     return jsonify({"ok": True})
 
 
 @main_bp.route("/admin/api/users", methods=["POST"])
-@admin_required
+@admin_panel_required
 def admin_create_user():
     guard = require_admin_reauth()
     if guard:
@@ -154,7 +176,7 @@ def _mutate_user(user_id: str):
 
 
 @main_bp.route("/admin/api/users/<user_id>/active", methods=["POST"])
-@admin_required
+@admin_panel_required
 def admin_set_active(user_id):
     guard = require_admin_reauth()
     if guard:
@@ -172,7 +194,7 @@ def admin_set_active(user_id):
 
 
 @main_bp.route("/admin/api/users/<user_id>/reset-password", methods=["POST"])
-@admin_required
+@admin_panel_required
 def admin_reset_password(user_id):
     guard = require_admin_reauth()
     if guard:
@@ -189,7 +211,7 @@ def admin_reset_password(user_id):
 
 
 @main_bp.route("/admin/api/users/<user_id>", methods=["DELETE"])
-@admin_required
+@admin_panel_required
 def admin_delete_user(user_id):
     guard = require_admin_reauth()
     if guard:
@@ -197,7 +219,8 @@ def admin_delete_user(user_id):
     user, err, code = _mutate_user(user_id)
     if err:
         return err, code
-    if user.get("id") == current_user()["id"]:
+    me = current_user()
+    if me and user.get("id") == me.get("id"):
         return jsonify({"ok": False, "error": "自分自身は削除できません。"}), 400
     if user.get("role") == "admin" and count_active_admins(exclude_id=user_id) < 1:
         return jsonify({"ok": False, "error": "最後の管理者は削除できません。"}), 400
@@ -206,7 +229,7 @@ def admin_delete_user(user_id):
 
 
 @main_bp.route("/admin/api/tools/<tool_id>/enabled", methods=["POST"])
-@admin_required
+@admin_panel_required
 def admin_set_tool(tool_id):
     guard = require_admin_reauth()
     if guard:
@@ -220,7 +243,7 @@ def admin_set_tool(tool_id):
 
 
 @main_bp.route("/admin/api/settings", methods=["POST"])
-@admin_required
+@admin_panel_required
 def admin_save_settings():
     guard = require_admin_reauth()
     if guard:
@@ -255,7 +278,7 @@ def admin_save_settings():
 
 
 @main_bp.route("/admin/api/models", methods=["POST"])
-@admin_required
+@admin_panel_required
 def admin_select_model():
     guard = require_admin_reauth()
     if guard:
@@ -277,7 +300,7 @@ def admin_select_model():
 
 
 @main_bp.route("/admin/api/models/<model_id>/meta", methods=["POST"])
-@admin_required
+@admin_panel_required
 def admin_edit_model_meta(model_id):
     guard = require_admin_reauth()
     if guard:

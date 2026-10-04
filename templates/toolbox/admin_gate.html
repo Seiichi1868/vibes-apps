@@ -1,0 +1,17 @@
+{% extends "toolbox/base.html" %}
+{% block title %}管理画面 · Toolbox{% endblock %}
+{% block body %}
+<section class="tb-card tb-narrow">
+  <h1>Toolbox 管理画面</h1>
+  <p class="tb-lead">管理パスワードを入力してください。Toolbox のログインは不要です。</p>
+  {% if error %}<p class="tb-error" role="alert">{{ error }}</p>{% endif %}
+  <form method="post" action="{{ url_for('toolbox.admin_unlock') }}" class="tb-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>管理パスワード
+      <input name="password" type="password" autocomplete="current-password" required autofocus>
+    </label>
+    <button class="tb-btn tb-btn-primary" type="submit">入る</button>
+  </form>
+  <p class="tb-note" style="margin-top:16px"><a href="{{ url_for('toolbox.login') }}">教員ログインへ</a></p>
+</section>
+{% endblock %}

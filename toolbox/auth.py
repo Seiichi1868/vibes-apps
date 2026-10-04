@@ -11,6 +11,7 @@ from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from toolbox.config import (
+    ADMIN_PANEL_PASSWORD,
     ADMIN_REAUTH_SEC,
     COOKIE_MAX_AGE,
     COOKIE_NAME,
@@ -132,6 +133,26 @@ def verify_password(user: dict, password: str) -> bool:
     return check_password_hash(user.get("password_hash") or "", password or "")
 
 
+def verify_admin_panel_password(password: str) -> bool:
+    return str(password or "") == str(ADMIN_PANEL_PASSWORD)
+
+
+def admin_panel_ok() -> bool:
+    until = getattr(g, "toolbox_session", {}).get("admin_panel_until")
+    try:
+        return float(until or 0) > __import__("time").time()
+    except (TypeError, ValueError):
+        return False
+
+
+def set_admin_panel_unlock(data: dict) -> dict:
+    import time
+
+    next_data = dict(data)
+    next_data["admin_panel_until"] = time.time() + COOKIE_MAX_AGE
+    return next_data
+
+
 def admin_reauth_ok() -> bool:
     until = getattr(g, "toolbox_session", {}).get("admin_ok_until")
     try:
@@ -193,21 +214,27 @@ def login_required(view):
     return wrapped
 
 
-def admin_required(view):
+def admin_panel_required(view):
+    """管理画面・管理 API。Toolbox ログイン不要。管理パスワード解除済みなら通す。"""
     @wraps(view)
     def wrapped(*args, **kwargs):
-        user = current_user()
-        if not user:
-            if wants_json():
-                return jsonify({"ok": False, "error": "ログインしてください。"}), 401
-            return redirect(url_for("toolbox.login", next=request.path))
-        if user.get("role") != "admin":
-            if wants_json():
-                return jsonify({"ok": False, "error": "管理画面は管理者だけが使えます。"}), 403
-            return "管理画面は管理者だけが使えます。", 403
-        return view(*args, **kwargs)
+        if admin_panel_ok():
+            return view(*args, **kwargs)
+        if wants_json():
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": "admin_unlock_required",
+                    "message": "管理パスワードを入力してください。",
+                }
+            ), 401
+        return redirect(url_for("toolbox.admin_page"))
 
     return wrapped
+
+
+# 後方互換の別名
+admin_required = admin_panel_required
 
 
 def require_admin_reauth():

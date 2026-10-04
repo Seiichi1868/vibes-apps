@@ -50,6 +50,9 @@ DEFAULT_TRANSCRIBE_MODEL = "whisper-1"
 DEFAULT_GENERATE_MODEL = "gpt-4o-mini"
 DEFAULT_PARALLEL_BROWSER_STT = True
 
+# 管理画面の入口（他アプリの 2479 と同じ運用）。環境変数で上書き可。
+ADMIN_PANEL_PASSWORD = os.environ.get("TOOLBOX_ADMIN_PASSWORD", "2479")
+
 
 def get_openai_api_key() -> str:
     return (os.environ.get("OPENAI_API_KEY") or "").strip()
