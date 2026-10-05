@@ -1,7 +1,7 @@
 from flask import jsonify, render_template, request
 
 from toolbox.auth import current_user, login_required
-from toolbox.routes import tool_required
+from toolbox.routes import any_tool_required, tool_required
 from toolbox.storage import delete_class, get_class, list_classes, new_id, now_iso, save_class
 
 
@@ -38,13 +38,13 @@ def register(bp):
 
     @bp.route("/api/classes")
     @login_required
-    @tool_required("random_pick")
+    @any_tool_required("random_pick", "random_seats")
     def api_list_classes():
         return jsonify({"ok": True, "classes": list_classes(current_user()["id"])})
 
     @bp.route("/api/classes", methods=["POST"])
     @login_required
-    @tool_required("random_pick")
+    @any_tool_required("random_pick", "random_seats")
     def api_create_class():
         row, error = _normalize_class(request.get_json(silent=True) or {}, current_user()["id"])
         if error:
@@ -54,7 +54,7 @@ def register(bp):
 
     @bp.route("/api/classes/<class_id>", methods=["PUT"])
     @login_required
-    @tool_required("random_pick")
+    @any_tool_required("random_pick", "random_seats")
     def api_update_class(class_id):
         existing = get_class(class_id, current_user()["id"])
         if not existing:
@@ -67,7 +67,7 @@ def register(bp):
 
     @bp.route("/api/classes/<class_id>/duplicate", methods=["POST"])
     @login_required
-    @tool_required("random_pick")
+    @any_tool_required("random_pick", "random_seats")
     def api_duplicate_class(class_id):
         existing = get_class(class_id, current_user()["id"])
         if not existing:
@@ -81,7 +81,7 @@ def register(bp):
 
     @bp.route("/api/classes/<class_id>", methods=["DELETE"])
     @login_required
-    @tool_required("random_pick")
+    @any_tool_required("random_pick", "random_seats")
     def api_delete_class(class_id):
         if not delete_class(class_id, current_user()["id"]):
             return jsonify({"ok": False, "error": "クラスが見つかりません。"}), 404

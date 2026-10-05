@@ -16,7 +16,7 @@
     bar.innerHTML = `
       <button type="button" data-act="prev" aria-label="前へ">←</button>
       <button type="button" data-act="next" aria-label="次へ">→</button>
-      <button type="button" data-act="blank" aria-label="ブランク">B</button>
+      <button type="button" data-act="blank" aria-label="Blank">B</button>
       <button type="button" data-act="full" aria-label="全画面">F</button>
       <button type="button" data-act="exit" aria-label="終了">Esc</button>
     `;

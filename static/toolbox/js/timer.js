@@ -13,6 +13,7 @@
   let muted = false;
   let audio = null;
   let wakeLock = null;
+  let ringing = false;
 
   function pad(n) {
     return String(n).padStart(2, "0");
@@ -46,9 +47,20 @@
     }).catch(() => {});
   }
 
+  function stopEnd() {
+    ringing = false;
+    document.body.classList.remove("tb-timer-ringing");
+    if (!audio) return;
+    audio.pause();
+    audio.currentTime = 0;
+  }
+
   function playEnd() {
     if (muted || !audio) return;
+    audio.loop = true;
     audio.currentTime = 0;
+    ringing = true;
+    document.body.classList.add("tb-timer-ringing");
     audio.play().catch(() => {});
   }
 
@@ -85,6 +97,7 @@
 
   function startPause() {
     unlockAudio();
+    stopEnd();
     if (remainingMs <= 0) remainingMs = durationMs;
     if (running) {
       running = false;
@@ -116,12 +129,21 @@
   resetBtn.addEventListener("click", () => {
     clearInterval(tickId);
     releaseWake();
+    stopEnd();
     setDuration(durationMs);
   });
   muteBtn.addEventListener("click", () => {
     muted = !muted;
     muteBtn.textContent = muted ? "ミュート解除" : "ミュート";
+    if (muted) stopEnd();
   });
+  function stopRingOnPointer(ev) {
+    if (!ringing) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    stopEnd();
+  }
+  document.addEventListener("pointerdown", stopRingOnPointer, true);
   document.addEventListener("visibilitychange", () => {
     if (running) tick();
   });

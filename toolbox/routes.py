@@ -84,7 +84,7 @@ def _inject():
         "admin_reauth_ok": admin_reauth_ok(),
         "login_required_enabled": login_is_required(),
         "is_guest": bool(user and user.get("is_guest")),
-        "toolbox_cache": "20261004e",
+        "toolbox_cache": "20261005a",
     }
 
 
@@ -106,6 +106,33 @@ def tool_required(tool_id: str):
                     return jsonify({"ok": False, "error": message}), 403
                 return render_template("toolbox/unavailable.html", message=message), 403
             record_recent(user["id"], tool_id)
+            return view(*args, **kwargs)
+
+        return wrapped
+
+    return deco
+
+
+def any_tool_required(*tool_ids: str):
+    def deco(view):
+        from functools import wraps
+
+        @wraps(view)
+        def wrapped(*args, **kwargs):
+            user = current_user()
+            if not user:
+                if not login_is_required():
+                    user = ensure_guest_user()
+                else:
+                    return redirect(url_for("toolbox.login", next=request.path))
+            enabled_id = next((tid for tid in tool_ids if is_tool_enabled(tid)), None)
+            if not enabled_id:
+                message = "このツールはいま公開されていません。管理画面でオンにしてください。"
+                if request.path.startswith("/toolbox/api/"):
+                    return jsonify({"ok": False, "error": message}), 403
+                return render_template("toolbox/unavailable.html", message=message), 403
+            if not request.path.startswith("/toolbox/api/"):
+                record_recent(user["id"], enabled_id)
             return view(*args, **kwargs)
 
         return wrapped

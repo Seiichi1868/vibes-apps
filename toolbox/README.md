@@ -2,6 +2,8 @@
 
 教員向け授業補助ツール。URL: `/toolbox/`
 
+タイマー・ランダム指名・ランダム座席表・スピーチ理解度チェックを教室内で大きく表示して使います。
+
 他アプリ（news / conjugate / debate など）は import しません。データは `data/toolbox/` の JSON です。
 
 ## 管理画面

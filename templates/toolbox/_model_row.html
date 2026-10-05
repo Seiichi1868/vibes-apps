@@ -20,10 +20,10 @@
   <td>
     <span class="tb-stars" aria-label="{{ row.quality_score }}/5">{{ "★" * (row.quality_score or 0) }}{{ "☆" * (5 - (row.quality_score or 0)) }}</span>
     <p class="tb-muted">{{ row.quality_note }}</p>
-    <button type="button" class="tb-linkish" data-edit-model="{{ row.id }}" data-score="{{ row.quality_score }}" data-note="{{ row.quality_note }}">参考値を編集</button>
+    <button type="button" class="tb-linkish" data-edit-model="{{ row.id }}" data-score="{{ row.quality_score }}" data-note="{{ row.quality_note }}">編集</button>
   </td>
   <td>
-    {% if row.cost_performance is not none %}{{ row.cost_performance }} <span class="tb-muted">（参考値から算出）</span>
+    {% if row.cost_performance is not none %}{{ row.cost_performance }} <span class="tb-muted">参考</span>
     {% else %}未評価{% endif %}
   </td>
 </tr>

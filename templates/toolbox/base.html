@@ -11,12 +11,12 @@
   {% block head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
-  <div id="tb-blank" class="tb-blank" hidden role="button" tabindex="0">画面を隠しています · タップまたは Enter で戻る</div>
+  <div id="tb-blank" class="tb-blank" hidden role="button" tabindex="0">タップまたはEnterで戻る</div>
   <header class="tb-top">
     <a class="tb-brand" href="{{ url_for('toolbox.launcher') }}">Toolbox</a>
     {% if current_user %}
     <div class="tb-user">
-      <button class="tb-user-btn" type="button" id="tb-user-toggle" aria-expanded="false">{{ "ゲスト" if is_guest else current_user.username }}</button>
+      <button class="tb-user-btn" type="button" id="tb-user-toggle" aria-expanded="false">{{ "Guest" if is_guest else current_user.username }}</button>
       <div class="tb-user-menu" id="tb-user-menu" hidden>
         {% if not is_guest %}
         <a href="{{ url_for('toolbox.change_password') }}">パスワード変更</a>
@@ -35,7 +35,7 @@
   <main class="tb-main">
     {% block body %}{% endblock %}
   </main>
-  <button class="tb-blank-btn" type="button" id="tb-blank-btn" title="ブランク画面 (B)">ブランク</button>
+  <button class="tb-blank-btn" type="button" id="tb-blank-btn" title="Blank (B)">Blank</button>
   <script>window.TOOLBOX_CSRF = {{ csrf_token|tojson }};</script>
   <script src="{{ url_for('static', filename='toolbox/js/app.js', v=toolbox_cache) }}"></script>
   <script src="{{ url_for('static', filename='toolbox/js/display_mode.js', v=toolbox_cache) }}"></script>

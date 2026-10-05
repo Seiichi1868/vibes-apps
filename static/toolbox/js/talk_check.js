@@ -26,6 +26,7 @@
     waitTimer: 0,
     wakeLock: null,
     pendingRetry: null,
+    regenBusy: false,
   };
 
   function settings() {
@@ -528,20 +529,38 @@
     else renderQuestion();
   });
 
-  document.getElementById("tb-regen").addEventListener("click", async () => {
+  document.getElementById("tb-regen").addEventListener("click", async (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
     const q = currentQ();
-    if (!q || !state.sessionId) return;
+    const btn = document.getElementById("tb-regen");
+    if (!q) return;
+    if (!state.sessionId) {
+      alert("この問題は作り直せません。もう一度問題を作ってください。");
+      return;
+    }
+    if (state.regenBusy) return;
     const realIndex = state.questions.indexOf(q);
+    if (realIndex < 0) return;
+    const label = btn.textContent;
+    state.regenBusy = true;
+    btn.disabled = true;
+    btn.textContent = "作り直し中…";
     try {
       const data = await toolboxFetch("/toolbox/api/talk/regenerate-one", {
         method: "POST",
         body: JSON.stringify({ session_id: state.sessionId, index: realIndex }),
       });
+      if (!data.question) throw new Error("新しい問題が返りませんでした。");
       state.questions[realIndex] = data.question;
       state.showingAnswer = false;
       renderQuestion();
     } catch (err) {
       alert(err.message);
+    } finally {
+      state.regenBusy = false;
+      btn.disabled = false;
+      btn.textContent = label;
     }
   });
 

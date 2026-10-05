@@ -3,7 +3,7 @@
 {% block body %}
 <section class="tb-admin">
   <h1>管理画面</h1>
-  <p class="tb-lead">重要操作は管理パスワードの再入力が必要です（15分間有効）。</p>
+  <p class="tb-lead">重要操作は管理パスワードの再入力が必要です（15分有効）。</p>
 
   <h2>ユーザー管理</h2>
   <form id="tb-user-form" class="tb-inline-form">
@@ -92,8 +92,8 @@
     <button class="tb-btn tb-btn-primary" type="submit">保存</button>
   </form>
 
-  <h2>モデル選択 <span class="tb-badge tb-badge-mute">参考値（実測ではありません）</span></h2>
-  <p class="tb-note">性能スコアとコスパは参考値です。実測の所要時間・平均費用は別列です。価格未設定のモデルは選べません。</p>
+  <h2>モデル選択 <span class="tb-badge tb-badge-mute">参考値</span></h2>
+  <p class="tb-note">性能・コスパは参考値。所要時間と平均費用は実測。価格未設定は選べません。</p>
   <div class="tb-sorts">
     <span>並び替え:</span>
     <button type="button" data-sort="cost">推定費用</button>
@@ -106,9 +106,9 @@
     <table class="tb-table tb-model-table" data-kind="transcribe">
       <thead>
         <tr>
-          <th>選択</th><th>モデル</th><th>価格</th><th>1回あたり推定</th>
-          <th>実測の平均所要時間</th><th>実測の平均費用</th>
-          <th>性能スコア（参考値）</th><th>コスパ（目安）</th>
+          <th>選択</th><th>モデル</th><th>価格</th><th>推定/回</th>
+          <th>平均所要</th><th>平均費用</th>
+          <th>性能</th><th>コスパ</th>
         </tr>
       </thead>
       <tbody>
@@ -124,9 +124,9 @@
     <table class="tb-table tb-model-table" data-kind="generate">
       <thead>
         <tr>
-          <th>選択</th><th>モデル</th><th>価格</th><th>1回あたり推定</th>
-          <th>実測の平均所要時間</th><th>実測の平均費用</th>
-          <th>性能スコア（参考値）</th><th>コスパ（目安）</th>
+          <th>選択</th><th>モデル</th><th>価格</th><th>推定/回</th>
+          <th>平均所要</th><th>平均費用</th>
+          <th>性能</th><th>コスパ</th>
         </tr>
       </thead>
       <tbody>

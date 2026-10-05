@@ -27,6 +27,17 @@ TOOLS: list[dict] = [
         "default_enabled": True,
     },
     {
+        "id": "random_seats",
+        "name": "ランダム座席表",
+        "description": "出席番号を座席にランダム配置。",
+        "icon": "seats",
+        "scene": "運営",
+        "route": "toolbox.random_seats_page",
+        "path": "/toolbox/random-seats",
+        "uses_ai": False,
+        "default_enabled": True,
+    },
+    {
         "id": "talk_check",
         "name": "スピーチ理解度チェック",
         "description": "スピーチを録音し、理解度チェックの質問を作る。",

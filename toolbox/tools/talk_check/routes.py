@@ -20,7 +20,7 @@ from toolbox.storage import (
     now_iso,
     save_talk_session,
 )
-from toolbox.tools.talk_check.generate import LEVELS, generate_questions, make_title
+from toolbox.tools.talk_check.generate import LEVELS, generate_questions, generate_replacement_question, make_title
 from toolbox.usage import UsageError, UsageLimitError, record_event, transcribe_file
 
 logger = logging.getLogger(__name__)
@@ -176,17 +176,16 @@ def register(bp):
         if index < 0 or index >= len(questions):
             return jsonify({"ok": False, "error": "その問題はありません。"}), 404
         try:
-            fresh = generate_questions(
+            replacement = generate_replacement_question(
                 transcript=session.get("transcript") or "",
                 level=session.get("level") or "A2",
-                count=max(3, min(8, len(questions))),
-                include_inference=any(q.get("type") == "inference" for q in questions),
-                notes="Replace only the weakest or most overlapping question. Keep the others distinct.",
+                existing_questions=questions,
+                replace_type=str((questions[index] or {}).get("type") or "fact"),
+                notes="Make a clearly different question from the one being replaced.",
                 user_id=user["id"],
             )
         except (UsageError, UsageLimitError) as exc:
             return _error(exc, "作り直しに失敗しました。")
-        replacement = fresh[min(index, len(fresh) - 1)]
         replacement["order"] = index + 1
         questions[index] = replacement
         session["questions_json"] = questions

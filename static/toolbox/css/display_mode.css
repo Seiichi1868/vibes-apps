@@ -2,9 +2,34 @@ body.tb-display-on {
   padding-bottom: 0;
 }
 
-body.tb-display-on .tb-top,
+body.tb-display-on .tb-top {
+  background: transparent;
+  box-shadow: none;
+  min-height: 36px;
+  padding: 4px 10px;
+}
+
+body.tb-display-on .tb-brand {
+  opacity: 0.12;
+  font-size: 0.85rem;
+}
+
+body.tb-display-on .tb-user-btn,
 body.tb-display-on .tb-blank-btn {
-  display: none;
+  opacity: 0.16;
+  background: transparent;
+  font-size: 11px;
+  min-height: 28px;
+  min-width: 28px;
+  padding: 0 8px;
+  color: #6a6a6a;
+}
+
+body.tb-display-on .tb-user-btn:hover,
+body.tb-display-on .tb-blank-btn:hover,
+body.tb-display-on .tb-user-btn:focus,
+body.tb-display-on .tb-blank-btn:focus {
+  opacity: 0.7;
 }
 
 body.tb-display-on .tb-main {
@@ -16,21 +41,43 @@ body.tb-display-on .tb-tool {
   padding: 16px;
 }
 
-body.tb-display-on .tb-tool-title,
 body.tb-display-on .tb-teacher-actions,
-body.tb-display-on .tb-presets,
-body.tb-display-on .tb-inline-form,
-body.tb-display-on .tb-note,
-body.tb-display-on .tb-muted {
-  opacity: 0.22;
+body.tb-display-on .tb-stage-chrome {
+  opacity: 0.18;
+}
+
+body.tb-display-on .tb-stage-chrome:hover,
+body.tb-display-on .tb-stage-chrome:focus-within {
+  opacity: 0.75;
 }
 
 body.tb-display-on .tb-timer-face,
 body.tb-display-on .tb-pick-result,
 body.tb-display-on .tb-wait-prompt,
 body.tb-display-on .tb-listening {
-  font-size: clamp(2.4rem, 12vw, 10rem);
+  font-size: clamp(6rem, 28vw, 18rem);
   color: #111;
+}
+
+body.tb-display-on .tb-stage-tool {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  margin: 0;
+  padding: 8px 12px 36px;
+  background: var(--tb-bg, #e9efdf);
+  border-radius: 0;
+  box-shadow: none;
+  min-height: 100vh;
+}
+
+body.tb-display-on .tb-stage-chrome .tb-btn,
+body.tb-display-on .tb-stage-chrome button,
+body.tb-display-on .tb-stage-chrome .tb-inline-form input,
+body.tb-display-on .tb-stage-chrome .tb-inline-form select {
+  min-height: 28px;
+  min-width: 28px;
+  font-size: 0.7rem;
 }
 
 body.tb-display-on [data-view="play"]:not([hidden]) {
@@ -56,10 +103,12 @@ body.tb-display-on [data-view="play"]:not([hidden]) .tb-progress {
 
 body.tb-display-on [data-view="play"]:not([hidden]) .tb-play-stage {
   flex: 1;
-  display: grid;
-  grid-template-rows: 1fr 1fr;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
   min-height: 0;
-  gap: 0;
 }
 
 body.tb-display-on [data-view="play"]:not([hidden]) .tb-play-q,
@@ -67,19 +116,20 @@ body.tb-display-on [data-view="play"]:not([hidden]) .tb-play-a {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex: 0 1 auto;
   min-height: 0;
   overflow: auto;
-  padding: 28px 28px 48px;
+  padding: 8px 32px;
 }
 
 body.tb-display-on [data-view="play"]:not([hidden]) .tb-play-q {
-  border-bottom: 1px solid rgba(17, 17, 17, 0.08);
+  border-bottom: 0;
 }
 
 body.tb-display-on [data-view="play"]:not([hidden]) .tb-question,
 body.tb-display-on [data-view="play"]:not([hidden]) .tb-answer {
-  font-size: clamp(1.25rem, 4.2vmin, 2.6rem);
-  line-height: 1.35;
+  font-size: clamp(1.85rem, 5.8vmin, 3.8rem);
+  line-height: 1.3;
   text-align: center;
   max-width: min(1100px, 92%);
   color: #111;
@@ -92,6 +142,10 @@ body.tb-display-on [data-view="play"]:not([hidden]) .tb-answer {
 
 body.tb-display-on [data-view="play"]:not([hidden]) .tb-teacher-actions {
   display: none;
+}
+
+body.tb-display-on .tb-seat-cell {
+  font-size: clamp(2rem, 8.5vmin, 5.5rem);
 }
 
 .tb-display-bar {
