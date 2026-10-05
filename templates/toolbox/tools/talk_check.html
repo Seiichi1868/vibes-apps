@@ -4,7 +4,7 @@
 <section class="tb-tool tb-talk" data-display-root>
   <div data-view="settings">
     <h1 class="tb-tool-title">スピーチ理解度チェック</h1>
-    <p class="tb-warn-note">生徒の氏名や個人情報は入力しないでください。録音・文字起こし・問題は「履歴（アーカイブ）」に自動保存されます。話者の同意を得て使ってください。</p>
+    <p class="tb-warn-note">生徒の氏名や個人情報は入力しないでください。文字起こしと問題は「履歴（アーカイブ）」に自動保存されます。録音した音声は、下で選んだこのパソコンのフォルダに保存されます（サーバーには残りません）。話者の同意を得て使ってください。</p>
     <form id="tb-talk-settings" class="tb-form" data-reasoning="{{ 1 if generate_reasoning else 0 }}">
       <label>レベル
         <select name="level">
@@ -37,6 +37,11 @@
       <label>待機画面の英文
         <input name="wait_prompt" value="Talk with your partner. What did you hear?">
       </label>
+      <div class="tb-dir-box">
+        <strong>音声の保存先フォルダ</strong>
+        <p class="tb-muted" id="tb-dir-status">確認中…</p>
+        <button class="tb-btn" type="button" id="tb-dir-pick">保存先フォルダを選ぶ</button>
+      </div>
       <label>入力マイク
         <select name="mic" id="tb-mic"></select>
       </label>
@@ -167,6 +172,8 @@
     <p class="tb-error" id="tb-ar-error" hidden></p>
     <div id="tb-ar-audio-box" hidden>
       <audio id="tb-ar-audio" controls preload="none"></audio>
+      <p class="tb-muted" id="tb-ar-audio-note" hidden></p>
+      <button class="tb-btn" type="button" id="tb-ar-audio-pick" hidden>保存先フォルダを選んで再生</button>
     </div>
     <label>文字起こし（修正できます）
       <textarea id="tb-ar-transcript" rows="8"></textarea>

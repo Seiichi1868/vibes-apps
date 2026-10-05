@@ -19,6 +19,7 @@
     browserTranscript: "",
     sttBase: "",
     reviewed: false,
+    localAudioName: "",
     questions: [],
     sessionId: null,
     detail: null,
@@ -92,6 +93,139 @@
       throw err;
     }
     return data;
+  }
+
+  // ── 音声のローカル保存（このパソコンのフォルダ）──────────────
+  const dirSupported = typeof window.showDirectoryPicker === "function";
+
+  function idbOpen() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open("toolbox-talk-check", 1);
+      req.onupgradeneeded = () => req.result.createObjectStore("kv");
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function idbGet(key) {
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction("kv").objectStore("kv").get(key);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function idbSet(key, value) {
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction("kv", "readwrite");
+      tx.objectStore("kv").put(value, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  // 選択済みフォルダのハンドル。権限がなければ null（ask=true のときはクリック操作中に許可を求める）
+  async function getDir(ask) {
+    if (!dirSupported) return null;
+    try {
+      const handle = await idbGet("dir");
+      if (!handle) return null;
+      let perm = await handle.queryPermission({ mode: "readwrite" });
+      if (perm !== "granted" && ask) perm = await handle.requestPermission({ mode: "readwrite" });
+      return perm === "granted" ? handle : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function pickDir() {
+    const handle = await window.showDirectoryPicker({ id: "toolbox-talk-audio", mode: "readwrite", startIn: "documents" });
+    await idbSet("dir", handle);
+    return handle;
+  }
+
+  async function updateDirStatus() {
+    const el = document.getElementById("tb-dir-status");
+    const btn = document.getElementById("tb-dir-pick");
+    if (!el) return;
+    if (!dirSupported) {
+      el.textContent = "このブラウザはフォルダ保存に未対応です（Chrome / Edge を使ってください）。音声はサーバーに保存されます。";
+      btn.hidden = true;
+      return;
+    }
+    let handle = null;
+    try { handle = await idbGet("dir"); } catch (_) {}
+    if (!handle) {
+      el.textContent = "未設定です。選ぶまでは音声がサーバーに保存されます。";
+      btn.textContent = "保存先フォルダを選ぶ";
+      return;
+    }
+    const ok = await getDir(false);
+    el.textContent = ok
+      ? `保存先: ${handle.name}（使用できます）`
+      : `保存先: ${handle.name}（アクセス許可が必要です。録音を始めるときに許可を求めます）`;
+    btn.textContent = "保存先フォルダを変更";
+  }
+
+  document.getElementById("tb-dir-pick").addEventListener("click", async () => {
+    try {
+      await pickDir();
+    } catch (err) {
+      if (err && err.name !== "AbortError") alert(`フォルダを選べませんでした: ${err.message}`);
+    }
+    updateDirStatus();
+  });
+
+  function localFileName(id, blob) {
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, "0");
+    const stamp = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+    return `${stamp}_${id}.${blobExt(blob)}`;
+  }
+
+  // 録音をこのパソコンのフォルダへ書き込む。できなければ false（サーバーの音声をそのまま残す）
+  async function saveLocalAudio() {
+    if (!state.audioBlob || !state.sessionId) return false;
+    const dir = await getDir(false);
+    if (!dir) return false;
+    try {
+      const name = localFileName(state.sessionId, state.audioBlob);
+      const fh = await dir.getFileHandle(name, { create: true });
+      const w = await fh.createWritable();
+      await w.write(state.audioBlob);
+      await w.close();
+      state.localAudioName = name;
+      await toolboxFetch(`/toolbox/api/talk/sessions/${state.sessionId}/audio-local`, {
+        method: "POST",
+        body: JSON.stringify({ filename: name, release: false }),
+      });
+      return true;
+    } catch (_) {
+      state.localAudioName = "";
+      return false;
+    }
+  }
+
+  // 文字起こしが終わったら、サーバー上の音声を消す（ローカルに保存済みの場合のみ）
+  async function releaseServerAudio() {
+    if (!state.localAudioName || !state.sessionId) return;
+    try {
+      await toolboxFetch(`/toolbox/api/talk/sessions/${state.sessionId}/audio-local`, {
+        method: "POST",
+        body: JSON.stringify({ filename: state.localAudioName, release: true }),
+      });
+    } catch (_) {}
+  }
+
+  async function readLocalFile(name) {
+    const dir = await getDir(false);
+    if (!dir) return null;
+    try {
+      const fh = await dir.getFileHandle(name);
+      return await fh.getFile();
+    } catch (_) {
+      return null;
+    }
   }
 
   // ── 設定（保存ボタンで確定）──────────────────────────────────
@@ -214,6 +348,7 @@
     state.browserTranscript = "";
     state.sttBase = "";
     state.reviewed = false;
+    state.localAudioName = "";
     state.questions = [];
     state.sessionId = null;
     state.detail = null;
@@ -461,6 +596,7 @@
   }
 
   async function startRecording() {
+    await getDir(true); // クリック操作中に保存先フォルダの許可を取っておく
     resetSession();
     state.source = "record";
     const stream = await getStream();
@@ -650,6 +786,7 @@
     const data = await postForm("/toolbox/api/talk/audio", fd, signal);
     state.sessionId = data.session_id;
     saveResume();
+    await saveLocalAudio();
   }
 
   async function createTextSession(signal) {
@@ -742,6 +879,7 @@
         waitStatus("文字起こし中");
         state.transcript = await transcribeSaved(controller.signal);
       }
+      await releaseServerAudio();
       if (settings().review_transcript && !state.reviewed) {
         state.running = false;
         endWaitTimer();
@@ -784,6 +922,7 @@
       alert("音声ファイルを選んでください。");
       return;
     }
+    await getDir(true);
     resetSession();
     state.audioBlob = file;
     state.source = "file";
@@ -1030,7 +1169,7 @@
           <div class="tb-actions">
             <button class="tb-btn" type="button" data-open="${esc(s.id)}">開く・修正</button>
             ${s.question_count ? `<button class="tb-btn tb-btn-primary" type="button" data-play="${esc(s.id)}">出題 ▶</button>` : ""}
-            <button class="tb-btn" type="button" data-del="${esc(s.id)}">削除</button>
+            <button class="tb-btn" type="button" data-del="${esc(s.id)}" data-local="${esc(s.local_audio || "")}">削除</button>
           </div>
         </li>`;
       }).join("");
@@ -1055,13 +1194,17 @@
   }
 
   document.getElementById("tb-history-list").addEventListener("click", async (ev) => {
-    const { open, del, play } = ev.target.dataset;
+    const { open, del, play, local } = ev.target.dataset;
     if (open) openArchive(open).catch((e) => alert(e.message));
     if (play) playSession(play).catch((e) => alert(e.message));
     if (del && confirm("この履歴（音声・文字起こし・問題）を削除しますか？")) {
       try {
         await toolboxFetch(`/toolbox/api/talk/sessions/${del}`, { method: "DELETE" });
         ev.target.closest("li").remove();
+        if (local) {
+          const dir = await getDir(false);
+          if (dir) await dir.removeEntry(local).catch(() => {});
+        }
       } catch (e) {
         alert(e.message);
       }
@@ -1105,6 +1248,42 @@
     });
   }
 
+  let arAudioUrl = "";
+  async function loadArchiveAudio(detail) {
+    const note = document.getElementById("tb-ar-audio-note");
+    const pick = document.getElementById("tb-ar-audio-pick");
+    if (arAudioUrl) {
+      URL.revokeObjectURL(arAudioUrl);
+      arAudioUrl = "";
+    }
+    ar.audio.removeAttribute("src");
+    note.hidden = true;
+    pick.hidden = true;
+    ar.audioBox.hidden = !(detail.has_audio || detail.local_audio);
+    if (detail.has_audio) {
+      ar.audio.src = `/toolbox/api/talk/sessions/${detail.id}/audio`;
+      return;
+    }
+    if (!detail.local_audio) return;
+    const file = await readLocalFile(detail.local_audio);
+    if (file) {
+      arAudioUrl = URL.createObjectURL(file);
+      ar.audio.src = arAudioUrl;
+      note.textContent = `このパソコンのフォルダ内: ${detail.local_audio}`;
+    } else {
+      note.textContent = `音声はこのパソコンのフォルダ（${detail.local_audio}）に保存されています。フォルダへのアクセス許可が必要です。別のパソコンでは再生できません。`;
+      pick.hidden = false;
+      pick.onclick = async () => {
+        try {
+          if (!(await getDir(true))) await pickDir();
+        } catch (_) {}
+        updateDirStatus();
+        loadArchiveAudio(detail);
+      };
+    }
+    note.hidden = false;
+  }
+
   function renderArchive(detail) {
     state.detail = detail;
     state.arDirty = false;
@@ -1118,10 +1297,8 @@
     ].filter(Boolean).join(" ・ ");
     ar.error.hidden = !detail.last_error;
     ar.error.textContent = detail.last_error ? `直前のエラー: ${detail.last_error}` : "";
-    ar.audioBox.hidden = !detail.has_audio;
-    if (detail.has_audio) ar.audio.src = `/toolbox/api/talk/sessions/${detail.id}/audio`;
-    else ar.audio.removeAttribute("src");
-    document.getElementById("tb-ar-retranscribe").hidden = !detail.has_audio;
+    loadArchiveAudio(detail);
+    document.getElementById("tb-ar-retranscribe").hidden = !(detail.has_audio || detail.local_audio);
     ar.transcript.value = detail.transcript || "";
     const bt = detail.browser_transcript || "";
     ar.browserBox.hidden = !bt;
@@ -1206,12 +1383,30 @@
   document.getElementById("tb-ar-retranscribe").addEventListener("click", (ev) => {
     if (ar.transcript.value.trim() && !confirm("現在の文字起こしは音声からの結果で置き換わります。よろしいですか？")) return;
     busy(ev.target, "文字起こし中…", async () => {
+      const detail = state.detail;
+      let fromLocal = false;
+      if (!detail.has_audio && detail.local_audio) {
+        await getDir(true);
+        const file = await readLocalFile(detail.local_audio);
+        if (!file) throw new Error("保存先フォルダ内に音声が見つかりません。フォルダへのアクセスを許可するか、正しいフォルダを選んでください。");
+        const fd = new FormData();
+        fd.append("audio", file, detail.local_audio);
+        await postForm(`/toolbox/api/talk/sessions/${detail.id}/audio-upload`, fd);
+        fromLocal = true;
+      }
       const data = await toolboxFetch("/toolbox/api/talk/transcribe", {
         method: "POST",
         body: JSON.stringify({ session_id: state.detail.id, keywords: settings().keywords }),
       });
       ar.transcript.value = data.transcript;
       state.arDirty = true;
+      if (fromLocal) {
+        await toolboxFetch(`/toolbox/api/talk/sessions/${detail.id}/audio-local`, {
+          method: "POST",
+          body: JSON.stringify({ filename: detail.local_audio, release: true }),
+        }).catch(() => {});
+        state.detail.has_audio = false;
+      }
     }).catch((e) => alert(e.message));
   });
 
@@ -1430,5 +1625,6 @@
   });
 
   loadMics().catch(() => {});
+  updateDirStatus();
   restore();
 })();

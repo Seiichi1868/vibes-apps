@@ -47,6 +47,7 @@ def _public_session(session: dict, *, include_questions: bool = False) -> dict:
         "keywords": session.get("keywords") or "",
         "duration_sec": session.get("duration_sec") or 0,
         "has_audio": bool(session.get("audio_file")),
+        "local_audio": session.get("local_audio") or "",
         "status": session.get("status") or ("ready" if questions else "transcribed"),
         "has_transcript": bool((session.get("transcript") or "").strip()),
         "last_error": session.get("last_error") or "",
@@ -366,6 +367,58 @@ def register(bp):
             return jsonify({"ok": False, "error": "音声がありません。"}), 404
         mime = mimetypes.guess_type(path.name)[0] or "audio/webm"
         return send_file(path, mimetype=mime, conditional=True)
+
+    def _drop_server_audio(session: dict) -> None:
+        name = session.get("audio_file")
+        if name:
+            try:
+                (TALK_AUDIO_DIR / Path(str(name)).name).unlink(missing_ok=True)
+            except OSError:
+                logger.warning("failed to delete talk audio %s", name)
+        session["audio_file"] = ""
+
+    @bp.route("/api/talk/sessions/<session_id>/audio-local", methods=["POST"])
+    @login_required
+    def api_audio_local(session_id):
+        """音声をこのパソコンのフォルダへ保存したことを記録し、必要ならサーバー上の音声を消す。"""
+        session = load_talk_session(session_id, current_user()["id"])
+        if not session:
+            return jsonify({"ok": False, "error": "履歴が見つかりません。"}), 404
+        payload = request.get_json(silent=True) or {}
+        filename = Path(str(payload.get("filename") or "")).name[:120]
+        if filename:
+            session["local_audio"] = filename
+        if payload.get("release") and session.get("local_audio"):
+            _drop_server_audio(session)
+        save_talk_session(session)
+        return jsonify({"ok": True, "session": _public_session(session)})
+
+    @bp.route("/api/talk/sessions/<session_id>/audio-upload", methods=["POST"])
+    @login_required
+    @tool_required("talk_check")
+    def api_audio_upload(session_id):
+        """ローカル保存済みの音声を、文字起こし用に一時的にサーバーへ戻す。"""
+        session = load_talk_session(session_id, current_user()["id"])
+        if not session:
+            return jsonify({"ok": False, "error": "履歴が見つかりません。"}), 404
+        upload = request.files.get("audio")
+        if not upload or not upload.filename:
+            return jsonify({"ok": False, "error": "音声ファイルがありません。"}), 400
+        ext = Path(secure_filename(upload.filename)).suffix.lower().lstrip(".")
+        if ext not in ALLOWED_AUDIO_EXTENSIONS:
+            return jsonify({"ok": False, "error": "対応していない音声形式です。"}), 400
+        upload.seek(0, os.SEEK_END)
+        size = upload.tell()
+        upload.seek(0)
+        if size > MAX_AUDIO_BYTES:
+            return jsonify({"ok": False, "error": "ファイルが大きすぎます。25MB以内にしてください。"}), 400
+        ensure_dirs()
+        _drop_server_audio(session)
+        audio_name = f"{session_id}.{ext}"
+        upload.save(TALK_AUDIO_DIR / audio_name)
+        session["audio_file"] = audio_name
+        save_talk_session(session)
+        return jsonify({"ok": True, "session": _public_session(session)})
 
     @bp.route("/api/talk/sessions/<session_id>", methods=["DELETE"])
     @login_required

@@ -587,3 +587,11 @@ body.tb-display-on .tb-refresh-row:hover { opacity: 0.8; }
 [data-view="archive"] textarea,
 [data-view="archive"] #tb-ar-title { width: 100%; box-sizing: border-box; }
 #tb-ar-audio { width: 100%; margin: 8px 0; }
+.tb-dir-box {
+  padding: 10px 12px;
+  background: #fff;
+  border-radius: 12px;
+  display: grid;
+  gap: 6px;
+}
+.tb-dir-box p { margin: 0; font-size: 0.85rem; }
