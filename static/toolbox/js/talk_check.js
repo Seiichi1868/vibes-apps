@@ -149,8 +149,8 @@
     const btn = document.getElementById("tb-dir-pick");
     if (!el) return;
     if (!dirSupported) {
-      el.textContent = "このブラウザはフォルダ保存に未対応です（Chrome / Edge を使ってください）。音声はサーバーに保存されます。";
-      btn.hidden = true;
+      el.textContent = "このブラウザはフォルダへ直接保存できないため、音声はいったんサーバーに保存されます。月に一度、まとめてダウンロードして「ToolboxTalkAudio」フォルダへ移すお知らせが出ます。";
+      btn.textContent = "音声をまとめてダウンロード";
       return;
     }
     let handle = null;
@@ -168,6 +168,10 @@
   }
 
   document.getElementById("tb-dir-pick").addEventListener("click", async () => {
+    if (!dirSupported) {
+      if (window.ToolboxAudioArchive) window.ToolboxAudioArchive.show();
+      return;
+    }
     try {
       await pickDir();
     } catch (err) {
@@ -1270,8 +1274,27 @@
       arAudioUrl = URL.createObjectURL(file);
       ar.audio.src = arAudioUrl;
       note.textContent = `このパソコンのフォルダ内: ${detail.local_audio}`;
+    } else if (!dirSupported) {
+      note.textContent = `音声は「ToolboxTalkAudio」フォルダの ${detail.local_audio} に保存されています。聞き直すときはファイルを選んでください。`;
+      pick.textContent = "音声ファイルを選んで再生";
+      pick.hidden = false;
+      pick.onclick = () => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "audio/*,video/mp4,video/webm";
+        input.onchange = () => {
+          const chosen = input.files && input.files[0];
+          if (!chosen) return;
+          if (arAudioUrl) URL.revokeObjectURL(arAudioUrl);
+          arAudioUrl = URL.createObjectURL(chosen);
+          ar.audio.src = arAudioUrl;
+          ar.audio.play().catch(() => {});
+        };
+        input.click();
+      };
     } else {
       note.textContent = `音声はこのパソコンのフォルダ（${detail.local_audio}）に保存されています。フォルダへのアクセス許可が必要です。別のパソコンでは再生できません。`;
+      pick.textContent = "保存先フォルダを選んで再生";
       pick.hidden = false;
       pick.onclick = async () => {
         try {

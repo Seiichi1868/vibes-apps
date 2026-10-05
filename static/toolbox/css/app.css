@@ -595,3 +595,13 @@ body.tb-display-on .tb-refresh-row:hover { opacity: 0.8; }
   gap: 6px;
 }
 .tb-dir-box p { margin: 0; font-size: 0.85rem; }
+.tb-archive-banner {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  background: var(--tb-warn-soft);
+  border-radius: 12px;
+}
+.tb-archive-banner p { margin: 0; font-size: 0.9rem; }
+.tb-archive-banner a.tb-btn { text-decoration: none; display: inline-flex; align-items: center; }

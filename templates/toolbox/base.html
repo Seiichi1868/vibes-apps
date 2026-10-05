@@ -39,6 +39,7 @@
   <script>window.TOOLBOX_CSRF = {{ csrf_token|tojson }};</script>
   <script src="{{ url_for('static', filename='toolbox/js/app.js', v=toolbox_cache) }}"></script>
   <script src="{{ url_for('static', filename='toolbox/js/display_mode.js', v=toolbox_cache) }}"></script>
+  <script src="{{ url_for('static', filename='toolbox/js/audio_archive.js', v=toolbox_cache) }}"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -4,7 +4,7 @@
 <section class="tb-tool tb-talk" data-display-root>
   <div data-view="settings">
     <h1 class="tb-tool-title">スピーチ理解度チェック</h1>
-    <p class="tb-warn-note">生徒の氏名や個人情報は入力しないでください。文字起こしと問題は「履歴（アーカイブ）」に自動保存されます。録音した音声は、下で選んだこのパソコンのフォルダに保存されます（サーバーには残りません）。話者の同意を得て使ってください。</p>
+    <p class="tb-warn-note">生徒の氏名や個人情報は入力しないでください。文字起こしと問題は「履歴（アーカイブ）」に自動保存されます。録音した音声は、Chrome / Edge では下で選んだこのパソコンのフォルダに保存されます（サーバーには残りません）。Safari ではいったんサーバーに保存され、月に一度のお知らせでまとめてダウンロードして指定フォルダへ移します。話者の同意を得て使ってください。</p>
     <form id="tb-talk-settings" class="tb-form" data-reasoning="{{ 1 if generate_reasoning else 0 }}">
       <label>レベル
         <select name="level">

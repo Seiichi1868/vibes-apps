@@ -3,6 +3,9 @@ from __future__ import annotations
 import logging
 import mimetypes
 import os
+import tempfile
+import zipfile
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from flask import jsonify, render_template, request, send_file
@@ -20,10 +23,14 @@ from toolbox.storage import (
     now_iso,
     save_talk_session,
 )
+from toolbox.storage import JST
 from toolbox.tools.talk_check.generate import LEVELS, generate_questions, generate_replacement_question, make_title
 from toolbox.usage import UsageError, UsageLimitError, _is_reasoning_model, record_event, selected_model, transcribe_file
 
 logger = logging.getLogger(__name__)
+
+ARCHIVE_INTERVAL_DAYS = 30
+ARCHIVE_FOLDER_NAME = "ToolboxTalkAudio"
 
 
 def _error(exc, fallback: str):
@@ -392,6 +399,96 @@ def register(bp):
             _drop_server_audio(session)
         save_talk_session(session)
         return jsonify({"ok": True, "session": _public_session(session)})
+
+    # ── Safari など、フォルダへ直接書き込めないブラウザ向け：まとめてダウンロード ──
+
+    def _server_audio_sessions(user_id: str) -> list[dict]:
+        rows = []
+        for row in list_talk_sessions(user_id):
+            name = row.get("audio_file")
+            if name and (TALK_AUDIO_DIR / Path(str(name)).name).is_file():
+                rows.append(row)
+        return rows
+
+    def _archive_name(session: dict) -> str:
+        digits = "".join(ch for ch in str(session.get("created_at") or "") if ch.isdigit())
+        stamp = f"{digits[:8]}-{digits[8:12]}" if len(digits) >= 12 else "unknown"
+        ext = Path(str(session.get("audio_file") or "")).suffix or ".webm"
+        return f"{stamp}_{session['id']}{ext}"
+
+    @bp.route("/api/talk/audio-archive")
+    @login_required
+    def api_audio_archive_status():
+        rows = _server_audio_sessions(current_user()["id"])
+        awaiting = [r for r in rows if r.get("audio_downloaded_at")]
+        oldest = min((str(r.get("created_at") or "") for r in rows), default="")
+        total = 0
+        for r in rows:
+            try:
+                total += (TALK_AUDIO_DIR / Path(str(r["audio_file"])).name).stat().st_size
+            except OSError:
+                pass
+        due = bool(awaiting)
+        if oldest and not due:
+            try:
+                created = datetime.fromisoformat(oldest)
+                if created.tzinfo is None:
+                    created = created.replace(tzinfo=JST)
+                age = datetime.now(JST) - created
+                due = age >= timedelta(days=ARCHIVE_INTERVAL_DAYS)
+            except ValueError:
+                pass
+        return jsonify(
+            {
+                "ok": True,
+                "count": len(rows),
+                "awaiting": len(awaiting),
+                "bytes": total,
+                "oldest_at": oldest,
+                "due": due,
+                "folder": ARCHIVE_FOLDER_NAME,
+            }
+        )
+
+    @bp.route("/api/talk/audio-archive.zip")
+    @login_required
+    def api_audio_archive_zip():
+        """サーバー上の音声をまとめた zip を返す。ダウンロード済みの印を付け、確認後に削除する。"""
+        rows = _server_audio_sessions(current_user()["id"])
+        if not rows:
+            return jsonify({"ok": False, "error": "ダウンロードする音声はありません。"}), 404
+        tmp = tempfile.TemporaryFile()
+        with zipfile.ZipFile(tmp, "w", zipfile.ZIP_STORED) as zf:
+            for row in rows:
+                zf.write(TALK_AUDIO_DIR / Path(str(row["audio_file"])).name, _archive_name(row))
+        stamp = now_iso()
+        for row in rows:
+            row["audio_downloaded_at"] = stamp
+            row["audio_download_name"] = _archive_name(row)
+            save_talk_session(row)
+        tmp.seek(0)
+        return send_file(
+            tmp,
+            mimetype="application/zip",
+            as_attachment=True,
+            download_name=f"{ARCHIVE_FOLDER_NAME}-{stamp[:10].replace('-', '')}.zip",
+        )
+
+    @bp.route("/api/talk/audio-archive/confirm", methods=["POST"])
+    @login_required
+    def api_audio_archive_confirm():
+        """指定フォルダへ移したことの確認。ダウンロード済みの音声をサーバーから消す。"""
+        released = 0
+        for row in list_talk_sessions(current_user()["id"]):
+            if not row.get("audio_downloaded_at") or not row.get("audio_file"):
+                continue
+            row["local_audio"] = row.get("audio_download_name") or row.get("local_audio") or ""
+            _drop_server_audio(row)
+            row.pop("audio_downloaded_at", None)
+            row.pop("audio_download_name", None)
+            save_talk_session(row)
+            released += 1
+        return jsonify({"ok": True, "released": released})
 
     @bp.route("/api/talk/sessions/<session_id>/audio-upload", methods=["POST"])
     @login_required

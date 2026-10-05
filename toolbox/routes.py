@@ -1,6 +1,8 @@
 """Toolbox 本体 Blueprint。ログイン・ランチャー・共通 API。"""
 from __future__ import annotations
 
+import time
+
 from flask import Blueprint, g, jsonify, redirect, render_template, request, url_for
 
 from toolbox.auth import (
@@ -23,6 +25,7 @@ from toolbox.auth import (
     verify_password,
     write_session_cookie,
 )
+from toolbox.config import PROJECT_ROOT
 from toolbox.registry import SCENE_TABS, all_tools, get_tool
 from toolbox.storage import (
     get_setting,
@@ -37,6 +40,26 @@ from toolbox.storage import (
 main_bp = Blueprint("toolbox", __name__, url_prefix="/toolbox")
 
 PUBLIC_ENDPOINTS = {"toolbox.login", "toolbox.admin_page", "toolbox.admin_unlock"}
+
+_STATIC_DIR = PROJECT_ROOT / "static" / "toolbox"
+_static_version_cache: dict = {"at": 0.0, "value": "0"}
+
+
+def _static_version() -> str:
+    """static/toolbox 配下で最も新しい更新時刻。ファイルを直せば URL の ?v= が自動で変わる。"""
+    now = time.monotonic()
+    if now - _static_version_cache["at"] < 2.0:
+        return _static_version_cache["value"]
+    newest = 0
+    try:
+        for path in _STATIC_DIR.rglob("*"):
+            if path.suffix in (".js", ".css"):
+                newest = max(newest, int(path.stat().st_mtime))
+    except OSError:
+        pass
+    _static_version_cache["at"] = now
+    _static_version_cache["value"] = format(newest, "x") if newest else "0"
+    return _static_version_cache["value"]
 
 
 def _admin_path() -> bool:
@@ -84,7 +107,7 @@ def _inject():
         "admin_reauth_ok": admin_reauth_ok(),
         "login_required_enabled": login_is_required(),
         "is_guest": bool(user and user.get("is_guest")),
-        "toolbox_cache": "20261005a",
+        "toolbox_cache": _static_version(),
     }
 
 
