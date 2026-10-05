@@ -16,20 +16,23 @@ body.tb-display-on .tb-brand {
 
 body.tb-display-on .tb-user-btn,
 body.tb-display-on .tb-blank-btn {
-  opacity: 0.16;
+  opacity: 1;
   background: transparent;
-  font-size: 11px;
-  min-height: 28px;
-  min-width: 28px;
-  padding: 0 8px;
-  color: #6a6a6a;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0;
+  min-height: 24px;
+  min-width: 24px;
+  padding: 0 6px;
+  color: rgba(43, 43, 43, 0.07);
 }
 
 body.tb-display-on .tb-user-btn:hover,
 body.tb-display-on .tb-blank-btn:hover,
 body.tb-display-on .tb-user-btn:focus,
 body.tb-display-on .tb-blank-btn:focus {
-  opacity: 0.7;
+  color: rgba(43, 43, 43, 0.38);
 }
 
 body.tb-display-on .tb-main {
