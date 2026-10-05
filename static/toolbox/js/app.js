@@ -26,14 +26,26 @@
   const toggle = document.getElementById("tb-user-toggle");
   const menu = document.getElementById("tb-user-menu");
   if (toggle && menu) {
-    toggle.addEventListener("click", () => {
-      const open = menu.hidden;
-      menu.hidden = !open;
-      toggle.setAttribute("aria-expanded", open ? "true" : "false");
-    });
-    document.addEventListener("click", (ev) => {
-      if (!toggle.contains(ev.target) && !menu.contains(ev.target)) menu.hidden = true;
-    });
+    const user = toggle.closest(".tb-user");
+    const setOpen = (open) => toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    if (user) {
+      user.addEventListener("mouseenter", () => setOpen(true));
+      user.addEventListener("mouseleave", () => setOpen(false));
+      user.addEventListener("focusin", () => setOpen(true));
+      user.addEventListener("focusout", () => setOpen(false));
+      toggle.addEventListener("click", () => {
+        const open = user.classList.toggle("is-open");
+        setOpen(open);
+      });
+    }
+  }
+
+  const opening = document.getElementById("tb-opening");
+  if (opening) {
+    window.setTimeout(() => {
+      opening.classList.add("is-hide");
+      window.setTimeout(() => opening.remove(), 320);
+    }, 1950);
   }
 
   const blank = document.getElementById("tb-blank");

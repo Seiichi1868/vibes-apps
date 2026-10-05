@@ -108,15 +108,73 @@ h1, h2, h3 { margin: 0 0 12px; }
 
 .tb-user { position: relative; }
 .tb-user-menu {
+  display: none;
   position: absolute;
   right: 0;
-  top: calc(100% + 4px);
+  top: 100%;
+  padding-top: 6px;
+  min-width: 180px;
+  z-index: 30;
+}
+.tb-user-menu-inner {
   background: #fff;
   border-radius: 12px;
   box-shadow: var(--tb-shadow);
-  min-width: 160px;
   padding: 8px;
-  z-index: 30;
+}
+.tb-user:hover .tb-user-menu,
+.tb-user:focus-within .tb-user-menu,
+.tb-user.is-open .tb-user-menu { display: block; }
+
+.tb-opening {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: linear-gradient(160deg, #e9efdf, #fff 45%, #c8e6a0);
+  transition: opacity 300ms ease;
+}
+.tb-opening.is-hide { opacity: 0; pointer-events: none; }
+.tb-opening-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(28px);
+}
+.tb-opening-orb-l {
+  width: 220px;
+  height: 220px;
+  left: -40px;
+  top: 48px;
+  background: rgba(200, 230, 160, 0.85);
+}
+.tb-opening-orb-r {
+  width: 240px;
+  height: 240px;
+  right: -30px;
+  bottom: 40px;
+  background: rgba(124, 179, 66, 0.35);
+}
+.tb-opening-card { position: relative; text-align: center; animation: tbOpeningIn 1.6s ease both; }
+.tb-opening-label {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: var(--tb-accent-dark);
+}
+.tb-opening-title {
+  margin: 0;
+  font-size: clamp(2.2rem, 6vw, 3.2rem);
+  letter-spacing: -0.03em;
+}
+.tb-opening-sub { margin: 12px 0 0; color: var(--tb-muted); font-weight: 600; }
+@keyframes tbOpeningIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
 }
 .tb-user-menu a, .tb-user-menu button {
   display: block;

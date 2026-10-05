@@ -1,5 +1,7 @@
 (function () {
-  let classes = Array.isArray(window.TOOLBOX_CLASSES) ? window.TOOLBOX_CLASSES.slice() : [];
+  const ROOMS_KEY = "toolbox.random_seats.rooms.v1";
+  const LAST_KEY = "toolbox.random_seats.last.v1";
+  let classes = [];
   const select = document.getElementById("tb-class");
   const grid = document.getElementById("tb-grid");
   const board = document.getElementById("tb-seats");
@@ -10,7 +12,7 @@
     return `toolbox.random_seats.${id}`;
   }
 
-  function loadState(id) {
+  function loadLegacy(id) {
     try {
       return JSON.parse(localStorage.getItem(storageKey(id)) || "{}");
     } catch (_) {
@@ -18,17 +20,51 @@
     }
   }
 
-  function saveState(id, state) {
-    localStorage.setItem(storageKey(id), JSON.stringify(state));
+  function readRooms() {
+    try {
+      const rows = JSON.parse(localStorage.getItem(ROOMS_KEY) || "[]");
+      return Array.isArray(rows) ? rows : [];
+    } catch (_) {
+      return [];
+    }
   }
 
-  function currentClass() {
-    return classes.find((row) => row.id === select.value) || null;
+  function writeRooms() {
+    localStorage.setItem(ROOMS_KEY, JSON.stringify(classes));
+    if (select.value) localStorage.setItem(LAST_KEY, select.value);
+  }
+
+  function newId() {
+    return (crypto.randomUUID && crypto.randomUUID()) || String(Date.now());
   }
 
   function suggestGrid(count) {
     const cols = count <= 20 ? 5 : count <= 36 ? 6 : 7;
     return { rows: Math.max(1, Math.ceil(count / cols)), cols };
+  }
+
+  function bootRooms() {
+    classes = readRooms();
+    if (classes.length) return;
+    const seeded = Array.isArray(window.TOOLBOX_CLASSES) ? window.TOOLBOX_CLASSES : [];
+    classes = seeded.map((row) => {
+      const layout = suggestGrid(row.student_count || 30);
+      const prev = loadLegacy(row.id);
+      return {
+        id: row.id,
+        name: row.name,
+        student_count: row.student_count,
+        absent: Array.isArray(prev.absent) ? prev.absent : [],
+        seats: Array.isArray(prev.seats) ? prev.seats : [],
+        rows: prev.rows || layout.rows,
+        cols: prev.cols || layout.cols,
+      };
+    });
+    if (classes.length) writeRooms();
+  }
+
+  function currentClass() {
+    return classes.find((row) => row.id === select.value) || null;
   }
 
   function defaultState(row) {
@@ -39,7 +75,7 @@
   function stateOf() {
     const row = currentClass();
     if (!row) return defaultState(null);
-    const state = Object.assign(defaultState(row), loadState(row.id));
+    const state = Object.assign(defaultState(row), row);
     state.absent = state.absent.filter((n) => n >= 1 && n <= row.student_count);
     state.rows = Math.max(1, Math.min(12, Number(state.rows) || defaultState(row).rows));
     state.cols = Math.max(1, Math.min(12, Number(state.cols) || defaultState(row).cols));
@@ -74,7 +110,8 @@
         if (next.absent.includes(n)) next.absent = next.absent.filter((x) => x !== n);
         else next.absent.push(n);
         next.seats = next.seats.map((seat) => (seat === n ? null : seat));
-        saveState(row.id, next);
+        Object.assign(row, next);
+        writeRooms();
         renderAll();
       });
       grid.appendChild(btn);
@@ -104,7 +141,7 @@
       board.appendChild(cell);
     }
     if (!row) {
-      board.innerHTML = `<p class="tb-seat-empty">クラスを作ってください</p>`;
+      board.innerHTML = `<p class="tb-seat-empty">教室を作ってください</p>`;
     }
   }
 
@@ -135,7 +172,8 @@
       pool[j] = tmp;
     }
     state.seats = Array.from({ length: capacity }, (_, i) => pool[i] || null);
-    saveState(row.id, state);
+    Object.assign(row, state);
+    writeRooms();
     renderAll();
   }
 
@@ -146,7 +184,8 @@
     const next = defaultState(row);
     next.rows = Math.max(1, Math.min(12, Number(rowsEl.value) || next.rows));
     next.cols = Math.max(1, Math.min(12, Number(colsEl.value) || next.cols));
-    saveState(row.id, next);
+    Object.assign(row, next);
+    writeRooms();
     renderAll();
   });
   rowsEl.addEventListener("change", () => {
@@ -154,7 +193,8 @@
     if (!row) return;
     const state = stateOf();
     state.rows = Math.max(1, Math.min(12, Number(rowsEl.value) || state.rows));
-    saveState(row.id, state);
+    Object.assign(row, state);
+    writeRooms();
     renderBoard();
   });
   colsEl.addEventListener("change", () => {
@@ -162,59 +202,81 @@
     if (!row) return;
     const state = stateOf();
     state.cols = Math.max(1, Math.min(12, Number(colsEl.value) || state.cols));
-    saveState(row.id, state);
+    Object.assign(row, state);
+    writeRooms();
     renderBoard();
   });
-  select.addEventListener("change", renderAll);
+  select.addEventListener("change", () => {
+    writeRooms();
+    renderAll();
+  });
 
-  async function promptClass(existing) {
-    const name = prompt("クラス名", existing ? existing.name : "");
-    if (!name) return;
+  function promptClass(existing) {
+    const name = prompt("教室の名前", existing ? existing.name : "");
+    if (!name || !name.trim()) return;
     const count = Number(prompt("人数（1〜60）", existing ? existing.student_count : "30"));
-    const body = JSON.stringify({ name, student_count: count });
-    if (existing) {
-      const data = await toolboxFetch(`/toolbox/api/classes/${existing.id}`, { method: "PUT", body });
-      classes = classes.map((row) => (row.id === existing.id ? data.class : row));
-    } else {
-      const data = await toolboxFetch("/toolbox/api/classes", { method: "POST", body });
-      classes.push(data.class);
-      select.value = data.class.id;
+    if (!Number.isFinite(count) || count < 1 || count > 60) {
+      alert("人数は1〜60で入力してください。");
+      return;
     }
+    if (existing) {
+      existing.name = name.trim();
+      existing.student_count = count;
+      existing.absent = (existing.absent || []).filter((n) => n >= 1 && n <= count);
+    } else {
+      const layout = suggestGrid(count);
+      const room = {
+        id: newId(),
+        name: name.trim(),
+        student_count: count,
+        absent: [],
+        seats: [],
+        rows: layout.rows,
+        cols: layout.cols,
+      };
+      classes.push(room);
+      select.value = room.id;
+    }
+    writeRooms();
     renderClasses();
   }
 
-  document.getElementById("tb-class-new").addEventListener("click", () => promptClass(null).catch((e) => alert(e.message)));
+  document.getElementById("tb-class-new").addEventListener("click", () => promptClass(null));
   document.getElementById("tb-class-edit").addEventListener("click", () => {
     const row = currentClass();
-    if (row) promptClass(row).catch((e) => alert(e.message));
+    if (row) promptClass(row);
   });
-  document.getElementById("tb-class-dup").addEventListener("click", async () => {
+  document.getElementById("tb-class-dup").addEventListener("click", () => {
     const row = currentClass();
     if (!row) return;
-    try {
-      const data = await toolboxFetch(`/toolbox/api/classes/${row.id}/duplicate`, { method: "POST", body: "{}" });
-      classes.push(data.class);
-      select.value = data.class.id;
-      renderClasses();
-    } catch (e) {
-      alert(e.message);
-    }
+    const copy = Object.assign({}, row, {
+      id: newId(),
+      name: `${row.name} のコピー`,
+      absent: (row.absent || []).slice(),
+      seats: (row.seats || []).slice(),
+    });
+    classes.push(copy);
+    select.value = copy.id;
+    writeRooms();
+    renderClasses();
   });
-  document.getElementById("tb-class-del").addEventListener("click", async () => {
+  document.getElementById("tb-class-del").addEventListener("click", () => {
     const row = currentClass();
-    if (!row || !confirm(`${row.name} を削除しますか？`)) return;
-    try {
-      await toolboxFetch(`/toolbox/api/classes/${row.id}`, { method: "DELETE" });
-      classes = classes.filter((item) => item.id !== row.id);
-      renderClasses();
-    } catch (e) {
-      alert(e.message);
-    }
+    if (!row || !confirm(`${row.name} をこの端末から削除しますか？`)) return;
+    classes = classes.filter((item) => item.id !== row.id);
+    writeRooms();
+    renderClasses();
   });
 
   ToolboxDisplay.init({
     onNext: shuffle,
     onPrev: () => document.getElementById("tb-clear").click(),
   });
+  bootRooms();
+  const last = localStorage.getItem(LAST_KEY);
   renderClasses();
+  if (last && classes.some((row) => row.id === last)) {
+    select.value = last;
+    renderAll();
+  }
 })();
