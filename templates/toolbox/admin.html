@@ -137,6 +137,32 @@
     </table>
   </div>
 
+  <h2>音声の保存先フォルダ</h2>
+  <p class="tb-note">このブラウザで録音した音声の保存先です。選んだフォルダは、同じパソコンのスピーチ理解度チェックでも使われます。</p>
+  <div class="tb-dir-box">
+    <p class="tb-muted" id="tb-dir-status">確認中…</p>
+    <button class="tb-btn" type="button" id="tb-dir-pick">保存先フォルダを選ぶ</button>
+  </div>
+
+  <h2>スピーチ理解度チェックの履歴</h2>
+  <p class="tb-note">全ユーザーの文字起こしと問題です。見出しをクリックすると並び替えできます。</p>
+  <div class="tb-table-wrap">
+    <table class="tb-table" id="tb-talk-archives">
+      <thead>
+        <tr>
+          <th><button type="button" data-talk-sort="user">ユーザー</button></th>
+          <th><button type="button" data-talk-sort="created_at">日時</button></th>
+          <th><button type="button" data-talk-sort="title">タイトル</button></th>
+          <th><button type="button" data-talk-sort="level">レベル</button></th>
+          <th><button type="button" data-talk-sort="question_count">問題数</button></th>
+          <th>状態</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <p class="tb-muted" id="tb-talk-archives-empty" hidden>まだ履歴はありません。</p>
+
   <h2>既存アプリ連携</h2>
   <p class="tb-note">今後ここに追加します。音読・News・ディベートなどとの連携は、今回はまだありません。</p>
 </section>

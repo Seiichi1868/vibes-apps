@@ -4,7 +4,7 @@
 <section class="tb-tool tb-talk" data-display-root>
   <div data-view="settings">
     <h1 class="tb-tool-title">スピーチ理解度チェック</h1>
-    <p class="tb-warn-note">生徒の氏名や個人情報は入力しないでください。文字起こしと問題は「履歴（アーカイブ）」に自動保存されます。録音した音声は、Chrome / Edge では下で選んだこのパソコンのフォルダに保存されます（サーバーには残りません）。Safari ではいったんサーバーに保存され、月に一度のお知らせでまとめてダウンロードして指定フォルダへ移します。話者の同意を得て使ってください。</p>
+    <p class="tb-info-note">文字起こしと問題は「履歴（アーカイブ）」に自動保存されます。作成した問題をもう一度見たい場合はアーカイブから選択してください。</p>
     <form id="tb-talk-settings" class="tb-form" data-reasoning="{{ 1 if generate_reasoning else 0 }}">
       <label>レベル
         <select name="level">
@@ -37,11 +37,6 @@
       <label>待機画面の英文
         <input name="wait_prompt" value="Talk with your partner. What did you hear?">
       </label>
-      <div class="tb-dir-box">
-        <strong>音声の保存先フォルダ</strong>
-        <p class="tb-muted" id="tb-dir-status">確認中…</p>
-        <button class="tb-btn" type="button" id="tb-dir-pick">保存先フォルダを選ぶ</button>
-      </div>
       <label>入力マイク
         <select name="mic" id="tb-mic"></select>
       </label>
@@ -157,7 +152,7 @@
 
   <div data-view="history" hidden>
     <h2>履歴（アーカイブ）</h2>
-    <p class="tb-note">録音した音声・文字起こし・問題が自動で保存されます。開いて修正し、そのまま再利用できます。</p>
+    <p class="tb-note">この端末で作成して保存した文字起こしと問題だけが表示されます。開いて修正し、そのまま再利用できます。</p>
     <ul id="tb-history-list" class="tb-history-list"></ul>
     <p class="tb-muted" id="tb-history-empty" hidden>まだ履歴はありません。</p>
     <button class="tb-btn" type="button" data-go="settings">戻る</button>

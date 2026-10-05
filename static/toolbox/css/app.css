@@ -312,9 +312,10 @@ h1, h2, h3 { margin: 0 0 12px; }
   margin-bottom: 8px;
 }
 .tb-blur { filter: blur(7px); user-select: none; }
-.tb-warn-note {
-  background: var(--tb-warn-soft);
-  color: var(--tb-warn-text);
+.tb-warn-note,
+.tb-info-note {
+  background: var(--tb-accent-light);
+  color: var(--tb-text);
   padding: 10px 12px;
   border-radius: 10px;
 }

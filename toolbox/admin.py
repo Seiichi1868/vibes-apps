@@ -30,6 +30,7 @@ from toolbox.storage import (
     get_setting,
     get_user,
     list_users,
+    list_all_talk_sessions,
     load_app_settings,
     load_tool_settings,
     new_id,
@@ -123,6 +124,40 @@ def admin_page():
         transcribe_models=_model_rows("transcribe"),
         generate_models=_model_rows("generate"),
     )
+
+
+@main_bp.route("/admin/api/talk/sessions")
+@admin_panel_required
+def admin_talk_sessions():
+    names = {user.get("id"): user.get("username") or "" for user in list_users()}
+    sort = str(request.args.get("sort") or "created_at")
+    if sort not in ("user", "created_at", "title", "level", "question_count"):
+        sort = "created_at"
+    descending = str(request.args.get("order") or "desc") != "asc"
+    rows = []
+    for session in list_all_talk_sessions():
+        questions = session.get("questions_json") or []
+        user_id = session.get("user_id") or ""
+        username = names.get(user_id) or "不明"
+        if username.startswith("guest_"):
+            username = "ゲスト"
+        rows.append({
+            "id": session.get("id"),
+            "user": username,
+            "title": session.get("title") or "",
+            "level": session.get("level") or "",
+            "question_count": session.get("question_count") if session.get("question_count") is not None else len(questions),
+            "created_at": session.get("created_at") or "",
+            "status": session.get("status") or "",
+        })
+
+    def sort_key(row):
+        if sort == "question_count":
+            return row["question_count"] or 0
+        return str(row.get(sort) or "").lower()
+
+    rows.sort(key=sort_key, reverse=descending)
+    return jsonify({"ok": True, "sessions": rows})
 
 
 @main_bp.route("/admin/api/reauth", methods=["POST"])

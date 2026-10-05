@@ -380,14 +380,27 @@ def load_talk_session(session_id: str, user_id: str | None = None) -> dict | Non
     return data
 
 
-def list_talk_sessions(user_id: str) -> list[dict]:
+def list_talk_sessions(user_id: str, device_id: str | None = None) -> list[dict]:
     ensure_dirs()
     rows = []
     for path in TALK_SESSIONS_DIR.glob("*.json"):
         data = _read_json(path, None)
-        if isinstance(data, dict) and data.get("user_id") == user_id:
-            rows.append(data)
+        if not isinstance(data, dict) or data.get("user_id") != user_id:
+            continue
+        if device_id is not None and data.get("device_id") != device_id:
+            continue
+        rows.append(data)
     rows.sort(key=lambda row: row.get("created_at") or "", reverse=True)
+    return rows
+
+
+def list_all_talk_sessions() -> list[dict]:
+    ensure_dirs()
+    rows = []
+    for path in TALK_SESSIONS_DIR.glob("*.json"):
+        data = _read_json(path, None)
+        if isinstance(data, dict):
+            rows.append(data)
     return rows
 
 

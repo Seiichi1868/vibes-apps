@@ -33,6 +33,19 @@ ARCHIVE_INTERVAL_DAYS = 30
 ARCHIVE_FOLDER_NAME = "ToolboxTalkAudio"
 
 
+def _device_id() -> str:
+    raw = str(request.headers.get("X-Toolbox-Device") or "")
+    cleaned = "".join(ch for ch in raw if ch.isalnum() or ch in "-_")[:64]
+    return cleaned
+
+
+def _own_session(session_id: str) -> dict | None:
+    session = load_talk_session(session_id, current_user()["id"])
+    if not session or session.get("device_id") != _device_id():
+        return None
+    return session
+
+
 def _error(exc, fallback: str):
     if isinstance(exc, UsageLimitError):
         return jsonify({"ok": False, "error": exc.message, "code": "limit"}), 429
@@ -163,6 +176,7 @@ def register(bp):
             "question_count": 0,
             "status": "recorded",
             "wait_prompt": "Talk with your partner. What did you hear?",
+            "device_id": _device_id(),
         }
         session["title"] = _title_for(session)
         save_talk_session(session)
@@ -174,7 +188,7 @@ def register(bp):
     def api_transcribe():
         user = current_user()
         payload = request.get_json(silent=True) or {}
-        session = load_talk_session(str(payload.get("session_id") or ""), user["id"])
+        session = _own_session(str(payload.get("session_id") or ""))
         if not session or not session.get("audio_file"):
             return jsonify({"ok": False, "error": "保存された音声が見つかりません。"}), 404
         audio_path = TALK_AUDIO_DIR / Path(str(session["audio_file"])).name
@@ -234,6 +248,7 @@ def register(bp):
             "question_count": 0,
             "status": "transcribed",
             "wait_prompt": "Talk with your partner. What did you hear?",
+            "device_id": _device_id(),
         }
         session["title"] = _title_for(session)
         save_talk_session(session)
@@ -262,7 +277,7 @@ def register(bp):
         session = None
         session_id = str(payload.get("session_id") or "")
         if session_id:
-            session = load_talk_session(session_id, user["id"])
+            session = _own_session(session_id)
         if session is not None and transcript:
             # 確認・修正された文字起こしも先に保存しておく
             session["transcript"] = transcript
@@ -294,6 +309,7 @@ def register(bp):
                 "user_id": user["id"],
                 "created_at": now_iso(),
                 "duration_sec": 0,
+                "device_id": _device_id(),
             }
         session.update(
             {
@@ -321,7 +337,7 @@ def register(bp):
     def api_regenerate_one():
         user = current_user()
         payload = request.get_json(silent=True) or {}
-        session = load_talk_session(str(payload.get("session_id") or ""), user["id"])
+        session = _own_session(str(payload.get("session_id") or ""))
         if not session:
             return jsonify({"ok": False, "error": "履歴が見つかりません。"}), 404
         try:
@@ -352,13 +368,17 @@ def register(bp):
     @bp.route("/api/talk/sessions")
     @login_required
     def api_list_sessions():
-        rows = [_public_session(row) for row in list_talk_sessions(current_user()["id"])]
+        device = _device_id()
+        rows = [
+            _public_session(row)
+            for row in list_talk_sessions(current_user()["id"], device or "")
+        ]
         return jsonify({"ok": True, "sessions": rows})
 
     @bp.route("/api/talk/sessions/<session_id>")
     @login_required
     def api_get_session(session_id):
-        session = load_talk_session(session_id, current_user()["id"])
+        session = _own_session(session_id)
         if not session:
             return jsonify({"ok": False, "error": "履歴が見つかりません。"}), 404
         return jsonify({"ok": True, "session": _public_session(session, include_questions=True)})
@@ -366,7 +386,7 @@ def register(bp):
     @bp.route("/api/talk/sessions/<session_id>/audio")
     @login_required
     def api_session_audio(session_id):
-        session = load_talk_session(session_id, current_user()["id"])
+        session = _own_session(session_id)
         if not session or not session.get("audio_file"):
             return jsonify({"ok": False, "error": "音声がありません。"}), 404
         path = TALK_AUDIO_DIR / Path(str(session["audio_file"])).name
@@ -388,7 +408,7 @@ def register(bp):
     @login_required
     def api_audio_local(session_id):
         """音声をこのパソコンのフォルダへ保存したことを記録し、必要ならサーバー上の音声を消す。"""
-        session = load_talk_session(session_id, current_user()["id"])
+        session = _own_session(session_id)
         if not session:
             return jsonify({"ok": False, "error": "履歴が見つかりません。"}), 404
         payload = request.get_json(silent=True) or {}
@@ -404,7 +424,7 @@ def register(bp):
 
     def _server_audio_sessions(user_id: str) -> list[dict]:
         rows = []
-        for row in list_talk_sessions(user_id):
+        for row in list_talk_sessions(user_id, _device_id() or ""):
             name = row.get("audio_file")
             if name and (TALK_AUDIO_DIR / Path(str(name)).name).is_file():
                 rows.append(row)
@@ -495,7 +515,7 @@ def register(bp):
     @tool_required("talk_check")
     def api_audio_upload(session_id):
         """ローカル保存済みの音声を、文字起こし用に一時的にサーバーへ戻す。"""
-        session = load_talk_session(session_id, current_user()["id"])
+        session = _own_session(session_id)
         if not session:
             return jsonify({"ok": False, "error": "履歴が見つかりません。"}), 404
         upload = request.files.get("audio")
@@ -527,7 +547,7 @@ def register(bp):
     @bp.route("/api/talk/sessions/<session_id>", methods=["PUT"])
     @login_required
     def api_update_session(session_id):
-        session = load_talk_session(session_id, current_user()["id"])
+        session = _own_session(session_id)
         if not session:
             return jsonify({"ok": False, "error": "履歴が見つかりません。"}), 404
         payload = request.get_json(silent=True) or {}

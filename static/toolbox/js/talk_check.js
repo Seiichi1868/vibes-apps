@@ -2,6 +2,7 @@
   const views = {};
   document.querySelectorAll("[data-view]").forEach((el) => { views[el.dataset.view] = el; });
   const settingsForm = document.getElementById("tb-talk-settings");
+  const DEVICE_KEY = "toolbox.talk_check.device.v1";
   const SETTINGS_KEY = "toolbox.talk_check.settings.v1";
   const RESUME_KEY = "toolbox.talk_check.resume.v1";
   const DRAFT_KEY = "toolbox.talk_check.drafts.v1";
@@ -78,10 +79,32 @@
     try { storage.setItem(key, JSON.stringify(value)); } catch (_) {}
   }
 
+  function deviceId() {
+    let id = "";
+    try { id = localStorage.getItem(DEVICE_KEY) || ""; } catch (_) {}
+    if (!id) {
+      id = (crypto.randomUUID && crypto.randomUUID()) || String(Date.now());
+      try { localStorage.setItem(DEVICE_KEY, id); } catch (_) {}
+    }
+    return id;
+  }
+
+  const baseFetch = window.toolboxFetch;
+  window.toolboxFetch = function (url, options) {
+    const next = Object.assign({}, options || {});
+    if (String(url).indexOf("/toolbox/api/talk/") !== -1) {
+      next.headers = Object.assign({ "X-Toolbox-Device": deviceId() }, next.headers || {});
+    }
+    return baseFetch(url, next);
+  };
+
   async function postForm(url, fd, signal) {
     const res = await fetch(url, {
       method: "POST",
-      headers: { "X-CSRF-Token": window.TOOLBOX_CSRF || "" },
+      headers: {
+        "X-CSRF-Token": window.TOOLBOX_CSRF || "",
+        "X-Toolbox-Device": deviceId(),
+      },
       body: fd,
       credentials: "same-origin",
       signal,
@@ -167,7 +190,8 @@
     btn.textContent = "保存先フォルダを変更";
   }
 
-  document.getElementById("tb-dir-pick").addEventListener("click", async () => {
+  const dirPick = document.getElementById("tb-dir-pick");
+  if (dirPick) dirPick.addEventListener("click", async () => {
     if (!dirSupported) {
       if (window.ToolboxAudioArchive) window.ToolboxAudioArchive.show();
       return;
