@@ -2,7 +2,8 @@
   const ROOMS_KEY = "toolbox.random_seats.rooms.v1";
   const LAST_KEY = "toolbox.random_seats.last.v1";
   let classes = [];
-  const select = document.getElementById("tb-class");
+  let activeId = "";
+  const tabs = document.getElementById("tb-room-tabs");
   const grid = document.getElementById("tb-grid");
   const board = document.getElementById("tb-seats");
   const rowsEl = document.getElementById("tb-rows");
@@ -31,7 +32,7 @@
 
   function writeRooms() {
     localStorage.setItem(ROOMS_KEY, JSON.stringify(classes));
-    if (select.value) localStorage.setItem(LAST_KEY, select.value);
+    if (activeId) localStorage.setItem(LAST_KEY, activeId);
   }
 
   function newId() {
@@ -64,7 +65,7 @@
   }
 
   function currentClass() {
-    return classes.find((row) => row.id === select.value) || null;
+    return classes.find((row) => row.id === activeId) || null;
   }
 
   function defaultState(row) {
@@ -85,10 +86,16 @@
     return state;
   }
 
+  function esc(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
   function renderClasses() {
-    const keep = select.value;
-    select.innerHTML = classes.map((row) => `<option value="${row.id}">${row.name}（${row.student_count}）</option>`).join("");
-    if (keep && classes.some((row) => row.id === keep)) select.value = keep;
+    if (!classes.some((row) => row.id === activeId)) activeId = classes[0] ? classes[0].id : "";
+    tabs.innerHTML = classes.map((row) => (
+      `<button class="tb-tab${row.id === activeId ? " is-active" : ""}" type="button" role="tab" aria-selected="${row.id === activeId}" data-room="${esc(row.id)}">${esc(row.name)}（${row.student_count}）</button>`
+    )).join("") || '<span class="tb-muted">保存はまだありません。「教室を追加」でタブを作れます。</span>';
     renderAll();
   }
 
@@ -206,9 +213,12 @@
     writeRooms();
     renderBoard();
   });
-  select.addEventListener("change", () => {
+  tabs.addEventListener("click", (ev) => {
+    const id = ev.target && ev.target.dataset ? ev.target.dataset.room : "";
+    if (!id || id === activeId) return;
+    activeId = id;
     writeRooms();
-    renderAll();
+    renderClasses();
   });
 
   function promptClass(existing) {
@@ -235,7 +245,7 @@
         cols: layout.cols,
       };
       classes.push(room);
-      select.value = room.id;
+      activeId = room.id;
     }
     writeRooms();
     renderClasses();
@@ -256,7 +266,7 @@
       seats: (row.seats || []).slice(),
     });
     classes.push(copy);
-    select.value = copy.id;
+    activeId = copy.id;
     writeRooms();
     renderClasses();
   });
@@ -264,6 +274,7 @@
     const row = currentClass();
     if (!row || !confirm(`${row.name} をこの端末から削除しますか？`)) return;
     classes = classes.filter((item) => item.id !== row.id);
+    activeId = classes[0] ? classes[0].id : "";
     writeRooms();
     renderClasses();
   });
@@ -273,10 +284,6 @@
     onPrev: () => document.getElementById("tb-clear").click(),
   });
   bootRooms();
-  const last = localStorage.getItem(LAST_KEY);
+  activeId = localStorage.getItem(LAST_KEY) || "";
   renderClasses();
-  if (last && classes.some((row) => row.id === last)) {
-    select.value = last;
-    renderAll();
-  }
 })();
