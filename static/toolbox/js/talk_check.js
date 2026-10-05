@@ -2,13 +2,26 @@
   const views = {};
   document.querySelectorAll("[data-view]").forEach((el) => { views[el.dataset.view] = el; });
   const settingsForm = document.getElementById("tb-talk-settings");
+  const SETTINGS_KEY = "toolbox.talk_check.settings.v1";
+  const RESUME_KEY = "toolbox.talk_check.resume.v1";
+  const DRAFT_KEY = "toolbox.talk_check.drafts.v1";
+  const FORM_FIELDS = [
+    "level", "count", "include_inference", "notes", "keywords", "stt_mode",
+    "review_transcript", "show_live", "parallel_browser", "wait_prompt",
+  ];
+
   const state = {
     view: "settings",
+    source: "paste",
     audioBlob: null,
+    durationSec: 0,
     transcript: "",
     browserTranscript: "",
+    sttBase: "",
+    reviewed: false,
     questions: [],
     sessionId: null,
+    detail: null,
     index: 0,
     showingAnswer: false,
     mediaRecorder: null,
@@ -27,13 +40,68 @@
     wakeLock: null,
     pendingRetry: null,
     regenBusy: false,
+    abort: null,
+    running: false,
+    arDirty: false,
   };
 
-  function settings() {
+  // ── 共通ユーティリティ ───────────────────────────────────────
+  function esc(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function fmtDuration(sec) {
+    const total = Math.round(Number(sec) || 0);
+    if (!total) return "-";
+    return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+  }
+
+  function fmtDate(iso) {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso || "";
+    const p = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}/${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+
+  function readJson(storage, key, fallback) {
+    try {
+      const raw = storage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function writeJson(storage, key, value) {
+    try { storage.setItem(key, JSON.stringify(value)); } catch (_) {}
+  }
+
+  async function postForm(url, fd, signal) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "X-CSRF-Token": window.TOOLBOX_CSRF || "" },
+      body: fd,
+      credentials: "same-origin",
+      signal,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(data.error || "通信に失敗しました。もう一度試してください。");
+      err.data = data;
+      throw err;
+    }
+    return data;
+  }
+
+  // ── 設定（保存ボタンで確定）──────────────────────────────────
+  function readForm() {
     const fd = new FormData(settingsForm);
+    let count = Math.floor(Number(fd.get("count")));
+    if (!Number.isFinite(count) || count < 1) count = 5;
     return {
       level: fd.get("level") || "A2",
-      count: Number(fd.get("count") || 5),
+      count,
       include_inference: fd.has("include_inference"),
       notes: fd.get("notes") || "",
       keywords: fd.get("keywords") || "",
@@ -42,19 +110,167 @@
       show_live: fd.has("show_live"),
       parallel_browser: fd.has("parallel_browser"),
       wait_prompt: fd.get("wait_prompt") || "Talk with your partner. What did you hear?",
-      mic: fd.get("mic") || "",
     };
+  }
+
+  function applyToForm(values) {
+    FORM_FIELDS.forEach((name) => {
+      const el = settingsForm.elements[name];
+      if (!el || values[name] === undefined) return;
+      if (el.type === "checkbox") el.checked = !!values[name];
+      else el.value = values[name];
+    });
+  }
+
+  let applied = Object.assign(readForm(), readJson(localStorage, SETTINGS_KEY, {}));
+  applyToForm(applied);
+
+  function settings() {
+    const mic = settingsForm.elements.mic ? settingsForm.elements.mic.value : "";
+    return Object.assign({}, applied, { mic });
+  }
+
+  function isDirty() {
+    const now = readForm();
+    return FORM_FIELDS.some((k) => now[k] !== applied[k]);
+  }
+
+  const saveBtn = document.getElementById("tb-save-settings");
+  function refreshSaveBtn() {
+    const dirty = isDirty();
+    saveBtn.disabled = !dirty;
+    saveBtn.classList.toggle("is-dirty", dirty);
+    saveBtn.textContent = dirty ? "変更を保存して更新" : "設定は保存済み";
+  }
+
+  function saveSettings() {
+    applied = readForm();
+    writeJson(localStorage, SETTINGS_KEY, applied);
+    applyToForm(applied);
+    refreshSaveBtn();
+    updateEstimate();
+  }
+
+  function ensureSaved() {
+    if (!isDirty()) return true;
+    if (confirm("設定に未保存の変更があります。保存して続けますか？")) {
+      saveSettings();
+      return true;
+    }
+    return false;
+  }
+
+  function estimateSeconds(count, reasoning) {
+    const calls = Math.max(1, Math.ceil(count / 12));
+    const base = 6 + 2 * calls + 3 * count;
+    return base * (reasoning ? 3 : 1);
+  }
+
+  function fmtEstimate(sec) {
+    const rounded = Math.max(5, Math.round(sec / 5) * 5);
+    if (rounded < 60) return `約${rounded}秒`;
+    const m = Math.floor(rounded / 60);
+    const s = rounded % 60;
+    return s ? `約${m}分${s}秒` : `約${m}分`;
+  }
+
+  function updateEstimate() {
+    const el = document.getElementById("tb-count-est");
+    if (!el) return;
+    const count = readForm().count;
+    const reasoning = settingsForm.dataset.reasoning === "1";
+    let text = `問題作成の待ち時間の目安: ${fmtEstimate(estimateSeconds(count, reasoning))}（モデルや混雑で変わります）`;
+    if (isDirty()) text += " ※保存すると反映されます";
+    el.textContent = text;
+  }
+
+  settingsForm.addEventListener("input", () => { refreshSaveBtn(); updateEstimate(); });
+  settingsForm.addEventListener("change", () => { refreshSaveBtn(); updateEstimate(); });
+  settingsForm.addEventListener("submit", (ev) => ev.preventDefault());
+  saveBtn.addEventListener("click", saveSettings);
+  refreshSaveBtn();
+  updateEstimate();
+
+  // ── 画面遷移と復元 ───────────────────────────────────────────
+  function saveResume() {
+    writeJson(sessionStorage, RESUME_KEY, {
+      view: state.view,
+      sessionId: state.sessionId,
+      index: state.index,
+      showingAnswer: state.showingAnswer,
+    });
   }
 
   function show(name) {
     state.view = name;
     Object.entries(views).forEach(([key, el]) => { el.hidden = key !== name; });
+    saveResume();
+  }
+
+  function resetSession() {
+    state.audioBlob = null;
+    state.durationSec = 0;
+    state.transcript = "";
+    state.browserTranscript = "";
+    state.sttBase = "";
+    state.reviewed = false;
+    state.questions = [];
+    state.sessionId = null;
+    state.detail = null;
+    state.index = 0;
+    state.showingAnswer = false;
+    state.pendingRetry = null;
+    updateDownloadLink();
+  }
+
+  function goTo(name) {
+    if (state.view === "settings" && name !== "settings" && !ensureSaved()) return;
+    if (name === "history") {
+      show("history");
+      loadHistory();
+      return;
+    }
+    if (name === "paste") {
+      resetSession();
+      state.source = "paste";
+      document.getElementById("tb-paste").value = readJson(sessionStorage, DRAFT_KEY, {}).paste || "";
+    }
+    if (name === "file") resetSession();
+    show(name);
   }
 
   document.querySelectorAll("[data-go]").forEach((btn) => {
-    btn.addEventListener("click", () => show(btn.dataset.go));
+    btn.addEventListener("click", (ev) => {
+      if (btn.dataset.go === "record") {
+        ev.preventDefault();
+        if (state.view === "settings" && !ensureSaved()) return;
+        startRecording().catch((err) => alert(err.message));
+        return;
+      }
+      goTo(btn.dataset.go);
+    });
   });
 
+  // 下書き（更新しても消えないように）
+  function saveDraft(key, value) {
+    const drafts = readJson(sessionStorage, DRAFT_KEY, {});
+    drafts[key] = value;
+    writeJson(sessionStorage, DRAFT_KEY, drafts);
+  }
+  document.getElementById("tb-paste").addEventListener("input", (ev) => saveDraft("paste", ev.target.value));
+  document.getElementById("tb-review").addEventListener("input", (ev) => {
+    state.transcript = ev.target.value;
+    saveDraft("review", ev.target.value);
+  });
+
+  window.addEventListener("beforeunload", (ev) => {
+    if (state.mediaRecorder && state.mediaRecorder.state === "recording") {
+      ev.preventDefault();
+      ev.returnValue = "";
+    }
+  });
+
+  // ── 録音まわり ───────────────────────────────────────────────
   function SpeechRecognitionCtor() {
     return window.SpeechRecognition || window.webkitSpeechRecognition || null;
   }
@@ -65,7 +281,7 @@
     const devices = await navigator.mediaDevices.enumerateDevices();
     const mics = devices.filter((d) => d.kind === "audioinput");
     const last = localStorage.getItem("toolbox.talk_check.mic") || "";
-    sel.innerHTML = mics.map((d) => `<option value="${d.deviceId}">${d.label || "マイク"}</option>`).join("");
+    sel.innerHTML = mics.map((d) => `<option value="${esc(d.deviceId)}">${esc(d.label || "マイク")}</option>`).join("");
     if (last) sel.value = last;
   }
 
@@ -77,6 +293,15 @@
     const types = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
     if (!window.MediaRecorder) return "";
     return types.find((t) => MediaRecorder.isTypeSupported(t)) || "";
+  }
+
+  function blobExt(blob) {
+    const t = (blob && blob.type) || "";
+    if (t.includes("mp4")) return "mp4";
+    if (t.includes("ogg")) return "ogg";
+    if (t.includes("wav")) return "wav";
+    if (t.includes("mpeg")) return "mp3";
+    return "webm";
   }
 
   function setMeter(el, value) {
@@ -120,6 +345,20 @@
     state.parallelOn = false;
   }
 
+  function renderLive(liveEl, note) {
+    if (!liveEl || liveEl.hidden) return;
+    const text = state.browserTranscript;
+    liveEl.textContent = text || "（ここにブラウザの文字起こしが表示されます）";
+    liveEl.classList.toggle("is-empty", !text);
+    if (note) {
+      const small = document.createElement("div");
+      small.className = "tb-live-note";
+      small.textContent = note;
+      liveEl.appendChild(small);
+    }
+    liveEl.scrollTop = liveEl.scrollHeight;
+  }
+
   function startRecognition({ liveEl }) {
     const Ctor = SpeechRecognitionCtor();
     if (!Ctor) return;
@@ -130,16 +369,21 @@
     rec.onresult = (ev) => {
       let text = "";
       for (let i = 0; i < ev.results.length; i += 1) text += ev.results[i][0].transcript + " ";
-      state.browserTranscript = text.trim();
-      if (liveEl && settings().show_live) liveEl.textContent = state.browserTranscript;
+      // 認識が自動で再開されると結果がリセットされるため、確定済みの文章に追記する
+      state.browserTranscript = `${state.sttBase} ${text}`.trim();
+      renderLive(liveEl);
     };
-    rec.onerror = () => {
+    rec.onerror = (ev) => {
+      const code = ev && ev.error;
+      if (code === "no-speech" || code === "aborted") return;
       state.speechErrors += 1;
       if (state.speechErrors >= 3 && state.mediaRecorder) {
         stopRecognition("errors");
+        renderLive(liveEl, "ブラウザの文字起こしは停止しました（録音は続いています）");
       }
     };
     rec.onend = () => {
+      state.sttBase = state.browserTranscript;
       if (state.mediaRecorder && state.mediaRecorder.state === "recording") {
         try { rec.start(); } catch (_) {}
       }
@@ -213,14 +457,15 @@
     document.getElementById("tb-rec-clock").textContent = `${m}:${s}`;
     const msg = document.getElementById("tb-rec-msg");
     if (elapsed >= 480 && elapsed < 600) msg.textContent = "まもなく10分です。長い場合は一度停止してください。";
-    if (elapsed >= 600) stopRecording(false);
+    if (elapsed >= 600) stopRecording(true);
   }
 
   async function startRecording() {
+    resetSession();
+    state.source = "record";
     const stream = await getStream();
     state.stream = stream;
     state.chunks = [];
-    state.browserTranscript = "";
     state.speechErrors = 0;
     const mime = pickMime();
     state.mediaRecorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
@@ -231,17 +476,23 @@
     state.mediaRecorder.start(1000);
     state.recStarted = Date.now();
     state.recTimer = setInterval(recClock, 250);
+    document.getElementById("tb-rec-clock").textContent = "00:00";
+    document.getElementById("tb-rec-msg").textContent = "";
     await requestWake();
     watchLevel(stream, document.getElementById("tb-rec-meter"), document.getElementById("tb-rec-msg"));
-    const live = document.getElementById("tb-live");
-    live.hidden = !settings().show_live;
     const cfg = settings();
     const canBrowser = !!SpeechRecognitionCtor();
     if (!canBrowser) {
-      settingsForm.parallel_browser.closest("label").hidden = true;
-      settingsForm.stt_mode.querySelector('option[value="browser"]').hidden = true;
+      const box = settingsForm.parallel_browser.closest("label");
+      if (box) box.hidden = true;
+      const opt = settingsForm.stt_mode.querySelector('option[value="browser"]');
+      if (opt) opt.hidden = true;
     }
-    if (canBrowser && (cfg.stt_mode === "browser" || cfg.parallel_browser)) {
+    const useBrowser = canBrowser && (cfg.stt_mode === "browser" || cfg.parallel_browser);
+    const live = document.getElementById("tb-live");
+    live.hidden = !(useBrowser && cfg.show_live);
+    renderLive(live);
+    if (useBrowser) {
       state.parallelOn = cfg.stt_mode !== "browser";
       startRecognition({ liveEl: live });
       toolboxFetch("/toolbox/api/talk/events", {
@@ -251,11 +502,6 @@
     }
     show("record");
   }
-
-  document.querySelector("[data-go=record]").addEventListener("click", (ev) => {
-    ev.preventDefault();
-    startRecording().catch((err) => alert(err.message));
-  });
 
   function stopRecording(keep) {
     clearInterval(state.recTimer);
@@ -270,6 +516,7 @@
     state.mediaRecorder = null;
     state.stream = null;
     if (!rec) return;
+    const durationSec = (Date.now() - state.recStarted) / 1000;
     rec.onstop = () => {
       stream?.getTracks().forEach((t) => t.stop());
       if (!keep) {
@@ -278,14 +525,40 @@
         return;
       }
       state.audioBlob = new Blob(state.chunks, { type: rec.mimeType || "audio/webm" });
-      afterAudioReady("record", (Date.now() - state.recStarted) / 1000);
+      state.durationSec = durationSec;
+      state.source = "record";
+      state.reviewed = false;
+      runPipeline();
     };
     if (rec.state !== "inactive") rec.stop();
     else rec.onstop();
   }
 
   document.getElementById("tb-stop").addEventListener("click", () => stopRecording(true));
-  document.getElementById("tb-cancel-rec").addEventListener("click", () => stopRecording(false));
+  document.getElementById("tb-cancel-rec").addEventListener("click", () => {
+    if (!confirm("録音を破棄しますか？（保存されません）")) return;
+    stopRecording(false);
+  });
+
+  // ── 待機画面とエラー復帰 ─────────────────────────────────────
+  function updateDownloadLink() {
+    const link = document.getElementById("tb-wait-dl");
+    if (!link) return;
+    if (link.dataset.url) {
+      URL.revokeObjectURL(link.dataset.url);
+      link.dataset.url = "";
+    }
+    if (state.audioBlob) {
+      const url = URL.createObjectURL(state.audioBlob);
+      link.dataset.url = url;
+      link.href = url;
+      link.download = `speech.${blobExt(state.audioBlob)}`;
+      link.hidden = false;
+    } else {
+      link.hidden = true;
+      link.removeAttribute("href");
+    }
+  }
 
   function beginWait() {
     show("wait");
@@ -294,6 +567,7 @@
     document.getElementById("tb-choose-qs").hidden = true;
     document.getElementById("tb-retry-send").hidden = true;
     document.getElementById("tb-wait-error").hidden = true;
+    document.getElementById("tb-wait-recover").hidden = true;
     state.waitStarted = Date.now();
     clearInterval(state.waitTimer);
     state.waitTimer = setInterval(() => {
@@ -302,91 +576,198 @@
     }, 250);
   }
 
+  function endWaitTimer() {
+    clearInterval(state.waitTimer);
+  }
+
   function waitStatus(text) {
     document.getElementById("tb-wait-status").textContent = text;
   }
 
   function waitError(message, retry) {
+    endWaitTimer();
+    waitStatus("エラー");
     const el = document.getElementById("tb-wait-error");
     el.textContent = message;
     el.hidden = false;
     document.getElementById("tb-retry-send").hidden = !retry;
     state.pendingRetry = retry || null;
+    document.getElementById("tb-wait-open").hidden = !state.sessionId;
+    document.getElementById("tb-wait-paste").hidden = !(state.transcript || state.browserTranscript);
+    updateDownloadLink();
+    document.getElementById("tb-wait-recover").hidden = false;
   }
 
   document.getElementById("tb-retry-send").addEventListener("click", () => {
     if (state.pendingRetry) state.pendingRetry();
   });
 
-  async function transcribeBlob(blob, durationSec) {
-    const cfg = settings();
-    if (cfg.stt_mode === "browser") {
-      if (!state.browserTranscript) throw new Error("ブラウザの文字起こしが取れませんでした。テキスト貼り付けを使ってください。");
-      return state.browserTranscript;
-    }
-    const fd = new FormData();
-    fd.append("audio", blob, "speech.webm");
-    fd.append("duration_sec", String(Math.round(durationSec || 0)));
-    fd.append("keywords", cfg.keywords);
-    const res = await fetch("/toolbox/api/talk/transcribe", {
-      method: "POST",
-      headers: { "X-CSRF-Token": window.TOOLBOX_CSRF || "" },
-      body: fd,
-      credentials: "same-origin",
+  document.getElementById("tb-wait-open").addEventListener("click", () => {
+    if (state.sessionId) openArchive(state.sessionId).catch((e) => alert(e.message));
+  });
+
+  document.getElementById("tb-wait-paste").addEventListener("click", () => {
+    const text = state.transcript || state.browserTranscript || "";
+    document.getElementById("tb-paste").value = text;
+    state.source = state.source === "record" || state.source === "file" ? state.source : "paste";
+    show("paste");
+  });
+
+  function probeDuration(blob) {
+    return new Promise((resolve) => {
+      try {
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio();
+        const done = (v) => { URL.revokeObjectURL(url); resolve(v); };
+        const timer = setTimeout(() => done(0), 4000);
+        audio.preload = "metadata";
+        audio.onloadedmetadata = () => {
+          clearTimeout(timer);
+          done(Number.isFinite(audio.duration) ? audio.duration : 0);
+        };
+        audio.onerror = () => { clearTimeout(timer); done(0); };
+        audio.src = url;
+      } catch (_) {
+        resolve(0);
+      }
     });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      if (state.browserTranscript) return state.browserTranscript;
-      const err = new Error(data.error || "文字起こしに失敗しました。テキスト貼り付けを試してください。");
-      err.data = data;
-      throw err;
-    }
-    return data.transcript;
   }
 
-  async function generateFromTranscript(transcript, source) {
+  function isAbort(err) {
+    return err && (err.name === "AbortError");
+  }
+
+  async function uploadAudio(signal) {
+    const cfg = settings();
+    const fd = new FormData();
+    const name = state.audioBlob.name || `speech.${blobExt(state.audioBlob)}`;
+    fd.append("audio", state.audioBlob, name);
+    fd.append("duration_sec", String(Math.round(state.durationSec || 0)));
+    fd.append("source", state.source === "file" ? "file" : "record");
+    fd.append("level", cfg.level);
+    fd.append("keywords", cfg.keywords);
+    fd.append("browser_transcript", state.browserTranscript || "");
+    const data = await postForm("/toolbox/api/talk/audio", fd, signal);
+    state.sessionId = data.session_id;
+    saveResume();
+  }
+
+  async function createTextSession(signal) {
+    const data = await toolboxFetch("/toolbox/api/talk/sessions", {
+      method: "POST",
+      body: JSON.stringify({ transcript: state.transcript, level: settings().level }),
+      signal,
+    });
+    state.sessionId = data.session_id;
+    saveResume();
+  }
+
+  async function transcribeSaved(signal) {
+    const cfg = settings();
+    if (cfg.stt_mode === "browser") {
+      if (!state.browserTranscript) {
+        throw new Error("ブラウザの文字起こしが取れませんでした。保存済みの音声は残っています。Whisper で文字起こしするか、テキスト貼り付けを使ってください。");
+      }
+      await toolboxFetch(`/toolbox/api/talk/sessions/${state.sessionId}`, {
+        method: "PUT",
+        body: JSON.stringify({ transcript: state.browserTranscript }),
+        signal,
+      });
+      return state.browserTranscript;
+    }
+    try {
+      const data = await toolboxFetch("/toolbox/api/talk/transcribe", {
+        method: "POST",
+        body: JSON.stringify({ session_id: state.sessionId, keywords: cfg.keywords }),
+        signal,
+      });
+      return data.transcript;
+    } catch (err) {
+      if (isAbort(err)) throw err;
+      if (state.browserTranscript) {
+        await toolboxFetch(`/toolbox/api/talk/sessions/${state.sessionId}`, {
+          method: "PUT",
+          body: JSON.stringify({ transcript: state.browserTranscript }),
+        }).catch(() => {});
+        return state.browserTranscript;
+      }
+      throw err;
+    }
+  }
+
+  async function generateForSession(signal) {
     const cfg = settings();
     const data = await toolboxFetch("/toolbox/api/talk/generate", {
       method: "POST",
       body: JSON.stringify({
-        transcript,
+        session_id: state.sessionId,
+        transcript: state.transcript,
         level: cfg.level,
         count: cfg.count,
         include_inference: cfg.include_inference,
         notes: cfg.notes,
-        source,
+        source: state.source,
         wait_prompt: cfg.wait_prompt,
         keywords: cfg.keywords,
       }),
+      signal,
     });
     state.sessionId = data.session_id;
     state.questions = data.questions || [];
-    state.transcript = transcript;
+    saveResume();
     return data;
   }
 
-  async function afterAudioReady(source, durationSec) {
-    const cfg = settings();
+  // 音声保存 → 文字起こし → （確認）→ 問題作成。途中で失敗しても、完了済みの段階は再実行しない。
+  async function runPipeline() {
+    if (state.running) return;
+    state.running = true;
+    const controller = new AbortController();
+    state.abort = controller;
     beginWait();
-    waitStatus("文字起こし中");
     try {
-      const text = await transcribeBlob(state.audioBlob, durationSec);
-      state.transcript = text;
-      if (cfg.review_transcript) {
-        document.getElementById("tb-review").value = text;
+      if (!state.sessionId) {
+        if (state.audioBlob) {
+          waitStatus("音声を保存中");
+          if (!state.durationSec) state.durationSec = await probeDuration(state.audioBlob);
+          await uploadAudio(controller.signal);
+        } else if (state.transcript) {
+          waitStatus("テキストを保存中");
+          await createTextSession(controller.signal);
+        } else {
+          throw new Error("音声または文章がありません。");
+        }
+      }
+      if (!state.transcript) {
+        waitStatus("文字起こし中");
+        state.transcript = await transcribeSaved(controller.signal);
+      }
+      if (settings().review_transcript && !state.reviewed) {
+        state.running = false;
+        endWaitTimer();
+        document.getElementById("tb-review").value = state.transcript;
         show("review");
         return;
       }
-      waitStatus("問題作成中");
-      await generateFromTranscript(text, source);
+      waitStatus(`問題作成中（${state.questionTarget || settings().count}問）`);
+      await generateForSession(controller.signal);
       readyToStart();
     } catch (err) {
-      waitError(err.message + (err.message.includes("テキスト") ? "" : " テキスト貼り付けに切り替えられます。"), () => afterAudioReady(source, durationSec));
+      if (isAbort(err)) return;
+      const saved = state.sessionId ? " 保存済みのデータは「履歴（アーカイブ）」から確認できます。" : "";
+      waitError(`${err.message}${saved}`, () => runPipeline());
+    } finally {
+      state.running = false;
+      if (state.abort === controller) state.abort = null;
     }
   }
 
   function readyToStart() {
+    endWaitTimer();
     waitStatus("準備完了");
+    document.getElementById("tb-wait-error").hidden = true;
+    document.getElementById("tb-wait-recover").hidden = true;
+    document.getElementById("tb-retry-send").hidden = true;
     document.getElementById("tb-start-qs").hidden = false;
     document.getElementById("tb-choose-qs").hidden = false;
   }
@@ -403,38 +784,38 @@
       alert("音声ファイルを選んでください。");
       return;
     }
+    resetSession();
     state.audioBlob = file;
-    afterAudioReady("file", 0);
+    state.source = "file";
+    state.durationSec = await probeDuration(file);
+    runPipeline();
   });
 
-  document.getElementById("tb-paste-go").addEventListener("click", async () => {
+  document.getElementById("tb-paste-go").addEventListener("click", () => {
     const text = document.getElementById("tb-paste").value.trim();
     if (!text) {
       alert("英文を貼り付けてください。");
       return;
     }
-    beginWait();
-    waitStatus("問題作成中");
-    try {
-      await generateFromTranscript(text, "paste");
-      readyToStart();
-    } catch (err) {
-      waitError(err.message, () => document.getElementById("tb-paste-go").click());
-    }
+    // エラー画面から編集して戻った場合は同じアーカイブを使い続ける
+    state.transcript = text;
+    state.reviewed = true;
+    if (!state.sessionId) state.source = "paste";
+    runPipeline();
   });
 
-  document.getElementById("tb-review-go").addEventListener("click", async () => {
+  document.getElementById("tb-review-go").addEventListener("click", () => {
     const text = document.getElementById("tb-review").value.trim();
-    beginWait();
-    waitStatus("問題作成中");
-    try {
-      await generateFromTranscript(text, "record");
-      readyToStart();
-    } catch (err) {
-      waitError(err.message, () => document.getElementById("tb-review-go").click());
+    if (!text) {
+      alert("文章が空です。");
+      return;
     }
+    state.transcript = text;
+    state.reviewed = true;
+    runPipeline();
   });
 
+  // ── 出題前の選択・出題 ───────────────────────────────────────
   function visibleQuestions() {
     return state.questions.filter((q) => q.included !== false);
   }
@@ -443,8 +824,8 @@
     const list = document.getElementById("tb-select-list");
     list.innerHTML = state.questions.map((q, i) => `
       <li>
-        <label class="tb-check"><input type="checkbox" data-i="${i}" ${q.included === false ? "" : "checked"}> 問題 ${i + 1}</label>
-        <p class="tb-blur" data-reveal>${q.question}</p>
+        <label class="tb-check"><input type="checkbox" data-i="${i}" ${q.included === false ? "" : "checked"}> 問題 ${i + 1}${q.section ? ` <small class="tb-muted">(${esc(q.section)})</small>` : ""}</label>
+        <p class="tb-blur" data-reveal>${esc(q.question)}</p>
       </li>
     `).join("");
     list.querySelectorAll("[data-reveal]").forEach((p) => {
@@ -497,6 +878,7 @@
     const ev = document.getElementById("tb-evidence");
     ev.hidden = true;
     ev.textContent = q.evidence || "";
+    saveResume();
   }
 
   function stepNext() {
@@ -574,9 +956,13 @@
   function endPlay() {
     show("end");
     document.getElementById("tb-end-list").innerHTML = visibleQuestions().map((q) => (
-      `<li><strong>${q.question}</strong><br>${q.model_answer}</li>`
+      `<li><strong>${esc(q.question)}</strong><br>${esc(q.model_answer)}</li>`
     )).join("");
   }
+
+  document.getElementById("tb-end-archive").addEventListener("click", () => {
+    if (state.sessionId) openArchive(state.sessionId).catch((e) => alert(e.message));
+  });
 
   function displayOn() {
     return !!(window.ToolboxDisplay && window.ToolboxDisplay.isOn && window.ToolboxDisplay.isOn());
@@ -614,19 +1000,65 @@
     }
   });
 
-  async function openSession(id) {
+  // ── 履歴（アーカイブ）──────────────────────────────────────
+  const STATUS_LABEL = {
+    recorded: "文字起こし未完了",
+    transcribed: "問題未作成",
+  };
+
+  async function loadHistory() {
+    const list = document.getElementById("tb-history-list");
+    const empty = document.getElementById("tb-history-empty");
+    list.innerHTML = '<li class="tb-muted">読み込み中…</li>';
+    empty.hidden = true;
+    try {
+      const data = await toolboxFetch("/toolbox/api/talk/sessions");
+      const rows = data.sessions || [];
+      empty.hidden = rows.length > 0;
+      list.innerHTML = rows.map((s) => {
+        const status = STATUS_LABEL[s.status] || "";
+        const meta = [
+          fmtDate(s.created_at),
+          `${s.question_count || 0}問`,
+          `音声 ${fmtDuration(s.duration_sec)}`,
+          `CEFR ${s.level || "-"}`,
+        ].join(" ・ ");
+        return `
+        <li data-id="${esc(s.id)}">
+          <div class="tb-hist-title">${esc(s.title)}${status ? ` <span class="tb-badge">${esc(status)}</span>` : ""}${s.last_error ? ' <span class="tb-badge tb-badge-warn">エラーあり</span>' : ""}</div>
+          <div class="tb-muted tb-hist-meta">${esc(meta)}</div>
+          <div class="tb-actions">
+            <button class="tb-btn" type="button" data-open="${esc(s.id)}">開く・修正</button>
+            ${s.question_count ? `<button class="tb-btn tb-btn-primary" type="button" data-play="${esc(s.id)}">出題 ▶</button>` : ""}
+            <button class="tb-btn" type="button" data-del="${esc(s.id)}">削除</button>
+          </div>
+        </li>`;
+      }).join("");
+    } catch (err) {
+      list.innerHTML = `<li class="tb-error">${esc(err.message)}</li>`;
+    }
+  }
+
+  async function fetchDetail(id) {
     const data = await toolboxFetch(`/toolbox/api/talk/sessions/${id}`);
-    state.sessionId = data.session.id;
-    state.questions = data.session.questions || [];
-    state.transcript = data.session.transcript || "";
+    return data.session;
+  }
+
+  async function playSession(id) {
+    const detail = await fetchDetail(id);
+    if (!(detail.questions || []).length) throw new Error("この履歴にはまだ問題がありません。開いて問題を作ってください。");
+    state.sessionId = detail.id;
+    state.questions = detail.questions;
+    state.transcript = detail.transcript || "";
+    state.source = detail.source || "paste";
     startPlay();
   }
 
   document.getElementById("tb-history-list").addEventListener("click", async (ev) => {
-    const open = ev.target.dataset.open;
-    const del = ev.target.dataset.del;
-    if (open) openSession(open).catch((e) => alert(e.message));
-    if (del && confirm("この履歴を削除しますか？")) {
+    const { open, del, play } = ev.target.dataset;
+    if (open) openArchive(open).catch((e) => alert(e.message));
+    if (play) playSession(play).catch((e) => alert(e.message));
+    if (del && confirm("この履歴（音声・文字起こし・問題）を削除しますか？")) {
       try {
         await toolboxFetch(`/toolbox/api/talk/sessions/${del}`, { method: "DELETE" });
         ev.target.closest("li").remove();
@@ -635,6 +1067,348 @@
       }
     }
   });
+
+  // ── アーカイブ詳細（修正・再利用）────────────────────────────
+  const ar = {
+    title: document.getElementById("tb-ar-title"),
+    meta: document.getElementById("tb-ar-meta"),
+    error: document.getElementById("tb-ar-error"),
+    audioBox: document.getElementById("tb-ar-audio-box"),
+    audio: document.getElementById("tb-ar-audio"),
+    transcript: document.getElementById("tb-ar-transcript"),
+    browserBox: document.getElementById("tb-ar-browser-box"),
+    browser: document.getElementById("tb-ar-browser"),
+    list: document.getElementById("tb-ar-questions"),
+    questions: [],
+  };
+
+  function renderArchiveQuestions() {
+    ar.list.innerHTML = ar.questions.map((q, i) => `
+      <li data-i="${i}">
+        <label class="tb-check"><input type="checkbox" data-f="included" ${q.included === false ? "" : "checked"}> 出題する（問題 ${i + 1}${q.section ? ` / ${esc(q.section)}` : ""}）</label>
+        <input data-f="question" value="${esc(q.question)}" placeholder="問題文">
+        <input data-f="model_answer" value="${esc(q.model_answer)}" placeholder="模範解答">
+        <input data-f="short_answer" value="${esc(q.short_answer)}" placeholder="要点">
+        <input data-f="evidence" value="${esc(q.evidence)}" placeholder="根拠（スピーチからの引用）">
+        <button class="tb-btn" type="button" data-act="del">この問題を削除</button>
+      </li>
+    `).join("") || '<li class="tb-muted">問題はまだありません。</li>';
+  }
+
+  function syncArchiveQuestions() {
+    ar.list.querySelectorAll("li[data-i]").forEach((li) => {
+      const q = ar.questions[Number(li.dataset.i)];
+      if (!q) return;
+      li.querySelectorAll("[data-f]").forEach((input) => {
+        q[input.dataset.f] = input.type === "checkbox" ? input.checked : input.value;
+      });
+    });
+  }
+
+  function renderArchive(detail) {
+    state.detail = detail;
+    state.arDirty = false;
+    ar.title.value = detail.title || "";
+    ar.meta.textContent = [
+      fmtDate(detail.created_at),
+      `${(detail.questions || []).length}問`,
+      `音声 ${fmtDuration(detail.duration_sec)}`,
+      `CEFR ${detail.level || "-"}`,
+      { record: "録音", file: "音声ファイル", paste: "テキスト" }[detail.source] || "",
+    ].filter(Boolean).join(" ・ ");
+    ar.error.hidden = !detail.last_error;
+    ar.error.textContent = detail.last_error ? `直前のエラー: ${detail.last_error}` : "";
+    ar.audioBox.hidden = !detail.has_audio;
+    if (detail.has_audio) ar.audio.src = `/toolbox/api/talk/sessions/${detail.id}/audio`;
+    else ar.audio.removeAttribute("src");
+    document.getElementById("tb-ar-retranscribe").hidden = !detail.has_audio;
+    ar.transcript.value = detail.transcript || "";
+    const bt = detail.browser_transcript || "";
+    ar.browserBox.hidden = !bt;
+    ar.browser.textContent = bt;
+    ar.questions = (detail.questions || []).map((q) => Object.assign({}, q));
+    renderArchiveQuestions();
+  }
+
+  async function openArchive(id) {
+    const detail = await fetchDetail(id);
+    state.sessionId = detail.id;
+    renderArchive(detail);
+    show("archive");
+  }
+
+  ar.list.addEventListener("input", () => { state.arDirty = true; });
+  ar.title.addEventListener("input", () => { state.arDirty = true; });
+  ar.transcript.addEventListener("input", () => { state.arDirty = true; });
+
+  ar.list.addEventListener("click", (ev) => {
+    if (ev.target.dataset.act !== "del") return;
+    syncArchiveQuestions();
+    const li = ev.target.closest("li[data-i]");
+    ar.questions.splice(Number(li.dataset.i), 1);
+    state.arDirty = true;
+    renderArchiveQuestions();
+  });
+
+  document.getElementById("tb-ar-add-q").addEventListener("click", () => {
+    syncArchiveQuestions();
+    ar.questions.push({ question: "", model_answer: "", short_answer: "", evidence: "", type: "fact", included: true });
+    state.arDirty = true;
+    renderArchiveQuestions();
+  });
+
+  document.getElementById("tb-ar-use-browser").addEventListener("click", () => {
+    ar.transcript.value = ar.browser.textContent;
+    state.arDirty = true;
+  });
+
+  async function saveArchive() {
+    syncArchiveQuestions();
+    const data = await toolboxFetch(`/toolbox/api/talk/sessions/${state.detail.id}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        title: ar.title.value,
+        transcript: ar.transcript.value,
+        questions: ar.questions.filter((q) => (q.question || "").trim()),
+      }),
+    });
+    renderArchive(data.session);
+    return data.session;
+  }
+
+  function busy(btn, text, fn) {
+    const label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = text;
+    return Promise.resolve().then(fn).finally(() => {
+      btn.disabled = false;
+      btn.textContent = label;
+    });
+  }
+
+  document.getElementById("tb-ar-save").addEventListener("click", (ev) => {
+    busy(ev.target, "保存中…", saveArchive)
+      .then(() => { ar.meta.textContent += " ・ 保存しました"; })
+      .catch((e) => alert(e.message));
+  });
+
+  document.getElementById("tb-ar-play").addEventListener("click", (ev) => {
+    busy(ev.target, "保存中…", async () => {
+      const saved = await saveArchive();
+      state.sessionId = saved.id;
+      state.questions = saved.questions;
+      state.transcript = saved.transcript || "";
+      state.source = saved.source || "paste";
+      startPlay();
+    }).catch((e) => alert(e.message));
+  });
+
+  document.getElementById("tb-ar-retranscribe").addEventListener("click", (ev) => {
+    if (ar.transcript.value.trim() && !confirm("現在の文字起こしは音声からの結果で置き換わります。よろしいですか？")) return;
+    busy(ev.target, "文字起こし中…", async () => {
+      const data = await toolboxFetch("/toolbox/api/talk/transcribe", {
+        method: "POST",
+        body: JSON.stringify({ session_id: state.detail.id, keywords: settings().keywords }),
+      });
+      ar.transcript.value = data.transcript;
+      state.arDirty = true;
+    }).catch((e) => alert(e.message));
+  });
+
+  document.getElementById("tb-ar-regenerate").addEventListener("click", async () => {
+    const text = ar.transcript.value.trim();
+    if (!text) {
+      alert("文字起こしが空です。");
+      return;
+    }
+    if (!confirm(`この文字起こしから、現在の設定（${settings().count}問・CEFR ${settings().level}）で問題を作り直します。今の問題は置き換わります。`)) return;
+    try {
+      await saveArchive();
+    } catch (e) {
+      alert(e.message);
+      return;
+    }
+    state.sessionId = state.detail.id;
+    state.transcript = text;
+    state.source = state.detail.source || "paste";
+    state.audioBlob = null;
+    state.reviewed = true;
+    runPipeline();
+  });
+
+  // ── 各画面の「更新」ボタン（画面だけを更新し、データは失わない）──
+  function flash(view, text) {
+    const el = views[view]?.querySelector(".tb-refresh-msg");
+    if (!el) return;
+    el.textContent = text;
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.textContent = ""; }, 3000);
+  }
+
+  function mergeIncluded(fresh) {
+    const old = new Map(state.questions.map((q) => [q.id, q.included]));
+    return (fresh || []).map((q) => (old.has(q.id) && old.get(q.id) === false ? Object.assign({}, q, { included: false }) : q));
+  }
+
+  async function reconcileWait() {
+    if (state.abort) {
+      state.abort.abort();
+      state.abort = null;
+    }
+    state.running = false;
+    if (!state.sessionId) {
+      waitError("処理を中断しました。最初からやり直してください。", null);
+      document.getElementById("tb-wait-recover").hidden = !state.audioBlob;
+      return;
+    }
+    try {
+      const detail = await fetchDetail(state.sessionId);
+      if ((detail.questions || []).length) {
+        state.questions = mergeIncluded(detail.questions);
+        state.transcript = detail.transcript || state.transcript;
+        readyToStart();
+        flash("wait", "問題は作成済みでした");
+        return;
+      }
+      state.transcript = detail.transcript || state.transcript;
+      state.browserTranscript = state.browserTranscript || detail.browser_transcript || "";
+      waitError("処理を中断しました。保存済みのデータから再開できます。", () => runPipeline());
+    } catch (err) {
+      waitError(`状態を確認できませんでした: ${err.message}`, () => runPipeline());
+    }
+  }
+
+  async function refreshView(name) {
+    switch (name) {
+      case "settings":
+        await loadMics().catch(() => {});
+        document.getElementById("tb-mic-msg").textContent = "";
+        document.getElementById("tb-mic-meter").hidden = true;
+        refreshSaveBtn();
+        updateEstimate();
+        flash("settings", "更新しました");
+        break;
+      case "record": {
+        const rec = state.mediaRecorder;
+        if (rec && rec.state === "recording") {
+          recClock();
+          renderLive(document.getElementById("tb-live"));
+          flash("record", "録音は続いています");
+        } else if (state.chunks.length) {
+          flash("record", "録音を保存します");
+          stopRecording(true);
+        } else {
+          show("settings");
+        }
+        break;
+      }
+      case "wait":
+        await reconcileWait();
+        break;
+      case "select":
+        if (state.sessionId) {
+          const detail = await fetchDetail(state.sessionId);
+          state.questions = mergeIncluded(detail.questions);
+        }
+        renderSelect();
+        flash("select", "更新しました");
+        break;
+      case "play":
+        if (state.sessionId) {
+          const detail = await fetchDetail(state.sessionId);
+          state.questions = mergeIncluded(detail.questions);
+        }
+        state.index = Math.min(state.index, Math.max(0, visibleQuestions().length - 1));
+        renderQuestion();
+        flash("play", "更新しました");
+        break;
+      case "end":
+        endPlay();
+        flash("end", "更新しました");
+        break;
+      case "history":
+        await loadHistory();
+        break;
+      case "archive":
+        if (state.arDirty && !confirm("未保存の修正は破棄されます。更新しますか？")) break;
+        renderArchive(await fetchDetail(state.detail.id));
+        flash("archive", "更新しました");
+        break;
+      default:
+        flash(name, "更新しました");
+    }
+  }
+
+  Object.entries(views).forEach(([name, el]) => {
+    const row = document.createElement("div");
+    row.className = "tb-refresh-row";
+    row.innerHTML = '<button class="tb-btn tb-refresh-btn" type="button" title="この画面だけを更新します（入力済みのデータは残ります）">↻ この画面を更新</button><span class="tb-refresh-msg tb-muted"></span>';
+    el.insertBefore(row, el.firstChild);
+    row.querySelector("button").addEventListener("click", async (ev) => {
+      const btn = ev.currentTarget;
+      btn.disabled = true;
+      try {
+        await refreshView(name);
+      } catch (err) {
+        flash(name, `更新できませんでした: ${err.message}`);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+
+  // ── ブラウザ再読み込み後の復元 ───────────────────────────────
+  async function restore() {
+    const resume = readJson(sessionStorage, RESUME_KEY, null);
+    if (!resume || resume.view === "settings") return;
+    const drafts = readJson(sessionStorage, DRAFT_KEY, {});
+    if (resume.view === "paste" && !resume.sessionId) {
+      document.getElementById("tb-paste").value = drafts.paste || "";
+      show("paste");
+      return;
+    }
+    if (resume.view === "history") {
+      show("history");
+      loadHistory();
+      return;
+    }
+    if (!resume.sessionId) return;
+    try {
+      const detail = await fetchDetail(resume.sessionId);
+      state.sessionId = detail.id;
+      state.questions = detail.questions || [];
+      state.transcript = detail.transcript || "";
+      state.browserTranscript = detail.browser_transcript || "";
+      state.source = detail.source || "paste";
+      state.index = resume.index || 0;
+      state.showingAnswer = !!resume.showingAnswer;
+      const hasQ = state.questions.length > 0;
+      if (resume.view === "archive") {
+        renderArchive(detail);
+        show("archive");
+      } else if ((resume.view === "play" || resume.view === "end" || resume.view === "select") && hasQ) {
+        if (resume.view === "select") {
+          renderSelect();
+          show("select");
+        } else if (resume.view === "end") endPlay();
+        else {
+          show("play");
+          renderQuestion();
+        }
+      } else if (resume.view === "review" && detail.transcript) {
+        document.getElementById("tb-review").value = drafts.review || detail.transcript;
+        show("review");
+      } else if (hasQ) {
+        beginWait();
+        readyToStart();
+      } else if (resume.view === "wait" || resume.view === "review" || resume.view === "record") {
+        beginWait();
+        waitError("画面を更新しました。保存済みのデータから再開できます。", () => runPipeline());
+      }
+    } catch (_) {
+      show("settings");
+    }
+  }
 
   if (!SpeechRecognitionCtor()) {
     const box = settingsForm.parallel_browser.closest("label");
@@ -656,4 +1430,5 @@
   });
 
   loadMics().catch(() => {});
+  restore();
 })();

@@ -29,6 +29,7 @@ def chat_completions(
     temperature: float | None,
     timeout: float,
     reasoning: bool = False,
+    max_tokens: int | None = None,
 ) -> dict:
     api_key = get_openai_api_key()
     if not api_key:
@@ -39,10 +40,13 @@ def chat_completions(
         "response_format": {"type": "json_object"},
     }
     if reasoning:
-        payload["max_completion_tokens"] = 4096
+        payload["max_completion_tokens"] = max(4096, int(max_tokens or 0))
         payload["reasoning_effort"] = "none"
-    elif temperature is not None:
-        payload["temperature"] = temperature
+    else:
+        if temperature is not None:
+            payload["temperature"] = temperature
+        if max_tokens:
+            payload["max_tokens"] = int(max_tokens)
     req = urllib.request.Request(
         "https://api.openai.com/v1/chat/completions",
         data=json.dumps(payload).encode("utf-8"),

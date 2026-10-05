@@ -23,6 +23,7 @@ APP_SETTINGS_FILE = DATA_DIR / "app_settings.json"
 USAGE_LOG_FILE = DATA_DIR / "usage_log.json"
 TALK_SESSIONS_DIR = DATA_DIR / "talk_sessions"
 AUDIO_TMP_DIR = DATA_DIR / "audio_tmp"
+TALK_AUDIO_DIR = DATA_DIR / "talk_audio"
 
 COOKIE_NAME = "toolbox_session"
 COOKIE_MAX_AGE = 60 * 60 * 24 * 14
@@ -67,3 +68,4 @@ def ensure_dirs() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     TALK_SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
     AUDIO_TMP_DIR.mkdir(parents=True, exist_ok=True)
+    TALK_AUDIO_DIR.mkdir(parents=True, exist_ok=True)

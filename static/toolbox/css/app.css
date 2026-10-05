@@ -514,3 +514,76 @@ h1, h2, h3 { margin: 0 0 12px; }
 }
 .tb-admin .tb-split { gap: 10px; }
 .tb-admin p { margin: 6px 0; }
+
+/* ── talk_check: 保存ボタン・ライブ文字起こし・更新ボタン・アーカイブ ── */
+.tb-save-fixed {
+  position: fixed;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 45;
+  min-height: var(--tb-tap);
+  max-width: 9.5em;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 16px;
+  background: #dfe6d2;
+  color: var(--tb-muted);
+  font-size: 0.85rem;
+  line-height: 1.3;
+  box-shadow: var(--tb-shadow);
+  cursor: pointer;
+}
+.tb-save-fixed.is-dirty {
+  background: var(--tb-accent);
+  color: #fff;
+  font-weight: 700;
+}
+.tb-save-fixed:disabled { cursor: default; opacity: 0.8; }
+
+.tb-live-box {
+  max-height: 9em;
+  overflow-y: auto;
+  margin: 8px auto 12px;
+  padding: 10px 14px;
+  width: min(720px, 100%);
+  background: #fff;
+  border-radius: 12px;
+  text-align: left;
+  line-height: 1.5;
+  color: var(--tb-text);
+  white-space: pre-wrap;
+}
+.tb-live-box[hidden] { display: none; }
+.tb-live-box.is-empty { color: var(--tb-muted); }
+.tb-live-note { margin-top: 6px; font-size: 0.8rem; color: var(--tb-muted); }
+
+.tb-refresh-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.tb-refresh-btn { min-height: 32px; font-size: 0.8rem; padding: 0 12px; }
+.tb-refresh-msg { font-size: 0.8rem; }
+body.tb-display-on .tb-refresh-row { opacity: 0.15; }
+body.tb-display-on .tb-refresh-row:hover { opacity: 0.8; }
+
+.tb-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 99px;
+  background: #e6ebdc;
+  color: var(--tb-muted);
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+.tb-badge-warn { background: var(--tb-warn-soft); color: var(--tb-warn-text); }
+.tb-hist-title { font-weight: 700; }
+.tb-hist-meta { font-size: 0.85rem; margin: 2px 0 6px; }
+#tb-ar-questions li { display: grid; gap: 6px; }
+#tb-ar-questions input[data-f]:not([type="checkbox"]),
+[data-view="archive"] textarea,
+[data-view="archive"] #tb-ar-title { width: 100%; box-sizing: border-box; }
+#tb-ar-audio { width: 100%; margin: 8px 0; }

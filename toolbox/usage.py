@@ -180,6 +180,8 @@ def generate_json(
     user_id: str,
     tool_id: str,
     temperature: float = 0.25,
+    timeout: float | None = None,
+    max_tokens: int | None = None,
 ) -> tuple[dict, str]:
     check_daily_limit()
     model_id = selected_model("generate")
@@ -191,8 +193,9 @@ def generate_json(
             model=model_id,
             messages=messages,
             temperature=None if _is_reasoning_model(model_id) else temperature,
-            timeout=GENERATE_TIMEOUT_SEC,
+            timeout=timeout or GENERATE_TIMEOUT_SEC,
             reasoning=_is_reasoning_model(model_id),
+            max_tokens=max_tokens,
         )
     except UsageLimitError:
         raise

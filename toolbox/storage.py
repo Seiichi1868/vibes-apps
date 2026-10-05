@@ -22,6 +22,7 @@ from toolbox.config import (
     FAVORITES_FILE,
     LOGIN_ATTEMPTS_FILE,
     RECENT_TOOLS_FILE,
+    TALK_AUDIO_DIR,
     TALK_SESSIONS_DIR,
     TOOL_SETTINGS_FILE,
     USAGE_LOG_FILE,
@@ -395,6 +396,12 @@ def delete_talk_session(session_id: str, user_id: str) -> bool:
     if not session:
         return False
     path = _session_path(session_id)
+    audio_name = session.get("audio_file")
+    if audio_name:
+        try:
+            (TALK_AUDIO_DIR / Path(str(audio_name)).name).unlink(missing_ok=True)
+        except OSError:
+            pass
     try:
         path.unlink()
     except OSError:

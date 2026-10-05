@@ -4,8 +4,8 @@
 <section class="tb-tool tb-talk" data-display-root>
   <div data-view="settings">
     <h1 class="tb-tool-title">スピーチ理解度チェック</h1>
-    <p class="tb-warn-note">生徒の氏名や個人情報は入力しないでください。音声は保存しません。話者の同意を得て使ってください。</p>
-    <form id="tb-talk-settings" class="tb-form">
+    <p class="tb-warn-note">生徒の氏名や個人情報は入力しないでください。録音・文字起こし・問題は「履歴（アーカイブ）」に自動保存されます。話者の同意を得て使ってください。</p>
+    <form id="tb-talk-settings" class="tb-form" data-reasoning="{{ 1 if generate_reasoning else 0 }}">
       <label>レベル
         <select name="level">
           {% for level in levels %}
@@ -14,7 +14,8 @@
         </select>
       </label>
       <label>問題数
-        <input name="count" type="number" min="3" max="8" value="5">
+        <input name="count" type="number" min="1" step="1" value="5">
+        <small class="tb-muted" id="tb-count-est">待ち時間の目安: 約20秒</small>
       </label>
       <label class="tb-check"><input name="include_inference" type="checkbox"> 推論問題を1問含める</label>
       <label>補足指示（任意）
@@ -30,7 +31,7 @@
         </select>
       </label>
       <label class="tb-check"><input name="review_transcript" type="checkbox"> 文字起こしを確認・修正してから生成</label>
-      <label class="tb-check"><input name="show_live" type="checkbox"> ライブ文字起こしを画面に表示</label>
+      <label class="tb-check"><input name="show_live" type="checkbox" checked> 録音中、ブラウザの文字起こしをタイマーの下に表示</label>
       <label class="tb-check"><input name="parallel_browser" type="checkbox" {% if parallel_browser_stt %}checked{% endif %}> ブラウザ文字起こしを並行して使う</label>
       <p class="tb-note">ブラウザ文字起こしは、音声がブラウザ提供元のサーバーで処理されます。</p>
       <label>待機画面の英文
@@ -44,19 +45,20 @@
         <button class="tb-btn tb-btn-primary" type="button" data-go="record">録音する</button>
         <button class="tb-btn" type="button" data-go="file">音声ファイル</button>
         <button class="tb-btn" type="button" data-go="paste">テキスト貼り付け</button>
-        <button class="tb-btn" type="button" data-go="history">履歴</button>
+        <button class="tb-btn" type="button" data-go="history">履歴（アーカイブ）</button>
       </div>
       <div id="tb-mic-meter" class="tb-meter" hidden><span></span></div>
       <p id="tb-mic-msg" class="tb-muted"></p>
     </form>
+    <button class="tb-save-fixed" type="button" id="tb-save-settings" disabled>設定は保存済み</button>
   </div>
 
   <div data-view="record" hidden>
     <p class="tb-listening">Listening</p>
     <p class="tb-timer-face tb-talk-clock" id="tb-rec-clock">00:00</p>
+    <div id="tb-live" class="tb-live tb-live-box" hidden aria-live="polite"></div>
     <div class="tb-meter" id="tb-rec-meter"><span></span></div>
     <p id="tb-rec-msg" class="tb-muted"></p>
-    <p id="tb-live" class="tb-live" hidden></p>
     <div class="tb-actions">
       <button class="tb-btn tb-btn-primary tb-btn-lg" type="button" id="tb-stop">停止</button>
       <button class="tb-btn" type="button" id="tb-cancel-rec">キャンセル</button>
@@ -97,9 +99,14 @@
     <div class="tb-actions">
       <button class="tb-btn tb-btn-primary tb-btn-lg" type="button" id="tb-start-qs" hidden>Start ▶</button>
       <button class="tb-btn" type="button" id="tb-choose-qs" hidden>問題を選ぶ</button>
-      <button class="tb-btn" type="button" id="tb-retry-send" hidden>再送信</button>
+      <button class="tb-btn" type="button" id="tb-retry-send" hidden>再試行</button>
     </div>
     <p class="tb-error" id="tb-wait-error" hidden></p>
+    <div class="tb-actions" id="tb-wait-recover" hidden>
+      <button class="tb-btn" type="button" id="tb-wait-open">保存済みデータを確認</button>
+      <button class="tb-btn" type="button" id="tb-wait-paste">文字起こしを編集してテキストから作る</button>
+      <a class="tb-btn" id="tb-wait-dl" download="speech.webm" hidden>音声をダウンロード</a>
+    </div>
   </div>
 
   <div data-view="select" hidden>
@@ -132,10 +139,11 @@
 
   <div data-view="end" hidden>
     <h2>終了</h2>
-    <p class="tb-ok">履歴に保存済みです。</p>
+    <p class="tb-ok">履歴（アーカイブ）に保存済みです。</p>
     <ul id="tb-end-list" class="tb-end-list"></ul>
     <div class="tb-actions">
       <button class="tb-btn tb-btn-primary" type="button" data-go="record">もう一度録音</button>
+      <button class="tb-btn" type="button" id="tb-end-archive">この回のアーカイブを開く</button>
       <button class="tb-btn" type="button" data-go="settings">設定に戻る</button>
       <button class="tb-btn is-disabled" type="button" disabled>Word出力（準備中）</button>
       <button class="tb-btn is-disabled" type="button" disabled>PDF出力（準備中）</button>
@@ -143,16 +151,43 @@
   </div>
 
   <div data-view="history" hidden>
-    <h2>履歴</h2>
-    <ul id="tb-history-list" class="tb-history-list">
-      {% for session in sessions %}
-      <li data-id="{{ session.id }}">
-        <button type="button" data-open="{{ session.id }}">{{ session.title }}</button>
-        <button type="button" data-del="{{ session.id }}">削除</button>
-      </li>
-      {% endfor %}
-    </ul>
+    <h2>履歴（アーカイブ）</h2>
+    <p class="tb-note">録音した音声・文字起こし・問題が自動で保存されます。開いて修正し、そのまま再利用できます。</p>
+    <ul id="tb-history-list" class="tb-history-list"></ul>
+    <p class="tb-muted" id="tb-history-empty" hidden>まだ履歴はありません。</p>
     <button class="tb-btn" type="button" data-go="settings">戻る</button>
+  </div>
+
+  <div data-view="archive" hidden>
+    <h2>アーカイブ</h2>
+    <label>タイトル
+      <input id="tb-ar-title" maxlength="80">
+    </label>
+    <p class="tb-muted" id="tb-ar-meta"></p>
+    <p class="tb-error" id="tb-ar-error" hidden></p>
+    <div id="tb-ar-audio-box" hidden>
+      <audio id="tb-ar-audio" controls preload="none"></audio>
+    </div>
+    <label>文字起こし（修正できます）
+      <textarea id="tb-ar-transcript" rows="8"></textarea>
+    </label>
+    <details id="tb-ar-browser-box" hidden>
+      <summary>ブラウザの文字起こし（参考）</summary>
+      <p id="tb-ar-browser" class="tb-muted"></p>
+      <button class="tb-btn" type="button" id="tb-ar-use-browser">これを文字起こしとして使う</button>
+    </details>
+    <h3>問題</h3>
+    <ul id="tb-ar-questions" class="tb-select-list"></ul>
+    <div class="tb-actions">
+      <button class="tb-btn" type="button" id="tb-ar-add-q">問題を追加</button>
+    </div>
+    <div class="tb-actions">
+      <button class="tb-btn tb-btn-primary" type="button" id="tb-ar-save">修正を保存</button>
+      <button class="tb-btn tb-btn-primary" type="button" id="tb-ar-play">この問題で出題 ▶</button>
+      <button class="tb-btn" type="button" id="tb-ar-retranscribe" hidden>音声から文字起こしし直す</button>
+      <button class="tb-btn" type="button" id="tb-ar-regenerate">文字起こしから問題を作り直す</button>
+      <button class="tb-btn" type="button" data-go="history">一覧へ戻る</button>
+    </div>
   </div>
 </section>
 {% endblock %}

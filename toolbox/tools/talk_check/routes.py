@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import logging
+import mimetypes
 import os
-import tempfile
 from pathlib import Path
 
-from flask import jsonify, render_template, request
+from flask import jsonify, render_template, request, send_file
 from werkzeug.utils import secure_filename
 
 from toolbox.auth import current_user, login_required
-from toolbox.config import ALLOWED_AUDIO_EXTENSIONS, AUDIO_TMP_DIR, MAX_AUDIO_BYTES, ensure_dirs
+from toolbox.config import ALLOWED_AUDIO_EXTENSIONS, MAX_AUDIO_BYTES, TALK_AUDIO_DIR, ensure_dirs
 from toolbox.routes import tool_required
 from toolbox.storage import (
     delete_talk_session,
@@ -21,7 +21,7 @@ from toolbox.storage import (
     save_talk_session,
 )
 from toolbox.tools.talk_check.generate import LEVELS, generate_questions, generate_replacement_question, make_title
-from toolbox.usage import UsageError, UsageLimitError, record_event, transcribe_file
+from toolbox.usage import UsageError, UsageLimitError, _is_reasoning_model, record_event, selected_model, transcribe_file
 
 logger = logging.getLogger(__name__)
 
@@ -36,20 +36,64 @@ def _error(exc, fallback: str):
 
 
 def _public_session(session: dict, *, include_questions: bool = False) -> dict:
+    questions = session.get("questions_json") or []
     row = {
         "id": session.get("id"),
         "title": session.get("title"),
         "level": session.get("level"),
-        "question_count": session.get("question_count"),
+        "question_count": session.get("question_count") if session.get("question_count") is not None else len(questions),
         "source": session.get("source"),
         "created_at": session.get("created_at"),
         "keywords": session.get("keywords") or "",
+        "duration_sec": session.get("duration_sec") or 0,
+        "has_audio": bool(session.get("audio_file")),
+        "status": session.get("status") or ("ready" if questions else "transcribed"),
+        "has_transcript": bool((session.get("transcript") or "").strip()),
+        "last_error": session.get("last_error") or "",
     }
     if include_questions:
         row["transcript"] = session.get("transcript") or ""
-        row["questions"] = session.get("questions_json") or []
+        row["browser_transcript"] = session.get("browser_transcript") or ""
+        row["questions"] = questions
         row["wait_prompt"] = session.get("wait_prompt") or "Talk with your partner. What did you hear?"
+        row["notes"] = session.get("notes") or ""
+        row["include_inference"] = bool(session.get("include_inference"))
+        row["count_requested"] = session.get("count_requested") or len(questions)
     return row
+
+
+def _title_for(session: dict) -> str:
+    if (session.get("transcript") or "").strip():
+        return make_title(session["transcript"])
+    stamp = (session.get("created_at") or now_iso()).replace("T", " ")[5:16]
+    return f"録音 {stamp}"
+
+
+def _clean_edit_questions(raw) -> list[dict]:
+    out: list[dict] = []
+    if not isinstance(raw, list):
+        return out
+    for index, item in enumerate(raw):
+        if not isinstance(item, dict):
+            continue
+        question = str(item.get("question") or "").strip()
+        if not question:
+            continue
+        q_type = "inference" if item.get("type") == "inference" else "fact"
+        out.append(
+            {
+                "id": str(item.get("id") or new_id())[:20],
+                "order": index + 1,
+                "question": question[:400],
+                "model_answer": str(item.get("model_answer") or "").strip()[:400],
+                "short_answer": str(item.get("short_answer") or "").strip()[:200],
+                "type": q_type,
+                "evidence": str(item.get("evidence") or "").strip()[:500],
+                "section": str(item.get("section") or "").strip()[:60],
+                "included": item.get("included") is not False,
+            }
+        )
+    return out
 
 
 def register(bp):
@@ -58,17 +102,20 @@ def register(bp):
     @tool_required("talk_check")
     def talk_check_page():
         user = current_user()
+        model_id = selected_model("generate")
         return render_template(
             "toolbox/tools/talk_check.html",
             sessions=[_public_session(row) for row in list_talk_sessions(user["id"])],
             parallel_browser_stt=bool(get_setting("parallel_browser_stt", True)),
             levels=LEVELS,
+            generate_reasoning=_is_reasoning_model(model_id),
         )
 
-    @bp.route("/api/talk/transcribe", methods=["POST"])
+    @bp.route("/api/talk/audio", methods=["POST"])
     @login_required
     @tool_required("talk_check")
-    def api_transcribe():
+    def api_save_audio():
+        """録音／音声ファイルを先に保存し、文字起こしや生成が失敗しても残るようにする。"""
         user = current_user()
         upload = request.files.get("audio")
         if not upload or not upload.filename:
@@ -86,32 +133,103 @@ def register(bp):
             duration_sec = float(request.form.get("duration_sec") or 0)
         except (TypeError, ValueError):
             duration_sec = 0
-        keywords = (request.form.get("keywords") or "").strip()[:200]
+        source = str(request.form.get("source") or "record")
+        if source not in ("record", "file"):
+            source = "record"
         ensure_dirs()
-        handle = tempfile.NamedTemporaryFile(delete=False, dir=AUDIO_TMP_DIR, suffix=f".{ext}")
-        tmp_path = Path(handle.name)
+        session_id = new_id()
+        audio_name = f"{session_id}.{ext}"
+        upload.save(TALK_AUDIO_DIR / audio_name)
+        session = {
+            "id": session_id,
+            "user_id": user["id"],
+            "created_at": now_iso(),
+            "level": str(request.form.get("level") or "A2"),
+            "source": source,
+            "keywords": (request.form.get("keywords") or "").strip()[:200],
+            "duration_sec": max(0, round(duration_sec)),
+            "audio_file": audio_name,
+            "browser_transcript": (request.form.get("browser_transcript") or "").strip()[:60000],
+            "transcript": "",
+            "questions_json": [],
+            "question_count": 0,
+            "status": "recorded",
+            "wait_prompt": "Talk with your partner. What did you hear?",
+        }
+        session["title"] = _title_for(session)
+        save_talk_session(session)
+        return jsonify({"ok": True, "session_id": session_id, "session": _public_session(session)})
+
+    @bp.route("/api/talk/transcribe", methods=["POST"])
+    @login_required
+    @tool_required("talk_check")
+    def api_transcribe():
+        user = current_user()
+        payload = request.get_json(silent=True) or {}
+        session = load_talk_session(str(payload.get("session_id") or ""), user["id"])
+        if not session or not session.get("audio_file"):
+            return jsonify({"ok": False, "error": "保存された音声が見つかりません。"}), 404
+        audio_path = TALK_AUDIO_DIR / Path(str(session["audio_file"])).name
+        if not audio_path.is_file():
+            return jsonify({"ok": False, "error": "音声ファイルが見つかりません。"}), 404
+        keywords = str(payload.get("keywords") or session.get("keywords") or "").strip()[:200]
         try:
-            upload.save(handle)
-            handle.close()
             text = transcribe_file(
-                file_path=tmp_path,
-                duration_sec=duration_sec,
+                file_path=audio_path,
+                duration_sec=float(session.get("duration_sec") or 0),
                 keywords=keywords,
                 user_id=user["id"],
                 tool_id="talk_check",
             )
         except (UsageError, UsageLimitError) as exc:
+            session["last_error"] = getattr(exc, "message", str(exc))
+            save_talk_session(session)
             return _error(exc, "文字起こしに失敗しました。")
         except Exception as exc:
-            return _error(exc, "文字起こしに失敗しました。テキスト貼り付けを試してください。")
-        finally:
-            try:
-                tmp_path.unlink(missing_ok=True)
-            except OSError:
-                logger.warning("failed to delete temp audio %s", tmp_path)
+            session["last_error"] = "文字起こしに失敗しました。"
+            save_talk_session(session)
+            return _error(exc, "文字起こしに失敗しました。保存済みの音声から再試行できます。")
         if not text:
-            return jsonify({"ok": False, "error": "文字が起こせませんでした。テキスト貼り付けを試してください。"}), 400
-        return jsonify({"ok": True, "transcript": text})
+            session["last_error"] = "文字が起こせませんでした。"
+            save_talk_session(session)
+            return jsonify({"ok": False, "error": "文字が起こせませんでした。保存済みの音声から再試行するか、テキスト貼り付けを使ってください。"}), 400
+        session["transcript"] = text
+        session["keywords"] = keywords
+        session["last_error"] = ""
+        if session.get("status") == "recorded":
+            session["status"] = "transcribed"
+        if not session.get("questions_json"):
+            session["title"] = _title_for(session)
+        save_talk_session(session)
+        return jsonify({"ok": True, "transcript": text, "session_id": session["id"]})
+
+    @bp.route("/api/talk/sessions", methods=["POST"])
+    @login_required
+    @tool_required("talk_check")
+    def api_create_text_session():
+        """貼り付けテキストを先に保存する（生成に失敗しても残る）。"""
+        user = current_user()
+        payload = request.get_json(silent=True) or {}
+        transcript = str(payload.get("transcript") or "").strip()[:60000]
+        if not transcript:
+            return jsonify({"ok": False, "error": "英文を貼り付けてください。"}), 400
+        session = {
+            "id": new_id(),
+            "user_id": user["id"],
+            "created_at": now_iso(),
+            "level": str(payload.get("level") or "A2"),
+            "source": "paste",
+            "keywords": "",
+            "duration_sec": 0,
+            "transcript": transcript,
+            "questions_json": [],
+            "question_count": 0,
+            "status": "transcribed",
+            "wait_prompt": "Talk with your partner. What did you hear?",
+        }
+        session["title"] = _title_for(session)
+        save_talk_session(session)
+        return jsonify({"ok": True, "session_id": session["id"], "session": _public_session(session)})
 
     @bp.route("/api/talk/generate", methods=["POST"])
     @login_required
@@ -132,6 +250,16 @@ def register(bp):
             source = "paste"
         wait_prompt = str(payload.get("wait_prompt") or "").strip() or "Talk with your partner. What did you hear?"
         keywords = str(payload.get("keywords") or "").strip()[:200]
+
+        session = None
+        session_id = str(payload.get("session_id") or "")
+        if session_id:
+            session = load_talk_session(session_id, user["id"])
+        if session is not None and transcript:
+            # 確認・修正された文字起こしも先に保存しておく
+            session["transcript"] = transcript
+            save_talk_session(session)
+
         try:
             questions = generate_questions(
                 transcript=transcript,
@@ -142,22 +270,42 @@ def register(bp):
                 user_id=user["id"],
             )
         except (UsageError, UsageLimitError) as exc:
+            if session is not None:
+                session["last_error"] = getattr(exc, "message", str(exc))
+                save_talk_session(session)
             return _error(exc, "問題を作れませんでした。")
-        session = {
-            "id": new_id(),
-            "user_id": user["id"],
-            "created_at": now_iso(),
-            "title": make_title(transcript),
-            "level": level,
-            "question_count": len(questions),
-            "source": source,
-            "keywords": keywords,
-            "transcript": transcript,
-            "questions_json": questions,
-            "wait_prompt": wait_prompt,
-        }
+        except Exception as exc:
+            if session is not None:
+                session["last_error"] = "問題を作れませんでした。"
+                save_talk_session(session)
+            return _error(exc, "問題を作れませんでした。保存済みの文字起こしから再試行できます。")
+
+        if session is None:
+            session = {
+                "id": new_id(),
+                "user_id": user["id"],
+                "created_at": now_iso(),
+                "duration_sec": 0,
+            }
+        session.update(
+            {
+                "level": level,
+                "source": source if (payload.get("source") or not session.get("source")) else session["source"],
+                "keywords": keywords,
+                "transcript": transcript,
+                "questions_json": questions,
+                "question_count": len(questions),
+                "count_requested": count,
+                "notes": notes,
+                "include_inference": include_inference,
+                "wait_prompt": wait_prompt,
+                "status": "ready",
+                "last_error": "",
+            }
+        )
+        session["title"] = make_title(transcript)
         save_talk_session(session)
-        return jsonify({"ok": True, "session_id": session["id"], "questions": questions})
+        return jsonify({"ok": True, "session_id": session["id"], "questions": questions, "session": _public_session(session)})
 
     @bp.route("/api/talk/regenerate-one", methods=["POST"])
     @login_required
@@ -183,6 +331,7 @@ def register(bp):
                 replace_type=str((questions[index] or {}).get("type") or "fact"),
                 notes="Make a clearly different question from the one being replaced.",
                 user_id=user["id"],
+                replace_section=str((questions[index] or {}).get("section") or ""),
             )
         except (UsageError, UsageLimitError) as exc:
             return _error(exc, "作り直しに失敗しました。")
@@ -206,6 +355,18 @@ def register(bp):
             return jsonify({"ok": False, "error": "履歴が見つかりません。"}), 404
         return jsonify({"ok": True, "session": _public_session(session, include_questions=True)})
 
+    @bp.route("/api/talk/sessions/<session_id>/audio")
+    @login_required
+    def api_session_audio(session_id):
+        session = load_talk_session(session_id, current_user()["id"])
+        if not session or not session.get("audio_file"):
+            return jsonify({"ok": False, "error": "音声がありません。"}), 404
+        path = TALK_AUDIO_DIR / Path(str(session["audio_file"])).name
+        if not path.is_file():
+            return jsonify({"ok": False, "error": "音声がありません。"}), 404
+        mime = mimetypes.guess_type(path.name)[0] or "audio/webm"
+        return send_file(path, mimetype=mime, conditional=True)
+
     @bp.route("/api/talk/sessions/<session_id>", methods=["DELETE"])
     @login_required
     def api_delete_session(session_id):
@@ -226,6 +387,17 @@ def register(bp):
                 session["title"] = title[:80]
         if "wait_prompt" in payload:
             session["wait_prompt"] = str(payload.get("wait_prompt") or "").strip()[:160]
+        if "transcript" in payload:
+            session["transcript"] = str(payload.get("transcript") or "").strip()[:60000]
+            if session["transcript"] and session.get("status") == "recorded":
+                session["status"] = "transcribed"
+        if "browser_transcript" in payload:
+            session["browser_transcript"] = str(payload.get("browser_transcript") or "").strip()[:60000]
+        if "questions" in payload:
+            questions = _clean_edit_questions(payload.get("questions"))
+            session["questions_json"] = questions
+            session["question_count"] = len(questions)
+            session["status"] = "ready" if questions else ("transcribed" if session.get("transcript") else "recorded")
         save_talk_session(session)
         return jsonify({"ok": True, "session": _public_session(session, include_questions=True)})
 
