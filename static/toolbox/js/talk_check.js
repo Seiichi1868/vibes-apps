@@ -457,6 +457,13 @@
     });
   }
 
+  function revealAllQuestions() {
+    document.querySelectorAll("#tb-select-list [data-reveal].tb-blur").forEach((p) => {
+      p.classList.remove("tb-blur");
+    });
+  }
+
+  document.getElementById("tb-reveal-all").addEventListener("click", revealAllQuestions);
   document.getElementById("tb-start-selected").addEventListener("click", startPlay);
 
   function startPlay() {
