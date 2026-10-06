@@ -79,6 +79,23 @@
     }
   });
 
+  const loginRequired = document.getElementById("tb-login-required");
+  if (loginRequired) {
+    loginRequired.addEventListener("change", () => {
+      withReauth(() => toolboxFetch("/toolbox/admin/api/settings", {
+        method: "POST",
+        body: JSON.stringify({ login_required_enabled: loginRequired.checked }),
+      })).then(() => {
+        const note = document.getElementById("tb-login-required-note");
+        if (note) {
+          note.textContent = loginRequired.checked
+            ? "オンのあいだは、ランチャーと各ツールで教員ログインが必要です。"
+            : "オフのあいだは、ランチャーと各ツールにログインなしで入れます。";
+        }
+      });
+    });
+  }
+
   document.querySelectorAll(".tb-tool-toggles input[data-tool]").forEach((input) => {
     input.addEventListener("change", () => {
       withReauth(() => toolboxFetch(`/toolbox/admin/api/tools/${input.dataset.tool}/enabled`, {
@@ -95,7 +112,6 @@
       method: "POST",
       body: JSON.stringify({
         daily_limit_usd: Number(fd.get("daily_limit_usd")),
-        login_required_enabled: fd.get("login_required_enabled") === "on",
         parallel_browser_stt: fd.get("parallel_browser_stt") === "on",
       }),
     }).then(() => alert("保存しました。")));

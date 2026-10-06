@@ -7,6 +7,18 @@
   <h1>管理画面</h1>
   <p class="tb-lead">重要操作は管理パスワードの再入力が必要です（15分有効）。</p>
 
+  <h2>ログイン</h2>
+  <ul class="tb-tool-toggles">
+    <li>
+      <span>教員ログイン</span>
+      <label class="tb-switch">
+        <input type="checkbox" id="tb-login-required" {% if settings.login_required_enabled %}checked{% endif %}>
+        <span>必須にする</span>
+      </label>
+    </li>
+  </ul>
+  <p class="tb-note" id="tb-login-required-note">{% if settings.login_required_enabled %}オンのあいだは、ランチャーと各ツールで教員ログインが必要です。{% else %}オフのあいだは、ランチャーと各ツールにログインなしで入れます。{% endif %}</p>
+
   <h2>ユーザー管理</h2>
   <form id="tb-user-form" class="tb-inline-form">
     <input name="username" placeholder="ユーザー名" required>
@@ -82,11 +94,6 @@
     <label>1日の利用上限（USD）
       <input name="daily_limit_usd" type="number" step="0.1" min="0" value="{{ settings.daily_limit_usd }}">
     </label>
-    <label class="tb-check">
-      <input name="login_required_enabled" type="checkbox" {% if settings.login_required_enabled %}checked{% endif %}>
-      教員ログインを必須にする
-    </label>
-    <p class="tb-note">オフのあいだは、ランチャーと各ツールにログインなしで入れます（検証用）。</p>
     <label class="tb-check">
       <input name="parallel_browser_stt" type="checkbox" {% if settings.parallel_browser_stt %}checked{% endif %}>
       ブラウザ文字起こしの並行実行を既定で使う
