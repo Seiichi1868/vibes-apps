@@ -227,6 +227,46 @@ body.tb-display-on .tb-stage-tool .tb-seat-edge {
   margin: 0;
 }
 
+body.tb-display-on .tb-stage-tool:has(.tb-seat-stage) {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+body.tb-display-on .tb-stage-tool:has(.tb-seat-stage) > .tb-stage-chrome {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  right: 12px;
+  z-index: 2;
+  flex: none;
+}
+
+body.tb-display-on .tb-stage-tool:has(.tb-seat-stage) > .tb-stage-main {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 12px 40px;
+}
+
+body.tb-display-on .tb-stage-tool:has(.tb-seat-stage) .tb-seat-stage {
+  flex: 0 1 auto;
+  width: 100%;
+  max-width: min(1100px, 100%);
+  min-height: 0;
+  justify-content: center;
+}
+
+body.tb-display-on .tb-stage-tool:has(.tb-seat-stage) .tb-seat-board {
+  flex: 0 1 auto;
+  min-height: 0;
+  width: 100%;
+  align-content: center;
+}
+
 .tb-display-bar {
   position: fixed;
   left: 50%;
