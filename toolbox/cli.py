@@ -45,7 +45,7 @@ def register(app) -> None:
     @toolbox_cli.command("create-user")
     @click.option("--username", prompt=True, help="ログイン用ユーザー名")
     @click.option("--role", type=click.Choice(["admin", "teacher"]), default="teacher")
-    @click.option("--password", default=None, help="10文字以上。省略時は非表示で入力")
+    @click.option("--password", default=None, help="4文字以上。省略時は非表示で入力")
     def create_user(username: str, role: str, password: str | None):
         if not password:
             password = getpass.getpass("Password: ")
