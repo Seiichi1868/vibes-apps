@@ -1,12 +1,13 @@
 (function () {
-  const titleEl = document.getElementById("screen-title");
-  const videoEl = document.getElementById("screen-video");
-  const bodyEl = document.getElementById("screen-body");
+  const root = document.getElementById("cnn10-screen");
+  const stage = document.getElementById("screen-stage");
   const statusEl = document.getElementById("screen-status");
-  let steps = [];
-  let index = 0;
+  const archiveId = root.dataset.archive || "";
+  let lesson = null;
+  let view = "video";
+  const reveal = { warmup: 0, discussion: 0, writing: 0 };
 
-  function escapeHtml(value) {
+  function esc(value) {
     return String(value || "").replace(/[&<>"']/g, (ch) => ({
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
     }[ch]));
@@ -23,71 +24,137 @@
     return 0;
   }
 
-  function show() {
-    const step = steps[index];
-    if (!step) {
-      bodyEl.innerHTML = "<p>表示するものがありません。</p>";
-      return;
-    }
-    statusEl.textContent = `${index + 1} / ${steps.length}　${step.label}`;
-    bodyEl.innerHTML = step.html;
+  function videoId() {
+    if (lesson.video_id && /^[a-zA-Z0-9_-]{11}$/.test(lesson.video_id)) return lesson.video_id;
+    const match = String(lesson.url || "").match(/([a-zA-Z0-9_-]{11})(?![a-zA-Z0-9_-])/);
+    return match ? match[1] : "";
   }
 
-  function build(lesson) {
-    const videoId = (lesson.url || "").match(/([a-zA-Z0-9_-]{11})(?=$|[^a-zA-Z0-9_-])/);
-    const id = lesson.video_id || (videoId ? videoId[1] : "");
-    const start = parseTime(lesson.start);
-    titleEl.textContent = lesson.title || "CNN10";
-    if (id) {
-      videoEl.innerHTML = `<iframe title="CNN10" width="100%" height="360" src="https://www.youtube.com/embed/${id}?start=${start}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
-    }
-    steps = [];
-    (lesson.warmup || []).forEach((item, i) => {
-      steps.push({
-        label: "ウォームアップ",
-        html: `<h2>ウォームアップ ${i + 1}</h2><p>${escapeHtml(item.q)}</p><p class="tb-muted">${escapeHtml(item.a || "")}</p>`,
-      });
+  function pieces(list) {
+    const out = [];
+    (list || []).forEach((item, index) => {
+      if (!(item.text || item.q)) return;
+      out.push({ index, kind: "question" });
+      if (item.answer || item.a) out.push({ index, kind: "answer" });
     });
-    if ((lesson.vocabulary || []).length) {
-      steps.push({
-        label: "語彙",
-        html: "<h2>語彙</h2><ul>" + lesson.vocabulary.map((item) =>
-          `<li><strong>${escapeHtml(item.word)}</strong> ${escapeHtml(item.meaning || "")}</li>`
-        ).join("") + "</ul>",
-      });
+    return out;
+  }
+
+  function renderQuestion(kind, heading) {
+    const list = lesson[kind] || [];
+    const steps = pieces(list);
+    const step = reveal[kind] || 0;
+    if (!list.length) {
+      stage.innerHTML = `<h2>${heading}</h2><p class="tb-wait">まだありません。</p>`;
+      statusEl.textContent = "";
+      return;
     }
-    if (lesson.script) {
-      steps.push({ label: "文字起こし", html: `<h2>文字起こし</h2><p>${escapeHtml(lesson.script)}</p>` });
+    if (step <= 0) {
+      stage.innerHTML = `<h2>${heading}</h2><p class="tb-wait">クリックまたは ↓ で質問を表示します。</p>`;
+    } else {
+      const piece = steps[Math.min(step, steps.length) - 1];
+      const item = list[piece.index];
+      const answer = piece.kind === "answer"
+        ? `<p class="tb-a"><span>A. </span>${esc(item.answer || item.a || "")}</p>`
+        : "";
+      stage.innerHTML = `<h2>${heading}</h2><p class="tb-q">Q${piece.index + 1}. ${esc(item.text || item.q)}</p>${answer}`;
     }
-    if (lesson.translation) {
-      steps.push({ label: "和訳", html: `<h2>和訳</h2><p>${escapeHtml(lesson.translation)}</p>` });
+    statusEl.textContent = `${Math.min(step, steps.length)} / ${steps.length}　↑ で戻る`;
+  }
+
+  function renderWriting() {
+    const list = lesson.writing || [];
+    const step = reveal.writing || 0;
+    if (!list.length) {
+      stage.innerHTML = "<h2>書く</h2><p class='tb-wait'>まだありません。</p>";
+      statusEl.textContent = "";
+      return;
     }
-    (lesson.discussion || []).forEach((item, i) => {
-      steps.push({
-        label: "ディスカッション",
-        html: `<h2>ディスカッション ${i + 1}</h2><p>${escapeHtml(item.q)}</p><p class="tb-muted">${escapeHtml(item.a || "")}</p>`,
-      });
+    if (step <= 0) {
+      stage.innerHTML = "<h2>書く</h2><p class='tb-wait'>クリックまたは ↓ で話題を表示します。</p><p>O Opinion → R Reason → E Example → O Opinion</p>";
+    } else {
+      const topic = list[Math.min(step, list.length) - 1];
+      const choices = (topic.options || []).length === 2
+        ? `<p>${esc(topic.options[0])} or ${esc(topic.options[1])}</p>`
+        : "<p>Your answer + Why?</p>";
+      stage.innerHTML = `<h2>書く</h2><p class="tb-q">T${Math.min(step, list.length)}. ${esc(topic.text)}</p>${choices}${topic.text_ja ? `<p class="tb-muted">${esc(topic.text_ja)}</p>` : ""}<p>O Opinion → R Reason → E Example → O Opinion</p>`;
+    }
+    statusEl.textContent = `${Math.min(step, list.length)} / ${list.length}　↑ で戻る`;
+  }
+
+  function render() {
+    document.querySelectorAll("[data-view]").forEach((btn) => {
+      btn.classList.toggle("is-on", btn.dataset.view === view);
     });
-    index = 0;
-    show();
+    if (view === "video") {
+      const id = videoId();
+      const start = parseTime(lesson.start);
+      const end = parseTime(lesson.end);
+      const params = new URLSearchParams({
+        start: String(start),
+        rel: "0",
+        modestbranding: "1",
+        hl: "en",
+        cc_lang_pref: "en",
+      });
+      if (end > start) params.set("end", String(end));
+      if (lesson.subtitles !== false) params.set("cc_load_policy", "1");
+      stage.innerHTML = `<h1>${esc(lesson.title || "CNN10")}</h1>` + (id
+        ? `<iframe title="CNN10" src="https://www.youtube.com/embed/${id}?${params}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`
+        : "<p>動画 URL がありません。</p>");
+      statusEl.textContent = lesson.script ? "文字起こし設定済み" : "";
+      return;
+    }
+    if (view === "vocab") {
+      const items = lesson.vocabulary || [];
+      stage.innerHTML = "<h2>語彙</h2>" + (items.length
+        ? "<ul>" + items.map((item) => `<li><strong>${esc(item.word)}</strong> ${esc(item.meaning || "")}</li>`).join("") + "</ul>"
+        : "<p class='tb-wait'>まだありません。</p>");
+      statusEl.textContent = "";
+      return;
+    }
+    if (view === "warmup") return renderQuestion("warmup", "ウォームアップ");
+    if (view === "discussion") return renderQuestion("discussion", "ディスカッション");
+    if (view === "writing") return renderWriting();
   }
 
   function move(delta) {
-    index = Math.min(steps.length - 1, Math.max(0, index + delta));
-    show();
+    if (view === "warmup" || view === "discussion") {
+      const max = pieces(lesson[view] || []).length;
+      reveal[view] = Math.min(max, Math.max(0, (reveal[view] || 0) + delta));
+    } else if (view === "writing") {
+      const max = (lesson.writing || []).length;
+      reveal.writing = Math.min(max, Math.max(0, reveal.writing + delta));
+    }
+    render();
   }
 
-  document.addEventListener("keydown", (ev) => {
-    if (ev.key === "ArrowDown" || ev.key === "ArrowRight") move(1);
-    if (ev.key === "ArrowUp" || ev.key === "ArrowLeft") move(-1);
+  document.querySelectorAll("[data-view]").forEach((btn) => {
+    btn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      view = btn.dataset.view;
+      render();
+    });
   });
-  document.getElementById("cnn10-screen").addEventListener("click", () => move(1));
+  stage.addEventListener("click", () => move(1));
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key === "ArrowDown" || ev.key === "ArrowRight" || ev.key === "Enter" || ev.key === " ") {
+      ev.preventDefault();
+      move(1);
+    }
+    if (ev.key === "ArrowUp" || ev.key === "ArrowLeft") {
+      ev.preventDefault();
+      move(-1);
+    }
+  });
 
-  fetch("/toolbox/api/cnn10/lesson")
+  const query = archiveId ? `?archive=${encodeURIComponent(archiveId)}` : "";
+  fetch(`/toolbox/api/cnn10/lesson${query}`)
     .then((res) => res.json())
     .then((data) => {
       if (!data.ok) throw new Error(data.error || "読み込めません。");
-      build(data.lesson);
+      lesson = data.lesson;
+      render();
     })
     .catch((err) => {
       statusEl.textContent = err.message;

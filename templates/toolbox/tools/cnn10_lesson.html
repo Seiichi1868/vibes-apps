@@ -1,51 +1,85 @@
 {% extends "toolbox/base.html" %}
 {% block title %}CNN10授業 · Toolbox{% endblock %}
+{% block head %}
+<style>
+  .tb-cnn10-overlay[hidden] { display: none !important; }
+  .tb-cnn10-overlay {
+    position: fixed; inset: 0; z-index: 40;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 64px 16px 16px; background: rgba(15, 23, 42, 0.28);
+  }
+  .tb-cnn10-dialog {
+    width: min(960px, 100%); max-height: calc(100vh - 80px);
+    overflow: auto; background: #fff; border-radius: 16px;
+    border: 1px solid #d7e3d4; padding: 16px;
+  }
+  .tb-cnn10-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; padding: 8px; border: 1px solid #e5efe4; border-radius: 10px; margin-bottom: 8px; background: #fff; }
+  .tb-cnn10-row > div:nth-child(2) { flex: 1; min-width: 0; }
+  .tb-cnn10-thumb { width: 112px; height: 63px; padding: 0; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; background: #f1f5f9; cursor: pointer; }
+  .tb-cnn10-thumb img { width: 112px; height: 63px; object-fit: cover; display: block; }
+  .tb-cnn10-thumb.is-open { outline: 2px solid #38bdf8; }
+  .tb-cnn10-title { margin: 2px 0; font-weight: 700; }
+  .tb-cnn10-meta, .tb-cnn10-url { margin: 0; color: #64748b; font-size: 12px; }
+  .tb-cnn10-url { font-family: ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tb-cnn10-preview { display: none; margin-top: 8px; flex-basis: 100%; }
+  .tb-cnn10-row.is-open .tb-cnn10-preview { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .tb-cnn10-video { aspect-ratio: 16/9; background: #000; border-radius: 8px; overflow: hidden; }
+  .tb-cnn10-video iframe { width: 100%; height: 100%; border: 0; }
+  .tb-cnn10-script { min-height: 160px; max-height: 280px; overflow: auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; font-family: ui-monospace, monospace; font-size: 12px; line-height: 1.45; }
+  .tb-cnn10-line.is-hit { background: #fef3c7; border-radius: 4px; }
+  .tb-cnn10-banner { margin-bottom: 8px; padding: 8px; border: 1px solid #fcd34d; background: #fffbeb; border-radius: 8px; font-size: 12px; }
+  .tb-cnn10-banner input[type="range"] { width: 100%; }
+  .tb-cnn10-actions { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+  @media (max-width: 720px) { .tb-cnn10-row.is-open .tb-cnn10-preview { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
 {% block body %}
 <section class="tb-admin">
   <h1>CNN10授業</h1>
-  <p class="tb-note">Toolbox 専用の字幕取得です。News の字幕経路とは別です。</p>
-
+  <p class="tb-note">サムネイルで動画と文字起こしを確認し、タイトル区間をスライダーで調整してから授業に設定します。字幕取得は Toolbox 専用です。</p>
   <div class="tb-row-actions">
     <button class="tb-btn tb-btn-primary" type="button" id="cnn10-open-btn">CNN10から動画を選ぶ</button>
     <a class="tb-btn" id="cnn10-screen-link" href="{{ url_for('toolbox.cnn10_screen_page') }}" target="_blank" rel="noopener">教室スクリーンを開く</a>
   </div>
 
-  <div id="cnn10-panel" class="tb-card" hidden>
-    <div class="tb-row-actions">
-      <strong>最近の CNN10</strong>
-      <button class="tb-btn" type="button" id="cnn10-close-btn">閉じる</button>
-    </div>
-    <p id="cnn10-message" class="tb-error" hidden></p>
-    <ul id="cnn10-list" class="tb-plain-list"></ul>
-    <button class="tb-btn" type="button" id="cnn10-more-btn" hidden>さらに古い動画を見る</button>
-  </div>
-
   <form id="cnn10-form" class="tb-form">
+    <label>授業名
+      <input id="lesson-name" value="{{ lesson.lesson_name }}">
+    </label>
+    <label>保存名
+      <input id="archive-title" value="{{ lesson.title }}">
+    </label>
     <label>動画タイトル
-      <input id="lesson-title" name="title" value="{{ lesson.title }}">
+      <input id="lesson-title" value="{{ lesson.title }}">
     </label>
     <label>YouTube URL
-      <input id="youtube-url" name="url" required value="{{ lesson.url }}" placeholder="https://www.youtube.com/watch?v=">
+      <input id="youtube-url" required value="{{ lesson.url }}">
     </label>
     <div class="tb-split">
       <label>開始
-        <input id="start-time" name="start" value="{{ lesson.start or '0:00' }}" placeholder="0:00">
+        <input id="start-time" value="{{ lesson.start or '0:00' }}">
       </label>
       <label>終了
-        <input id="end-time" name="end" value="{{ lesson.end }}" placeholder="3:40">
+        <input id="end-time" value="{{ lesson.end }}">
       </label>
     </div>
+    <label class="tb-check">
+      <input id="subtitles-enabled" type="checkbox" {% if lesson.subtitles %}checked{% endif %}>
+      教室スクリーンで英語字幕を出す
+    </label>
     <label>文字起こし
-      <textarea id="lesson-script" name="script" rows="10" required>{{ lesson.script }}</textarea>
+      <textarea id="lesson-script" rows="8" required>{{ lesson.script }}</textarea>
     </label>
     <div class="tb-row-actions">
-      <button class="tb-btn tb-btn-primary" type="button" id="fetch-script-btn">この範囲の文字起こしを取得</button>
-      <button class="tb-btn" type="submit">設定を保存</button>
+      <button class="tb-btn" type="button" id="fetch-script-btn">この範囲の文字起こしを取得</button>
+      <button class="tb-btn tb-btn-primary" type="submit">設定を保存</button>
+      <button class="tb-btn" type="button" id="archive-btn">アーカイブ</button>
       <span id="lesson-status" class="tb-muted"></span>
     </div>
   </form>
 
   <h2>補助</h2>
+  <p class="tb-note">教室スクリーンでは、ウォームアップ・ディスカッションはクリックするたびに質問と解答が一つずつ出ます。書く話題も同じです。</p>
   <div class="tb-row-actions">
     <label>語彙の最低レベル
       <select id="vocab-min">
@@ -58,10 +92,32 @@
     <button class="tb-btn" type="button" data-assist="translation">和訳を作る</button>
     <button class="tb-btn" type="button" data-assist="warmup">ウォームアップ</button>
     <button class="tb-btn" type="button" data-assist="discussion">ディスカッション</button>
+    <button class="tb-btn" type="button" data-assist="writing">書く話題</button>
   </div>
   <p id="assist-status" class="tb-muted"></p>
   <div id="assist-preview"></div>
+
+  <h2>アーカイブ</h2>
+  <p class="tb-note">「画面」はそのアーカイブを教室スクリーンに出します。授業設定に戻さなくても使えます。</p>
+  <ul id="archive-list" class="tb-plain"></ul>
 </section>
+
+<div id="cnn10-panel" class="tb-cnn10-overlay" hidden>
+  <div class="tb-cnn10-dialog">
+    <div class="tb-row-actions">
+      <div>
+        <strong>CNN10 Previous Episodes</strong>
+        <p class="tb-note">サムネイルをクリックして動画と文字起こしを確認し、区間をスライダーで調整してから「授業に設定」で反映できます。</p>
+      </div>
+      <button class="tb-btn" type="button" id="cnn10-close-btn">閉じる</button>
+    </div>
+    <p id="cnn10-message" class="tb-error" hidden></p>
+    <div id="cnn10-list"></div>
+    <div class="tb-row-actions">
+      <button class="tb-btn" type="button" id="cnn10-more-btn" hidden>さらに古い動画を見る</button>
+    </div>
+  </div>
+</div>
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='toolbox/js/youtube-transcript.js', v=toolbox_cache) }}"></script>

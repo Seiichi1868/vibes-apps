@@ -38,6 +38,17 @@ TOOLS: list[dict] = [
         "default_enabled": True,
     },
     {
+        "id": "cnn10",
+        "name": "CNN10授業",
+        "description": "動画を選び、文字起こしと語彙などの補助を教室スクリーンに出す。",
+        "icon": "cnn10",
+        "scene": "導入",
+        "route": "toolbox.cnn10_lesson_page",
+        "path": "/toolbox/cnn10",
+        "uses_ai": True,
+        "default_enabled": True,
+    },
+    {
         "id": "talk_check",
         "name": "スピーチ理解度チェック",
         "description": "スピーチを録音し、理解度チェックの質問を作る。",

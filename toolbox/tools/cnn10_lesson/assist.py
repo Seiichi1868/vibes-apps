@@ -54,6 +54,21 @@ def extract_vocabulary(script: str, min_cefr: str = "B1") -> list[dict]:
     return cleaned[:16]
 
 
+def _qa_items(payload: dict) -> list[dict]:
+    items = []
+    for item in payload.get("items") or []:
+        if not isinstance(item, dict):
+            continue
+        text = str(item.get("text") or item.get("q") or "").strip()
+        if not text:
+            continue
+        items.append({
+            "text": text,
+            "answer": str(item.get("answer") or item.get("a") or "").strip(),
+        })
+    return items[:5]
+
+
 def extract_questions(script: str, kind: str) -> list[dict]:
     if kind == "warmup":
         instruction = "視聴前のウォームアップ質問を3つ。答えは短い英語の模範。"
@@ -63,7 +78,22 @@ def extract_questions(script: str, kind: str) -> list[dict]:
         {
             "role": "system",
             "content": (
-                f"{instruction} JSON {{\"items\":[{{\"q\",\"a\"}}]}} 。質問は英語。"
+                f"{instruction} JSON {{\"items\":[{{\"text\",\"answer\"}}]}} 。質問は英語。"
+            ),
+        },
+        {"role": "user", "content": script[:12000]},
+    ])
+    return _qa_items(payload)
+
+
+def extract_writing(script: str) -> list[dict]:
+    payload = _json_content([
+        {
+            "role": "system",
+            "content": (
+                "高校生向けの英語ライティング話題を2つ。"
+                " JSON {\"items\":[{\"text\",\"text_ja\",\"kind\":\"opinion\",\"options\":[\"A\",\"B\"]}]}。"
+                " text は英語の問い。options は意見が分かれる2択。"
             ),
         },
         {"role": "user", "content": script[:12000]},
@@ -72,11 +102,17 @@ def extract_questions(script: str, kind: str) -> list[dict]:
     for item in payload.get("items") or []:
         if not isinstance(item, dict):
             continue
-        q = str(item.get("q") or "").strip()
-        if not q:
+        text = str(item.get("text") or "").strip()
+        if not text:
             continue
-        items.append({"q": q, "a": str(item.get("a") or "").strip()})
-    return items[:5]
+        options = [str(opt).strip() for opt in (item.get("options") or []) if str(opt).strip()]
+        items.append({
+            "text": text,
+            "text_ja": str(item.get("text_ja") or "").strip(),
+            "kind": "opinion",
+            "options": options[:2],
+        })
+    return items[:4]
 
 
 def translate_script(script: str) -> str:
