@@ -13,7 +13,7 @@
       <button class="tb-btn" type="button" id="tb-class-dup">複製</button>
       <button class="tb-btn" type="button" id="tb-class-del">削除</button>
     </div>
-    <p class="tb-note">氏名は使いません。番号だけを指名します。欠席はマスをタップ。</p>
+    <p class="tb-note">クラスはこの端末に保存され、閉じたり更新したりしても残ります。座席のクラスとも共有されます。氏名は使いません。欠席はマスをタップ。</p>
     <div id="tb-grid" class="tb-grid"></div>
     <div class="tb-inline-form">
       <label>同時指名
@@ -35,5 +35,6 @@
 {% endblock %}
 {% block scripts %}
 <script>window.TOOLBOX_CLASSES = {{ classes|tojson }};</script>
+<script src="{{ url_for('static', filename='toolbox/js/local_classes.js', v=toolbox_cache) }}"></script>
 <script src="{{ url_for('static', filename='toolbox/js/random_pick.js', v=toolbox_cache) }}"></script>
 {% endblock %}

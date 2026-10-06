@@ -11,7 +11,7 @@
       <button class="tb-btn" type="button" id="tb-class-dup">この配置を複製</button>
       <button class="tb-btn" type="button" id="tb-class-del">このタブを削除</button>
     </div>
-    <p class="tb-note">人数・座席・配置はタブごとに、この端末へいくつでも保存できます。タブを選ぶと、その教室の状態がすぐ開きます。氏名は使いません。欠席は番号をタップ。席数は人数以上にしてください。</p>
+    <p class="tb-note">クラスはタブごとにこの端末へ保存され、閉じたり更新したりしても残ります。欠席は番号をタップ。座席表のマスをタップすると、その席を使えない席にできます。席数は人数以上にしてください。</p>
     <div id="tb-grid" class="tb-grid"></div>
     <div class="tb-inline-form">
       <label>行
@@ -34,5 +34,6 @@
 {% endblock %}
 {% block scripts %}
 <script>window.TOOLBOX_CLASSES = {{ classes|tojson }};</script>
+<script src="{{ url_for('static', filename='toolbox/js/local_classes.js', v=toolbox_cache) }}"></script>
 <script src="{{ url_for('static', filename='toolbox/js/random_seats.js', v=toolbox_cache) }}"></script>
 {% endblock %}

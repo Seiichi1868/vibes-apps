@@ -19,7 +19,7 @@
       <button class="tb-user-btn" type="button" id="tb-user-toggle" aria-expanded="false" aria-haspopup="true">画面</button>
       <div class="tb-user-menu" id="tb-user-menu">
         <div class="tb-user-menu-inner">
-        <a href="{{ url_for('main.index') }}">トップ画面</a>
+        <a href="{{ url_for('toolbox.launcher') }}">トップ画面</a>
         <a href="{{ url_for('toolbox.launcher') }}">ユーザー画面</a>
         <a href="{{ url_for('toolbox.admin_page') }}">管理画面</a>
         {% if not is_guest %}

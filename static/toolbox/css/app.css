@@ -510,6 +510,16 @@ h1, h2, h3 { margin: 0 0 12px; }
 }
 .tb-seat-cell.is-empty {
   background: #e8eedc;
+  cursor: pointer;
+}
+.tb-seat-cell.is-blocked {
+  background: #d5d8cc;
+  color: transparent;
+  cursor: pointer;
+  background-image: linear-gradient(#9aa08a, #9aa08a), linear-gradient(#9aa08a, #9aa08a);
+  background-size: 42% 3px, 3px 42%;
+  background-position: center, center;
+  background-repeat: no-repeat;
 }
 .tb-seat-empty {
   grid-column: 1 / -1;

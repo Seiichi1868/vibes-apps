@@ -1,5 +1,6 @@
 (function () {
-  let classes = Array.isArray(window.TOOLBOX_CLASSES) ? window.TOOLBOX_CLASSES.slice() : [];
+  const LAST_KEY = "toolbox.random_pick.last.v1";
+  let classes = window.ToolboxClasses.load(window.TOOLBOX_CLASSES);
   const select = document.getElementById("tb-class");
   const grid = document.getElementById("tb-grid");
   const result = document.getElementById("tb-result");
@@ -7,20 +8,14 @@
   const countEl = document.getElementById("tb-count");
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  function storageKey(id) {
-    return `toolbox.random_pick.${id}`;
-  }
-
-  function loadState(id) {
-    try {
-      return JSON.parse(localStorage.getItem(storageKey(id)) || "{}");
-    } catch (_) {
-      return {};
-    }
-  }
-
-  function saveState(id, state) {
-    localStorage.setItem(storageKey(id), JSON.stringify(state));
+  function saveState(row, state) {
+    row.pick = {
+      absent: state.absent,
+      picked: state.picked,
+      history: state.history,
+    };
+    classes = window.ToolboxClasses.save(classes);
+    if (select.value) localStorage.setItem(LAST_KEY, select.value);
   }
 
   function currentClass() {
@@ -34,7 +29,7 @@
   function stateOf() {
     const row = currentClass();
     if (!row) return defaultState();
-    const state = Object.assign(defaultState(), loadState(row.id));
+    const state = Object.assign(defaultState(), row.pick || {});
     state.absent = state.absent.filter((n) => n >= 1 && n <= row.student_count);
     state.picked = state.picked.filter((n) => n >= 1 && n <= row.student_count && !state.absent.includes(n));
     return state;
@@ -70,7 +65,7 @@
           next.picked = next.picked.filter((x) => x !== n);
           next.history = next.history.filter((x) => x !== n);
         }
-        saveState(row.id, next);
+        saveState(row, next);
         renderGrid();
       });
       grid.appendChild(btn);
@@ -96,7 +91,7 @@
       alert("全員が当たりました。リセットします。");
       state.picked = [];
       state.history = [];
-      saveState(row.id, state);
+      saveState(row, state);
       renderGrid();
       pool = available(state, row.student_count);
       if (!pool.length) {
@@ -115,7 +110,7 @@
       state = stateOf();
       state.picked = state.picked.concat(chosen);
       state.history = state.history.concat(chosen);
-      saveState(row.id, state);
+      saveState(row, state);
       result.textContent = chosen.join("  ");
       renderGrid();
     };
@@ -144,67 +139,99 @@
     const state = stateOf();
     const last = state.history.pop();
     if (last != null) state.picked = state.picked.filter((n) => n !== last);
-    saveState(row.id, state);
+    saveState(row, state);
     result.textContent = last != null ? `取消: ${last}` : "—";
     renderGrid();
   });
   document.getElementById("tb-clear").addEventListener("click", () => {
     const row = currentClass();
     if (!row) return;
-    saveState(row.id, defaultState());
+    saveState(row, defaultState());
     result.textContent = "—";
     renderGrid();
   });
-  select.addEventListener("change", renderGrid);
+  select.addEventListener("change", () => {
+    if (select.value) localStorage.setItem(LAST_KEY, select.value);
+    renderGrid();
+  });
 
-  async function promptClass(existing) {
+  function newId() {
+    return (crypto.randomUUID && crypto.randomUUID()) || String(Date.now());
+  }
+
+  function promptClass(existing) {
     const name = prompt("クラス名", existing ? existing.name : "");
-    if (!name) return;
+    if (!name || !name.trim()) return;
     const count = Number(prompt("人数（1〜60）", existing ? existing.student_count : "30"));
-    const body = JSON.stringify({ name, student_count: count });
-    if (existing) {
-      const data = await toolboxFetch(`/toolbox/api/classes/${existing.id}`, { method: "PUT", body });
-      classes = classes.map((row) => (row.id === existing.id ? data.class : row));
-    } else {
-      const data = await toolboxFetch("/toolbox/api/classes", { method: "POST", body });
-      classes.push(data.class);
-      select.value = data.class.id;
+    if (!Number.isFinite(count) || count < 1 || count > 60) {
+      alert("人数は1〜60で入力してください。");
+      return;
     }
+    if (existing) {
+      existing.name = name.trim();
+      existing.student_count = count;
+    } else {
+      const layout = window.ToolboxClasses.suggestGrid(count);
+      classes.push({
+        id: newId(),
+        name: name.trim(),
+        student_count: count,
+        absent: [],
+        seats: [],
+        rows: layout.rows,
+        cols: layout.cols,
+        blocked: [],
+        pick: { absent: [], picked: [], history: [] },
+      });
+      select.value = classes[classes.length - 1].id;
+    }
+    classes = window.ToolboxClasses.save(classes);
+    if (select.value) localStorage.setItem(LAST_KEY, select.value);
     renderClasses();
   }
 
-  document.getElementById("tb-class-new").addEventListener("click", () => promptClass(null).catch((e) => alert(e.message)));
+  document.getElementById("tb-class-new").addEventListener("click", () => promptClass(null));
   document.getElementById("tb-class-edit").addEventListener("click", () => {
     const row = currentClass();
-    if (row) promptClass(row).catch((e) => alert(e.message));
+    if (row) promptClass(row);
   });
-  document.getElementById("tb-class-dup").addEventListener("click", async () => {
+  document.getElementById("tb-class-dup").addEventListener("click", () => {
     const row = currentClass();
     if (!row) return;
-    try {
-      const data = await toolboxFetch(`/toolbox/api/classes/${row.id}/duplicate`, { method: "POST", body: "{}" });
-      classes.push(data.class);
-      select.value = data.class.id;
-      renderClasses();
-    } catch (e) {
-      alert(e.message);
-    }
+    const copy = Object.assign({}, row, {
+      id: newId(),
+      name: `${row.name} のコピー`,
+      absent: (row.absent || []).slice(),
+      seats: (row.seats || []).slice(),
+      blocked: (row.blocked || []).slice(),
+      pick: {
+        absent: ((row.pick || {}).absent || []).slice(),
+        picked: ((row.pick || {}).picked || []).slice(),
+        history: ((row.pick || {}).history || []).slice(),
+      },
+    });
+    classes.push(copy);
+    select.value = copy.id;
+    classes = window.ToolboxClasses.save(classes);
+    localStorage.setItem(LAST_KEY, copy.id);
+    renderClasses();
   });
-  document.getElementById("tb-class-del").addEventListener("click", async () => {
+  document.getElementById("tb-class-del").addEventListener("click", () => {
     const row = currentClass();
-    if (!row || !confirm(`${row.name} を削除しますか？`)) return;
-    try {
-      await toolboxFetch(`/toolbox/api/classes/${row.id}`, { method: "DELETE" });
-      classes = classes.filter((item) => item.id !== row.id);
-      renderClasses();
-    } catch (e) {
-      alert(e.message);
-    }
+    if (!row || !confirm(`${row.name} をこの端末から削除しますか？`)) return;
+    classes = classes.filter((item) => item.id !== row.id);
+    classes = window.ToolboxClasses.save(classes);
+    renderClasses();
   });
 
   ToolboxDisplay.init({
     onNext: pickNow,
     onPrev: () => document.getElementById("tb-undo").click(),
   });
+  const last = localStorage.getItem(LAST_KEY);
   renderClasses();
+  if (last && classes.some((row) => row.id === last)) {
+    select.value = last;
+    renderGrid();
+  }
 })();

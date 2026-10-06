@@ -31,7 +31,7 @@
   }
 
   function writeRooms() {
-    localStorage.setItem(ROOMS_KEY, JSON.stringify(classes));
+    classes = window.ToolboxClasses.save(classes);
     if (activeId) localStorage.setItem(LAST_KEY, activeId);
   }
 
@@ -45,23 +45,7 @@
   }
 
   function bootRooms() {
-    classes = readRooms();
-    if (classes.length) return;
-    const seeded = Array.isArray(window.TOOLBOX_CLASSES) ? window.TOOLBOX_CLASSES : [];
-    classes = seeded.map((row) => {
-      const layout = suggestGrid(row.student_count || 30);
-      const prev = loadLegacy(row.id);
-      return {
-        id: row.id,
-        name: row.name,
-        student_count: row.student_count,
-        absent: Array.isArray(prev.absent) ? prev.absent : [],
-        seats: Array.isArray(prev.seats) ? prev.seats : [],
-        rows: prev.rows || layout.rows,
-        cols: prev.cols || layout.cols,
-      };
-    });
-    if (classes.length) writeRooms();
+    classes = window.ToolboxClasses.load(window.TOOLBOX_CLASSES);
   }
 
   function currentClass() {
@@ -70,7 +54,7 @@
 
   function defaultState(row) {
     const suggested = suggestGrid(row ? row.student_count : 30);
-    return { absent: [], seats: [], rows: suggested.rows, cols: suggested.cols };
+    return { absent: [], seats: [], rows: suggested.rows, cols: suggested.cols, blocked: [] };
   }
 
   function stateOf() {
@@ -83,6 +67,7 @@
     const maxSeats = state.rows * state.cols;
     if (!Array.isArray(state.seats)) state.seats = [];
     if (state.seats.length > maxSeats) state.seats = state.seats.slice(0, maxSeats);
+    state.blocked = (state.blocked || []).filter((n) => n >= 0 && n < maxSeats);
     return state;
   }
 
@@ -138,13 +123,33 @@
       const cell = document.createElement("div");
       cell.className = "tb-seat-cell";
       cell.setAttribute("role", "gridcell");
+      const blocked = (state.blocked || []).includes(i);
       const num = state.seats[i];
-      if (num) {
+      if (blocked) {
+        cell.classList.add("is-blocked");
+        cell.textContent = "";
+        cell.title = "使えない席。もう一度タップすると使えます";
+      } else if (num) {
         cell.textContent = String(num);
+        cell.title = "タップすると使えない席にします";
       } else {
         cell.classList.add("is-empty");
         cell.textContent = "";
+        cell.title = "タップすると使えない席にします";
       }
+      cell.addEventListener("click", () => {
+        const next = stateOf();
+        const set = new Set(next.blocked || []);
+        if (set.has(i)) set.delete(i);
+        else {
+          set.add(i);
+          if (Array.isArray(next.seats)) next.seats[i] = null;
+        }
+        next.blocked = Array.from(set);
+        Object.assign(row, next);
+        writeRooms();
+        renderBoard();
+      });
       board.appendChild(cell);
     }
     if (!row) {
@@ -163,7 +168,8 @@
     const state = stateOf();
     state.rows = Math.max(1, Math.min(12, Number(rowsEl.value) || state.rows));
     state.cols = Math.max(1, Math.min(12, Number(colsEl.value) || state.cols));
-    const capacity = state.rows * state.cols;
+    const blocked = new Set(state.blocked || []);
+    const capacity = state.rows * state.cols - blocked.size;
     const pool = [];
     for (let n = 1; n <= row.student_count; n += 1) {
       if (!state.absent.includes(n)) pool.push(n);
@@ -178,7 +184,13 @@
       pool[i] = pool[j];
       pool[j] = tmp;
     }
-    state.seats = Array.from({ length: capacity }, (_, i) => pool[i] || null);
+    const total = state.rows * state.cols;
+    state.seats = [];
+    let placed = 0;
+    for (let i = 0; i < total; i += 1) {
+      if (blocked.has(i)) state.seats.push(null);
+      else state.seats.push(pool[placed++] || null);
+    }
     Object.assign(row, state);
     writeRooms();
     renderAll();
@@ -191,6 +203,7 @@
     const next = defaultState(row);
     next.rows = Math.max(1, Math.min(12, Number(rowsEl.value) || next.rows));
     next.cols = Math.max(1, Math.min(12, Number(colsEl.value) || next.cols));
+    next.blocked = stateOf().blocked || [];
     Object.assign(row, next);
     writeRooms();
     renderAll();
