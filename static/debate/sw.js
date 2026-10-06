@@ -1,0 +1,85 @@
+/* Debate Service Worker */
+const VERSION = "debate-v1";
+const STATIC_CACHE = `${VERSION}-static`;
+const PAGE_CACHE = `${VERSION}-pages`;
+const OFFLINE_URL = "/debate/offline";
+const STATIC_PREFIX = "/static/debate/";
+
+const OFFLINE_TOOL_PAGES = [];
+
+const NEVER_CACHE_PREFIXES = ["/debate/api/", "/debate/admin/", "/debate/audio/"];
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches
+      .open(STATIC_CACHE)
+      .then((cache) => cache.add(OFFLINE_URL))
+      .then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(
+          keys
+            .filter((k) => k.startsWith("debate-") && !k.startsWith(VERSION))
+            .map((k) => caches.delete(k))
+        )
+      )
+      .then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener("fetch", (event) => {
+  const req = event.request;
+  if (req.method !== "GET") return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;
+  if (NEVER_CACHE_PREFIXES.some((p) => url.pathname.startsWith(p))) return;
+
+  if (url.pathname.startsWith(STATIC_PREFIX)) {
+    event.respondWith(staleWhileRevalidate(req));
+    return;
+  }
+  if (req.mode === "navigate") {
+    event.respondWith(networkFirstPage(req, url));
+  }
+});
+
+async function staleWhileRevalidate(req) {
+  const cache = await caches.open(STATIC_CACHE);
+  const cached = await cache.match(req);
+  const network = fetch(req)
+    .then((res) => {
+      if (res && res.status === 200 && res.type === "basic") cache.put(req, res.clone());
+      return res;
+    })
+    .catch(() => cached);
+  return cached || network;
+}
+
+async function networkFirstPage(req, url) {
+  try {
+    const res = await fetch(req);
+    if (res && res.status === 200 && OFFLINE_TOOL_PAGES.includes(url.pathname)) {
+      const cache = await caches.open(PAGE_CACHE);
+      cache.put(req, res.clone());
+    }
+    return res;
+  } catch (e) {
+    const cache = await caches.open(PAGE_CACHE);
+    const cachedPage = await cache.match(req);
+    if (cachedPage) return cachedPage;
+    const offline = await caches.match(OFFLINE_URL);
+    return (
+      offline ||
+      new Response("オフラインです", {
+        status: 503,
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      })
+    );
+  }
+}

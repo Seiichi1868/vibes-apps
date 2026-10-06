@@ -208,6 +208,25 @@ def _resolve_extension(filename: str, mimetype: str | None) -> str:
 
 
 # ── ①論題入力画面 ─────────────────────────────────────────────
+@debate_bp.route("/sw.js")
+def service_worker():
+    """Service Worker。/debate/ を制御できるパスで配信する。"""
+    response = send_from_directory(
+        Path(current_app.static_folder) / "debate",
+        "sw.js",
+        mimetype="application/javascript",
+    )
+    response.headers["Content-Type"] = "application/javascript"
+    response.headers["Service-Worker-Allowed"] = "/debate/"
+    response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
+@debate_bp.route("/offline")
+def offline():
+    return render_template("debate/offline.html")
+
+
 @debate_bp.route("/manifest.json")
 def web_app_manifest():
     """生徒画面用 PWA manifest（scope: /debate/）。"""

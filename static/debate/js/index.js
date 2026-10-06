@@ -3,6 +3,7 @@
   if (openingOverlay) {
     setTimeout(() => {
       openingOverlay.classList.add("opacity-0", "pointer-events-none", "transition-opacity", "duration-300");
+      document.dispatchEvent(new CustomEvent("debate:opening-done"));
       setTimeout(() => openingOverlay.remove(), 320);
     }, 1950);
   }
