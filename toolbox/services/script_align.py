@@ -138,18 +138,15 @@ def _split_sentences(text: str) -> list[str]:
                 cursor += 1
             at_end = cursor >= length
             next_is_space = cursor < length and source[cursor].isspace()
+            look = cursor
+            while look < length and source[look].isspace():
+                look += 1
+            next_is_upper = look < length and source[look].isupper()
             is_cjk = char in _CJK_TERMINAL
-            if is_cjk or at_end or next_is_space:
+            if is_cjk or at_end or next_is_space or next_is_upper:
                 if char in _LATIN_TERMINAL and _is_abbreviation("".join(buf)):
                     index = cursor
                     continue
-                if char in _LATIN_TERMINAL and not at_end:
-                    look = cursor
-                    while look < length and source[look].isspace():
-                        look += 1
-                    if look < length and source[look].islower():
-                        index = cursor
-                        continue
                 candidate = "".join(buf).strip()
                 if candidate:
                     units.append(candidate)
@@ -193,8 +190,14 @@ def expand_sentence_aligned_rows(rows: list[dict]) -> list[dict]:
         translated = str(row.get("ja") or row.get("es") or row.get("text") or "").strip()
         en_parts = split_script_units(english) if english else []
         ja_parts = split_script_units(translated) if translated else []
-        if len(en_parts) > 1 and len(en_parts) == len(ja_parts):
-            expanded.extend({"en": en, "ja": ja} for en, ja in zip(en_parts, ja_parts))
-        elif english or translated:
-            expanded.append({"en": english, "ja": translated})
+        if len(en_parts) <= 1 and len(ja_parts) <= 1:
+            if english or translated:
+                expanded.append({"en": english, "ja": translated})
+            continue
+        count = max(len(en_parts), len(ja_parts))
+        for index in range(count):
+            expanded.append({
+                "en": en_parts[index] if index < len(en_parts) else "",
+                "ja": ja_parts[index] if index < len(ja_parts) else "",
+            })
     return expanded
