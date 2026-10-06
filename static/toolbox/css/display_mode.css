@@ -231,6 +231,8 @@ body.tb-display-on .tb-stage-tool:has(.tb-seat-stage) {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  padding-top: 16px;
+  padding-bottom: 16px;
 }
 
 body.tb-display-on .tb-stage-tool:has(.tb-seat-stage) > .tb-stage-chrome {
@@ -248,9 +250,9 @@ body.tb-display-on .tb-stage-tool:has(.tb-seat-stage) > .tb-stage-main {
   height: 100%;
   min-height: 0;
   display: flex;
-  align-items: stretch;
+  align-items: center;
   justify-content: center;
-  padding: 10px 10px 18px;
+  padding: 0;
 }
 
 body.tb-display-on .tb-stage-tool:has(.tb-seat-stage) .tb-seat-stage {
@@ -259,6 +261,8 @@ body.tb-display-on .tb-stage-tool:has(.tb-seat-stage) .tb-seat-stage {
   max-width: none;
   height: 100%;
   min-height: 0;
+  margin-top: auto;
+  margin-bottom: auto;
   justify-content: center;
 }
 
@@ -267,7 +271,6 @@ body.tb-display-on .tb-stage-tool:has(.tb-seat-stage) .tb-seat-board {
   width: 100%;
   height: 100%;
   min-height: 0;
-  align-content: stretch;
 }
 
 .tb-display-bar {
