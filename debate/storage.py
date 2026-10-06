@@ -196,9 +196,9 @@ def session_summary(data: dict, *, mtime: float | None = None, include_notes: bo
 
     debate_mode = session_mode(data)
     mode_labels = {
-        "duo": "通常の対戦",
-        "solo": "Solo Practice",
-        "practice": "パート練習",
+        "duo": "通常対戦モード",
+        "solo": "AI対戦モード",
+        "practice": "パート練習モード",
     }
     summary = {
         "session_id": data.get("session_id"),

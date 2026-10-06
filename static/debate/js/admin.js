@@ -421,10 +421,10 @@ function sessionRowHtml(s) {
     : "";
 
   const modeLabel = s.mode === "solo"
-    ? `Solo ${escapeHtml(s.user_side || "")} / ${escapeHtml(s.ai_difficulty || "")}`
+    ? `AI対戦モード ${escapeHtml(s.user_side || "")} / ${escapeHtml(s.ai_difficulty || "")}`
     : s.mode === "practice"
-      ? `パート練習 ${escapeHtml(s.practice_scope || (s.included_parts || []).join("→"))}`
-      : escapeHtml(s.mode_label || "通常の対戦");
+      ? `パート練習モード ${escapeHtml(s.practice_scope || (s.included_parts || []).join("→"))}`
+      : escapeHtml(s.mode_label || "通常対戦モード");
   const modeMeta = `<span><span class="session-row__meta-key">モード</span> ${modeLabel}</span>`;
   const affiliationMeta = `<span><span class="session-row__meta-key">所属</span> ${escapeHtml(affiliationLabel(s) || "未選択")}</span>`;
 

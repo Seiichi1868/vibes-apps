@@ -24,9 +24,9 @@
       <span id="overall-progress-label"></span>
       {% if session.mode == 'solo' %}
       <span class="status-pill side-badge-{{ session.user_side }}">あなたの陣営: {{ session.user_side }}</span>
-      <span class="status-pill">Solo Practice · vs AI: {{ session.ai_difficulty }}</span>
+      <span class="status-pill">AI対戦モード · {{ session.ai_difficulty }}</span>
       {% elif session.mode == 'practice' %}
-      <span class="status-pill">パート練習</span>
+      <span class="status-pill">パート練習モード</span>
       {% if session.ai_difficulty %}
       <span class="status-pill">AI: {{ session.ai_difficulty }}</span>
       {% endif %}

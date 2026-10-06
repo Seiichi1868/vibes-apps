@@ -83,7 +83,7 @@ def web_app_manifest():
     return response
 
 
-@debate_admin_bp.route("")
+@debate_admin_bp.route("/", strict_slashes=False)
 def admin_page():
     settings = load_settings()
     bg = resolve_background(settings.get("background_id"))

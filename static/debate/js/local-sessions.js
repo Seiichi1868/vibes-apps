@@ -3,9 +3,9 @@
   const MAX_IDS = 20;
   const TRANSCRIPTION_LABELS = { batch: "モードA", realtime: "モードB", mixed: "混在" };
   const DEBATE_MODE_LABELS = {
-    duo: "通常の対戦",
-    solo: "Solo Practice",
-    practice: "パート練習",
+    duo: "通常対戦モード",
+    solo: "AI対戦モード",
+    practice: "パート練習モード",
   };
 
   function formatDebateModeLine(session) {
@@ -78,9 +78,9 @@
       : "";
     const modeBadge =
       session.mode === "practice"
-        ? `<span class="status-pill shrink-0 text-[0.65rem]">パート練習</span>`
+        ? `<span class="status-pill shrink-0 text-[0.65rem]">パート練習モード</span>`
         : session.mode === "solo"
-          ? `<span class="status-pill shrink-0 text-[0.65rem]">Solo</span>`
+          ? `<span class="status-pill shrink-0 text-[0.65rem]">AI対戦モード</span>`
           : "";
     const meta = savedAt
       ? `<p class="text-[0.68rem] text-slate-400 mt-0.5">${escapeHtml(savedAt)}${escapeHtml(affiliation)}${escapeHtml(debateMode)}${escapeHtml(transcription)}</p>`
