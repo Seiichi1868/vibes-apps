@@ -44,6 +44,7 @@ PUBLIC_ENDPOINTS = {
     "toolbox.admin_page",
     "toolbox.admin_unlock",
     "toolbox.web_app_manifest",
+    "toolbox.admin_web_app_manifest",
 }
 
 _STATIC_DIR = PROJECT_ROOT / "static" / "toolbox"
@@ -189,6 +190,18 @@ def web_app_manifest():
     """PWA manifest（scope: /toolbox/）。application/manifest+json で配信する。"""
     response = send_from_directory(
         _STATIC_DIR,
+        "manifest.json",
+        mimetype="application/manifest+json",
+    )
+    response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return response
+
+
+@main_bp.route("/admin/manifest.json")
+def admin_web_app_manifest():
+    """管理画面用 PWA manifest（start_url / scope: /toolbox/admin/）。"""
+    response = send_from_directory(
+        _STATIC_DIR / "admin",
         "manifest.json",
         mimetype="application/manifest+json",
     )

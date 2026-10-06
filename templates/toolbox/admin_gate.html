@@ -1,5 +1,7 @@
 {% extends "toolbox/base.html" %}
 {% block title %}管理画面 · Toolbox{% endblock %}
+{% block manifest_href %}{{ url_for('toolbox.admin_web_app_manifest') }}{% endblock %}
+{% block pwa_short_name %}Toolbox 管理{% endblock %}
 {% block body %}
 <section class="tb-card tb-narrow">
   <h1>Toolbox 管理画面</h1>
