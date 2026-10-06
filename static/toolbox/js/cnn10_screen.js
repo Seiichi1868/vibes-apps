@@ -45,12 +45,13 @@
   }
 
   function questionFontSize() {
-    return "clamp(0.95rem, 2vw, 1.5rem)";
+    return "clamp(2.15rem, 6.8vmin, 5.6rem)";
   }
 
   function qaFrame(heading, body, hint, size) {
     const fontSize = size || questionFontSize();
-    return `<div class="screen-view--warmup"><div class="screen-warmup-inner" style="--warmup-q-size:${fontSize}"><p class="screen-warmup-heading">${esc(heading)}</p>${body}<p class="screen-postview-hint">${esc(hint)}</p></div></div>`;
+    const head = heading ? `<p class="screen-warmup-heading">${esc(heading)}</p>` : "";
+    return `<div class="screen-view--warmup"><div class="screen-warmup-inner" style="--warmup-q-size:${fontSize}">${head}${body}<p class="screen-postview-hint">${esc(hint)}</p></div></div>`;
   }
 
   function renderQuestion(kind, heading) {
@@ -79,22 +80,18 @@
     statusEl.textContent = "";
   }
 
-  function writingOreo() {
-    return `<div class="screen-writing-oreo"><span class="screen-writing-oreo-step"><b>O</b>Opinion</span><span class="screen-writing-oreo-arrow">→</span><span class="screen-writing-oreo-step"><b>R</b>Reason</span><span class="screen-writing-oreo-arrow">→</span><span class="screen-writing-oreo-step"><b>E</b>Example</span><span class="screen-writing-oreo-arrow">→</span><span class="screen-writing-oreo-step"><b>O</b>Opinion</span><span class="screen-writing-oreo-words">about 100 words</span></div>`;
-  }
-
   function renderWriting() {
     const list = visible(lesson.writing);
     const step = reveal.writing || 0;
-    const heading = "Write & speak (OREO, about 100 words)";
+    const size = "clamp(2rem, 6.4vmin, 5.25rem)";
     if (!list.length) {
-      stage.innerHTML = qaFrame(heading, `<p class="screen-qa-waiting">No topics yet.</p>`, "", "clamp(0.95rem, 2vw, 1.5rem)");
+      stage.innerHTML = qaFrame("", `<p class="screen-qa-waiting">No topics yet.</p>`, "", size);
       statusEl.textContent = "";
       return;
     }
     const hint = `Down for next, up to go back (${Math.min(step, list.length)}/${list.length})`;
     if (step <= 0) {
-      stage.innerHTML = qaFrame(heading, `<p class="screen-qa-waiting">Click or press down to show a topic</p>${writingOreo()}`, hint, "clamp(0.95rem, 2vw, 1.5rem)");
+      stage.innerHTML = qaFrame("", `<p class="screen-qa-waiting">Click or press down to show a topic</p>`, hint, size);
       statusEl.textContent = "";
       return;
     }
@@ -105,8 +102,8 @@
       body += `<div class="screen-writing-choices"><span class="screen-writing-choice">${esc(topic.options[0])}</span><span class="screen-writing-or">or</span><span class="screen-writing-choice">${esc(topic.options[1])}</span></div>`;
     }
     if (topic.text_ja) body += `<p class="screen-writing-ja">${esc(topic.text_ja)}</p>`;
-    body += `</div></div>${writingOreo()}`;
-    stage.innerHTML = qaFrame(heading, body, hint, "clamp(0.95rem, 2vw, 1.5rem)");
+    body += "</div></div>";
+    stage.innerHTML = qaFrame("", body, hint, size);
     statusEl.textContent = "";
   }
 

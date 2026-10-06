@@ -101,7 +101,7 @@
   .screen-warmup-heading {
     flex-shrink: 0;
     margin: 0 0 clamp(0.75rem, 2.5vh, 1.75rem);
-    font-size: clamp(0.95rem, 2vw, 1.5rem);
+    font-size: clamp(1.25rem, 3.2vmin, 2.25rem);
     font-weight: 600;
     color: #7dd3fc;
     line-height: 1.3;
@@ -110,7 +110,7 @@
     display: flex;
     align-items: flex-start;
     gap: 0.35em;
-    font-size: var(--warmup-q-size, clamp(0.95rem, 2vw, 1.5rem));
+    font-size: var(--warmup-q-size, clamp(1.75rem, 5vmin, 3.5rem));
     line-height: 1.32;
     font-weight: 500;
     letter-spacing: 0.01em;
@@ -118,7 +118,7 @@
   .screen-warmup-num {
     color: #38bdf8;
     font-weight: 700;
-    font-size: 1em;
+    font-size: 0.9em;
     min-width: 2.2em;
     flex-shrink: 0;
   }
@@ -136,9 +136,9 @@
     align-items: center;
     justify-content: center;
     margin: 0;
-    color: rgba(148, 163, 184, 0.3);
-    font-size: clamp(0.72rem, 1.45vmin, 0.95rem);
-    font-weight: 500;
+    color: rgba(148, 163, 184, 0.7);
+    font-size: clamp(1rem, 2.6vmin, 1.6rem);
+    font-weight: 600;
     text-align: center;
   }
   .screen-postview-answer {
@@ -146,7 +146,7 @@
     min-height: calc(var(--warmup-q-size, 2rem) * 1.35);
     margin: 0.45em 0 0 1.98em;
     color: #fcd34d;
-    font-size: var(--warmup-q-size, clamp(0.95rem, 2vw, 1.5rem));
+    font-size: var(--warmup-q-size, 2rem);
     font-weight: 500;
     line-height: 1.32;
   }
@@ -168,7 +168,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.25em;
-    font-size: var(--warmup-q-size, clamp(0.95rem, 2vw, 1.5rem));
+    font-size: var(--warmup-q-size, 2rem);
   }
   .screen-writing-choices {
     display: flex;
@@ -176,7 +176,7 @@
     align-items: center;
     gap: 0.4em;
     margin-left: 2.75em;
-    font-size: 1em;
+    font-size: 0.72em;
   }
   .screen-writing-choice {
     border: 2px solid rgba(251, 113, 133, 0.7);
@@ -188,33 +188,14 @@
   .screen-writing-or { color: rgba(148, 163, 184, 0.9); font-weight: 600; }
   .screen-writing-ja {
     margin-left: 3.6em;
-    font-size: 1em;
+    font-size: 0.55em;
     color: rgba(203, 213, 225, 0.85);
     line-height: 1.4;
   }
-  .screen-writing-oreo {
-    flex-shrink: 0;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    align-items: center;
-    gap: clamp(0.3rem, 1vmin, 0.75rem);
-    margin-top: clamp(0.5rem, 2vh, 1.25rem);
-    font-size: clamp(0.95rem, 2vw, 1.5rem);
-  }
-  .screen-writing-oreo-step {
-    border: 1px solid rgba(125, 211, 252, 0.45);
-    border-radius: 0.6rem;
-    padding: 0.2em 0.7em;
-    color: #e0f2fe;
-  }
-  .screen-writing-oreo-step b { color: #38bdf8; margin-right: 0.3em; }
-  .screen-writing-oreo-arrow { color: rgba(148, 163, 184, 0.8); }
-  .screen-writing-oreo-words { color: #fda4af; font-weight: 700; margin-left: 0.5em; }
   .tb-vocab {
     width: 100%;
     border-collapse: collapse;
-    font-size: clamp(0.95rem, 2vw, 1.5rem);
+    font-size: clamp(1rem, 2.2vw, 1.75rem);
   }
   .tb-vocab th, .tb-vocab td {
     text-align: left;
@@ -223,12 +204,12 @@
     border-bottom: 1px solid rgba(51, 65, 85, 0.7);
   }
   .tb-vocab th {
-    font-size: 1em;
+    font-size: 0.55em;
     letter-spacing: 0.06em;
     color: rgba(148, 163, 184, 0.9);
   }
   .tb-vocab .word { color: #fbbf24; font-weight: 700; white-space: nowrap; }
-  .tb-wait { color: #94a3b8; font-size: clamp(0.95rem, 2vw, 1.5rem); }
+  .tb-wait { color: #94a3b8; font-size: 1.3rem; }
   #screen-status {
     position: absolute;
     left: 12px;
