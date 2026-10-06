@@ -49,19 +49,19 @@
     const steps = pieces(list);
     const step = reveal[kind] || 0;
     if (!list.length) {
-      stage.innerHTML = `<h2>${heading}</h2><p class="tb-wait">まだありません。</p>`;
+      stage.innerHTML = `<div class="tb-screen-copy"><h2>${heading}</h2><p class="tb-wait">まだありません。</p></div>`;
       statusEl.textContent = "";
       return;
     }
     if (step <= 0) {
-      stage.innerHTML = `<h2>${heading}</h2><p class="tb-wait">クリックまたは ↓ で質問を表示します。</p>`;
+      stage.innerHTML = `<div class="tb-screen-copy"><h2>${heading}</h2><p class="tb-wait">クリックまたは ↓ で質問を表示します。</p></div>`;
     } else {
       const piece = steps[Math.min(step, steps.length) - 1];
       const item = list[piece.index];
       const answer = piece.kind === "answer"
         ? `<p class="tb-a"><span>A. </span>${esc(item.answer || item.a || "")}</p>`
         : "";
-      stage.innerHTML = `<h2>${heading}</h2><p class="tb-q">Q${piece.index + 1}. ${esc(item.text || item.q)}</p>${answer}`;
+      stage.innerHTML = `<div class="tb-screen-copy"><h2>${heading}</h2><p class="tb-q">Q${piece.index + 1}. ${esc(item.text || item.q)}</p>${answer}</div>`;
     }
     statusEl.textContent = `${Math.min(step, steps.length)} / ${steps.length}　↑ で戻る`;
   }
@@ -70,23 +70,24 @@
     const list = visible(lesson.writing);
     const step = reveal.writing || 0;
     if (!list.length) {
-      stage.innerHTML = "<h2>書く</h2><p class='tb-wait'>まだありません。</p>";
+      stage.innerHTML = "<div class='tb-screen-copy'><h2>書く</h2><p class='tb-wait'>まだありません。</p></div>";
       statusEl.textContent = "";
       return;
     }
     if (step <= 0) {
-      stage.innerHTML = "<h2>書く</h2><p class='tb-wait'>クリックまたは ↓ で話題を表示します。</p><p>O Opinion → R Reason → E Example → O Opinion</p>";
+      stage.innerHTML = "<div class='tb-screen-copy'><h2>書く</h2><p class='tb-wait'>クリックまたは ↓ で話題を表示します。</p><p>O Opinion → R Reason → E Example → O Opinion</p></div>";
     } else {
       const topic = list[Math.min(step, list.length) - 1];
       const choices = (topic.options || []).length === 2
         ? `<p>${esc(topic.options[0])} or ${esc(topic.options[1])}</p>`
         : "<p>Your answer + Why?</p>";
-      stage.innerHTML = `<h2>書く</h2><p class="tb-q">T${Math.min(step, list.length)}. ${esc(topic.text)}</p>${choices}${topic.text_ja ? `<p class="tb-muted">${esc(topic.text_ja)}</p>` : ""}<p>O Opinion → R Reason → E Example → O Opinion</p>`;
+      stage.innerHTML = `<div class="tb-screen-copy"><h2>書く</h2><p class="tb-q">T${Math.min(step, list.length)}. ${esc(topic.text)}</p>${choices}${topic.text_ja ? `<p>${esc(topic.text_ja)}</p>` : ""}<p>O Opinion → R Reason → E Example → O Opinion</p></div>`;
     }
     statusEl.textContent = `${Math.min(step, list.length)} / ${list.length}　↑ で戻る`;
   }
 
   function render() {
+    root.classList.toggle("is-video", view === "video");
     document.querySelectorAll("[data-view]").forEach((btn) => {
       btn.classList.toggle("is-on", btn.dataset.view === view);
     });
@@ -103,17 +104,19 @@
       });
       if (end > start) params.set("end", String(end));
       if (lesson.subtitles !== false) params.set("cc_load_policy", "1");
-      stage.innerHTML = `<h1>${esc(lesson.title || "CNN10")}</h1>` + (id
+      stage.innerHTML = id
         ? `<iframe title="CNN10" src="https://www.youtube.com/embed/${id}?${params}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`
-        : "<p>動画 URL がありません。</p>");
-      statusEl.textContent = lesson.script ? "文字起こし設定済み" : "";
+        : "<p class='tb-screen-copy'>動画 URL がありません。</p>";
+      statusEl.textContent = "";
       return;
     }
     if (view === "vocab") {
       const items = visible(lesson.vocabulary);
-      stage.innerHTML = "<h2>語彙</h2>" + (items.length
-        ? "<ul>" + items.map((item) => `<li><strong>${esc(item.word)}</strong> ${esc(item.meaning || "")}</li>`).join("") + "</ul>"
-        : "<p class='tb-wait'>まだありません。</p>");
+      stage.innerHTML = "<div class='tb-screen-copy'>" + (items.length
+        ? "<table class='tb-vocab'><thead><tr><th>単語・熟語</th><th>品詞</th><th>意味</th></tr></thead><tbody>"
+          + items.map((item) => `<tr><td class="word">${esc(item.word)}</td><td>${esc(item.part_of_speech || item.pos || "")}</td><td>${esc(item.meaning || "")}</td></tr>`).join("")
+          + "</tbody></table>"
+        : "<p class='tb-wait'>まだありません。</p>") + "</div>";
       statusEl.textContent = "";
       return;
     }

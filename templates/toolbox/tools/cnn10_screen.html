@@ -1,30 +1,114 @@
 {% extends "toolbox/base.html" %}
 {% block title %}CNN10スクリーン · Toolbox{% endblock %}
-{% block body_class %}tb-display{% endblock %}
+{% block body_class %}tb-screen-page{% endblock %}
 {% block head %}
 <style>
-  .tb-screen-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
-  .tb-screen-bar button.is-on { background: var(--tb-accent); color: #fff; }
-  .tb-screen-stage { min-height: 60vh; }
-  .tb-screen-stage h1, .tb-screen-stage h2 { font-size: clamp(1.6rem, 4vw, 2.6rem); }
-  .tb-screen-stage .tb-q { font-size: clamp(1.8rem, 5vw, 3.4rem); line-height: 1.35; font-weight: 700; }
-  .tb-screen-stage .tb-a { font-size: clamp(1.4rem, 3.5vw, 2.4rem); margin-top: 16px; }
-  .tb-screen-stage iframe { width: 100%; aspect-ratio: 16/9; border: 0; background: #000; border-radius: 12px; }
-  .tb-screen-stage li { font-size: clamp(1.3rem, 3vw, 2rem); margin: 8px 0; }
-  .tb-wait { color: #64748b; font-size: 1.4rem; }
+  html, body.tb-screen-page {
+    height: 100%;
+    overflow: hidden;
+    padding: 0;
+    background: #0f172a;
+  }
+  body.tb-screen-page .tb-top,
+  body.tb-screen-page .tb-blank-btn,
+  body.tb-screen-page #tb-blank { display: none; }
+  body.tb-screen-page .tb-main {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    height: 100%;
+  }
+  .tb-screen { position: fixed; inset: 0; background: #0f172a; color: #f8fafc; }
+  .tb-screen-stage { position: absolute; inset: 0; overflow: auto; }
+  .tb-screen.is-video .tb-screen-stage { overflow: hidden; background: #000; }
+  .tb-screen-stage iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: #000;
+  }
+  .tb-screen-bar {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    z-index: 5;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 4px;
+    max-width: min(100% - 16px, 28rem);
+    padding: 3px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(148, 163, 184, 0.28);
+  }
+  .tb-screen.is-video .tb-screen-bar { bottom: 52px; }
+  .tb-screen-bar button {
+    min-height: 0;
+    min-width: 0;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    background: rgba(51, 65, 85, 0.72);
+    color: #e2e8f0;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.3;
+    cursor: pointer;
+  }
+  .tb-screen-bar button.is-on {
+    background: #0e7490;
+    color: #fff;
+    border-color: rgba(45, 212, 191, 0.45);
+  }
+  .tb-screen-copy {
+    padding: clamp(16px, 3vw, 40px);
+  }
+  .tb-screen-copy h2 { margin: 0 0 12px; font-size: clamp(1.4rem, 3vw, 2.2rem); }
+  .tb-screen-copy .tb-q { font-size: clamp(1.6rem, 4.2vw, 3rem); line-height: 1.35; font-weight: 700; }
+  .tb-screen-copy .tb-a { font-size: clamp(1.2rem, 2.8vw, 2rem); margin-top: 16px; }
+  .tb-vocab {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: clamp(1rem, 2.2vw, 1.7rem);
+  }
+  .tb-vocab th, .tb-vocab td {
+    text-align: left;
+    vertical-align: top;
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid rgba(51, 65, 85, 0.7);
+  }
+  .tb-vocab th {
+    font-size: 0.55em;
+    letter-spacing: 0.06em;
+    color: rgba(148, 163, 184, 0.9);
+  }
+  .tb-vocab .word { color: #fbbf24; font-weight: 700; white-space: nowrap; }
+  .tb-wait { color: #94a3b8; font-size: 1.3rem; }
+  #screen-status {
+    position: absolute;
+    left: 12px;
+    bottom: 12px;
+    z-index: 5;
+    margin: 0;
+    font-size: 12px;
+    color: rgba(226, 232, 240, 0.75);
+  }
 </style>
 {% endblock %}
 {% block body %}
-<section class="tb-screen" id="cnn10-screen" data-archive="{{ archive_id }}">
-  <div class="tb-screen-bar" id="screen-controls">
-    <button class="tb-btn is-on" type="button" data-view="video">動画</button>
-    <button class="tb-btn" type="button" data-view="vocab">語彙</button>
-    <button class="tb-btn" type="button" data-view="warmup">ウォームアップ</button>
-    <button class="tb-btn" type="button" data-view="discussion">ディスカッション</button>
-    <button class="tb-btn" type="button" data-view="writing">書く</button>
-  </div>
-  <p class="tb-muted" id="screen-status"></p>
+<section class="tb-screen is-video" id="cnn10-screen" data-archive="{{ archive_id }}">
   <div class="tb-screen-stage" id="screen-stage"></div>
+  <p id="screen-status"></p>
+  <div class="tb-screen-bar" id="screen-controls">
+    <button type="button" data-view="video">動画</button>
+    <button type="button" data-view="vocab">語彙</button>
+    <button type="button" data-view="warmup">ウォームアップ</button>
+    <button type="button" data-view="discussion">ディスカッション</button>
+    <button type="button" data-view="writing">書く</button>
+  </div>
 </section>
 {% endblock %}
 {% block scripts %}

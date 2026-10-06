@@ -12,15 +12,20 @@ def _model() -> str:
     return str(get_setting("generate_model") or "gpt-4o-mini")
 
 
-def _json_content(messages: list[dict]) -> dict:
+def _json_content(messages: list[dict], max_tokens: int = 2500) -> dict:
     data = chat_completions(
         model=_model(),
         messages=messages,
         temperature=0.4,
         timeout=GENERATE_TIMEOUT_SEC,
-        max_tokens=2500,
+        max_tokens=max_tokens,
     )
-    content = data["choices"][0]["message"]["content"]
+    content = str(data["choices"][0]["message"]["content"] or "").strip()
+    if content.startswith("```"):
+        content = content.split("\n", 1)[-1]
+        if content.endswith("```"):
+            content = content[:-3]
+        content = content.strip()
     return json.loads(content)
 
 
@@ -118,12 +123,56 @@ def extract_writing(script: str) -> list[dict]:
     return items[:4]
 
 
-def translate_script(script: str) -> str:
-    payload = _json_content([
+def translate_script(script: str) -> dict:
+    """原文の文と同じ件数・同じ順の和訳を返す。"""
+    from toolbox.services.script_align import split_script_units
+
+    units = split_script_units(script)
+    if not units:
+        return {"translation": "", "pairs": []}
+    numbered = "\n".join(f"{index}. {unit}" for index, unit in enumerate(units, start=1))
+    messages = [
         {
             "role": "system",
-            "content": "英語ニュース原稿を自然な日本語に訳す。JSON {\"translation\":\"...\"} のみ。",
+            "content": (
+                "あなたは、日本の高校の英語授業向けにニュース原稿を訳す翻訳者です。"
+                "番号付きの英語ユニットを、同じ順番・同じ件数で日本語に翻訳してください。"
+                "各ユニットは1文です。左右対訳で並べられるように、文の対応を崩さないでください。"
+                "前置き・解説・注釈は付けない。"
+                "出力は JSON オブジェクトのみ。キーは translations。"
+                "translations は文字列配列で、入力ユニットと同じ件数・同じ順番にする。"
+                "1つの英語ユニットに対して、対応する日本語を1つだけ入れる。"
+                "ニュースとして自然な日本語にする。固有名詞は一般的な日本語表記があればそれを使い、なければ英語のまま残す。"
+                "数字・日付・肩書は原文の情報を落とさない。"
+            ),
         },
-        {"role": "user", "content": script[:12000]},
-    ])
-    return str(payload.get("translation") or "").strip()
+        {
+            "role": "user",
+            "content": (
+                "次の英語ユニットを日本語に翻訳してください。\n"
+                f"translations 配列は必ず {len(units)} 件にしてください。\n\n"
+                '{"translations": ["日本語1", "日本語2"]}\n\n'
+                f"--- English units ---\n{numbered}\n--- End ---\n"
+            ),
+        },
+    ]
+    payload = _json_content(messages, max_tokens=6000)
+    translations = payload.get("translations")
+    if not isinstance(translations, list):
+        translations = []
+    translations = [str(item or "").strip() for item in translations]
+    if len(translations) != len(units):
+        messages.append({"role": "assistant", "content": json.dumps({"translations": translations}, ensure_ascii=False)})
+        messages.append({
+            "role": "user",
+            "content": f"前回は {len(translations)} 件でした。必ず {len(units)} 件にしてください。",
+        })
+        payload = _json_content(messages, max_tokens=6000)
+        translations = payload.get("translations")
+        if not isinstance(translations, list):
+            translations = []
+        translations = [str(item or "").strip() for item in translations]
+    if len(translations) != len(units):
+        raise RuntimeError("AI が原文と同じ件数の和訳を返しませんでした。再試行してください。")
+    pairs = [{"en": en, "ja": ja} for en, ja in zip(units, translations)]
+    return {"translation": "\n".join(translations), "pairs": pairs}

@@ -18,6 +18,7 @@ EMPTY = {
     "end": "",
     "script": "",
     "translation": "",
+    "pairs": [],
     "vocabulary": [],
     "warmup": [],
     "discussion": [],

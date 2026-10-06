@@ -80,53 +80,101 @@
   function renderAssist(lesson) {
     currentLesson = lesson || {};
     preview.innerHTML = "";
-    if (lesson.translation) {
+    if (lesson.translation || (lesson.pairs || []).length) {
       const block = document.createElement("div");
-      block.innerHTML = `<h3>和訳</h3><p>${esc(lesson.translation)}</p>`;
+      const pairs = (lesson.pairs || []).filter((row) => row && (row.en || row.ja));
+      const rows = pairs.length
+        ? pairs.map((row) => `<tr><td>${esc(row.en)}</td><td>${esc(row.ja)}</td></tr>`).join("")
+        : String(lesson.translation).split(/\n+/).filter(Boolean).map((line) => `<tr><td></td><td>${esc(line)}</td></tr>`).join("");
+      block.innerHTML = `<h3>和訳</h3><table class="tb-align"><thead><tr><th>英文</th><th>和訳</th></tr></thead><tbody>${rows}</tbody></table>`;
       preview.appendChild(block);
     }
-    function listBlock(title, key, line) {
+    function bindCheck(box, item, label, items, heading, title, key) {
+      box.addEventListener("change", () => {
+        item.selected = box.checked;
+        label.style.opacity = box.checked ? "" : "0.5";
+        heading.textContent = `${title}（${items.filter((row) => row.selected !== false).length} / ${items.length}）`;
+        saveLesson({ [key]: items }).catch((err) => {
+          assistStatus.textContent = err.message;
+        });
+      });
+    }
+
+    function tableBlock(title, key, headers, cellsFor) {
       const items = lesson[key] || [];
       if (!items.length) return;
       const wrap = document.createElement("div");
       const heading = document.createElement("h3");
-      const selected = items.filter((item) => item.selected !== false).length;
-      heading.textContent = `${title}（${selected} / ${items.length}）`;
-      wrap.appendChild(heading);
-      items.forEach((item, index) => {
-        const label = document.createElement("label");
-        label.className = "tb-check";
-        if (item.selected === false) label.style.opacity = "0.5";
+      heading.textContent = `${title}（${items.filter((item) => item.selected !== false).length} / ${items.length}）`;
+      const table = document.createElement("table");
+      table.className = "tb-align tb-align-check";
+      table.innerHTML = `<thead><tr><th></th>${headers.map((name) => `<th>${esc(name)}</th>`).join("")}</tr></thead>`;
+      const body = document.createElement("tbody");
+      items.forEach((item) => {
+        const row = document.createElement("tr");
+        if (item.selected === false) row.style.opacity = "0.5";
+        const checkCell = document.createElement("td");
         const box = document.createElement("input");
         box.type = "checkbox";
         box.checked = item.selected !== false;
-        box.addEventListener("change", () => {
-          item.selected = box.checked;
-          label.style.opacity = box.checked ? "" : "0.5";
-          heading.textContent = `${title}（${items.filter((row) => row.selected !== false).length} / ${items.length}）`;
-          saveLesson({ [key]: items }).catch((err) => {
-            assistStatus.textContent = err.message;
-          });
+        bindCheck(box, item, row, items, heading, title, key);
+        checkCell.appendChild(box);
+        row.appendChild(checkCell);
+        cellsFor(item).forEach((value) => {
+          const cell = document.createElement("td");
+          cell.textContent = value || "";
+          row.appendChild(cell);
         });
-        const span = document.createElement("span");
-        span.innerHTML = line(item);
-        label.append(box, span);
-        wrap.appendChild(label);
+        body.appendChild(row);
       });
+      table.appendChild(body);
+      wrap.append(heading, table);
       preview.appendChild(wrap);
     }
-    listBlock("語彙", "vocabulary", (item) =>
-      `<strong>${esc(item.word)}</strong> ${esc(item.part_of_speech || item.pos || "")} ${esc(item.cefr || "")} — ${esc(item.meaning || "")}`
-    );
-    listBlock("ウォームアップ", "warmup", (item) =>
-      `${esc(item.text || item.q)} <span class="tb-muted">${esc(item.answer || item.a || "")}</span>`
-    );
-    listBlock("ディスカッション", "discussion", (item) =>
-      `${esc(item.text || item.q)} <span class="tb-muted">${esc(item.answer || item.a || "")}</span>`
-    );
-    listBlock("書く", "writing", (item) =>
-      `${esc(item.text)}${item.text_ja ? ` <span class="tb-muted">${esc(item.text_ja)}</span>` : ""}`
-    );
+
+    function qaBlock(title, key) {
+      const items = lesson[key] || [];
+      if (!items.length) return;
+      const wrap = document.createElement("div");
+      const heading = document.createElement("h3");
+      heading.textContent = `${title}（${items.filter((item) => item.selected !== false).length} / ${items.length}）`;
+      const table = document.createElement("table");
+      table.className = "tb-align tb-align-check";
+      table.innerHTML = "<thead><tr><th></th><th>質問</th><th>答え</th></tr></thead>";
+      const body = document.createElement("tbody");
+      items.forEach((item) => {
+        const row = document.createElement("tr");
+        if (item.selected === false) row.style.opacity = "0.5";
+        const checkCell = document.createElement("td");
+        const box = document.createElement("input");
+        box.type = "checkbox";
+        box.checked = item.selected !== false;
+        bindCheck(box, item, row, items, heading, title, key);
+        checkCell.appendChild(box);
+        const q = document.createElement("td");
+        q.textContent = item.text || item.q || "";
+        const a = document.createElement("td");
+        a.textContent = item.answer || item.a || "";
+        row.append(checkCell, q, a);
+        body.appendChild(row);
+      });
+      table.appendChild(body);
+      wrap.append(heading, table);
+      preview.appendChild(wrap);
+    }
+    tableBlock("語彙", "vocabulary", ["単語・熟語", "品詞", "CEFR", "意味"], (item) => [
+      item.word,
+      item.part_of_speech || item.pos || "",
+      item.cefr || "",
+      item.meaning || "",
+    ]);
+    qaBlock("ウォームアップ", "warmup");
+    qaBlock("ディスカッション", "discussion");
+    tableBlock("書く", "writing", ["話題", "和訳", "選択肢"], (item) => [
+      item.text,
+      item.text_ja || "",
+      (item.options || []).filter(Boolean).join(" / "),
+    ]);
   }
 
   function renderArchives(rows) {
@@ -577,6 +625,7 @@
         body: JSON.stringify({
           ...lessonPayload(),
           translation: currentLesson.translation || "",
+          pairs: currentLesson.pairs || [],
           vocabulary: currentLesson.vocabulary || [],
           warmup: currentLesson.warmup || [],
           discussion: currentLesson.discussion || [],

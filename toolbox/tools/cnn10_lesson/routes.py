@@ -193,7 +193,11 @@ def register(bp):
                 lesson_name=str(payload.get("lesson_name") or lesson.get("lesson_name") or ""),
                 title=str(payload.get("title") or lesson.get("title") or ""),
                 script=script,
-                pairs=translation_rows(script, translation, payload.get("pairs")),
+                pairs=translation_rows(
+                    script,
+                    translation,
+                    payload.get("pairs") if isinstance(payload.get("pairs"), list) else lesson.get("pairs"),
+                ),
                 vocabulary=chosen(vocabulary, "word"),
                 warmup_questions=chosen(warmup),
                 postview_questions=chosen(discussion),
@@ -228,7 +232,7 @@ def register(bp):
             elif kind in {"warmup", "discussion"}:
                 result = {kind: extract_questions(script, kind)}
             elif kind == "translation":
-                result = {"translation": translate_script(script)}
+                result = translate_script(script)
             elif kind == "writing":
                 result = {"writing": extract_writing(script)}
             else:
