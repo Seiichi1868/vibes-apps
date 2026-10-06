@@ -614,6 +614,25 @@ h1, h2, h3 { margin: 0 0 12px; }
 }
 .tb-save-fixed:disabled { cursor: default; opacity: 0.8; }
 
+.tb-save-toast {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 75;
+  padding: 18px 32px;
+  border-radius: 16px;
+  background: var(--tb-accent);
+  color: #fff;
+  font-size: 1.15rem;
+  font-weight: 700;
+  box-shadow: var(--tb-shadow);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+.tb-save-toast.is-show { opacity: 1; }
+
 .tb-live-box {
   max-height: 9em;
   overflow-y: auto;

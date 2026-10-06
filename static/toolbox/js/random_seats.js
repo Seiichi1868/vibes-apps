@@ -31,16 +31,28 @@
     }
   }
 
+  let saveToastTimer = 0;
+
+  function showSaveToast() {
+    let el = document.getElementById("tb-save-toast");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "tb-save-toast";
+      el.className = "tb-save-toast";
+      el.setAttribute("role", "status");
+      el.setAttribute("aria-live", "polite");
+      el.textContent = "保存しました";
+      document.body.appendChild(el);
+    }
+    el.classList.add("is-show");
+    window.clearTimeout(saveToastTimer);
+    saveToastTimer = window.setTimeout(() => el.classList.remove("is-show"), 1600);
+  }
+
   function writeRooms(confirmSave) {
     classes = window.ToolboxClasses.save(classes);
     if (activeId) localStorage.setItem(LAST_KEY, activeId);
-    if (!confirmSave) return;
-    const btn = document.getElementById("tb-room-save");
-    if (!btn) return;
-    btn.textContent = "保存しました";
-    window.setTimeout(() => {
-      if (btn.textContent === "保存しました") btn.textContent = "保存";
-    }, 1200);
+    if (confirmSave) showSaveToast();
   }
 
   function cloneRoom(row, id, name) {
@@ -278,7 +290,7 @@
   });
 
   document.getElementById("tb-room-save").addEventListener("click", () => {
-    writeRooms();
+    writeRooms(true);
   });
 
   function promptClass(existing) {
