@@ -44,57 +44,70 @@
     return out;
   }
 
-  function qaShell(label, top, bottom) {
-    return `<div class="tb-qa"><p class="tb-qa-label">${esc(label)}</p><div class="tb-qa-top">${top}</div><div class="tb-qa-bottom">${bottom}</div></div>`;
+  function questionFontSize() {
+    return "clamp(2.15rem, 6.8vmin, 5.6rem)";
   }
 
-  function renderQuestion(kind, label) {
+  function qaFrame(heading, body, hint, size) {
+    const fontSize = size || questionFontSize();
+    return `<div class="screen-view--warmup"><div class="screen-warmup-inner" style="--warmup-q-size:${fontSize}"><p class="screen-warmup-heading">${esc(heading)}</p>${body}<p class="screen-postview-hint">${esc(hint)}</p></div></div>`;
+  }
+
+  function renderQuestion(kind, heading) {
     const list = visible(lesson[kind]);
     const steps = pieces(list);
     const step = reveal[kind] || 0;
     if (!list.length) {
-      stage.innerHTML = qaShell(label, `<p class="tb-qa-hint">No questions yet.</p>`, "");
+      stage.innerHTML = qaFrame(heading, `<p class="screen-qa-waiting">No questions yet.</p>`, "");
       statusEl.textContent = "";
       return;
     }
+    const hint = `Down for next, up to go back (${Math.min(step, steps.length)}/${steps.length})`;
     if (step <= 0) {
-      stage.innerHTML = qaShell(label, `<p class="tb-qa-hint">Click or press down.</p>`, "");
-      statusEl.textContent = `0 / ${steps.length}`;
+      stage.innerHTML = qaFrame(heading, `<p class="screen-qa-waiting">Click or press down to show a question</p>`, hint);
+      statusEl.textContent = "";
       return;
     }
     const piece = steps[Math.min(step, steps.length) - 1];
     const item = list[piece.index];
-    const question = `<p class="tb-qa-text">Q${piece.index + 1}. ${esc(item.text || item.q)}</p>`;
-    const answer = piece.kind === "answer"
-      ? `<p class="tb-qa-text">A. ${esc(item.answer || item.a || "")}</p>`
-      : "";
-    stage.innerHTML = qaShell(label, question, answer);
-    statusEl.textContent = `${Math.min(step, steps.length)} / ${steps.length}`;
+    let body = `<div class="screen-qa-current"><div class="screen-warmup-q"><span class="screen-warmup-num">Q${piece.index + 1}.</span><span class="screen-warmup-text">${esc(item.text || item.q)}</span></div>`;
+    if (piece.kind === "answer") {
+      body += `<p class="screen-postview-answer"><span class="screen-postview-answer-label">A.</span>${esc(item.answer || item.a || "")}</p>`;
+    }
+    body += "</div>";
+    stage.innerHTML = qaFrame(heading, body, hint);
+    statusEl.textContent = "";
+  }
+
+  function writingOreo() {
+    return `<div class="screen-writing-oreo"><span class="screen-writing-oreo-step"><b>O</b>Opinion</span><span class="screen-writing-oreo-arrow">→</span><span class="screen-writing-oreo-step"><b>R</b>Reason</span><span class="screen-writing-oreo-arrow">→</span><span class="screen-writing-oreo-step"><b>E</b>Example</span><span class="screen-writing-oreo-arrow">→</span><span class="screen-writing-oreo-step"><b>O</b>Opinion</span><span class="screen-writing-oreo-words">about 100 words</span></div>`;
   }
 
   function renderWriting() {
     const list = visible(lesson.writing);
     const step = reveal.writing || 0;
+    const heading = "Write & speak (OREO, about 100 words)";
     if (!list.length) {
-      stage.innerHTML = qaShell("Writing", `<p class="tb-qa-hint">No topics yet.</p>`, "");
+      stage.innerHTML = qaFrame(heading, `<p class="screen-qa-waiting">No topics yet.</p>`, "", "clamp(2rem, 6.4vmin, 5.25rem)");
       statusEl.textContent = "";
       return;
     }
+    const hint = `Down for next, up to go back (${Math.min(step, list.length)}/${list.length})`;
     if (step <= 0) {
-      stage.innerHTML = qaShell("Writing", `<p class="tb-qa-hint">Click or press down.</p>`, "");
-      statusEl.textContent = `0 / ${list.length}`;
+      stage.innerHTML = qaFrame(heading, `<p class="screen-qa-waiting">Click or press down to show a topic</p>${writingOreo()}`, hint, "clamp(2rem, 6.4vmin, 5.25rem)");
+      statusEl.textContent = "";
       return;
     }
-    const topic = list[Math.min(step, list.length) - 1];
-    const question = `<p class="tb-qa-text">${esc(topic.text)}</p>`;
-    const lines = [];
+    const index = Math.min(step, list.length) - 1;
+    const topic = list[index];
+    let body = `<div class="screen-qa-current"><div class="screen-writing-item"><div class="screen-warmup-q"><span class="screen-warmup-num">T${index + 1}.</span><span class="screen-warmup-text">${esc(topic.text)}</span></div>`;
     if ((topic.options || []).length === 2) {
-      lines.push(`${esc(topic.options[0])} or ${esc(topic.options[1])}`);
+      body += `<div class="screen-writing-choices"><span class="screen-writing-choice">${esc(topic.options[0])}</span><span class="screen-writing-or">or</span><span class="screen-writing-choice">${esc(topic.options[1])}</span></div>`;
     }
-    if (topic.text_ja) lines.push(esc(topic.text_ja));
-    const below = lines.length ? `<p class="tb-qa-text">${lines.join("<br>")}</p>` : "";
-    stage.innerHTML = qaShell("Writing", question, below);
-    statusEl.textContent = `${Math.min(step, list.length)} / ${list.length}`;
+    if (topic.text_ja) body += `<p class="screen-writing-ja">${esc(topic.text_ja)}</p>`;
+    body += `</div></div>${writingOreo()}`;
+    stage.innerHTML = qaFrame(heading, body, hint, "clamp(2rem, 6.4vmin, 5.25rem)");
+    statusEl.textContent = "";
   }
 
   function render() {
@@ -131,8 +144,8 @@
       statusEl.textContent = "";
       return;
     }
-    if (view === "warmup") return renderQuestion("warmup", "Warm-up");
-    if (view === "discussion") return renderQuestion("discussion", "Discussion");
+    if (view === "warmup") return renderQuestion("warmup", "Think about this before watching");
+    if (view === "discussion") return renderQuestion("discussion", "Talk about this after watching");
     if (view === "writing") return renderWriting();
   }
 

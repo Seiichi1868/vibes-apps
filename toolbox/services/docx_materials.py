@@ -138,7 +138,7 @@ def _fill_cell(cell, text: str, *, header: bool = False, japanese: bool = False)
     paragraph.paragraph_format.space_before = Pt(0)
     paragraph.paragraph_format.space_after = Pt(0)
     paragraph.paragraph_format.line_spacing = 1.15
-    display = str(text or "").strip() or ("（和訳なし）" if japanese else "（原文なし）")
+    display = str(text or "").strip() or ("(no translation)" if japanese else "(no original)")
     run = paragraph.add_run(display)
     if header:
         _set_run_font(run, size_pt=10, bold=True, color=HEADER_JA_COLOR if japanese else HEADER_EN_COLOR)
@@ -181,8 +181,8 @@ def build_script_translation_docx(*, title: str = "", pairs: list[dict]) -> byte
     header_cells = table.rows[0].cells
     _set_cell_shading(header_cells[0], HEADER_FILL)
     _set_cell_shading(header_cells[1], HEADER_FILL)
-    _fill_cell(header_cells[0], "原文", header=True, japanese=False)
-    _fill_cell(header_cells[1], "和訳", header=True, japanese=True)
+    _fill_cell(header_cells[0], "English", header=True, japanese=False)
+    _fill_cell(header_cells[1], "Japanese", header=True, japanese=True)
     header_cells[0].width = col_width
     header_cells[1].width = col_width
 
@@ -226,8 +226,8 @@ def _add_translation_table(doc, pairs: list[dict], *, col_width: int) -> None:
     header_cells = table.rows[0].cells
     _set_cell_shading(header_cells[0], HEADER_FILL)
     _set_cell_shading(header_cells[1], HEADER_FILL)
-    _fill_cell(header_cells[0], "原文", header=True, japanese=False)
-    _fill_cell(header_cells[1], "和訳", header=True, japanese=True)
+    _fill_cell(header_cells[0], "English", header=True, japanese=False)
+    _fill_cell(header_cells[1], "Japanese", header=True, japanese=True)
     header_cells[0].width = col_width
     header_cells[1].width = col_width
 
@@ -244,7 +244,7 @@ def _add_vocab_table(doc, vocabulary: list[dict], *, col_widths: list[int]) -> N
     table.style = "Table Grid"
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.autofit = False
-    headers = ("単語・熟語", "品詞", "CEFR", "意味")
+    headers = ("Word / phrase", "Part of speech", "CEFR", "Meaning")
     header_cells = table.rows[0].cells
     for index, header in enumerate(headers):
         header_cells[index].width = col_widths[index]
@@ -380,10 +380,10 @@ def build_lesson_materials_docx(
         if name == "bilingual":
             _add_translation_table(doc, rows, col_width=col_width)
         elif name == "transcript":
-            _add_heading(doc, "文字起こし", first=first_section)
+            _add_heading(doc, "Transcript", first=first_section)
             _add_body_paragraph(doc, script_text)
         elif name == "translation":
-            _add_heading(doc, "和訳", first=first_section)
+            _add_heading(doc, "Translation", first=first_section)
             if rows:
                 for row in rows:
                     ja = str(row.get("ja") or "").strip()
@@ -392,7 +392,7 @@ def build_lesson_materials_docx(
             else:
                 _add_body_paragraph(doc, "")
         elif name == "vocabulary":
-            _add_heading(doc, "語彙補助", first=first_section)
+            _add_heading(doc, "Vocabulary", first=first_section)
             vocab_widths = [
                 int(usable_width * 0.28),
                 int(usable_width * 0.16),
@@ -401,10 +401,10 @@ def build_lesson_materials_docx(
             ]
             _add_vocab_table(doc, vocab_items, col_widths=vocab_widths)
         elif name == "warmup":
-            _add_heading(doc, "ウォームアップ", first=first_section)
+            _add_heading(doc, "Warm-up", first=first_section)
             _add_question_list(doc, warmup_items)
         elif name == "postview":
-            _add_heading(doc, "ディスカッション", first=first_section)
+            _add_heading(doc, "Discussion", first=first_section)
             _add_question_list(doc, postview_items)
         first_section = False
 
