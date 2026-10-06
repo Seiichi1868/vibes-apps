@@ -76,20 +76,25 @@
     const list = visible(lesson.writing);
     const step = reveal.writing || 0;
     if (!list.length) {
-      stage.innerHTML = "<div class='tb-screen-copy'><h2>書く</h2><p class='tb-wait'>まだありません。</p></div>";
+      stage.innerHTML = qaShell("Writing", `<p class="tb-qa-hint">No topics yet.</p>`, "");
       statusEl.textContent = "";
       return;
     }
     if (step <= 0) {
-      stage.innerHTML = "<div class='tb-screen-copy'><h2>書く</h2><p class='tb-wait'>クリックまたは ↓ で話題を表示します。</p><p>O Opinion → R Reason → E Example → O Opinion</p></div>";
-    } else {
-      const topic = list[Math.min(step, list.length) - 1];
-      const choices = (topic.options || []).length === 2
-        ? `<p>${esc(topic.options[0])} or ${esc(topic.options[1])}</p>`
-        : "<p>Your answer + Why?</p>";
-      stage.innerHTML = `<div class="tb-screen-copy"><h2>書く</h2><p class="tb-q">T${Math.min(step, list.length)}. ${esc(topic.text)}</p>${choices}${topic.text_ja ? `<p>${esc(topic.text_ja)}</p>` : ""}<p>O Opinion → R Reason → E Example → O Opinion</p></div>`;
+      stage.innerHTML = qaShell("Writing", `<p class="tb-qa-hint">Click or press down.</p>`, "");
+      statusEl.textContent = `0 / ${list.length}`;
+      return;
     }
-    statusEl.textContent = `${Math.min(step, list.length)} / ${list.length}　↑ で戻る`;
+    const topic = list[Math.min(step, list.length) - 1];
+    const question = `<p class="tb-qa-text">${esc(topic.text)}</p>`;
+    const lines = [];
+    if ((topic.options || []).length === 2) {
+      lines.push(`${esc(topic.options[0])} or ${esc(topic.options[1])}`);
+    }
+    if (topic.text_ja) lines.push(esc(topic.text_ja));
+    const below = lines.length ? `<p class="tb-qa-text">${lines.join("<br>")}</p>` : "";
+    stage.innerHTML = qaShell("Writing", question, below);
+    statusEl.textContent = `${Math.min(step, list.length)} / ${list.length}`;
   }
 
   function render() {

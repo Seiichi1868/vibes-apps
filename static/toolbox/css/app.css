@@ -84,6 +84,11 @@ h1, h2, h3 { margin: 0 0 12px; }
 }
 
 .tb-btn, .tb-presets button, .tb-tab, .tb-user-btn, .tb-blank-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1.2;
   min-height: var(--tb-tap);
   min-width: var(--tb-tap);
   padding: 0 16px;
@@ -92,6 +97,7 @@ h1, h2, h3 { margin: 0 0 12px; }
   background: #eef3e6;
   color: var(--tb-text);
   cursor: pointer;
+  text-decoration: none;
 }
 
 .tb-btn-primary { background: var(--tb-accent); color: #17300c; font-weight: 700; }
