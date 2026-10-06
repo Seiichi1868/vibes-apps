@@ -126,6 +126,7 @@ h1, h2, h3 { margin: 0 0 12px; }
 .tb-user:focus-within .tb-user-menu,
 .tb-user.is-open .tb-user-menu { display: block; }
 
+html.tb-skip-opening .tb-opening { display: none !important; }
 .tb-opening {
   position: fixed;
   inset: 0;

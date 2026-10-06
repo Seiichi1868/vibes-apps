@@ -1,5 +1,22 @@
 {% extends "toolbox/base.html" %}
 {% block title %}Toolbox{% endblock %}
+{% block head %}
+<script>
+  (function () {
+    var key = "tbOpeningAt";
+    var gapMs = 4 * 60 * 60 * 1000;
+    try {
+      var last = Number(localStorage.getItem(key) || 0);
+      var now = Date.now();
+      if (last && now - last < gapMs) {
+        document.documentElement.classList.add("tb-skip-opening");
+      } else {
+        localStorage.setItem(key, String(now));
+      }
+    } catch (_) {}
+  })();
+</script>
+{% endblock %}
 {% block body %}
 <div id="tb-opening" class="tb-opening" role="presentation">
   <span class="tb-opening-orb tb-opening-orb-l" aria-hidden="true"></span>

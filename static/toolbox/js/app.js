@@ -41,7 +41,10 @@
   }
 
   const opening = document.getElementById("tb-opening");
-  if (opening) {
+  if (opening && document.documentElement.classList.contains("tb-skip-opening")) {
+    opening.remove();
+    document.dispatchEvent(new CustomEvent("toolbox:opening-done"));
+  } else if (opening) {
     window.setTimeout(() => {
       opening.classList.add("is-hide");
       document.dispatchEvent(new CustomEvent("toolbox:opening-done"));
