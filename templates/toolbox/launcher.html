@@ -12,6 +12,16 @@
   </div>
 </div>
 <section class="tb-launcher">
+  <aside id="pwa-install-banner" class="pwa-banner" hidden role="region" aria-label="アプリのインストール">
+    <img class="pwa-banner__icon" src="{{ url_for('static', filename='toolbox/icons/icon-192x192.png') }}" alt="" width="40" height="40">
+    <div class="pwa-banner__text">
+      <strong>Toolboxをインストール</strong>
+      <span>ホーム画面から1タップで開けます</span>
+    </div>
+    <button id="pwa-install-btn" class="pwa-banner__btn" type="button">インストール</button>
+    <button id="pwa-install-dismiss" class="pwa-banner__close" type="button" aria-label="閉じる">×</button>
+  </aside>
+
   {% if favorites %}
   <h2>お気に入り</h2>
   <div class="tb-cards">
@@ -41,4 +51,20 @@
     {% endfor %}
   </div>
 </section>
+
+<dialog id="pwa-ios-dialog" class="pwa-dialog">
+  <h2>ホーム画面に追加する</h2>
+  <p class="pwa-dialog__inapp">いまのアプリ内ブラウザでは追加できません。<strong>Safari</strong>で開き直してください。</p>
+  <ol class="pwa-dialog__steps">
+    <li>Safariの<strong>共有ボタン</strong>（四角から上向きの矢印）をタップ</li>
+    <li><strong>「ホーム画面に追加」</strong>を選ぶ</li>
+    <li>右上の<strong>「追加」</strong>をタップ</li>
+  </ol>
+  <p class="pwa-dialog__note">iPadでは共有ボタンが画面上部にあります。</p>
+  <p class="pwa-dialog__other">ブラウザのメニューから「インストール」または「ホーム画面に追加」を選んでください。</p>
+  <button id="pwa-ios-close" type="button" class="pwa-banner__btn">閉じる</button>
+</dialog>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='toolbox/js/pwa-install.js', v=toolbox_cache) }}"></script>
 {% endblock %}

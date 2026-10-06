@@ -45,6 +45,8 @@ PUBLIC_ENDPOINTS = {
     "toolbox.admin_unlock",
     "toolbox.web_app_manifest",
     "toolbox.admin_web_app_manifest",
+    "toolbox.service_worker",
+    "toolbox.offline",
 }
 
 _STATIC_DIR = PROJECT_ROOT / "static" / "toolbox"
@@ -73,8 +75,27 @@ def _admin_path() -> bool:
     return path == "/toolbox/admin" or path.startswith("/toolbox/admin/")
 
 
+def _canonical_host_redirect():
+    """onrender.com で開いた Toolbox は正式ドメインへ送る。
+
+    オリジンが違うと、インストール済み PWA と localStorage が別物になる。
+    """
+    if request.method not in ("GET", "HEAD"):
+        return None
+    host = (request.host or "").split(":")[0].lower()
+    if not host.endswith(".onrender.com"):
+        return None
+    target = "https://vibes-lab.com" + request.full_path
+    if target.endswith("?"):
+        target = target[:-1]
+    return redirect(target, code=302)
+
+
 @main_bp.before_request
 def _before():
+    canonical = _canonical_host_redirect()
+    if canonical is not None:
+        return canonical
     load_request_user()
     if request.endpoint in PUBLIC_ENDPOINTS:
         return check_csrf()
@@ -183,6 +204,21 @@ def launcher_tools(user: dict) -> list[dict]:
         row["favorite"] = tool["id"] in favorites
         rows.append(row)
     return rows
+
+
+@main_bp.route("/sw.js")
+def service_worker():
+    """Service Worker。/toolbox/ を制御できるパスで配信する。"""
+    response = send_from_directory(_STATIC_DIR, "sw.js", mimetype="application/javascript")
+    response.headers["Content-Type"] = "application/javascript"
+    response.headers["Service-Worker-Allowed"] = "/toolbox/"
+    response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
+@main_bp.route("/offline")
+def offline():
+    return render_template("toolbox/offline.html")
 
 
 @main_bp.route("/manifest.json")

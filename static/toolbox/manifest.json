@@ -2,9 +2,12 @@
   "id": "/toolbox/",
   "name": "Toolbox",
   "short_name": "Toolbox",
+  "description": "授業中に使う教員向けツール集",
+  "lang": "ja",
   "start_url": "/toolbox/",
   "scope": "/toolbox/",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#7CB342",
   "theme_color": "#2E7D32",
   "icons": [

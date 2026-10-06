@@ -44,6 +44,7 @@
   if (opening) {
     window.setTimeout(() => {
       opening.classList.add("is-hide");
+      document.dispatchEvent(new CustomEvent("toolbox:opening-done"));
       window.setTimeout(() => opening.remove(), 320);
     }, 1950);
   }

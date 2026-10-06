@@ -2,13 +2,14 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block title %}Toolbox{% endblock %}</title>
   <link rel="manifest" href="{% block manifest_href %}{{ url_for('toolbox.web_app_manifest') }}{% endblock %}">
   <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='toolbox/icons/favicon-32x32.png') }}">
   <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='toolbox/icons/favicon-16x16.png') }}">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='toolbox/icons/apple-touch-icon.png') }}">
   <meta name="theme-color" content="#2E7D32">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="{% block pwa_short_name %}Toolbox{% endblock %}">
@@ -28,6 +29,7 @@
         <div class="tb-user-menu-inner">
         <a href="{{ url_for('toolbox.launcher') }}">トップ画面</a>
         <a href="{{ url_for('toolbox.launcher') }}">ユーザー画面</a>
+        <button id="pwa-menu-install" type="button" hidden>アプリとして追加</button>
         <a href="{{ url_for('toolbox.admin_page') }}">管理画面</a>
         {% if not is_guest %}
         <a href="{{ url_for('toolbox.change_password') }}">パスワード変更</a>
@@ -46,6 +48,13 @@
   </main>
   <button class="tb-blank-btn" type="button" id="tb-blank-btn" title="blank (B)">blank</button>
   <script>window.TOOLBOX_CSRF = {{ csrf_token|tojson }};</script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("/toolbox/sw.js", { scope: "/toolbox/" }).catch(function () {});
+      });
+    }
+  </script>
   <script src="{{ url_for('static', filename='toolbox/js/app.js', v=toolbox_cache) }}"></script>
   <script src="{{ url_for('static', filename='toolbox/js/display_mode.js', v=toolbox_cache) }}"></script>
   <script src="{{ url_for('static', filename='toolbox/js/audio_archive.js', v=toolbox_cache) }}"></script>
