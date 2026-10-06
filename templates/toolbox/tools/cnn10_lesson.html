@@ -1,0 +1,69 @@
+{% extends "toolbox/base.html" %}
+{% block title %}CNN10授業 · Toolbox{% endblock %}
+{% block body %}
+<section class="tb-admin">
+  <h1>CNN10授業</h1>
+  <p class="tb-note">Toolbox 専用の字幕取得です。News の字幕経路とは別です。</p>
+
+  <div class="tb-row-actions">
+    <button class="tb-btn tb-btn-primary" type="button" id="cnn10-open-btn">CNN10から動画を選ぶ</button>
+    <a class="tb-btn" id="cnn10-screen-link" href="{{ url_for('toolbox.cnn10_screen_page') }}" target="_blank" rel="noopener">教室スクリーンを開く</a>
+  </div>
+
+  <div id="cnn10-panel" class="tb-card" hidden>
+    <div class="tb-row-actions">
+      <strong>最近の CNN10</strong>
+      <button class="tb-btn" type="button" id="cnn10-close-btn">閉じる</button>
+    </div>
+    <p id="cnn10-message" class="tb-error" hidden></p>
+    <ul id="cnn10-list" class="tb-plain-list"></ul>
+    <button class="tb-btn" type="button" id="cnn10-more-btn" hidden>さらに古い動画を見る</button>
+  </div>
+
+  <form id="cnn10-form" class="tb-form">
+    <label>動画タイトル
+      <input id="lesson-title" name="title" value="{{ lesson.title }}">
+    </label>
+    <label>YouTube URL
+      <input id="youtube-url" name="url" required value="{{ lesson.url }}" placeholder="https://www.youtube.com/watch?v=">
+    </label>
+    <div class="tb-split">
+      <label>開始
+        <input id="start-time" name="start" value="{{ lesson.start or '0:00' }}" placeholder="0:00">
+      </label>
+      <label>終了
+        <input id="end-time" name="end" value="{{ lesson.end }}" placeholder="3:40">
+      </label>
+    </div>
+    <label>文字起こし
+      <textarea id="lesson-script" name="script" rows="10" required>{{ lesson.script }}</textarea>
+    </label>
+    <div class="tb-row-actions">
+      <button class="tb-btn tb-btn-primary" type="button" id="fetch-script-btn">この範囲の文字起こしを取得</button>
+      <button class="tb-btn" type="submit">設定を保存</button>
+      <span id="lesson-status" class="tb-muted"></span>
+    </div>
+  </form>
+
+  <h2>補助</h2>
+  <div class="tb-row-actions">
+    <label>語彙の最低レベル
+      <select id="vocab-min">
+        <option value="A2">A2以上</option>
+        <option value="B1" selected>B1以上</option>
+        <option value="B2">B2以上</option>
+      </select>
+    </label>
+    <button class="tb-btn" type="button" data-assist="vocab">語彙を作る</button>
+    <button class="tb-btn" type="button" data-assist="translation">和訳を作る</button>
+    <button class="tb-btn" type="button" data-assist="warmup">ウォームアップ</button>
+    <button class="tb-btn" type="button" data-assist="discussion">ディスカッション</button>
+  </div>
+  <p id="assist-status" class="tb-muted"></p>
+  <div id="assist-preview"></div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='toolbox/js/youtube-transcript.js', v=toolbox_cache) }}"></script>
+<script src="{{ url_for('static', filename='toolbox/js/cnn10_lesson.js', v=toolbox_cache) }}"></script>
+{% endblock %}

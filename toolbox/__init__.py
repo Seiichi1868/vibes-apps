@@ -7,9 +7,11 @@ def create_toolbox_blueprints() -> dict:
     from toolbox.tools.random_pick.routes import register as register_random_pick
     from toolbox.tools.random_seats.routes import register as register_random_seats
     from toolbox.tools.talk_check.routes import register as register_talk_check
+    from toolbox.tools.cnn10_lesson.routes import register as register_cnn10_lesson
     from toolbox.tools.timer.routes import register as register_timer
 
     register_timer(main_bp)
+    register_cnn10_lesson(main_bp)
     register_random_pick(main_bp)
     register_random_seats(main_bp)
     register_talk_check(main_bp)
