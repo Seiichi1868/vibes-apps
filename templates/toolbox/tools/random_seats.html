@@ -3,16 +3,19 @@
 {% block body %}
 <section class="tb-tool tb-stage-tool" data-display-root>
   <div class="tb-stage-chrome tb-stage-chrome-top">
-    <h1 class="tb-tool-title">ランダム座席表</h1>
-    <div class="tb-tabs" id="tb-room-tabs" role="tablist" aria-label="保存した教室"></div>
-    <div class="tb-inline-form">
-      <button class="tb-btn" type="button" id="tb-class-new">教室を追加</button>
-      <button class="tb-btn" type="button" id="tb-class-edit">名前と人数</button>
-      <button class="tb-btn" type="button" id="tb-class-dup">この配置を複製</button>
-      <button class="tb-btn" type="button" id="tb-class-del">このタブを削除</button>
-      <button class="tb-btn tb-btn-primary" type="button" id="tb-room-save">保存</button>
+    <div class="tb-stage-setup">
+      <h1 class="tb-tool-title">ランダム座席表</h1>
+      <div class="tb-tabs" id="tb-room-tabs" role="tablist" aria-label="保存した教室"></div>
+      <div class="tb-inline-form">
+        <button class="tb-btn" type="button" id="tb-class-new">教室を追加</button>
+        <button class="tb-btn" type="button" id="tb-class-edit">名前と人数</button>
+        <button class="tb-btn" type="button" id="tb-class-dup">この配置を複製</button>
+        <button class="tb-btn" type="button" id="tb-class-del">このタブを削除</button>
+        <button class="tb-btn tb-btn-primary" type="button" id="tb-room-save">保存</button>
+      </div>
+      <p class="tb-note">タブは自動で保存されます。「保存」でこの端末への保存を確認できます。複製したタブを開くと、その配置を修正できます。番号の席をタップしてから別の席をタップすると入れ替えられます。空席をタップすると使えない席になります。欠席は上の番号をタップ。席数は人数以上にしてください。</p>
     </div>
-    <p class="tb-note">タブは自動で保存されます。「保存」でこの端末への保存を確認できます。複製したタブを開くと、その配置を修正できます。番号の席をタップしてから別の席をタップすると入れ替えられます。空席をタップすると使えない席になります。欠席は上の番号をタップ。席数は人数以上にしてください。</p>
+    <div class="tb-stage-controls">
     <div id="tb-grid" class="tb-grid"></div>
     <div class="tb-inline-form">
       <label>行
@@ -24,6 +27,7 @@
       <button class="tb-btn tb-btn-primary" type="button" id="tb-shuffle">配置する</button>
       <button class="tb-btn" type="button" id="tb-clear">全リセット</button>
       <button class="tb-btn" type="button" data-display-enter>表示モード</button>
+    </div>
     </div>
   </div>
   <div class="tb-stage-main tb-seat-stage">

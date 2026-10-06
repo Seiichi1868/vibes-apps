@@ -3,17 +3,20 @@
 {% block body %}
 <section class="tb-tool tb-stage-tool" data-display-root>
   <div class="tb-stage-chrome tb-stage-chrome-top">
-    <h1 class="tb-tool-title">ランダム指名</h1>
-    <div class="tb-inline-form">
-      <label>クラス
-        <select id="tb-class"></select>
-      </label>
-      <button class="tb-btn" type="button" id="tb-class-new">新規</button>
-      <button class="tb-btn" type="button" id="tb-class-edit">編集</button>
-      <button class="tb-btn" type="button" id="tb-class-dup">複製</button>
-      <button class="tb-btn" type="button" id="tb-class-del">削除</button>
+    <div class="tb-stage-setup">
+      <h1 class="tb-tool-title">ランダム指名</h1>
+      <div class="tb-inline-form">
+        <label>クラス
+          <select id="tb-class"></select>
+        </label>
+        <button class="tb-btn" type="button" id="tb-class-new">新規</button>
+        <button class="tb-btn" type="button" id="tb-class-edit">編集</button>
+        <button class="tb-btn" type="button" id="tb-class-dup">複製</button>
+        <button class="tb-btn" type="button" id="tb-class-del">削除</button>
+      </div>
+      <p class="tb-note">クラスはこの端末に保存され、閉じたり更新したりしても残ります。座席のクラスとも共有されます。氏名は使いません。欠席はマスをタップ。</p>
     </div>
-    <p class="tb-note">クラスはこの端末に保存され、閉じたり更新したりしても残ります。座席のクラスとも共有されます。氏名は使いません。欠席はマスをタップ。</p>
+    <div class="tb-stage-controls">
     <div id="tb-grid" class="tb-grid"></div>
     <div class="tb-inline-form">
       <label>同時指名
@@ -27,6 +30,7 @@
       <button class="tb-btn" type="button" data-display-enter>表示モード</button>
     </div>
     <p class="tb-muted" id="tb-history">履歴: なし</p>
+    </div>
   </div>
   <div class="tb-stage-main">
     <p class="tb-pick-result" id="tb-result">—</p>

@@ -151,6 +151,82 @@ body.tb-display-on .tb-seat-cell {
   font-size: clamp(2rem, 8.5vmin, 5.5rem);
 }
 
+/* ランダム座席・指名: 設定タブと説明は非表示、操作部だけ薄くコンパクトに */
+body.tb-display-on .tb-stage-tool > .tb-stage-chrome {
+  opacity: 1;
+}
+
+body.tb-display-on .tb-stage-tool > .tb-stage-chrome:hover,
+body.tb-display-on .tb-stage-tool > .tb-stage-chrome:focus-within {
+  opacity: 1;
+}
+
+body.tb-display-on .tb-stage-tool .tb-stage-setup {
+  display: none !important;
+}
+
+body.tb-display-on .tb-stage-tool .tb-stage-controls {
+  opacity: 0.3;
+  margin: 0;
+  padding: 0;
+  gap: 2px;
+}
+
+body.tb-display-on .tb-stage-tool .tb-stage-controls:hover,
+body.tb-display-on .tb-stage-tool .tb-stage-controls:focus-within {
+  opacity: 0.55;
+}
+
+body.tb-display-on .tb-stage-tool .tb-stage-controls .tb-inline-form,
+body.tb-display-on .tb-stage-tool .tb-stage-controls .tb-grid {
+  margin: 2px 0;
+  gap: 3px;
+}
+
+body.tb-display-on .tb-stage-tool .tb-stage-controls .tb-grid {
+  grid-template-columns: repeat(auto-fill, minmax(26px, 1fr));
+}
+
+body.tb-display-on .tb-stage-tool .tb-stage-controls .tb-grid button {
+  min-height: 22px;
+  font-size: 0.62rem;
+}
+
+body.tb-display-on .tb-stage-tool .tb-stage-controls .tb-btn,
+body.tb-display-on .tb-stage-tool .tb-stage-controls .tb-inline-form button {
+  min-height: 22px;
+  min-width: 22px;
+  padding: 0 5px;
+  font-size: 0.62rem;
+}
+
+body.tb-display-on .tb-stage-tool .tb-stage-controls .tb-inline-form label {
+  font-size: 0.62rem;
+  gap: 2px;
+}
+
+body.tb-display-on .tb-stage-tool .tb-stage-controls .tb-inline-form input,
+body.tb-display-on .tb-stage-tool .tb-stage-controls .tb-inline-form select {
+  min-height: 22px;
+  padding: 2px 4px;
+  font-size: 0.62rem;
+}
+
+body.tb-display-on .tb-stage-tool .tb-stage-controls .tb-muted {
+  font-size: 0.62rem;
+  margin: 2px 0 0;
+}
+
+body.tb-display-on .tb-stage-tool .tb-stage-controls [data-display-enter] {
+  display: none;
+}
+
+body.tb-display-on .tb-stage-tool .tb-seat-edge {
+  opacity: 0.25;
+  font-size: 0.55rem;
+  margin: 0;
+}
+
 .tb-display-bar {
   position: fixed;
   left: 50%;
