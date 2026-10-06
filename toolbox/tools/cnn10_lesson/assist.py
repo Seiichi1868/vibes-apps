@@ -37,6 +37,7 @@ def extract_vocabulary(script: str, min_cefr: str = "B1") -> list[dict]:
                 "You extract classroom vocabulary for Japanese high school students. "
                 f"Return JSON {{\"vocabulary\":[{{\"word\",\"pos\",\"meaning\",\"cefr\"}}]}}. "
                 f"8 to 16 items at CEFR {min_cefr} or harder. Japanese meanings. "
+                "pos は学習者向けの日本語品詞名（名詞、動詞、形容詞、副詞、前置詞、接続詞、代名詞、句動詞、慣用句）にする。"
                 "Skip proper nouns. Include some phrasal verbs that appear in the script."
             ),
         },

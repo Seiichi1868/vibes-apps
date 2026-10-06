@@ -239,12 +239,53 @@ def _add_translation_table(doc, pairs: list[dict], *, col_width: int) -> None:
         _fill_cell(cells[1], row.get("ja") or "", japanese=True)
 
 
+_POS_JA = {
+    "n": "名詞",
+    "noun": "名詞",
+    "n.": "名詞",
+    "v": "動詞",
+    "verb": "動詞",
+    "v.": "動詞",
+    "adj": "形容詞",
+    "adjective": "形容詞",
+    "adj.": "形容詞",
+    "a": "形容詞",
+    "adv": "副詞",
+    "adverb": "副詞",
+    "adv.": "副詞",
+    "prep": "前置詞",
+    "preposition": "前置詞",
+    "prep.": "前置詞",
+    "conj": "接続詞",
+    "conjunction": "接続詞",
+    "pron": "代名詞",
+    "pronoun": "代名詞",
+    "phr v": "句動詞",
+    "phrasal verb": "句動詞",
+    "idiom": "慣用句",
+    "interj": "間投詞",
+    "det": "限定詞",
+    "article": "冠詞",
+    "aux": "助動詞",
+}
+
+
+def _pos_label(value: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    mapped = _POS_JA.get(text.lower().rstrip("."))
+    if mapped:
+        return mapped
+    return _POS_JA.get(text.lower(), text)
+
+
 def _add_vocab_table(doc, vocabulary: list[dict], *, col_widths: list[int]) -> None:
     table = doc.add_table(rows=1, cols=4)
     table.style = "Table Grid"
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.autofit = False
-    headers = ("Word / phrase", "Part of speech", "CEFR", "Meaning")
+    headers = ("Word / phrase", "品詞", "CEFR", "Meaning")
     header_cells = table.rows[0].cells
     for index, header in enumerate(headers):
         header_cells[index].width = col_widths[index]
@@ -255,7 +296,7 @@ def _add_vocab_table(doc, vocabulary: list[dict], *, col_widths: list[int]) -> N
         cells = table.add_row().cells
         values = (
             item.get("word") or "",
-            item.get("part_of_speech") or "",
+            _pos_label(item.get("part_of_speech") or item.get("pos") or ""),
             item.get("cefr") or "",
             item.get("meaning") or item.get("meaning_es") or "",
         )
@@ -363,14 +404,14 @@ def build_lesson_materials_docx(
         heading = doc.add_paragraph()
         heading.paragraph_format.space_after = Pt(2) if cleaned_title else Pt(10)
         heading_run = heading.add_run(cleaned_lesson_name)
-        _set_run_font(heading_run, size_pt=10, color=LESSON_NAME_COLOR)
+        _set_run_font(heading_run, size_pt=13, color=LESSON_NAME_COLOR)
 
     if cleaned_title:
         subtitle = doc.add_paragraph()
         subtitle.paragraph_format.space_before = Pt(0)
         subtitle.paragraph_format.space_after = Pt(12)
         subtitle_run = subtitle.add_run(cleaned_title)
-        _set_run_font(subtitle_run, size_pt=10, color=BODY_EN_COLOR)
+        _set_run_font(subtitle_run, size_pt=16, color=BODY_EN_COLOR)
 
     usable_width = int(section.page_width - section.left_margin - section.right_margin)
     col_width = usable_width // 2

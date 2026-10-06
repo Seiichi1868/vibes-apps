@@ -176,9 +176,9 @@
       item.cefr || "",
       item.meaning || "",
     ]);
-    qaBlock("ウォームアップ", "warmup");
-    qaBlock("ディスカッション", "discussion");
-    tableBlock("書く", "writing", ["話題", "和訳", "選択肢"], (item) => [
+    qaBlock("Warm-up", "warmup");
+    qaBlock("Discussion", "discussion");
+    tableBlock("Writing", "writing", ["話題", "和訳", "選択肢"], (item) => [
       item.text,
       item.text_ja || "",
       (item.options || []).filter(Boolean).join(" / "),

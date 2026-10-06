@@ -45,7 +45,7 @@
   }
 
   function questionFontSize() {
-    return "clamp(2.15rem, 6.8vmin, 5.6rem)";
+    return "clamp(0.95rem, 2vw, 1.5rem)";
   }
 
   function qaFrame(heading, body, hint, size) {
@@ -88,13 +88,13 @@
     const step = reveal.writing || 0;
     const heading = "Write & speak (OREO, about 100 words)";
     if (!list.length) {
-      stage.innerHTML = qaFrame(heading, `<p class="screen-qa-waiting">No topics yet.</p>`, "", "clamp(2rem, 6.4vmin, 5.25rem)");
+      stage.innerHTML = qaFrame(heading, `<p class="screen-qa-waiting">No topics yet.</p>`, "", "clamp(0.95rem, 2vw, 1.5rem)");
       statusEl.textContent = "";
       return;
     }
     const hint = `Down for next, up to go back (${Math.min(step, list.length)}/${list.length})`;
     if (step <= 0) {
-      stage.innerHTML = qaFrame(heading, `<p class="screen-qa-waiting">Click or press down to show a topic</p>${writingOreo()}`, hint, "clamp(2rem, 6.4vmin, 5.25rem)");
+      stage.innerHTML = qaFrame(heading, `<p class="screen-qa-waiting">Click or press down to show a topic</p>${writingOreo()}`, hint, "clamp(0.95rem, 2vw, 1.5rem)");
       statusEl.textContent = "";
       return;
     }
@@ -106,7 +106,7 @@
     }
     if (topic.text_ja) body += `<p class="screen-writing-ja">${esc(topic.text_ja)}</p>`;
     body += `</div></div>${writingOreo()}`;
-    stage.innerHTML = qaFrame(heading, body, hint, "clamp(2rem, 6.4vmin, 5.25rem)");
+    stage.innerHTML = qaFrame(heading, body, hint, "clamp(0.95rem, 2vw, 1.5rem)");
     statusEl.textContent = "";
   }
 
