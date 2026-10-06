@@ -80,6 +80,7 @@
     if (archiveName) body.title = body.title || archiveName;
     const data = await postJson("/toolbox/api/cnn10/lesson", body);
     if (!data.ok) throw new Error(data.error || "保存に失敗しました。");
+    renderAssist(data.lesson);
     return data.lesson;
   }
 

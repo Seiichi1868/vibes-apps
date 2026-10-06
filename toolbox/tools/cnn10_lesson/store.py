@@ -65,13 +65,46 @@ def load_lesson() -> dict:
     return _load_raw()["current"]
 
 
+def _sync_translation(current: dict, previous_script: str) -> None:
+    new_script = str(current.get("script") or "")
+    if re.sub(r"\s+", " ", new_script).strip() == re.sub(r"\s+", " ", previous_script).strip():
+        return
+    pairs = current.get("pairs") if isinstance(current.get("pairs"), list) else []
+    if not pairs and not str(current.get("translation") or "").strip():
+        return
+    from toolbox.services.script_align import sync_pairs_to_script
+    from toolbox.tools.cnn10_lesson.assist import translate_script
+
+    synced = sync_pairs_to_script(new_script, pairs)
+    if not synced:
+        return
+    kept = synced["pairs"]
+    indexes = synced["retranslate"]
+    if indexes:
+        snippet = " ".join(str(kept[index].get("en") or "") for index in indexes)
+        try:
+            fresh = translate_script(snippet).get("pairs") or []
+            if len(fresh) == len(indexes):
+                for index, pair in zip(indexes, fresh):
+                    kept[index]["ja"] = str(pair.get("ja") or "").strip()
+        except Exception:
+            pass
+    current["pairs"] = kept
+    current["translation"] = "\n".join(
+        str(row.get("ja") or "").strip() for row in kept if str(row.get("ja") or "").strip()
+    )
+
+
 def save_lesson(payload: dict) -> dict:
     data = _load_raw()
     current = data["current"]
+    previous_script = str(current.get("script") or "")
     if isinstance(payload, dict):
         for key in EMPTY:
             if key in payload:
                 current[key] = payload[key]
+        if "script" in payload:
+            _sync_translation(current, previous_script)
     data["current"] = _lesson(current)
     _save_raw(data)
     return data["current"]

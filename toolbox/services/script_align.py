@@ -180,6 +180,57 @@ def split_script_units(script: str) -> list[str]:
     return parts or [text]
 
 
+def _norm_text(text: str) -> str:
+    return re.sub(r"\s+", " ", str(text or "")).strip()
+
+
+def sync_pairs_to_script(script: str, pairs: list[dict]) -> dict | None:
+    """文字起こしの削除に合わせて、既存の対訳から消えた文を外す。
+
+    文が短くなった箇所は ja を空にして、呼び出し側で訳し直す。
+    変化がなければ None。
+    """
+    units = split_script_units(script)
+    old = [row for row in pairs if isinstance(row, dict)]
+    if not old:
+        return None
+    old_text = _norm_text(" ".join(str(row.get("en") or "") for row in old))
+    if _norm_text(script) == old_text:
+        return None
+    kept: list[dict] = []
+    cursor = 0
+    retranslate: list[int] = []
+    for unit in units:
+        normalized = _norm_text(unit)
+        hit = None
+        trimmed = False
+        for index in range(cursor, len(old)):
+            english = _norm_text(old[index].get("en"))
+            if not english:
+                continue
+            if english == normalized:
+                hit = index
+                break
+            if len(normalized) >= 12 and english.startswith(normalized):
+                hit = index
+                trimmed = True
+                break
+        if hit is None:
+            kept.append({"en": unit, "ja": ""})
+            retranslate.append(len(kept) - 1)
+            continue
+        if trimmed:
+            kept.append({"en": unit, "ja": ""})
+            retranslate.append(len(kept) - 1)
+        else:
+            kept.append({
+                "en": unit,
+                "ja": str(old[hit].get("ja") or old[hit].get("es") or "").strip(),
+            })
+        cursor = hit + 1
+    return {"pairs": kept, "retranslate": retranslate}
+
+
 def expand_sentence_aligned_rows(rows: list[dict]) -> list[dict]:
     """1行に複数文が入っている対訳を、文ごとに左右へ展開する。"""
     expanded: list[dict] = []
