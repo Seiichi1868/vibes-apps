@@ -143,7 +143,7 @@ def _fill_cell(cell, text: str, *, header: bool = False, japanese: bool = False)
     if header:
         _set_run_font(run, size_pt=10, bold=True, color=HEADER_JA_COLOR if japanese else HEADER_EN_COLOR)
     else:
-        _set_run_font(run, size_pt=11, color=BODY_JA_COLOR if japanese else BODY_EN_COLOR)
+        _set_run_font(run, size_pt=10, color=BODY_JA_COLOR if japanese else BODY_EN_COLOR)
 
 
 def build_script_translation_docx(*, title: str = "", pairs: list[dict]) -> bytes:
@@ -166,7 +166,7 @@ def build_script_translation_docx(*, title: str = "", pairs: list[dict]) -> byte
         heading = doc.add_paragraph()
         heading.paragraph_format.space_after = Pt(12)
         heading_run = heading.add_run(cleaned_title)
-        _set_run_font(heading_run, size_pt=14, color=BODY_EN_COLOR)
+        _set_run_font(heading_run, size_pt=10, color=BODY_EN_COLOR)
 
     table = doc.add_table(rows=1, cols=2)
     table.style = "Table Grid"
@@ -203,7 +203,7 @@ def _add_heading(doc, text: str, *, first: bool = False) -> None:
     heading.paragraph_format.space_before = Pt(0 if first else 14)
     heading.paragraph_format.space_after = Pt(6)
     run = heading.add_run(text)
-    _set_run_font(run, size_pt=14, bold=True, color=BODY_EN_COLOR)
+    _set_run_font(run, size_pt=10, bold=True, color=BODY_EN_COLOR)
 
 
 def _add_body_paragraph(doc, text: str) -> None:
@@ -212,7 +212,7 @@ def _add_body_paragraph(doc, text: str) -> None:
     paragraph.paragraph_format.space_after = Pt(6)
     paragraph.paragraph_format.line_spacing = 1.2
     run = paragraph.add_run(str(text or "").strip())
-    _set_run_font(run, size_pt=11, color=BODY_EN_COLOR)
+    _set_run_font(run, size_pt=10, color=BODY_EN_COLOR)
 
 
 def _add_translation_table(doc, pairs: list[dict], *, col_width: int) -> None:
@@ -276,9 +276,9 @@ def _add_question_list(doc, questions: list[dict]) -> None:
         paragraph.paragraph_format.space_after = Pt(1 if answer else 6)
         paragraph.paragraph_format.line_spacing = 1.25
         num_run = paragraph.add_run(f"Q{index}. ")
-        _set_run_font(num_run, size_pt=11, bold=True, color=HEADER_EN_COLOR)
+        _set_run_font(num_run, size_pt=10, bold=True, color=HEADER_EN_COLOR)
         text_run = paragraph.add_run(text)
-        _set_run_font(text_run, size_pt=11, color=BODY_EN_COLOR)
+        _set_run_font(text_run, size_pt=10, color=BODY_EN_COLOR)
         if not answer:
             continue
         answer_p = doc.add_paragraph()
@@ -363,14 +363,14 @@ def build_lesson_materials_docx(
         heading = doc.add_paragraph()
         heading.paragraph_format.space_after = Pt(2) if cleaned_title else Pt(10)
         heading_run = heading.add_run(cleaned_lesson_name)
-        _set_run_font(heading_run, size_pt=13, color=LESSON_NAME_COLOR)
+        _set_run_font(heading_run, size_pt=10, color=LESSON_NAME_COLOR)
 
     if cleaned_title:
         subtitle = doc.add_paragraph()
         subtitle.paragraph_format.space_before = Pt(0)
         subtitle.paragraph_format.space_after = Pt(12)
         subtitle_run = subtitle.add_run(cleaned_title)
-        _set_run_font(subtitle_run, size_pt=16, color=BODY_EN_COLOR)
+        _set_run_font(subtitle_run, size_pt=10, color=BODY_EN_COLOR)
 
     usable_width = int(section.page_width - section.left_margin - section.right_margin)
     col_width = usable_width // 2
