@@ -111,7 +111,7 @@
       if (end > start) params.set("end", String(end));
       if (lesson.subtitles !== false) params.set("cc_load_policy", "1");
       stage.innerHTML = id
-        ? `<iframe title="news talk" src="https://www.youtube.com/embed/${id}?${params}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`
+        ? `<iframe title="News Talk" src="https://www.youtube.com/embed/${id}?${params}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`
         : "<p class='tb-screen-copy'>動画 URL がありません。</p>";
       statusEl.textContent = "";
       return;

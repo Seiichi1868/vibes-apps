@@ -39,7 +39,7 @@ TOOLS: list[dict] = [
     },
     {
         "id": "cnn10",
-        "name": "news talk",
+        "name": "News Talk",
         "description": "動画を選び、文字起こしと語彙などの補助を教室スクリーンに出す。",
         "icon": "cnn10",
         "scene": "導入",

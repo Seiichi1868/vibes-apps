@@ -5,7 +5,13 @@
   const moreBtn = document.getElementById("cnn10-more-btn");
   const statusEl = document.getElementById("lesson-status");
   const assistStatus = document.getElementById("assist-status");
-  const preview = document.getElementById("assist-preview");
+  const previewHosts = {
+    translation: document.getElementById("preview-translation"),
+    vocabulary: document.getElementById("preview-vocab"),
+    warmup: document.getElementById("preview-warmup"),
+    discussion: document.getElementById("preview-discussion"),
+    writing: document.getElementById("preview-writing"),
+  };
   const archiveList = document.getElementById("archive-list");
   let offset = 0;
   let hasMore = false;
@@ -79,15 +85,17 @@
 
   function renderAssist(lesson) {
     currentLesson = lesson || {};
-    preview.innerHTML = "";
+    Object.values(previewHosts).forEach((host) => {
+      if (host) host.innerHTML = "";
+    });
     if (lesson.translation || (lesson.pairs || []).length) {
       const block = document.createElement("div");
       const pairs = (lesson.pairs || []).filter((row) => row && (row.en || row.ja));
       const rows = pairs.length
         ? pairs.map((row) => `<tr><td>${esc(row.en)}</td><td>${esc(row.ja)}</td></tr>`).join("")
         : String(lesson.translation).split(/\n+/).filter(Boolean).map((line) => `<tr><td></td><td>${esc(line)}</td></tr>`).join("");
-      block.innerHTML = `<h3>和訳</h3><table class="tb-align"><thead><tr><th>英文</th><th>和訳</th></tr></thead><tbody>${rows}</tbody></table>`;
-      preview.appendChild(block);
+      block.innerHTML = `<table class="tb-align"><thead><tr><th>英文</th><th>和訳</th></tr></thead><tbody>${rows}</tbody></table>`;
+      previewHosts.translation.appendChild(block);
     }
     function bindCheck(box, item, label, items, heading, title, key) {
       box.addEventListener("change", () => {
@@ -129,7 +137,7 @@
       });
       table.appendChild(body);
       wrap.append(heading, table);
-      preview.appendChild(wrap);
+      previewHosts[key].appendChild(wrap);
     }
 
     function qaBlock(title, key) {
@@ -160,7 +168,7 @@
       });
       table.appendChild(body);
       wrap.append(heading, table);
-      preview.appendChild(wrap);
+      previewHosts[key].appendChild(wrap);
     }
     tableBlock("語彙", "vocabulary", ["単語・熟語", "品詞", "CEFR", "意味"], (item) => [
       item.word,

@@ -86,7 +86,12 @@ def extract_questions(script: str, kind: str, avoid: list | None = None) -> list
             existing.append(text)
     count = 2 if existing else 3
     if kind == "warmup":
-        instruction = f"視聴前のウォームアップ質問を{count}つ。答えは短い英語の模範。"
+        instruction = (
+            f"視聴前の導入質問を{count}つ。生徒はこの動画をまだ見ていない。"
+            "テーマについて自分の経験や意見で答えられる、広い英語の質問にする。"
+            "原稿に出てくる具体的な出来事、人名・地名、数字、日付、結果は質問に入れない。"
+            "原稿の文や事実を言い換えない。答えは短い英語の例で、動画を見ていなくても成り立つもの。"
+        )
     else:
         instruction = f"視聴後のディスカッション質問を{count}つ。答えは短い英語の要点。"
     avoided = ""
