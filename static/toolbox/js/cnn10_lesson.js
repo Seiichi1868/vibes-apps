@@ -11,6 +11,7 @@
   let hasMore = false;
   let loading = false;
   let openRow = null;
+  let currentLesson = {};
 
   function postJson(url, body) {
     return fetch(url, {
@@ -77,25 +78,55 @@
   }
 
   function renderAssist(lesson) {
-    const bits = [];
-    if (lesson.translation) bits.push(`<h3>和訳</h3><p>${esc(lesson.translation)}</p>`);
-    if ((lesson.vocabulary || []).length) {
-      bits.push("<h3>語彙</h3><ul>" + lesson.vocabulary.map((item) =>
-        `<li><strong>${esc(item.word)}</strong> ${esc(item.pos || "")} ${esc(item.cefr || "")} — ${esc(item.meaning || "")}</li>`
-      ).join("") + "</ul>");
+    currentLesson = lesson || {};
+    preview.innerHTML = "";
+    if (lesson.translation) {
+      const block = document.createElement("div");
+      block.innerHTML = `<h3>和訳</h3><p>${esc(lesson.translation)}</p>`;
+      preview.appendChild(block);
     }
-    [["warmup", "ウォームアップ"], ["discussion", "ディスカッション"]].forEach(([key, label]) => {
-      if (!(lesson[key] || []).length) return;
-      bits.push(`<h3>${label}</h3><ol>` + lesson[key].map((item) =>
-        `<li>${esc(item.text || item.q)}<br><span class="tb-muted">${esc(item.answer || item.a || "")}</span></li>`
-      ).join("") + "</ol>");
-    });
-    if ((lesson.writing || []).length) {
-      bits.push("<h3>書く</h3><ol>" + lesson.writing.map((item) =>
-        `<li>${esc(item.text)}${item.text_ja ? `<br><span class="tb-muted">${esc(item.text_ja)}</span>` : ""}</li>`
-      ).join("") + "</ol>");
+    function listBlock(title, key, line) {
+      const items = lesson[key] || [];
+      if (!items.length) return;
+      const wrap = document.createElement("div");
+      const heading = document.createElement("h3");
+      const selected = items.filter((item) => item.selected !== false).length;
+      heading.textContent = `${title}（${selected} / ${items.length}）`;
+      wrap.appendChild(heading);
+      items.forEach((item, index) => {
+        const label = document.createElement("label");
+        label.className = "tb-check";
+        if (item.selected === false) label.style.opacity = "0.5";
+        const box = document.createElement("input");
+        box.type = "checkbox";
+        box.checked = item.selected !== false;
+        box.addEventListener("change", () => {
+          item.selected = box.checked;
+          label.style.opacity = box.checked ? "" : "0.5";
+          heading.textContent = `${title}（${items.filter((row) => row.selected !== false).length} / ${items.length}）`;
+          saveLesson({ [key]: items }).catch((err) => {
+            assistStatus.textContent = err.message;
+          });
+        });
+        const span = document.createElement("span");
+        span.innerHTML = line(item);
+        label.append(box, span);
+        wrap.appendChild(label);
+      });
+      preview.appendChild(wrap);
     }
-    preview.innerHTML = bits.join("");
+    listBlock("語彙", "vocabulary", (item) =>
+      `<strong>${esc(item.word)}</strong> ${esc(item.part_of_speech || item.pos || "")} ${esc(item.cefr || "")} — ${esc(item.meaning || "")}`
+    );
+    listBlock("ウォームアップ", "warmup", (item) =>
+      `${esc(item.text || item.q)} <span class="tb-muted">${esc(item.answer || item.a || "")}</span>`
+    );
+    listBlock("ディスカッション", "discussion", (item) =>
+      `${esc(item.text || item.q)} <span class="tb-muted">${esc(item.answer || item.a || "")}</span>`
+    );
+    listBlock("書く", "writing", (item) =>
+      `${esc(item.text)}${item.text_ja ? ` <span class="tb-muted">${esc(item.text_ja)}</span>` : ""}`
+    );
   }
 
   function renderArchives(rows) {
@@ -519,6 +550,66 @@
       moreBtn.textContent = "さらに古い動画を見る";
     }
   }
+
+  document.getElementById("export-materials-docx-btn").addEventListener("click", async () => {
+    const status = document.getElementById("export-materials-status");
+    const include = {
+      transcript: document.getElementById("export-include-transcript").checked,
+      translation: document.getElementById("export-include-translation").checked,
+      vocabulary: document.getElementById("export-include-vocab").checked,
+      warmup: document.getElementById("export-include-warmup").checked,
+      postview: document.getElementById("export-include-postview").checked,
+    };
+    if (!Object.values(include).some(Boolean)) {
+      status.textContent = "出力する項目を選んでください。";
+      return;
+    }
+    const btn = document.getElementById("export-materials-docx-btn");
+    btn.disabled = true;
+    status.textContent = "Word を作成しています…";
+    try {
+      const res = await fetch("/toolbox/api/cnn10/materials/docx", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": window.TOOLBOX_CSRF || "",
+        },
+        body: JSON.stringify({
+          ...lessonPayload(),
+          translation: currentLesson.translation || "",
+          vocabulary: currentLesson.vocabulary || [],
+          warmup: currentLesson.warmup || [],
+          discussion: currentLesson.discussion || [],
+          include,
+        }),
+      });
+      const contentType = res.headers.get("content-type") || "";
+      if (!res.ok || contentType.includes("application/json")) {
+        let message = "Word の作成に失敗しました。";
+        try {
+          const data = await res.json();
+          if (data.error) message = data.error;
+        } catch (_err) { /* ignore */ }
+        throw new Error(message);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const name = (document.getElementById("lesson-name").value || document.getElementById("lesson-title").value || "lesson_materials")
+        .replace(/[\\/:*?"<>|]+/g, " ").trim().slice(0, 40);
+      a.href = url;
+      a.download = name ? `${name}.docx` : "lesson_materials.docx";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      status.textContent = "Word をダウンロードしました。";
+    } catch (err) {
+      status.textContent = err.message;
+    } finally {
+      btn.disabled = false;
+    }
+  });
 
   document.getElementById("cnn10-open-btn").addEventListener("click", () => {
     panel.hidden = false;

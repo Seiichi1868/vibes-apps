@@ -30,6 +30,10 @@
     return match ? match[1] : "";
   }
 
+  function visible(list) {
+    return (list || []).filter((item) => item && item.selected !== false);
+  }
+
   function pieces(list) {
     const out = [];
     (list || []).forEach((item, index) => {
@@ -41,7 +45,7 @@
   }
 
   function renderQuestion(kind, heading) {
-    const list = lesson[kind] || [];
+    const list = visible(lesson[kind]);
     const steps = pieces(list);
     const step = reveal[kind] || 0;
     if (!list.length) {
@@ -63,7 +67,7 @@
   }
 
   function renderWriting() {
-    const list = lesson.writing || [];
+    const list = visible(lesson.writing);
     const step = reveal.writing || 0;
     if (!list.length) {
       stage.innerHTML = "<h2>書く</h2><p class='tb-wait'>まだありません。</p>";
@@ -106,7 +110,7 @@
       return;
     }
     if (view === "vocab") {
-      const items = lesson.vocabulary || [];
+      const items = visible(lesson.vocabulary);
       stage.innerHTML = "<h2>語彙</h2>" + (items.length
         ? "<ul>" + items.map((item) => `<li><strong>${esc(item.word)}</strong> ${esc(item.meaning || "")}</li>`).join("") + "</ul>"
         : "<p class='tb-wait'>まだありません。</p>");
@@ -120,10 +124,10 @@
 
   function move(delta) {
     if (view === "warmup" || view === "discussion") {
-      const max = pieces(lesson[view] || []).length;
+      const max = pieces(visible(lesson[view])).length;
       reveal[view] = Math.min(max, Math.max(0, (reveal[view] || 0) + delta));
     } else if (view === "writing") {
-      const max = (lesson.writing || []).length;
+      const max = visible(lesson.writing).length;
       reveal.writing = Math.min(max, Math.max(0, reveal.writing + delta));
     }
     render();

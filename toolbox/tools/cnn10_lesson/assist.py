@@ -47,9 +47,10 @@ def extract_vocabulary(script: str, min_cefr: str = "B1") -> list[dict]:
             continue
         cleaned.append({
             "word": word,
-            "pos": str(item.get("pos") or "").strip(),
+            "part_of_speech": str(item.get("part_of_speech") or item.get("pos") or "").strip(),
             "meaning": str(item.get("meaning") or "").strip(),
             "cefr": str(item.get("cefr") or min_cefr).strip(),
+            "selected": True,
         })
     return cleaned[:16]
 
@@ -65,6 +66,7 @@ def _qa_items(payload: dict) -> list[dict]:
         items.append({
             "text": text,
             "answer": str(item.get("answer") or item.get("a") or "").strip(),
+            "selected": True,
         })
     return items[:5]
 
@@ -111,6 +113,7 @@ def extract_writing(script: str) -> list[dict]:
             "text_ja": str(item.get("text_ja") or "").strip(),
             "kind": "opinion",
             "options": options[:2],
+            "selected": True,
         })
     return items[:4]
 

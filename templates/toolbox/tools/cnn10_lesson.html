@@ -95,7 +95,22 @@
     <button class="tb-btn" type="button" data-assist="writing">書く話題</button>
   </div>
   <p id="assist-status" class="tb-muted"></p>
+  <p class="tb-note">チェックを外した項目は、教室スクリーンと Word に出しません。</p>
   <div id="assist-preview"></div>
+
+  <h2>教材を Word で出力</h2>
+  <p class="tb-note">出力する項目を選んでください。</p>
+  <div class="tb-row-actions">
+    <label class="tb-check"><input type="checkbox" id="export-include-transcript" checked> 文字起こし</label>
+    <label class="tb-check"><input type="checkbox" id="export-include-translation" checked> 和訳</label>
+    <label class="tb-check"><input type="checkbox" id="export-include-vocab" checked> 語彙補助</label>
+    <label class="tb-check"><input type="checkbox" id="export-include-warmup" checked> ウォームアップ</label>
+    <label class="tb-check"><input type="checkbox" id="export-include-postview" checked> ディスカッション</label>
+  </div>
+  <div class="tb-row-actions">
+    <button class="tb-btn tb-btn-primary" type="button" id="export-materials-docx-btn">Wordで出力</button>
+    <span id="export-materials-status" class="tb-muted"></span>
+  </div>
 
   <h2>アーカイブ</h2>
   <p class="tb-note">「画面」はそのアーカイブを教室スクリーンに出します。授業設定に戻さなくても使えます。</p>

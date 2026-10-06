@@ -3,12 +3,15 @@ from __future__ import annotations
 
 import logging
 
-from flask import jsonify, render_template, request
+import io
+
+from flask import jsonify, render_template, request, send_file
 
 from toolbox.auth import login_required
 from toolbox.config import DEFAULT_GENERATE_MODEL, get_openai_api_key
 from toolbox.routes import tool_required
 from toolbox.services.cnn10 import fetch_cnn10_episodes
+from toolbox.services.docx_materials import build_lesson_materials_docx, translation_rows
 from toolbox.services.cnn10_highlight import find_title_segment_in_transcript
 from toolbox.storage import get_setting
 from toolbox.services.youtube_transcript import (
@@ -154,6 +157,61 @@ def register(bp):
         except LookupError as exc:
             return jsonify({"ok": False, "error": str(exc)}), 404
         return jsonify({"ok": True, "archives": list_archives()})
+
+    @bp.route("/api/cnn10/materials/docx", methods=["POST"])
+    @login_required
+    @tool_required("cnn10")
+    def cnn10_materials_docx():
+        payload = request.get_json(silent=True) or {}
+        lesson = load_lesson()
+        if isinstance(payload.get("lesson"), dict):
+            lesson = save_lesson(payload["lesson"])
+        include = payload.get("include") if isinstance(payload.get("include"), dict) else {}
+        script = str(payload.get("script") or lesson.get("script") or "").strip()
+        translation = str(payload.get("translation") or lesson.get("translation") or "").strip()
+        vocabulary = payload.get("vocabulary") if isinstance(payload.get("vocabulary"), list) else lesson.get("vocabulary")
+        warmup = payload.get("warmup") if isinstance(payload.get("warmup"), list) else lesson.get("warmup")
+        discussion = payload.get("discussion") if isinstance(payload.get("discussion"), list) else lesson.get("discussion")
+
+        def chosen(items, text_key="text"):
+            picked = []
+            for item in items or []:
+                if not isinstance(item, dict) or item.get("selected") is False:
+                    continue
+                if text_key == "word":
+                    if str(item.get("word") or "").strip():
+                        picked.append(item)
+                elif str(item.get("text") or item.get("q") or "").strip():
+                    picked.append({
+                        "text": str(item.get("text") or item.get("q") or "").strip(),
+                        "answer": str(item.get("answer") or item.get("a") or "").strip(),
+                    })
+            return picked
+
+        try:
+            content = build_lesson_materials_docx(
+                lesson_name=str(payload.get("lesson_name") or lesson.get("lesson_name") or ""),
+                title=str(payload.get("title") or lesson.get("title") or ""),
+                script=script,
+                pairs=translation_rows(script, translation, payload.get("pairs")),
+                vocabulary=chosen(vocabulary, "word"),
+                warmup_questions=chosen(warmup),
+                postview_questions=chosen(discussion),
+                include=include,
+            )
+        except ValueError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
+        except Exception as exc:
+            logger.exception("toolbox cnn10 docx failed")
+            return jsonify({"ok": False, "error": f"Word の作成に失敗しました: {exc}"}), 500
+        buf = io.BytesIO(content)
+        buf.seek(0)
+        return send_file(
+            buf,
+            as_attachment=True,
+            download_name="lesson_materials.docx",
+            mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
 
     @bp.route("/api/cnn10/assist", methods=["POST"])
     @login_required
