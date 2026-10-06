@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import time
 
-from flask import Blueprint, g, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, g, jsonify, redirect, render_template, request, send_from_directory, url_for
 
 from toolbox.auth import (
     admin_panel_ok,
@@ -39,7 +39,12 @@ from toolbox.storage import (
 
 main_bp = Blueprint("toolbox", __name__, url_prefix="/toolbox")
 
-PUBLIC_ENDPOINTS = {"toolbox.login", "toolbox.admin_page", "toolbox.admin_unlock"}
+PUBLIC_ENDPOINTS = {
+    "toolbox.login",
+    "toolbox.admin_page",
+    "toolbox.admin_unlock",
+    "toolbox.web_app_manifest",
+}
 
 _STATIC_DIR = PROJECT_ROOT / "static" / "toolbox"
 _static_version_cache: dict = {"at": 0.0, "value": "0"}
@@ -177,6 +182,18 @@ def launcher_tools(user: dict) -> list[dict]:
         row["favorite"] = tool["id"] in favorites
         rows.append(row)
     return rows
+
+
+@main_bp.route("/manifest.json")
+def web_app_manifest():
+    """PWA manifest（scope: /toolbox/）。application/manifest+json で配信する。"""
+    response = send_from_directory(
+        _STATIC_DIR,
+        "manifest.json",
+        mimetype="application/manifest+json",
+    )
+    response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return response
 
 
 @main_bp.route("/login", methods=["GET", "POST"])

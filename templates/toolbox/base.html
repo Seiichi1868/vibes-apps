@@ -4,7 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Toolbox{% endblock %}</title>
-  <meta name="theme-color" content="#7CB342">
+  <link rel="manifest" href="{{ url_for('toolbox.web_app_manifest') }}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='toolbox/icons/favicon-32x32.png') }}">
+  <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='toolbox/icons/favicon-16x16.png') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='toolbox/icons/apple-touch-icon.png') }}">
+  <meta name="theme-color" content="#2E7D32">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Toolbox">
   <link rel="stylesheet" href="{{ url_for('static', filename='toolbox/css/tokens.css', v=toolbox_cache) }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='toolbox/css/app.css', v=toolbox_cache) }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='toolbox/css/display_mode.css', v=toolbox_cache) }}">

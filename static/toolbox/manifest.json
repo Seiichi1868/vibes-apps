@@ -1,0 +1,29 @@
+{
+  "name": "Toolbox",
+  "short_name": "Toolbox",
+  "start_url": "/toolbox/",
+  "scope": "/toolbox/",
+  "display": "standalone",
+  "background_color": "#7CB342",
+  "theme_color": "#2E7D32",
+  "icons": [
+    {
+      "src": "/static/toolbox/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/toolbox/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/toolbox/icons/icon-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
