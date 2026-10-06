@@ -37,7 +37,7 @@ def web_app_manifest():
     return response
 
 
-@gtec_bp.route("/gtec")
+@gtec_bp.route("/gtec", strict_slashes=False)
 def index():
     settings = public_settings()
     return render_template(

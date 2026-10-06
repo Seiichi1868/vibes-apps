@@ -44,7 +44,7 @@ def web_app_manifest():
     return response
 
 
-@gtec_admin_bp.route("/gtec/admin")
+@gtec_admin_bp.route("/gtec/admin", strict_slashes=False)
 def admin_page():
     settings = load_settings()
     bg = resolve_background(settings.get("background_id"))
