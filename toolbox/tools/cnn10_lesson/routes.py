@@ -10,7 +10,16 @@ from flask import jsonify, render_template, request, send_file
 from toolbox.auth import login_required
 from toolbox.config import DEFAULT_GENERATE_MODEL, get_openai_api_key
 from toolbox.routes import tool_required
+from toolbox.openai_http import OpenAIHttpError
 from toolbox.services.cnn10 import fetch_cnn10_episodes
+from toolbox.services.cnn10_search import (
+    embedding_status,
+    library_status,
+    search_titles,
+    semantic_search,
+    start_embeddings,
+    start_library_update,
+)
 from toolbox.services.docx_materials import build_lesson_materials_docx, translation_rows
 from toolbox.services.cnn10_highlight import find_title_segment_in_transcript
 from toolbox.storage import get_setting
@@ -75,6 +84,60 @@ def register(bp):
             logger.exception("toolbox cnn10 episodes failed")
             return jsonify({"ok": False, "error": str(exc)}), 502
         return jsonify({"ok": True, **data})
+
+    @bp.route("/api/cnn10/library/status")
+    @login_required
+    @tool_required("cnn10")
+    def cnn10_library_status():
+        return jsonify({"ok": True, **library_status()})
+
+    @bp.route("/api/cnn10/library/update", methods=["POST"])
+    @login_required
+    @tool_required("cnn10")
+    def cnn10_library_update():
+        payload = request.get_json(silent=True) or {}
+        mode = "full" if payload.get("mode") == "full" else "diff"
+        return jsonify({"ok": True, **start_library_update(mode)})
+
+    @bp.route("/api/cnn10/library/search")
+    @login_required
+    @tool_required("cnn10")
+    def cnn10_library_search():
+        try:
+            limit = int(request.args.get("limit") or 50)
+        except ValueError:
+            limit = 50
+        return jsonify({"ok": True, **search_titles(request.args.get("q") or "", limit=limit)})
+
+    @bp.route("/api/cnn10/library/embeddings/status")
+    @login_required
+    @tool_required("cnn10")
+    def cnn10_embeddings_status():
+        return jsonify({"ok": True, **embedding_status()})
+
+    @bp.route("/api/cnn10/library/embeddings/init", methods=["POST"])
+    @login_required
+    @tool_required("cnn10")
+    def cnn10_embeddings_init():
+        try:
+            result = start_embeddings()
+        except OpenAIHttpError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
+        return jsonify({"ok": True, **result})
+
+    @bp.route("/api/cnn10/library/search/semantic")
+    @login_required
+    @tool_required("cnn10")
+    def cnn10_library_semantic():
+        try:
+            limit = int(request.args.get("limit") or 10)
+            since = int(request.args.get("since") or 0) or None
+        except ValueError:
+            limit, since = 10, None
+        try:
+            return jsonify({"ok": True, **semantic_search(request.args.get("q") or "", limit=limit, since_year=since)})
+        except OpenAIHttpError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
 
     @bp.route("/api/cnn10/highlight", methods=["POST"])
     @login_required

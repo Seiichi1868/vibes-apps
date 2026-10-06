@@ -30,6 +30,8 @@
   .tb-cnn10-banner { margin-bottom: 8px; padding: 8px; border: 1px solid #fcd34d; background: #fffbeb; border-radius: 8px; font-size: 12px; }
   .tb-cnn10-banner input[type="range"] { width: 100%; }
   .tb-cnn10-actions { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+  .tb-cnn10-search { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+  .tb-cnn10-search input[type="search"] { flex: 1; min-width: 12rem; min-height: 36px; padding: 4px 10px; border: 1px solid #d7e3d4; border-radius: 999px; }
   @media (max-width: 720px) { .tb-cnn10-row.is-open .tb-cnn10-preview { grid-template-columns: 1fr; } }
   .tb-archive { display: flex; gap: 12px; align-items: flex-start; list-style: none; margin: 0 0 12px; padding: 8px; border: 1px solid #e5efe4; border-radius: 10px; background: #fff; }
   .tb-archive-thumb { width: 160px; height: 90px; object-fit: cover; border-radius: 6px; background: #e2e8f0; flex: none; }
@@ -202,6 +204,14 @@
       </div>
       <button class="tb-btn" type="button" id="cnn10-close-btn">閉じる</button>
     </div>
+    <div class="tb-cnn10-search">
+      <input id="cnn10-search" type="search" placeholder="文字検索（例: Mars, election）" autocomplete="off">
+      <button class="tb-btn" type="button" id="cnn10-library-btn">一覧を取得</button>
+      <label class="tb-check"><input id="cnn10-ai-toggle" type="checkbox"> AI検索</label>
+      <button class="tb-btn" type="button" id="cnn10-ai-btn" hidden>AIで検索</button>
+      <button class="tb-btn" type="button" id="cnn10-ai-prep" hidden>AI検索を準備</button>
+    </div>
+    <p id="cnn10-search-status" class="tb-note"></p>
     <p id="cnn10-message" class="tb-error" hidden></p>
     <div id="cnn10-list"></div>
     <div class="tb-row-actions">

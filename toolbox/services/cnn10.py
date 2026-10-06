@@ -310,6 +310,13 @@ def _ensure_episode_count(required: int) -> None:
         _CACHE["fetched_at"] = time.time()
 
 
+def reset_episode_cache() -> None:
+    _CACHE["episodes"] = []
+    _CACHE["continuation"] = None
+    _CACHE["exhausted"] = False
+    _CACHE["fetched_at"] = 0.0
+
+
 def fetch_cnn10_episodes(offset: int = 0, limit: int = 10) -> dict:
     offset = max(0, int(offset or 0))
     limit = max(1, min(int(limit or 10), 30))

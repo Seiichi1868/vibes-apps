@@ -715,8 +715,152 @@
     }
   });
 
+  const searchInput = document.getElementById("cnn10-search");
+  const searchStatus = document.getElementById("cnn10-search-status");
+  const libraryBtn = document.getElementById("cnn10-library-btn");
+  const aiToggle = document.getElementById("cnn10-ai-toggle");
+  const aiBtn = document.getElementById("cnn10-ai-btn");
+  const aiPrep = document.getElementById("cnn10-ai-prep");
+  let searchTimer = null;
+  let libraryTimer = null;
+  let embedTimer = null;
+
+  function showSearchRows(episodes, summary) {
+    list.innerHTML = "";
+    openRow = null;
+    if (summary) {
+      const note = document.createElement("p");
+      note.className = "tb-note";
+      note.textContent = summary;
+      list.appendChild(note);
+    }
+    (episodes || []).forEach((episode) => list.appendChild(createRow(episode)));
+    moreBtn.hidden = true;
+  }
+
+  async function refreshLibraryStatus() {
+    const res = await fetch("/toolbox/api/cnn10/library/status");
+    const data = await res.json();
+    if (!data.ok) return;
+    const job = data.job || {};
+    libraryBtn.disabled = Boolean(data.running);
+    libraryBtn.textContent = data.running ? "取得中…" : (data.count ? "新着を取り込む" : "一覧を取得");
+    if (!aiToggle.checked) {
+      searchStatus.textContent = data.running
+        ? `取得中… ${job.pages || 0} ページ / ${job.added || 0} 本`
+        : (data.count ? `文字検索できる動画 ${data.count} 本` : "まだ一覧がありません。「一覧を取得」を押すと文字検索できます。");
+    }
+    if (data.running) {
+      libraryTimer = setTimeout(refreshLibraryStatus, 2000);
+    } else if (libraryTimer) {
+      clearTimeout(libraryTimer);
+      libraryTimer = null;
+    }
+  }
+
+  async function refreshEmbedStatus() {
+    const res = await fetch("/toolbox/api/cnn10/library/embeddings/status");
+    const data = await res.json();
+    if (!data.ok) return;
+    aiBtn.disabled = !data.ready || data.running;
+    aiPrep.hidden = !aiToggle.checked || data.running || (data.ready && !data.missing_count);
+    aiPrep.textContent = data.ready ? "未準備分を準備" : "AI検索を準備";
+    if (aiToggle.checked) {
+      searchStatus.textContent = data.running
+        ? "AI検索を準備しています…"
+        : (data.ready ? `AI検索の準備済み ${data.embedded_count} 本` : "AI検索はまだ準備されていません。");
+    }
+    if (data.running) embedTimer = setTimeout(refreshEmbedStatus, 2000);
+  }
+
+  async function runTextSearch() {
+    const query = searchInput.value.trim();
+    if (aiToggle.checked) return;
+    if (!query) {
+      loadEpisodes(true);
+      refreshLibraryStatus();
+      return;
+    }
+    const res = await fetch(`/toolbox/api/cnn10/library/search?q=${encodeURIComponent(query)}&limit=50`);
+    const data = await res.json();
+    if (!data.ok) {
+      searchStatus.textContent = data.error || "文字検索に失敗しました。";
+      return;
+    }
+    const episodes = data.episodes || [];
+    showSearchRows(episodes, episodes.length
+      ? `${data.total} 件ヒット${data.total > episodes.length ? `（${episodes.length} 件表示）` : ""}`
+      : "該当する動画がありません。");
+  }
+
+  async function runAiSearch() {
+    const query = searchInput.value.trim();
+    if (!query) {
+      searchStatus.textContent = "検索する文章を入力してください。";
+      return;
+    }
+    searchStatus.textContent = "AI検索中…";
+    const res = await fetch(`/toolbox/api/cnn10/library/search/semantic?q=${encodeURIComponent(query)}&limit=10`);
+    const data = await res.json();
+    if (!data.ok) {
+      searchStatus.textContent = data.error || "AI検索に失敗しました。";
+      return;
+    }
+    const episodes = (data.episodes || []).map((episode) => ({
+      ...episode,
+      published: [`類似度 ${Math.round((Number(episode.score) || 0) * 100)}%`, episode.published || ""].filter(Boolean).join(" · "),
+    }));
+    showSearchRows(episodes, episodes.length ? `AI検索の結果 ${episodes.length} 件` : "近い動画がありません。");
+  }
+
+  searchInput.addEventListener("input", () => {
+    if (aiToggle.checked) return;
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(runTextSearch, 300);
+  });
+  searchInput.addEventListener("keydown", (ev) => {
+    if (aiToggle.checked && ev.key === "Enter") {
+      ev.preventDefault();
+      runAiSearch();
+    }
+  });
+  libraryBtn.addEventListener("click", async () => {
+    const mode = libraryBtn.textContent.includes("新着") ? "diff" : "full";
+    libraryBtn.disabled = true;
+    const data = await postJson("/toolbox/api/cnn10/library/update", { mode });
+    if (!data.ok) {
+      searchStatus.textContent = data.error || "取得を開始できませんでした。";
+      libraryBtn.disabled = false;
+      return;
+    }
+    refreshLibraryStatus();
+  });
+  aiToggle.addEventListener("change", () => {
+    const on = aiToggle.checked;
+    aiBtn.hidden = !on;
+    aiPrep.hidden = !on;
+    searchInput.placeholder = on ? "AI検索（例: 健康診断の重要性）" : "文字検索（例: Mars, election）";
+    if (on) refreshEmbedStatus();
+    else {
+      aiPrep.hidden = true;
+      runTextSearch();
+    }
+  });
+  aiBtn.addEventListener("click", runAiSearch);
+  aiPrep.addEventListener("click", async () => {
+    aiPrep.disabled = true;
+    const data = await postJson("/toolbox/api/cnn10/library/embeddings/init", {});
+    aiPrep.disabled = false;
+    if (!data.ok) {
+      searchStatus.textContent = data.error || "準備を開始できませんでした。";
+      return;
+    }
+    refreshEmbedStatus();
+  });
+
   document.getElementById("cnn10-open-btn").addEventListener("click", () => {
     panel.hidden = false;
+    refreshLibraryStatus();
     if (!list.children.length) loadEpisodes(true);
   });
   document.getElementById("cnn10-close-btn").addEventListener("click", () => {
