@@ -508,6 +508,10 @@ h1, h2, h3 { margin: 0 0 12px; }
   border-radius: 12px;
   line-height: 1;
 }
+.tb-seat-cell.is-picked {
+  outline: 3px solid var(--tb-accent);
+  background: var(--tb-accent-light);
+}
 .tb-seat-cell.is-empty {
   background: #e8eedc;
   cursor: pointer;

@@ -3,6 +3,7 @@
   const LAST_KEY = "toolbox.random_seats.last.v1";
   let classes = [];
   let activeId = "";
+  let holdSeat = null;
   const tabs = document.getElementById("tb-room-tabs");
   const grid = document.getElementById("tb-grid");
   const board = document.getElementById("tb-seats");
@@ -30,9 +31,34 @@
     }
   }
 
-  function writeRooms() {
+  function writeRooms(confirmSave) {
     classes = window.ToolboxClasses.save(classes);
     if (activeId) localStorage.setItem(LAST_KEY, activeId);
+    if (!confirmSave) return;
+    const btn = document.getElementById("tb-room-save");
+    if (!btn) return;
+    btn.textContent = "保存しました";
+    window.setTimeout(() => {
+      if (btn.textContent === "保存しました") btn.textContent = "保存";
+    }, 1200);
+  }
+
+  function cloneRoom(row, id, name) {
+    return {
+      id: id,
+      name: name,
+      student_count: row.student_count,
+      absent: (row.absent || []).slice(),
+      seats: (row.seats || []).slice(),
+      rows: row.rows,
+      cols: row.cols,
+      blocked: (row.blocked || []).slice(),
+      pick: {
+        absent: ((row.pick || {}).absent || []).slice(),
+        picked: ((row.pick || {}).picked || []).slice(),
+        history: ((row.pick || {}).history || []).slice(),
+      },
+    };
   }
 
   function newId() {
@@ -128,22 +154,37 @@
       if (blocked) {
         cell.classList.add("is-blocked");
         cell.textContent = "";
-        cell.title = "使えない席。もう一度タップすると使えます";
+        cell.title = "使えない席。タップすると使えます";
       } else if (num) {
         cell.textContent = String(num);
-        cell.title = "タップすると使えない席にします";
+        cell.title = "タップしてから別の席をタップすると移動できます";
+        if (holdSeat === i) cell.classList.add("is-picked");
       } else {
         cell.classList.add("is-empty");
         cell.textContent = "";
-        cell.title = "タップすると使えない席にします";
+        cell.title = "番号を置ける席。空のままタップすると使えない席になります";
       }
       cell.addEventListener("click", () => {
+        if (!row) return;
         const next = stateOf();
         const set = new Set(next.blocked || []);
-        if (set.has(i)) set.delete(i);
-        else {
-          set.add(i);
-          if (Array.isArray(next.seats)) next.seats[i] = null;
+        if (!Array.isArray(next.seats)) next.seats = [];
+        if (set.has(i)) {
+          set.delete(i);
+          holdSeat = null;
+        } else if (holdSeat == null) {
+          if (next.seats[i]) holdSeat = i;
+          else {
+            set.add(i);
+          }
+        } else if (holdSeat === i) {
+          holdSeat = null;
+        } else {
+          const from = next.seats[holdSeat];
+          next.seats[holdSeat] = next.seats[i] || null;
+          next.seats[i] = from || null;
+          set.delete(i);
+          holdSeat = null;
         }
         next.blocked = Array.from(set);
         Object.assign(row, next);
@@ -227,11 +268,17 @@
     renderBoard();
   });
   tabs.addEventListener("click", (ev) => {
-    const id = ev.target && ev.target.dataset ? ev.target.dataset.room : "";
-    if (!id || id === activeId) return;
+    const button = ev.target.closest ? ev.target.closest("[data-room]") : null;
+    const id = button ? button.dataset.room : "";
+    if (!id) return;
     activeId = id;
-    writeRooms();
+    holdSeat = null;
+    localStorage.setItem(LAST_KEY, activeId);
     renderClasses();
+  });
+
+  document.getElementById("tb-room-save").addEventListener("click", () => {
+    writeRooms();
   });
 
   function promptClass(existing) {
@@ -272,12 +319,7 @@
   document.getElementById("tb-class-dup").addEventListener("click", () => {
     const row = currentClass();
     if (!row) return;
-    const copy = Object.assign({}, row, {
-      id: newId(),
-      name: `${row.name} のコピー`,
-      absent: (row.absent || []).slice(),
-      seats: (row.seats || []).slice(),
-    });
+    const copy = cloneRoom(row, newId(), `${row.name} のコピー`);
     classes.push(copy);
     activeId = copy.id;
     writeRooms();
