@@ -1,5 +1,5 @@
 {% extends "toolbox/base.html" %}
-{% block title %}CNN10スクリーン · Toolbox{% endblock %}
+{% block title %}news talk · Toolbox{% endblock %}
 {% block body_class %}tb-screen-page{% endblock %}
 {% block head %}
 <style>
@@ -67,8 +67,35 @@
     padding: clamp(16px, 3vw, 40px);
   }
   .tb-screen-copy h2 { margin: 0 0 12px; font-size: clamp(1.4rem, 3vw, 2.2rem); }
-  .tb-screen-copy .tb-q { font-size: clamp(1.6rem, 4.2vw, 3rem); line-height: 1.35; font-weight: 700; }
-  .tb-screen-copy .tb-a { font-size: clamp(1.2rem, 2.8vw, 2rem); margin-top: 16px; }
+  .tb-qa { position: absolute; inset: 0; }
+  .tb-qa-label {
+    position: absolute;
+    top: 8px;
+    left: 10px;
+    margin: 0;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: rgba(148, 163, 184, 0.75);
+  }
+  .tb-qa-top, .tb-qa-bottom {
+    position: absolute;
+    left: 8vw;
+    right: 8vw;
+    display: flex;
+    justify-content: center;
+  }
+  .tb-qa-top { bottom: 50%; padding-bottom: 0.2rem; align-items: flex-end; }
+  .tb-qa-bottom { top: 50%; padding-top: 0.2rem; align-items: flex-start; }
+  .tb-qa-text {
+    margin: 0;
+    max-width: 46rem;
+    font-size: 13px;
+    line-height: 1.35;
+    font-weight: 600;
+    text-align: center;
+  }
+  .tb-qa-hint { margin: 0; font-size: 11px; line-height: 1.4; color: #94a3b8; text-align: center; }
   .tb-vocab {
     width: 100%;
     border-collapse: collapse;
@@ -105,8 +132,8 @@
   <div class="tb-screen-bar" id="screen-controls">
     <button type="button" data-view="video">動画</button>
     <button type="button" data-view="vocab">語彙</button>
-    <button type="button" data-view="warmup">ウォームアップ</button>
-    <button type="button" data-view="discussion">ディスカッション</button>
+    <button type="button" data-view="warmup">Warm-up</button>
+    <button type="button" data-view="discussion">Discussion</button>
     <button type="button" data-view="writing">書く</button>
   </div>
 </section>

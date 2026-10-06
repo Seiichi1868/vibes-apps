@@ -1,5 +1,5 @@
 {% extends "toolbox/base.html" %}
-{% block title %}CNN10授業 · Toolbox{% endblock %}
+{% block title %}news talk · Toolbox{% endblock %}
 {% block head %}
 <style>
   .tb-cnn10-overlay[hidden] { display: none !important; }
@@ -31,11 +31,16 @@
   .tb-cnn10-banner input[type="range"] { width: 100%; }
   .tb-cnn10-actions { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
   @media (max-width: 720px) { .tb-cnn10-row.is-open .tb-cnn10-preview { grid-template-columns: 1fr; } }
+  .tb-archive { display: flex; gap: 12px; align-items: flex-start; list-style: none; margin: 0 0 12px; padding: 8px; border: 1px solid #e5efe4; border-radius: 10px; background: #fff; }
+  .tb-archive-thumb { width: 160px; height: 90px; object-fit: cover; border-radius: 6px; background: #e2e8f0; flex: none; }
+  .tb-archive-script { display: none; margin: 8px 0 0; max-height: 220px; overflow: auto; white-space: pre-wrap; font-size: 12px; line-height: 1.45; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; }
+  .tb-archive.is-open .tb-archive-script { display: block; }
+  .tb-qa-compose textarea { min-height: 72px; }
 </style>
 {% endblock %}
 {% block body %}
 <section class="tb-admin">
-  <h1>CNN10授業</h1>
+  <h1>news talk</h1>
   <p class="tb-note">サムネイルで動画と文字起こしを確認し、タイトル区間をスライダーで調整してから授業に設定します。字幕取得は Toolbox 専用です。</p>
   <div class="tb-row-actions">
     <button class="tb-btn tb-btn-primary" type="button" id="cnn10-open-btn">CNN10から動画を選ぶ</button>
@@ -91,9 +96,29 @@
     <button class="tb-btn" type="button" data-assist="vocab">語彙を作る</button>
     <button class="tb-btn" type="button" data-assist="translation">和訳を作る</button>
     <button class="tb-btn" type="button" data-assist="warmup">ウォームアップ</button>
+    <button class="tb-btn" type="button" data-assist="warmup_more">ウォームアップを追加</button>
     <button class="tb-btn" type="button" data-assist="discussion">ディスカッション</button>
+    <button class="tb-btn" type="button" data-assist="discussion_more">ディスカッションを追加</button>
     <button class="tb-btn" type="button" data-assist="writing">書く話題</button>
   </div>
+  <form id="qa-compose" class="tb-form tb-qa-compose">
+    <p class="tb-note">質問は自分でも追加できます。質問も模範解答も英語で入れると、教室スクリーンにそのまま出ます。</p>
+    <label>種類
+      <select id="qa-add-kind">
+        <option value="warmup">ウォームアップ</option>
+        <option value="discussion">ディスカッション</option>
+      </select>
+    </label>
+    <label>質問
+      <textarea id="qa-add-text" rows="2" placeholder="英語の質問"></textarea>
+    </label>
+    <label>模範解答
+      <textarea id="qa-add-answer" rows="2" placeholder="英語の模範解答"></textarea>
+    </label>
+    <div class="tb-row-actions">
+      <button class="tb-btn" type="submit">入力して追加</button>
+    </div>
+  </form>
   <p id="assist-status" class="tb-muted"></p>
   <p class="tb-note">チェックを外した項目は、教室スクリーンと Word に出しません。</p>
   <div id="assist-preview"></div>
@@ -114,7 +139,7 @@
 
   <h2>アーカイブ</h2>
   <p class="tb-note">「画面」はそのアーカイブを教室スクリーンに出します。授業設定に戻さなくても使えます。</p>
-  <ul id="archive-list" class="tb-plain"></ul>
+  <div id="archive-list"></div>
 </section>
 
 <div id="cnn10-panel" class="tb-cnn10-overlay" hidden>

@@ -229,8 +229,13 @@ def register(bp):
         try:
             if kind == "vocab":
                 result = {"vocabulary": extract_vocabulary(script, str(payload.get("min_cefr") or "B1"))}
-            elif kind in {"warmup", "discussion"}:
-                result = {kind: extract_questions(script, kind)}
+            elif kind in {"warmup", "discussion", "warmup_more", "discussion_more"}:
+                base = "warmup" if kind.startswith("warmup") else "discussion"
+                current = load_lesson().get(base)
+                existing = current if isinstance(current, list) else []
+                more = kind.endswith("_more")
+                fresh = extract_questions(script, base, existing if more else None)
+                result = {base: (existing + fresh) if more else fresh}
             elif kind == "translation":
                 result = translate_script(script)
             elif kind == "writing":

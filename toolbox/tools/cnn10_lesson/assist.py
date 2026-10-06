@@ -60,7 +60,7 @@ def extract_vocabulary(script: str, min_cefr: str = "B1") -> list[dict]:
     return cleaned[:16]
 
 
-def _qa_items(payload: dict) -> list[dict]:
+def _qa_items(payload: dict, limit: int = 5) -> list[dict]:
     items = []
     for item in payload.get("items") or []:
         if not isinstance(item, dict):
@@ -73,24 +73,36 @@ def _qa_items(payload: dict) -> list[dict]:
             "answer": str(item.get("answer") or item.get("a") or "").strip(),
             "selected": True,
         })
-    return items[:5]
+    return items[:limit]
 
 
-def extract_questions(script: str, kind: str) -> list[dict]:
+def extract_questions(script: str, kind: str, avoid: list | None = None) -> list[dict]:
+    existing = []
+    for item in avoid or []:
+        if not isinstance(item, dict):
+            continue
+        text = str(item.get("text") or item.get("q") or "").strip()
+        if text:
+            existing.append(text)
+    count = 2 if existing else 3
     if kind == "warmup":
-        instruction = "視聴前のウォームアップ質問を3つ。答えは短い英語の模範。"
+        instruction = f"視聴前のウォームアップ質問を{count}つ。答えは短い英語の模範。"
     else:
-        instruction = "視聴後のディスカッション質問を3つ。答えは短い英語の要点。"
+        instruction = f"視聴後のディスカッション質問を{count}つ。答えは短い英語の要点。"
+    avoided = ""
+    if existing:
+        listed = "\n".join(f"- {text}" for text in existing[:24])
+        avoided = f"\nすでに次の質問がある。内容が重ならない新しい質問だけを作る。\n{listed}\n"
     payload = _json_content([
         {
             "role": "system",
             "content": (
-                f"{instruction} JSON {{\"items\":[{{\"text\",\"answer\"}}]}} 。質問は英語。"
+                f"{instruction} JSON {{\"items\":[{{\"text\",\"answer\"}}]}} 。質問も答えも英語。"
             ),
         },
-        {"role": "user", "content": script[:12000]},
+        {"role": "user", "content": script[:12000] + avoided},
     ])
-    return _qa_items(payload)
+    return _qa_items(payload, limit=count)
 
 
 def extract_writing(script: str) -> list[dict]:

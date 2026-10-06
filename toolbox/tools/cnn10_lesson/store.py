@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import secrets
 from datetime import datetime, timezone
 
@@ -76,16 +77,28 @@ def save_lesson(payload: dict) -> dict:
     return data["current"]
 
 
+def _video_id(item: dict) -> str:
+    video_id = str(item.get("video_id") or "").strip()
+    if re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id):
+        return video_id
+    match = re.search(r"([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])", str(item.get("url") or ""))
+    return match.group(1) if match else ""
+
+
 def list_archives() -> list[dict]:
     rows = []
     for item in _load_raw()["archives"]:
         if not isinstance(item, dict):
             continue
+        video_id = _video_id(item)
         rows.append({
             "archive_id": item.get("archive_id") or "",
             "title": item.get("title") or item.get("lesson_name") or "無題",
             "lesson_name": item.get("lesson_name") or "",
             "archived_at": item.get("archived_at") or "",
+            "video_id": video_id,
+            "thumbnail_url": f"https://i.ytimg.com/vi/{video_id}/mqdefault.jpg" if video_id else "",
+            "script": str(item.get("script") or ""),
             "has_vocab": bool(item.get("vocabulary")),
             "has_warmup": bool(item.get("warmup")),
             "has_discussion": bool(item.get("discussion")),

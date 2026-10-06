@@ -180,18 +180,30 @@
   function renderArchives(rows) {
     archiveList.innerHTML = "";
     if (!rows.length) {
-      archiveList.innerHTML = "<li class='tb-muted'>まだアーカイブはありません。</li>";
+      archiveList.innerHTML = "<p class='tb-muted'>まだアーカイブはありません。</p>";
       return;
     }
     rows.forEach((row) => {
-      const li = document.createElement("li");
+      const card = document.createElement("article");
+      card.className = "tb-archive";
+      if (row.thumbnail_url) {
+        const img = document.createElement("img");
+        img.className = "tb-archive-thumb";
+        img.alt = "";
+        img.src = row.thumbnail_url;
+        card.appendChild(img);
+      }
+      const body = document.createElement("div");
       const marks = [
         row.has_vocab ? "語彙" : "",
         row.has_warmup ? "W" : "",
         row.has_discussion ? "D" : "",
         row.has_writing ? "書く" : "",
       ].filter(Boolean).join(" ");
-      li.innerHTML = `<strong>${esc(row.title)}</strong> <span class="tb-muted">${esc(row.archived_at)} ${esc(marks)}</span> `;
+      const title = document.createElement("p");
+      title.innerHTML = `<strong>${esc(row.title)}</strong> <span class="tb-muted">${esc(row.archived_at)} ${esc(marks)}</span>`;
+      const actions = document.createElement("div");
+      actions.className = "tb-row-actions";
       const restore = document.createElement("button");
       restore.type = "button";
       restore.className = "tb-btn";
@@ -203,13 +215,25 @@
       screen.rel = "noopener";
       screen.href = `/toolbox/cnn10/screen?archive=${encodeURIComponent(row.archive_id)}`;
       screen.textContent = "画面";
+      const scriptBtn = document.createElement("button");
+      scriptBtn.type = "button";
+      scriptBtn.className = "tb-btn";
+      scriptBtn.textContent = "スクリプト";
+      scriptBtn.addEventListener("click", () => {
+        card.classList.toggle("is-open");
+      });
       const remove = document.createElement("button");
       remove.type = "button";
       remove.className = "tb-btn";
       remove.textContent = "削除";
       remove.addEventListener("click", () => deleteArchive(row.archive_id));
-      li.append(restore, screen, remove);
-      archiveList.appendChild(li);
+      actions.append(restore, screen, scriptBtn, remove);
+      const script = document.createElement("pre");
+      script.className = "tb-archive-script";
+      script.textContent = row.script || "保存されたスクリプトはありません。";
+      body.append(title, actions, script);
+      card.appendChild(body);
+      archiveList.appendChild(card);
     });
   }
 
@@ -298,6 +322,29 @@
       statusEl.textContent = "アーカイブしました。";
     }).catch((err) => {
       statusEl.textContent = err.message;
+    });
+  });
+
+  document.getElementById("qa-compose").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const kind = document.getElementById("qa-add-kind").value;
+    const text = document.getElementById("qa-add-text").value.trim();
+    const answer = document.getElementById("qa-add-answer").value.trim();
+    if (kind !== "warmup" && kind !== "discussion") return;
+    if (!text) {
+      assistStatus.textContent = "質問を入力してください。";
+      return;
+    }
+    const items = Array.isArray(currentLesson[kind]) ? currentLesson[kind].slice() : [];
+    items.push({ text, answer, selected: true });
+    assistStatus.textContent = "追加しています…";
+    saveLesson({ [kind]: items }).then((lesson) => {
+      renderAssist(lesson);
+      document.getElementById("qa-add-text").value = "";
+      document.getElementById("qa-add-answer").value = "";
+      assistStatus.textContent = "質問を追加しました。";
+    }).catch((err) => {
+      assistStatus.textContent = err.message;
     });
   });
 

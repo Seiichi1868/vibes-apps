@@ -44,26 +44,32 @@
     return out;
   }
 
-  function renderQuestion(kind, heading) {
+  function qaShell(label, top, bottom) {
+    return `<div class="tb-qa"><p class="tb-qa-label">${esc(label)}</p><div class="tb-qa-top">${top}</div><div class="tb-qa-bottom">${bottom}</div></div>`;
+  }
+
+  function renderQuestion(kind, label) {
     const list = visible(lesson[kind]);
     const steps = pieces(list);
     const step = reveal[kind] || 0;
     if (!list.length) {
-      stage.innerHTML = `<div class="tb-screen-copy"><h2>${heading}</h2><p class="tb-wait">まだありません。</p></div>`;
+      stage.innerHTML = qaShell(label, `<p class="tb-qa-hint">No questions yet.</p>`, "");
       statusEl.textContent = "";
       return;
     }
     if (step <= 0) {
-      stage.innerHTML = `<div class="tb-screen-copy"><h2>${heading}</h2><p class="tb-wait">クリックまたは ↓ で質問を表示します。</p></div>`;
-    } else {
-      const piece = steps[Math.min(step, steps.length) - 1];
-      const item = list[piece.index];
-      const answer = piece.kind === "answer"
-        ? `<p class="tb-a"><span>A. </span>${esc(item.answer || item.a || "")}</p>`
-        : "";
-      stage.innerHTML = `<div class="tb-screen-copy"><h2>${heading}</h2><p class="tb-q">Q${piece.index + 1}. ${esc(item.text || item.q)}</p>${answer}</div>`;
+      stage.innerHTML = qaShell(label, `<p class="tb-qa-hint">Click or press down.</p>`, "");
+      statusEl.textContent = `0 / ${steps.length}`;
+      return;
     }
-    statusEl.textContent = `${Math.min(step, steps.length)} / ${steps.length}　↑ で戻る`;
+    const piece = steps[Math.min(step, steps.length) - 1];
+    const item = list[piece.index];
+    const question = `<p class="tb-qa-text">Q${piece.index + 1}. ${esc(item.text || item.q)}</p>`;
+    const answer = piece.kind === "answer"
+      ? `<p class="tb-qa-text">A. ${esc(item.answer || item.a || "")}</p>`
+      : "";
+    stage.innerHTML = qaShell(label, question, answer);
+    statusEl.textContent = `${Math.min(step, steps.length)} / ${steps.length}`;
   }
 
   function renderWriting() {
@@ -105,7 +111,7 @@
       if (end > start) params.set("end", String(end));
       if (lesson.subtitles !== false) params.set("cc_load_policy", "1");
       stage.innerHTML = id
-        ? `<iframe title="CNN10" src="https://www.youtube.com/embed/${id}?${params}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`
+        ? `<iframe title="news talk" src="https://www.youtube.com/embed/${id}?${params}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`
         : "<p class='tb-screen-copy'>動画 URL がありません。</p>";
       statusEl.textContent = "";
       return;
@@ -120,8 +126,8 @@
       statusEl.textContent = "";
       return;
     }
-    if (view === "warmup") return renderQuestion("warmup", "ウォームアップ");
-    if (view === "discussion") return renderQuestion("discussion", "ディスカッション");
+    if (view === "warmup") return renderQuestion("warmup", "Warm-up");
+    if (view === "discussion") return renderQuestion("discussion", "Discussion");
     if (view === "writing") return renderWriting();
   }
 
