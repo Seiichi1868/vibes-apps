@@ -133,6 +133,12 @@
     if (current) select.value = current;
   }
 
+  function topicNumber(item) {
+    const order = Number(item && item.source_order);
+    if (!order || order > 10000) return "";
+    return `No.${order}`;
+  }
+
   function esc(value) {
     return String(value || "").replace(/[&<>"']/g, (ch) => ({
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -186,7 +192,8 @@
     els["ms-hint"].hidden = !showHint;
     els["ms-hint"].textContent = showHint ? (HINTS[topic.type] || "") : "";
     stage.classList.toggle("is-long", Number(topic.words) >= 60);
-    els["ms-meta-type"].textContent = TYPE_LABEL[topic.type] || "";
+    const number = topicNumber(topic);
+    els["ms-meta-type"].textContent = `${TYPE_LABEL[topic.type] || ""}${number ? " " + number : ""}`;
     const selected = classes.find((row) => row.id === classId());
     els["ms-meta-class"].textContent = selected ? selected.name : "クラスなし";
     els["ms-meta-no"].textContent = sessionNo ? `#${sessionNo}` : "";
@@ -385,6 +392,7 @@
         suffix: topic.suffix,
         type: topic.type,
         ja: topic.ja || "",
+        source_order: topic.source_order,
       });
     }
     saveStore();
@@ -557,7 +565,7 @@
     rows.slice(0, 40).forEach((row) => {
       const card = document.createElement("article");
       card.className = "ms-card is-blur";
-      card.innerHTML = `<div class="ms-meta"><span class="tb-badge">タイプ${row.type}</span><span class="tb-muted">${esc(row.usedAt || "").slice(0, 16).replace("T", " ")}</span></div><p class="ms-card-text">${esc(row.text)}</p>`;
+      card.innerHTML = `<div class="ms-meta"><span class="tb-badge">タイプ${row.type}${topicNumber(row) ? " " + topicNumber(row) : ""}</span><span class="tb-muted">${esc(row.usedAt || "").slice(0, 16).replace("T", " ")}</span></div><p class="ms-card-text">${esc(row.text)}</p>`;
       card.querySelector(".ms-card-text").addEventListener("click", () => card.classList.remove("is-blur"));
       const button = document.createElement("button");
       button.type = "button";
@@ -600,7 +608,7 @@
     items.forEach((item) => {
       const card = document.createElement("article");
       card.className = blur ? "ms-card is-blur" : "ms-card";
-      card.innerHTML = `<div class="ms-meta"><span class="tb-badge">タイプ${item.type}</span>${item.level ? `<span class="tb-badge">L${item.level}</span>` : ""}${item.used ? '<span class="tb-badge">使用済み</span>' : ""}${(item.flags || []).length ? '<span class="tb-badge tb-badge-mute">配慮</span>' : ""}</div><p class="ms-card-text">${highlight(item.text, els["ms-q"].value)}</p>${item.ja ? `<p class="tb-muted">${esc(item.ja)}</p>` : ""}`;
+      card.innerHTML = `<div class="ms-meta"><span class="tb-badge">タイプ${item.type}${topicNumber(item) ? " " + topicNumber(item) : ""}</span>${item.level ? `<span class="tb-badge">L${item.level}</span>` : ""}${item.used ? '<span class="tb-badge">使用済み</span>' : ""}${(item.flags || []).length ? '<span class="tb-badge tb-badge-mute">配慮</span>' : ""}</div><p class="ms-card-text">${highlight(item.text, els["ms-q"].value)}</p>${item.ja ? `<p class="tb-muted">${esc(item.ja)}</p>` : ""}`;
       card.querySelector(".ms-card-text").addEventListener("click", () => card.classList.remove("is-blur"));
       const use = document.createElement("button");
       use.type = "button";
@@ -629,7 +637,7 @@
     }
     if (reset) searchOffset = 0;
     rememberQuery(query);
-    els["ms-ai"].checked ? els["ms-q"].placeholder = "AI検索（例: 部活の経験が話せる話題）" : els["ms-q"].placeholder = "一致検索（例: school, travel）";
+    els["ms-ai"].checked ? els["ms-q"].placeholder = "AI検索（例: 部活の経験が話せる話題）" : els["ms-q"].placeholder = "番号・語句（例: 12、1-12、school）";
     els["ms-search-status"].textContent = "検索中…";
     try {
       const data = await toolboxFetch("/toolbox/api/minute-speech/search", {
@@ -727,7 +735,7 @@
     els[id].addEventListener("change", () => {
       writePrefs();
       if (els["ms-ai"].checked) els["ms-q"].placeholder = "AI検索（例: 旅行に関するお題）";
-      else els["ms-q"].placeholder = "一致検索（例: school, travel）";
+      else els["ms-q"].placeholder = "番号・語句（例: 12、1-12、school）";
     });
   });
   els["ms-draw"].addEventListener("click", () => {

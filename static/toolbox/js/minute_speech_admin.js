@@ -55,7 +55,8 @@
     items.forEach((item) => {
       const tr = document.createElement("tr");
       tr.innerHTML = `<td></td><td><textarea rows="3"></textarea><p class="tb-muted"></p></td><td><input data-ja type="text"><select data-level><option value="">—</option><option>1</option><option>2</option><option>3</option></select></td><td></td>`;
-      tr.children[0].textContent = `${item.type}${item.ai_pending ? " 未確認" : ""}`;
+      const order = Number(item.source_order);
+      tr.children[0].textContent = `タイプ${item.type}${order && order <= 10000 ? " No." + order : ""}${item.ai_pending ? " 未確認" : ""}`;
       tr.querySelector("textarea").value = item.text || "";
       tr.querySelector("p").textContent = `${(item.flags || []).join(", ")} ${item.status || ""} ${item.ai_reason || ""}`;
       tr.querySelector("[data-ja]").value = item.ja || "";

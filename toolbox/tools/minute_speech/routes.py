@@ -19,6 +19,7 @@ from toolbox.tools.minute_speech.topics import (
     draw_topic,
     hide_flagged,
     keyword_search,
+    parse_number_query,
     merged_topics,
     passes_filters,
     public_topic,
@@ -127,11 +128,14 @@ def register(bp):
         payload = request.get_json(silent=True) or {}
         mode = str(payload.get("mode") or "keyword")
         query = str(payload.get("q") or "").strip()
-        if len(query) < 2:
+        by_number = parse_number_query(query) is not None
+        if len(query) < 2 and not by_number:
             return jsonify({"ok": False, "error": "検索語は2文字以上にしてください。"}), 400
         filters = _filters(payload)
         limit = payload.get("limit", SEARCH_LIMIT)
         offset = payload.get("offset", 0)
+        if by_number:
+            mode = "keyword"
         if mode == "ai":
             if not _rate_ok("minute-ai", AI_RPM):
                 return jsonify({"ok": False, "error": "AI検索の回数が多いため、少し待ってからもう一度試してください。一致検索は使えます。"}), 429

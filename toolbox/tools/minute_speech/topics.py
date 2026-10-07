@@ -104,6 +104,7 @@ def public_topic(topic: dict, *, used: bool = False) -> dict:
         "flags": list(topic.get("flags") or []),
         "themes": topic.get("themes"),
         "status": topic.get("status") or "active",
+        "source_order": topic.get("source_order"),
         "used": bool(used),
     }
 
@@ -207,6 +208,30 @@ def _is_japanese(text: str) -> bool:
     return bool(re.search(r"[\u3040-\u30ff\u4e00-\u9fff]", text or ""))
 
 
+def parse_number_query(query: str) -> tuple[int | None, int] | None:
+    """「12」「1-12」「タイプ2 5」「#8」をお題番号として読む。番号でなければ None。"""
+    text = _normalize(query).strip()
+    text = re.sub(r"[ー−‐–—]", "-", text)
+    typed = re.fullmatch(
+        r"(?:(?:タイプ|type|t)\s*)?([12])\s*[-.．]\s*(?:no\.?|番号|#)?\s*(\d{1,4})",
+        text,
+    )
+    if typed:
+        order = int(typed.group(2))
+        return (int(typed.group(1)), order) if order > 0 else None
+    plain = re.fullmatch(
+        r"(?:(?:タイプ|type|t)\s*([12])\s+)?(?:no\.?|番号|#)?\s*(\d{1,4})",
+        text,
+    )
+    if not plain:
+        return None
+    order = int(plain.group(2))
+    if order <= 0:
+        return None
+    type_num = int(plain.group(1)) if plain.group(1) else None
+    return type_num, order
+
+
 def _query_parts(query: str) -> tuple[list[str], list[str]]:
     normalized = _normalize(query)
     phrases = [a or b for a, b in re.findall(r'"([^"]+)"|「([^」]+)」', normalized)]
@@ -247,6 +272,20 @@ def keyword_search(
     limit=20,
     offset=0,
 ) -> dict:
+    number = parse_number_query(query)
+    if number:
+        return _search_by_number(
+            number,
+            type_value=type_value,
+            level_max=level_max,
+            include_flagged=include_flagged,
+            include_unleveled=include_unleveled,
+            used_ids=used_ids,
+            exclude_used=exclude_used,
+            hidden_ids=hidden_ids,
+            limit=limit,
+            offset=offset,
+        )
     phrases, words = _query_parts(query)
     if len("".join(phrases + words)) < 2:
         return {"error": "検索語は2文字以上にしてください。", "code": "query_too_short"}
@@ -297,6 +336,65 @@ def keyword_search(
     return {
         "results": [public_topic(topic, used=topic.get("id") in used) for _, _, topic in page],
         "has_more": offset + len(page) < len(window),
+        "notice": notice,
+    }
+
+
+def _search_by_number(
+    number: tuple[int | None, int],
+    *,
+    type_value,
+    level_max,
+    include_flagged,
+    include_unleveled,
+    used_ids,
+    exclude_used,
+    hidden_ids,
+    limit,
+    offset,
+) -> dict:
+    query_type, order = number
+    limit = max(1, min(_as_int(limit, SEARCH_LIMIT), SEARCH_LIMIT))
+    offset = max(0, min(_as_int(offset, 0), SEARCH_WINDOW - limit))
+    used = {str(item) for item in (used_ids or [])}
+    hidden = {str(item) for item in (hidden_ids or [])}
+    selected = None if type_value in (None, "", "all", "mixed") else _as_int(type_value, 0)
+    if query_type and selected and query_type != selected:
+        return {
+            "results": [],
+            "has_more": False,
+            "notice": "選んでいるタイプと、番号に書いたタイプが違います。",
+        }
+    want_type = query_type or selected
+    filters = {
+        "type_value": want_type,
+        "level_max": level_max if level_max not in (None, "") else 3,
+        "include_flagged": bool(include_flagged),
+        "include_unleveled": bool(include_unleveled),
+    }
+    matched = []
+    blocked = []
+    for topic in merged_topics():
+        if _as_int(topic.get("source_order"), 0) != order:
+            continue
+        if want_type and int(topic.get("type") or 0) != int(want_type):
+            continue
+        if topic.get("id") in hidden or (exclude_used and topic.get("id") in used):
+            continue
+        if passes_filters(topic, **filters):
+            matched.append(topic)
+        else:
+            blocked.append(topic)
+    matched.sort(key=lambda topic: (int(topic.get("type") or 0), str(topic.get("id"))))
+    page = matched[offset:offset + limit]
+    notice = ""
+    if not page and blocked:
+        notice = "この番号のお題は、いまの難易度・フラグ・非公開の条件では出ません。"
+    elif not page:
+        notice = "その番号のお題はありません。"
+    return {
+        "results": [public_topic(topic, used=topic.get("id") in used) for topic in page],
+        "has_more": offset + len(page) < len(matched),
         "notice": notice,
     }
 
