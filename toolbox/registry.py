@@ -40,7 +40,7 @@ TOOLS: list[dict] = [
     {
         "id": "cnn10",
         "name": "News Talk",
-        "description": "動画を選び、文字起こしと語彙などの補助を教室スクリーンに出す。",
+        "description": "授業にあった関連テーマで動画を選び、文字起こしから語彙、事前事後の問いを作成する。",
         "icon": "cnn10",
         "scene": "導入",
         "route": "toolbox.cnn10_lesson_page",
@@ -51,7 +51,7 @@ TOOLS: list[dict] = [
     {
         "id": "minute-speech",
         "name": "1分スピーチ",
-        "description": "お題を大きく出し、準備と発話の時間を計る。",
+        "description": "準備と発話の時間を計ってスピーチに取り組み英会話の瞬発力をつける。",
         "icon": "speech",
         "scene": "展開",
         "route": "toolbox.minute_speech_page",
@@ -62,7 +62,7 @@ TOOLS: list[dict] = [
     {
         "id": "talk_check",
         "name": "スピーチ理解度チェック",
-        "description": "スピーチを録音し、理解度チェックの質問を作る。",
+        "description": "ALTや生徒のスピーチを文字起こしして、理解度チェックの質問を作る。",
         "icon": "mic",
         "scene": "展開",
         "route": "toolbox.talk_check_page",
