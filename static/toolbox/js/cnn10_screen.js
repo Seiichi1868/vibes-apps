@@ -25,9 +25,12 @@
   }
 
   function videoId() {
+    const url = String(lesson.url || "");
+    const fromUrl = url.match(/(?:v=|vi=|youtu\.be\/|embed\/|shorts\/)([a-zA-Z0-9_-]{11})/)
+      || url.match(/([a-zA-Z0-9_-]{11})(?![a-zA-Z0-9_-])/);
+    if (fromUrl) return fromUrl[1];
     if (lesson.video_id && /^[a-zA-Z0-9_-]{11}$/.test(lesson.video_id)) return lesson.video_id;
-    const match = String(lesson.url || "").match(/([a-zA-Z0-9_-]{11})(?![a-zA-Z0-9_-])/);
-    return match ? match[1] : "";
+    return "";
   }
 
   function visible(list) {

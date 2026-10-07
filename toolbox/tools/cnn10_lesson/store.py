@@ -105,17 +105,33 @@ def save_lesson(payload: dict) -> dict:
                 current[key] = payload[key]
         if "script" in payload:
             _sync_translation(current, previous_script)
+        if "url" in payload:
+            current["video_id"] = _video_id_from_url(payload.get("url") or "")
     data["current"] = _lesson(current)
     _save_raw(data)
     return data["current"]
 
 
+_YT_ID = re.compile(r"(?:v=|vi=|youtu\.be/|embed/|shorts/)([A-Za-z0-9_-]{11})")
+
+
+def _video_id_from_url(url: str) -> str:
+    text = str(url or "")
+    match = _YT_ID.search(text)
+    if match:
+        return match.group(1)
+    match = re.search(r"([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])", text)
+    return match.group(1) if match else ""
+
+
 def _video_id(item: dict) -> str:
+    from_url = _video_id_from_url(item.get("url") or "")
+    if from_url:
+        return from_url
     video_id = str(item.get("video_id") or "").strip()
     if re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id):
         return video_id
-    match = re.search(r"([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])", str(item.get("url") or ""))
-    return match.group(1) if match else ""
+    return ""
 
 
 def list_archives() -> list[dict]:
@@ -145,6 +161,7 @@ def get_archive(archive_id: str) -> dict | None:
     for item in _load_raw()["archives"]:
         if isinstance(item, dict) and str(item.get("archive_id") or "") == archive_id:
             lesson = _lesson(item)
+            lesson["video_id"] = _video_id(lesson)
             lesson["archive_id"] = archive_id
             lesson["archived_at"] = item.get("archived_at") or ""
             return lesson
@@ -158,6 +175,7 @@ def archive_current(title: str = "", lesson_name: str = "") -> dict:
         item["title"] = title
     if lesson_name:
         item["lesson_name"] = lesson_name
+    item["video_id"] = _video_id(item)
     if not (item.get("url") or item.get("script")):
         raise ValueError("保存する授業設定がありません。")
     item["archive_id"] = secrets.token_hex(8)

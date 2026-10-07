@@ -43,6 +43,13 @@
     return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   }
 
+  function youtubeId(url) {
+    const text = String(url || "");
+    const match = text.match(/(?:v=|vi=|youtu\.be\/|embed\/|shorts\/)([a-zA-Z0-9_-]{11})/)
+      || text.match(/([a-zA-Z0-9_-]{11})(?![a-zA-Z0-9_-])/);
+    return match ? match[1] : "";
+  }
+
   function parseTime(text) {
     const raw = String(text || "").trim();
     if (!raw) return null;
@@ -67,6 +74,7 @@
       lesson_name: document.getElementById("lesson-name").value.trim(),
       title: document.getElementById("lesson-title").value.trim(),
       url: document.getElementById("youtube-url").value.trim(),
+      video_id: youtubeId(document.getElementById("youtube-url").value),
       start: document.getElementById("start-time").value.trim(),
       end: document.getElementById("end-time").value.trim(),
       script: document.getElementById("lesson-script").value.trim(),
