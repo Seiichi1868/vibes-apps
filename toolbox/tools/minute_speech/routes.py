@@ -6,7 +6,13 @@ import time
 
 from flask import jsonify, render_template, request
 
-from toolbox.auth import admin_panel_required, current_user, login_required, require_admin_reauth
+from toolbox.auth import (
+    admin_panel_required,
+    current_user,
+    login_required,
+    require_admin_reauth,
+    verify_admin_panel_password,
+)
 from toolbox.routes import tool_required
 from toolbox.storage import get_setting, update_app_settings
 from toolbox.tools.minute_speech import classify, embed
@@ -30,8 +36,11 @@ from toolbox.tools.minute_speech.topics import (
 from toolbox.usage import UsageError, UsageLimitError, generate_json
 
 _hits: dict[str, list[float]] = {}
+_delete_fails: dict[str, list[float]] = {}
 KEYWORD_RPM = 30
 AI_RPM = 10
+DELETE_FAIL_LIMIT = 5
+DELETE_FAIL_WINDOW = 900
 
 
 def _user_id() -> str:
@@ -53,9 +62,20 @@ def _ids(value) -> list[str]:
     return [str(item) for item in value if item][:4000]
 
 
+def _client_ip() -> str:
+    return request.headers.get("X-Forwarded-For", request.remote_addr or "local").split(",")[0].strip()
+
+
+def _delete_locked(ip: str) -> bool:
+    now = time.time()
+    rows = [stamp for stamp in _delete_fails.get(ip, []) if now - stamp < DELETE_FAIL_WINDOW]
+    _delete_fails[ip] = rows
+    return len(rows) >= DELETE_FAIL_LIMIT
+
+
 def _rate_ok(bucket: str, limit: int) -> bool:
     now = time.time()
-    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "local").split(",")[0].strip()
+    ip = _client_ip()
     key = f"{bucket}:{ip}"
     rows = [stamp for stamp in _hits.get(key, []) if now - stamp < 60]
     if len(rows) >= limit:
@@ -105,6 +125,20 @@ def register(bp):
     @tool_required("minute-speech")
     def minute_speech_page():
         return render_template("toolbox/tools/minute_speech.html")
+
+    @bp.route("/api/minute-speech/confirm-delete", methods=["POST"])
+    @login_required
+    @tool_required("minute-speech")
+    def minute_speech_confirm_delete():
+        ip = _client_ip()
+        if _delete_locked(ip):
+            return jsonify({"ok": False, "error": "試行が多すぎます。しばらくしてからもう一度試してください。"}), 429
+        payload = request.get_json(silent=True) or {}
+        if not verify_admin_panel_password(payload.get("password") or ""):
+            _delete_fails.setdefault(ip, []).append(time.time())
+            return jsonify({"ok": False, "error": "パスワードが違います。"}), 403
+        _delete_fails.pop(ip, None)
+        return jsonify({"ok": True})
 
     @bp.route("/api/minute-speech/draw", methods=["POST"])
     @login_required

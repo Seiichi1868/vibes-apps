@@ -27,6 +27,8 @@
   let switchTimer = 0;
   let themes = [];
   let teachers = [];
+  let scopeTeacher = "";
+  let scopeClass = "";
   let activeTheme = "";
   let catType = 1;
   let catOffset = 0;
@@ -42,11 +44,13 @@
         data.rounds = data.rounds || {};
         data.hiddenTopicIds = data.hiddenTopicIds || [];
         data.prefs = data.prefs || {};
+        data.scopes = data.scopes || {};
+        data.lastClass = data.lastClass || {};
         data.recentQueries = data.recentQueries || [];
         return data;
       }
     } catch (_) {}
-    return { history: {}, rounds: {}, hiddenTopicIds: [], prefs: {}, recentQueries: [], lastBackupAt: null };
+    return { history: {}, rounds: {}, hiddenTopicIds: [], prefs: {}, scopes: {}, lastClass: {}, recentQueries: [], lastBackupAt: null };
   }
 
   function saveStore() {
@@ -85,35 +89,33 @@
     };
   }
 
-  function readPrefsIntoForm() {
-    const prefs = store.prefs || {};
-    if (prefs.type) els["ms-type"].value = prefs.type;
-    if (prefs.level) els["ms-level"].value = String(prefs.level);
-    if (prefs.prep) els["ms-prep"].value = prefs.prep;
-    if (prefs.speak) els["ms-speak"].value = prefs.speak;
-    if (prefs.format) els["ms-format"].value = prefs.format;
-    if (prefs.teacherId) els["ms-teacher"].value = prefs.teacherId;
-    fillClasses();
-    if (prefs.classId) els["ms-class"].value = prefs.classId;
-    els["ms-unleveled"].checked = prefs.unleveled !== false;
-    els["ms-flagged"].checked = !!prefs.flagged;
-    els["ms-auto"].checked = prefs.auto !== false;
-    els["ms-ja"].checked = !!prefs.ja;
-    els["ms-hints"].checked = prefs.hints !== false;
-    els["ms-blur"].checked = prefs.blur !== false;
-    els["ms-exclude-used"].checked = !!prefs.excludeUsed;
-    els["ms-ai"].checked = !!prefs.ai;
+  const DEFAULT_SETTINGS = {
+    type: "1",
+    level: 2,
+    prep: 60,
+    speak: 60,
+    format: "solo",
+    unleveled: true,
+    flagged: false,
+    auto: true,
+    ja: false,
+    hints: true,
+    blur: true,
+    excludeUsed: false,
+    ai: false,
+  };
+
+  function scopeKey(teacher, klass) {
+    return `${teacher || ""}::${klass || ""}`;
   }
 
-  function writePrefs() {
-    store.prefs = {
-      teacherId: teacherId(),
-      classId: classId(),
+  function settingsFromForm() {
+    return {
       type: typeValue(),
-      level: Number(els["ms-level"].value),
+      level: Number(els["ms-level"].value) || 2,
       prep: Number(els["ms-prep"].value) || 60,
       speak: Number(els["ms-speak"].value) || 60,
-      format: els["ms-format"].value,
+      format: els["ms-format"].value || "solo",
       unleveled: els["ms-unleveled"].checked,
       flagged: els["ms-flagged"].checked,
       auto: els["ms-auto"].checked,
@@ -123,7 +125,138 @@
       excludeUsed: els["ms-exclude-used"].checked,
       ai: els["ms-ai"].checked,
     };
+  }
+
+  function pickSettings(prefs) {
+    if (!prefs || typeof prefs !== "object") return null;
+    if (!prefs.type && prefs.level == null && prefs.prep == null && prefs.format == null) return null;
+    return {
+      type: prefs.type || DEFAULT_SETTINGS.type,
+      level: Number(prefs.level) || DEFAULT_SETTINGS.level,
+      prep: Number(prefs.prep) || DEFAULT_SETTINGS.prep,
+      speak: Number(prefs.speak) || DEFAULT_SETTINGS.speak,
+      format: prefs.format || DEFAULT_SETTINGS.format,
+      unleveled: prefs.unleveled !== false,
+      flagged: !!prefs.flagged,
+      auto: prefs.auto !== false,
+      ja: !!prefs.ja,
+      hints: prefs.hints !== false,
+      blur: prefs.blur !== false,
+      excludeUsed: !!prefs.excludeUsed,
+      ai: !!prefs.ai,
+    };
+  }
+
+  function migrateScopes() {
+    store.scopes = store.scopes && typeof store.scopes === "object" ? store.scopes : {};
+    store.lastClass = store.lastClass && typeof store.lastClass === "object" ? store.lastClass : {};
+    const prefs = store.prefs || {};
+    const legacy = pickSettings(prefs);
+    if (!legacy) return;
+    const key = scopeKey(prefs.teacherId, prefs.classId);
+    if (!store.scopes[key]) store.scopes[key] = legacy;
+    if (prefs.teacherId) store.lastClass[prefs.teacherId] = prefs.classId || "";
+    store.prefs = { teacherId: prefs.teacherId || "", classId: prefs.classId || "" };
+  }
+
+  function settingsFor(teacher, klass) {
+    const scopes = store.scopes || {};
+    const exact = scopes[scopeKey(teacher, klass)];
+    if (exact) return exact;
+    if (klass) {
+      const suffix = `::${klass}`;
+      const found = Object.keys(scopes).find((key) => key.endsWith(suffix) && scopes[key]);
+      if (found) return scopes[found];
+      const teacherDefault = scopes[scopeKey(teacher, "")];
+      if (teacherDefault) return teacherDefault;
+    }
+    return null;
+  }
+
+  function applySettings(prefs) {
+    const next = Object.assign({}, DEFAULT_SETTINGS, prefs || {});
+    els["ms-type"].value = next.type;
+    els["ms-level"].value = String(next.level);
+    els["ms-prep"].value = String(next.prep);
+    els["ms-speak"].value = String(next.speak);
+    els["ms-format"].value = next.format;
+    els["ms-unleveled"].checked = next.unleveled !== false;
+    els["ms-flagged"].checked = !!next.flagged;
+    els["ms-auto"].checked = next.auto !== false;
+    els["ms-ja"].checked = !!next.ja;
+    els["ms-hints"].checked = next.hints !== false;
+    els["ms-blur"].checked = next.blur !== false;
+    els["ms-exclude-used"].checked = !!next.excludeUsed;
+    els["ms-ai"].checked = !!next.ai;
+    els["ms-q"].placeholder = next.ai ? "AI検索（例: 旅行に関するお題）" : "番号・語句（例: 12、1-12、school）";
+  }
+
+  function rememberScope() {
+    store.scopes = store.scopes || {};
+    store.lastClass = store.lastClass || {};
+    store.scopes[scopeKey(scopeTeacher, scopeClass)] = settingsFromForm();
+    if (scopeTeacher) store.lastClass[scopeTeacher] = scopeClass;
+    store.prefs = { teacherId: scopeTeacher, classId: scopeClass };
     saveStore();
+  }
+
+  function enterScope(teacher, klass) {
+    scopeTeacher = teacher || "";
+    scopeClass = klass || "";
+    applySettings(settingsFor(scopeTeacher, scopeClass) || DEFAULT_SETTINGS);
+    store.lastClass = store.lastClass || {};
+    if (scopeTeacher) store.lastClass[scopeTeacher] = scopeClass;
+    store.prefs = { teacherId: scopeTeacher, classId: scopeClass };
+    saveStore();
+  }
+
+  function bindScope(teacher, klass, settings) {
+    scopeTeacher = teacher || "";
+    scopeClass = klass || "";
+    store.scopes = store.scopes || {};
+    store.lastClass = store.lastClass || {};
+    store.scopes[scopeKey(scopeTeacher, scopeClass)] = settings;
+    if (scopeTeacher) store.lastClass[scopeTeacher] = scopeClass;
+    store.prefs = { teacherId: scopeTeacher, classId: scopeClass };
+    saveStore();
+  }
+
+  async function confirmDelete(message) {
+    if (!confirm(message)) return false;
+    const password = prompt("削除するには管理パスワードを入力してください");
+    if (password == null || password === "") return false;
+    try {
+      await toolboxFetch("/toolbox/api/minute-speech/confirm-delete", {
+        method: "POST",
+        body: JSON.stringify({ password }),
+      });
+      return true;
+    } catch (err) {
+      alert(err.message || "パスワードが違います。");
+      return false;
+    }
+  }
+
+  function selectClass(klass) {
+    const select = els["ms-class"];
+    const exists = Array.from(select.options).some((option) => option.value === (klass || ""));
+    select.value = exists ? (klass || "") : "";
+  }
+
+  function readPrefsIntoForm() {
+    migrateScopes();
+    const prefs = store.prefs || {};
+    if (prefs.teacherId && teachers.some((row) => row.id === prefs.teacherId)) {
+      els["ms-teacher"].value = prefs.teacherId;
+    }
+    fillClasses();
+    const savedClass = prefs.classId || (store.lastClass || {})[teacherId()] || "";
+    selectClass(savedClass);
+    enterScope(teacherId(), classId());
+  }
+
+  function writePrefs() {
+    rememberScope();
   }
 
   function teacherId() {
@@ -183,11 +316,12 @@
       button.className = "tb-btn";
       button.textContent = `${row.name} をこの教員へ`;
       button.addEventListener("click", () => {
+        rememberScope();
         row.teacher_id = teacherId();
         classes = window.ToolboxClasses.save(classes);
         fillClasses();
-        els["ms-class"].value = row.id;
-        writePrefs();
+        selectClass(row.id);
+        enterScope(teacherId(), classId());
         loadCatalog();
       });
       box.appendChild(button);
@@ -206,6 +340,8 @@
       alert("人数は1〜60で入力してください。");
       return;
     }
+    rememberScope();
+    const settings = settingsFromForm();
     if (existing) {
       existing.name = name.trim();
       existing.student_count = count;
@@ -224,12 +360,12 @@
         pick: { absent: [], picked: [], history: [] },
         teacher_id: teacherId(),
       });
-      els["ms-class"].value = classes[classes.length - 1].id;
     }
     classes = window.ToolboxClasses.save(classes);
     fillClasses();
-    if (!existing) els["ms-class"].value = classes[classes.length - 1].id;
-    writePrefs();
+    selectClass(existing ? existing.id : classes[classes.length - 1].id);
+    bindScope(teacherId(), classId(), settings);
+    loadCatalog();
   }
 
   function topicNumber(item) {
@@ -783,6 +919,8 @@
       rounds: store.rounds,
       hiddenTopicIds: store.hiddenTopicIds,
       prefs: store.prefs,
+      scopes: store.scopes,
+      lastClass: store.lastClass,
     }, null, 2)], { type: "application/json" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -802,7 +940,9 @@
         store.history = data.history || {};
         store.rounds = data.rounds || {};
         store.hiddenTopicIds = data.hiddenTopicIds || [];
-        if (data.prefs) store.prefs = Object.assign(store.prefs, data.prefs);
+        if (data.prefs && typeof data.prefs === "object") store.prefs = data.prefs;
+        if (data.scopes && typeof data.scopes === "object") store.scopes = data.scopes;
+        if (data.lastClass && typeof data.lastClass === "object") store.lastClass = data.lastClass;
         store.lastBackupAt = new Date().toISOString();
         saveStore();
         readPrefsIntoForm();
@@ -830,7 +970,7 @@
     if (button.dataset.speak) els["ms-speak"].value = button.dataset.speak;
     writePrefs();
   });
-  ["ms-teacher", "ms-class", "ms-type", "ms-level", "ms-prep", "ms-speak", "ms-format", "ms-unleveled", "ms-flagged", "ms-auto", "ms-ja", "ms-hints", "ms-blur", "ms-exclude-used", "ms-ai"].forEach((id) => {
+  ["ms-type", "ms-level", "ms-prep", "ms-speak", "ms-format", "ms-unleveled", "ms-flagged", "ms-auto", "ms-ja", "ms-hints", "ms-blur", "ms-exclude-used", "ms-ai"].forEach((id) => {
     els[id].addEventListener("change", () => {
       writePrefs();
       if (els["ms-ai"].checked) els["ms-q"].placeholder = "AI検索（例: 旅行に関するお題）";
@@ -945,24 +1085,30 @@
   loadCatalog();
 
   els["ms-teacher"].addEventListener("change", () => {
+    rememberScope();
     fillClasses();
-    writePrefs();
+    selectClass((store.lastClass || {})[teacherId()] || "");
+    enterScope(teacherId(), classId());
     loadCatalog();
+    if (!els["ms-panel-history"].hidden) renderHistory();
   });
   els["ms-class"].addEventListener("change", () => {
-    writePrefs();
+    rememberScope();
+    enterScope(teacherId(), classId());
     loadCatalog();
     if (!els["ms-panel-history"].hidden) renderHistory();
   });
   els["ms-teacher-add"].addEventListener("click", () => {
     const name = prompt("担当教員名");
     if (!name || !name.trim()) return;
+    rememberScope();
     teachers.push({ id: newLocalId(), name: name.trim() });
     teachers = window.ToolboxClasses.saveTeachers(teachers);
     fillTeachers();
     els["ms-teacher"].value = teachers[teachers.length - 1].id;
     fillClasses();
-    writePrefs();
+    selectClass("");
+    enterScope(teacherId(), classId());
   });
   els["ms-teacher-edit"].addEventListener("click", () => {
     const row = teachers.find((item) => item.id === teacherId());
@@ -975,9 +1121,10 @@
     els["ms-teacher"].value = row.id;
     writePrefs();
   });
-  els["ms-teacher-del"].addEventListener("click", () => {
+  els["ms-teacher-del"].addEventListener("click", async () => {
     const row = teachers.find((item) => item.id === teacherId());
-    if (!row || !confirm(`${row.name} を削除しますか？クラスは担当未設定として残ります。`)) return;
+    if (!row) return;
+    if (!await confirmDelete(`${row.name} を削除しますか？クラスは担当未設定として残ります。`)) return;
     classes.forEach((item) => {
       if (item.teacher_id === row.id) item.teacher_id = "";
     });
@@ -985,19 +1132,22 @@
     teachers = window.ToolboxClasses.saveTeachers(teachers.filter((item) => item.id !== row.id));
     fillTeachers();
     fillClasses();
-    writePrefs();
+    selectClass((store.lastClass || {})[teacherId()] || "");
+    enterScope(teacherId(), classId());
+    loadCatalog();
   });
   els["ms-class-add"].addEventListener("click", () => saveClassRow(null));
   els["ms-class-edit"].addEventListener("click", () => {
     const row = classes.find((item) => item.id === classId());
     if (row) saveClassRow(row);
   });
-  els["ms-class-del"].addEventListener("click", () => {
+  els["ms-class-del"].addEventListener("click", async () => {
     const row = classes.find((item) => item.id === classId());
-    if (!row || !confirm(`${row.name} をこの端末から削除しますか？`)) return;
+    if (!row) return;
+    if (!await confirmDelete(`${row.name} をこの端末から削除しますか？`)) return;
     classes = window.ToolboxClasses.save(classes.filter((item) => item.id !== row.id));
     fillClasses();
-    writePrefs();
+    enterScope(teacherId(), classId());
     loadCatalog();
   });
   els["ms-cat-1"].addEventListener("click", () => {
