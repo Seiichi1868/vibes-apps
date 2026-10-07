@@ -414,7 +414,6 @@ def list_catalog(*, type_value, offset=0, limit=50) -> dict:
         if order <= 0 or order > 10000:
             continue
         rows.append(topic)
-    rows.sort(key=lambda topic: (_as_int(topic.get("source_order"), 0), str(topic.get("id"))))
     offset = max(0, _as_int(offset, 0))
     limit = max(1, min(_as_int(limit, 50), 100))
     page = rows[offset:offset + limit]
