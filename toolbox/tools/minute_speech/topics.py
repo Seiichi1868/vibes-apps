@@ -399,7 +399,7 @@ def _search_by_number(
     }
 
 
-def list_catalog(*, type_value, offset=0, limit=50) -> dict:
+def list_catalog(*, type_value, offset=0, limit=50, include_ids=False) -> dict:
     """タイプごとの番号順。1ページ分だけ返す。"""
     type_num = _as_int(type_value, 1)
     if type_num not in (1, 2):
@@ -417,12 +417,15 @@ def list_catalog(*, type_value, offset=0, limit=50) -> dict:
     offset = max(0, _as_int(offset, 0))
     limit = max(1, min(_as_int(limit, 50), 100))
     page = rows[offset:offset + limit]
-    return {
+    payload = {
         "results": [public_topic(topic) for topic in page],
         "has_more": offset + len(page) < len(rows),
         "count": len(rows),
         "offset": offset,
     }
+    if include_ids:
+        payload["ids"] = [str(topic.get("id") or "") for topic in rows]
+    return payload
 
 
 def content_hash(topic: dict) -> str:

@@ -166,6 +166,7 @@ def register(bp):
             type_value=request.args.get("type") or 1,
             offset=request.args.get("offset") or 0,
             limit=request.args.get("limit") or 50,
+            include_ids=str(request.args.get("index") or "") in ("1", "true", "yes"),
         )
         return jsonify({"ok": True, **data})
 

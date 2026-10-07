@@ -33,6 +33,8 @@
   let catType = 1;
   let catOffset = 0;
   const CAT_PAGE = 50;
+  const catalogIds = { 1: null, 2: null };
+  let catalogCount = 0;
   let searchOffset = 0;
   let audio = null;
 
@@ -47,10 +49,12 @@
         data.scopes = data.scopes || {};
         data.lastClass = data.lastClass || {};
         data.recentQueries = data.recentQueries || [];
+        data.nextUse = data.nextUse || {};
+        data.archived = data.archived || {};
         return data;
       }
     } catch (_) {}
-    return { history: {}, rounds: {}, hiddenTopicIds: [], prefs: {}, scopes: {}, lastClass: {}, recentQueries: [], lastBackupAt: null };
+    return { history: {}, rounds: {}, hiddenTopicIds: [], prefs: {}, scopes: {}, lastClass: {}, recentQueries: [], nextUse: {}, archived: {}, lastBackupAt: null };
   }
 
   function saveStore() {
@@ -72,11 +76,32 @@
     return bucket;
   }
 
+  function archivedYears(classKey) {
+    const id = classKey || classId();
+    const years = (store.archived || {})[id] || {};
+    return years && typeof years === "object" ? years : {};
+  }
+
+  function archivedRows(typeNum) {
+    const rows = [];
+    Object.values(archivedYears()).forEach((list) => {
+      if (!Array.isArray(list)) return;
+      list.forEach((row) => {
+        if (typeNum == null || Number(row.type) === Number(typeNum)) rows.push(row);
+      });
+    });
+    return rows;
+  }
+
+  function spentRows(typeNum) {
+    return usedRows(typeNum).concat(archivedRows(typeNum));
+  }
+
   function usedIds() {
     const type = typeValue();
     const types = type === "mixed" ? [1, 2] : [Number(type)];
     const ids = [];
-    types.forEach((num) => usedRows(num).forEach((row) => ids.push(row.id)));
+    types.forEach((num) => spentRows(num).forEach((row) => ids.push(row.id)));
     return ids;
   }
 
@@ -288,11 +313,34 @@
     if (current && teachers.some((row) => row.id === current)) select.value = current;
   }
 
+  function teacherClasses() {
+    const teacher = teacherId();
+    if (!teacher) return [];
+    return classes.filter((row) => row.teacher_id === teacher);
+  }
+
+  function moveClass(direction) {
+    const id = classId();
+    const mine = teacherClasses();
+    const index = mine.findIndex((row) => row.id === id);
+    const next = index + direction;
+    if (!id || index < 0 || next < 0 || next >= mine.length) return;
+    const from = classes.indexOf(mine[index]);
+    const to = classes.indexOf(mine[next]);
+    if (from < 0 || to < 0) return;
+    const swapped = classes[from];
+    classes[from] = classes[to];
+    classes[to] = swapped;
+    classes = window.ToolboxClasses.save(classes);
+    fillClasses();
+    selectClass(id);
+  }
+
   function fillClasses() {
     classes = window.ToolboxClasses ? window.ToolboxClasses.load() : [];
     const select = els["ms-class"];
     const current = select.value;
-    const mine = classes.filter((row) => row.teacher_id === teacherId() && teacherId());
+    const mine = teacherClasses();
     select.innerHTML = '<option value="">クラスなし（記録しない）</option>';
     mine.forEach((row) => {
       const option = document.createElement("option");
@@ -613,13 +661,23 @@
     startRunning();
   }
 
-  function topicIsUsed(item) {
+  function topicInLists(item, lists) {
+    return lists.some((rows) => Array.isArray(rows) && rows.some((row) => row.id === item.id));
+  }
+
+  function topicIsActiveUsed(item) {
     const id = classId();
     if (!id || !item || !item.id) return false;
     const bucket = store.history[id] || {};
     const typeKey = item.type != null && item.type !== "" ? String(item.type) : "";
     const lists = typeKey ? [bucket[typeKey] || []] : Object.values(bucket);
-    return lists.some((rows) => Array.isArray(rows) && rows.some((row) => row.id === item.id));
+    return topicInLists(item, lists);
+  }
+
+  function topicIsUsed(item) {
+    if (topicIsActiveUsed(item)) return true;
+    if (!item || !item.id || !classId()) return false;
+    return topicInLists(item, Object.values(archivedYears()));
   }
 
   function pushUsed(item) {
@@ -639,6 +697,7 @@
         source_order: item.source_order,
       });
     }
+    clearNext(item);
     saveStore();
   }
 
@@ -669,7 +728,18 @@
     const badge = card.querySelector("[data-used-badge]");
     if (badge) badge.hidden = !used;
     const button = card.querySelector("[data-used-toggle]");
-    if (button) button.textContent = used ? "使用済みを取り消す" : "使用済みにする";
+    if (button) {
+      const active = topicIsActiveUsed({ id: card.dataset.topicId, type: card.dataset.topicType });
+      button.textContent = active ? "使用済みを取り消す" : "使用済みにする";
+    }
+  }
+
+  function applyNextLook(card, next) {
+    card.classList.toggle("is-next", !!next);
+    const badge = card.querySelector("[data-next-badge]");
+    if (badge) badge.hidden = !next;
+    const button = card.querySelector("[data-next-toggle]");
+    if (button) button.textContent = next ? "次回使うを取り消す" : "次回使う";
   }
 
   function refreshUsedSurfaces(topicId) {
@@ -681,8 +751,9 @@
     const shown = els["ms-catalog"].querySelectorAll(".ms-card").length;
     if (shown) {
       const usedCount = els["ms-catalog"].querySelectorAll(".ms-card.is-used").length;
-      const total = (els["ms-cat-status"].textContent.match(/全 (\d+) 件/) || [])[1];
-      els["ms-cat-status"].textContent = `このページ ${shown} 件中、使用済み ${usedCount} 件。${total ? `全 ${total} 件。` : ""}`;
+      const nextCount = els["ms-catalog"].querySelectorAll(".ms-card.is-next").length;
+      const total = catalogCount || (els["ms-cat-status"].textContent.match(/全 (\d+) 件/) || [])[1];
+      els["ms-cat-status"].textContent = `このページ ${shown} 件中、使用済み ${usedCount} 件、次回使う ${nextCount} 件。${total ? `全 ${total} 件。` : ""}`;
     }
     if (!els["ms-panel-history"].hidden) renderHistory();
   }
@@ -694,8 +765,9 @@
     }
     if (topicIsUsed(item)) removeUsed(item);
     else pushUsed(item);
-    if (topic && item && topic.id === item.id) marked = topicIsUsed(item);
+    if (topic && item && topic.id === item.id) marked = topicIsActiveUsed(item);
     refreshUsedSurfaces(item.id);
+    refreshNextSurfaces(item.id);
   }
 
   function usedBadge(used) {
@@ -707,9 +779,137 @@
     button.type = "button";
     button.className = "tb-btn";
     button.dataset.usedToggle = "1";
-    button.textContent = topicIsUsed(item) ? "使用済みを取り消す" : "使用済みにする";
+    button.textContent = topicIsActiveUsed(item) ? "使用済みを取り消す" : "使用済みにする";
     button.addEventListener("click", () => toggleTopicUsed(item));
     return button;
+  }
+
+  function nextList() {
+    const id = classId();
+    store.nextUse = store.nextUse || {};
+    if (!id) return [];
+    if (!Array.isArray(store.nextUse[id])) store.nextUse[id] = [];
+    return store.nextUse[id];
+  }
+
+  function topicIsNext(item) {
+    if (!item || !item.id) return false;
+    return nextList().some((row) => row.id === item.id);
+  }
+
+  function clearNext(item) {
+    if (!item || !item.id) return;
+    const rows = nextList();
+    const index = rows.findIndex((row) => row.id === item.id);
+    if (index >= 0) rows.splice(index, 1);
+  }
+
+  function topicSnapshot(item) {
+    return {
+      id: item.id,
+      text: item.text,
+      suffix: item.suffix,
+      type: item.type,
+      ja: item.ja || "",
+      source_order: item.source_order,
+    };
+  }
+
+  function toggleNext(item) {
+    if (!classId()) {
+      alert("クラスを選ぶと次回使うを記録できます。");
+      return;
+    }
+    const rows = nextList();
+    const index = rows.findIndex((row) => row.id === item.id);
+    if (index >= 0) rows.splice(index, 1);
+    else rows.push(topicSnapshot(item));
+    saveStore();
+    refreshNextSurfaces(item.id);
+  }
+
+  function nextBadge(next) {
+    return `<span class="tb-badge ms-next-badge" data-next-badge ${next ? "" : "hidden"}>次回使う</span>`;
+  }
+
+  function nextToggleButton(item) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "tb-btn";
+    button.dataset.nextToggle = "1";
+    button.textContent = topicIsNext(item) ? "次回使うを取り消す" : "次回使う";
+    button.addEventListener("click", () => toggleNext(item));
+    return button;
+  }
+
+  function refreshNextSurfaces(topicId) {
+    document.querySelectorAll("#ms-catalog .ms-card, #ms-results .ms-card").forEach((card) => {
+      if (topicId && card.dataset.topicId !== topicId) return;
+      applyNextLook(card, topicIsNext({ id: card.dataset.topicId }));
+    });
+    paintCatalogPages(catalogCount);
+    const shown = els["ms-catalog"].querySelectorAll(".ms-card").length;
+    if (shown && catalogCount) {
+      const usedCount = els["ms-catalog"].querySelectorAll(".ms-card.is-used").length;
+      const nextCount = els["ms-catalog"].querySelectorAll(".ms-card.is-next").length;
+      els["ms-cat-status"].textContent = `このページ ${shown} 件中、使用済み ${usedCount} 件、次回使う ${nextCount} 件。全 ${catalogCount} 件。`;
+    }
+  }
+
+  function schoolYear(date) {
+    const now = date || new Date();
+    return now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+  }
+
+  function archiveYear() {
+    const year = Number(els["ms-archive-year"] && els["ms-archive-year"].value);
+    if (!Number.isInteger(year) || year < 2000 || year > 2100) return 0;
+    return year;
+  }
+
+  function archiveRows(rows, year) {
+    const id = classId();
+    if (!id || !year) return;
+    store.archived = store.archived || {};
+    store.archived[id] = archivedYears();
+    const key = String(year);
+    const existing = Array.isArray(store.archived[id][key]) ? store.archived[id][key] : [];
+    const seen = new Set(existing.map((row) => row.id));
+    rows.forEach((row) => {
+      if (!row || !row.id) return;
+      Object.keys(store.archived[id]).forEach((other) => {
+        if (other === key || !Array.isArray(store.archived[id][other])) return;
+        store.archived[id][other] = store.archived[id][other].filter((item) => item.id !== row.id);
+        if (!store.archived[id][other].length) delete store.archived[id][other];
+      });
+      if (seen.has(row.id)) {
+        removeUsed(row);
+        clearNext(row);
+        return;
+      }
+      seen.add(row.id);
+      existing.push(Object.assign({}, topicSnapshot(row), { usedAt: row.usedAt || "", year: key }));
+      removeUsed(row);
+      clearNext(row);
+    });
+    store.archived[id][key] = existing;
+    saveStore();
+  }
+
+  function restoreArchived(row) {
+    if (!row || !row.id) return;
+    pushUsed(row);
+    const years = archivedYears();
+    Object.keys(years).forEach((key) => {
+      years[key] = (years[key] || []).filter((item) => item.id !== row.id);
+      if (!years[key].length) delete years[key];
+    });
+    saveStore();
+  }
+
+  function restoreYear(year) {
+    const rows = ((archivedYears()[String(year)] || []).slice());
+    rows.forEach((row) => restoreArchived(row));
   }
 
   function cardActions() {
@@ -918,8 +1118,10 @@
       card.className = blur ? "ms-card is-blur" : "ms-card";
       card.dataset.topicId = item.id;
       card.dataset.topicType = String(item.type || "");
-      card.innerHTML = `<div class="ms-meta"><span class="tb-badge">タイプ${item.type}${topicNumber(item) ? " " + topicNumber(item) : ""}</span>${item.level ? `<span class="tb-badge">L${item.level}</span>` : ""}${usedBadge(used)}${(item.flags || []).length ? '<span class="tb-badge tb-badge-mute">配慮</span>' : ""}</div><p class="ms-card-text">${highlight(item.text, els["ms-q"].value)}</p>${item.ja ? `<p class="tb-muted">${esc(item.ja)}</p>` : ""}`;
+      const next = topicIsNext(item);
+      card.innerHTML = `<div class="ms-meta"><span class="tb-badge">タイプ${item.type}${topicNumber(item) ? " " + topicNumber(item) : ""}</span>${item.level ? `<span class="tb-badge">L${item.level}</span>` : ""}${usedBadge(used)}${nextBadge(next)}${(item.flags || []).length ? '<span class="tb-badge tb-badge-mute">配慮</span>' : ""}</div><p class="ms-card-text">${highlight(item.text, els["ms-q"].value)}</p>${item.ja ? `<p class="tb-muted">${esc(item.ja)}</p>` : ""}`;
       applyUsedLook(card, used);
+      applyNextLook(card, next);
       card.querySelector(".ms-card-text").addEventListener("click", () => card.classList.remove("is-blur"));
       const use = document.createElement("button");
       use.type = "button";
@@ -936,7 +1138,7 @@
         card.remove();
       });
       const actions = cardActions();
-      actions.append(use, usedToggleButton(item), hide);
+      actions.append(use, nextToggleButton(item), usedToggleButton(item), hide);
       card.appendChild(actions);
       box.appendChild(card);
     });
@@ -996,6 +1198,8 @@
       history: store.history,
       rounds: store.rounds,
       hiddenTopicIds: store.hiddenTopicIds,
+      nextUse: store.nextUse,
+      archived: store.archived,
       prefs: store.prefs,
       scopes: store.scopes,
       lastClass: store.lastClass,
@@ -1018,6 +1222,8 @@
         store.history = data.history || {};
         store.rounds = data.rounds || {};
         store.hiddenTopicIds = data.hiddenTopicIds || [];
+        if (data.nextUse && typeof data.nextUse === "object") store.nextUse = data.nextUse;
+        if (data.archived && typeof data.archived === "object") store.archived = data.archived;
         if (data.prefs && typeof data.prefs === "object") store.prefs = data.prefs;
         if (data.scopes && typeof data.scopes === "object") store.scopes = data.scopes;
         if (data.lastClass && typeof data.lastClass === "object") store.lastClass = data.lastClass;
@@ -1162,6 +1368,26 @@
   readPrefsIntoForm();
   renderRecent();
   loadStats().catch(() => {});
+  if (els["ms-archive-year"]) els["ms-archive-year"].value = String(schoolYear());
+  els["ms-archive-used"].addEventListener("click", () => {
+    if (!classId()) {
+      alert("クラスを選んでください。");
+      return;
+    }
+    const year = archiveYear();
+    if (!year) {
+      alert("年度は2000〜2100で入力してください。");
+      return;
+    }
+    const rows = allUsedRows();
+    if (!rows.length) {
+      alert("移す使用済みがありません。");
+      return;
+    }
+    if (!confirm(`使用済み ${rows.length} 件を ${year} の非表示に移しますか？`)) return;
+    archiveRows(rows, year);
+    loadCatalog();
+  });
   loadCatalog();
 
   els["ms-teacher"].addEventListener("change", () => {
@@ -1216,6 +1442,8 @@
     enterScope(teacherId(), classId());
     loadCatalog();
   });
+  els["ms-class-up"].addEventListener("click", () => moveClass(-1));
+  els["ms-class-down"].addEventListener("click", () => moveClass(1));
   els["ms-class-add"].addEventListener("click", () => saveClassRow(null));
   els["ms-class-edit"].addEventListener("click", () => {
     const row = classes.find((item) => item.id === classId());
@@ -1285,15 +1513,103 @@
       use.className = "tb-btn tb-btn-primary";
       use.textContent = "このお題を使う";
       use.addEventListener("click", () => useSearched(Object.assign({ used: true }, row)));
+      const archive = document.createElement("button");
+      archive.type = "button";
+      archive.className = "tb-btn";
+      archive.textContent = "非表示にする";
+      archive.addEventListener("click", () => {
+        const year = archiveYear();
+        if (!year) {
+          alert("年度は2000〜2100で入力してください。");
+          return;
+        }
+        archiveRows([row], year);
+        loadCatalog();
+      });
       const actions = cardActions();
-      actions.append(use, usedToggleButton(row));
+      actions.append(use, usedToggleButton(row), archive);
       card.appendChild(actions);
       box.appendChild(card);
     });
   }
 
+  function renderArchived() {
+    const box = els["ms-archived"];
+    if (!box) return;
+    box.innerHTML = "";
+    if (!classId()) return;
+    const years = archivedYears();
+    const keys = Object.keys(years).filter((key) => (years[key] || []).length).sort((a, b) => Number(b) - Number(a));
+    if (!keys.length) {
+      const note = document.createElement("p");
+      note.className = "tb-note";
+      note.textContent = "非表示にしたお題はまだありません。";
+      box.appendChild(note);
+      return;
+    }
+    keys.forEach((year) => {
+      const heading = document.createElement("h3");
+      heading.className = "ms-year";
+      heading.textContent = year;
+      const back = document.createElement("button");
+      back.type = "button";
+      back.className = "tb-btn";
+      back.textContent = `${year} を使用済みに戻す`;
+      back.addEventListener("click", () => {
+        restoreYear(year);
+        loadCatalog();
+      });
+      const list = document.createElement("div");
+      list.className = "ms-results";
+      (years[year] || []).forEach((row) => {
+        const card = document.createElement("article");
+        card.className = "ms-card is-used";
+        card.innerHTML = `<div class="ms-meta"><span class="tb-badge">タイプ${row.type}${topicNumber(row) ? " " + topicNumber(row) : ""}</span>${usedBadge(true)}</div><p class="ms-card-text">${esc(row.text)}</p>`;
+        const restore = document.createElement("button");
+        restore.type = "button";
+        restore.className = "tb-btn";
+        restore.textContent = "使用済みに戻す";
+        restore.addEventListener("click", () => {
+          restoreArchived(row);
+          loadCatalog();
+        });
+        const actions = cardActions();
+        actions.appendChild(restore);
+        card.appendChild(actions);
+        list.appendChild(card);
+      });
+      box.append(heading, back, list);
+    });
+  }
+
+  function paintCatalogPages(count) {
+    const pages = els["ms-cat-pages"];
+    if (!pages) return;
+    pages.innerHTML = "";
+    if (!count) return;
+    const ids = catalogIds[catType] || [];
+    const nextIds = new Set(nextList().filter((row) => Number(row.type) === Number(catType)).map((row) => row.id));
+    const pageCount = Math.ceil(count / CAT_PAGE);
+    for (let index = 0; index < pageCount; index += 1) {
+      const start = index * CAT_PAGE + 1;
+      const slice = ids.slice(index * CAT_PAGE, index * CAT_PAGE + CAT_PAGE);
+      const marked = slice.some((id) => nextIds.has(id));
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = catOffset === index * CAT_PAGE ? "tb-btn tb-btn-primary" : "tb-btn";
+      if (marked) button.classList.add("ms-page-next");
+      button.textContent = `${start}–${Math.min(count, start + CAT_PAGE - 1)}`;
+      button.addEventListener("click", () => {
+        catOffset = index * CAT_PAGE;
+        loadCatalog();
+      });
+      pages.appendChild(button);
+    }
+  }
+
   function loadCatalog() {
     renderUsedList();
+    renderArchived();
     const status = els["ms-cat-status"];
     status.textContent = "読み込み中…";
     const params = new URLSearchParams({
@@ -1301,48 +1617,39 @@
       offset: String(catOffset),
       limit: String(CAT_PAGE),
     });
+    if (!catalogIds[catType]) params.set("index", "1");
     toolboxFetch(`/toolbox/api/minute-speech/catalog?${params}`).then((data) => {
-      const used = new Set(usedRows(catType).map((row) => row.id));
+      if (Array.isArray(data.ids)) catalogIds[catType] = data.ids;
+      catalogCount = Number(data.count) || 0;
+      const used = new Set(spentRows(catType).map((row) => row.id));
       const box = els["ms-catalog"];
       box.innerHTML = "";
       (data.results || []).forEach((item) => {
         const isUsed = used.has(item.id);
+        const next = topicIsNext(item);
         const card = document.createElement("article");
         card.className = "ms-card";
         card.dataset.topicId = item.id;
         card.dataset.topicType = String(item.type || "");
-        card.innerHTML = `<div class="ms-meta"><span class="tb-badge">タイプ${item.type} ${topicNumber(item)}</span>${usedBadge(isUsed)}</div><p class="ms-card-text">${esc(item.text)}</p>`;
+        card.innerHTML = `<div class="ms-meta"><span class="tb-badge">タイプ${item.type} ${topicNumber(item)}</span>${usedBadge(isUsed)}${nextBadge(next)}</div><p class="ms-card-text">${esc(item.text)}</p>`;
         applyUsedLook(card, isUsed);
+        applyNextLook(card, next);
         const use = document.createElement("button");
         use.type = "button";
         use.className = "tb-btn tb-btn-primary";
         use.textContent = "このお題を使う";
         use.addEventListener("click", () => useSearched(Object.assign({}, item, { used: topicIsUsed(item) })));
         const actions = cardActions();
-        actions.append(use, usedToggleButton(item));
+        actions.append(use, nextToggleButton(item), usedToggleButton(item));
         card.appendChild(actions);
         box.appendChild(card);
       });
-      const count = Number(data.count) || 0;
-      const pages = els["ms-cat-pages"];
-      pages.innerHTML = "";
-      const pageCount = Math.ceil(count / CAT_PAGE);
-      for (let index = 0; index < pageCount; index += 1) {
-        const start = index * CAT_PAGE + 1;
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = catOffset === index * CAT_PAGE ? "tb-btn tb-btn-primary" : "tb-btn";
-        button.textContent = `${start}–${Math.min(count, start + CAT_PAGE - 1)}`;
-        button.addEventListener("click", () => {
-          catOffset = index * CAT_PAGE;
-          loadCatalog();
-        });
-        pages.appendChild(button);
-      }
+      paintCatalogPages(catalogCount);
       const shown = (data.results || []).length;
       const usedCount = (data.results || []).filter((item) => used.has(item.id)).length;
+      const nextCount = (data.results || []).filter((item) => topicIsNext(item)).length;
       status.textContent = shown
-        ? `このページ ${shown} 件中、使用済み ${usedCount} 件。全 ${count} 件。`
+        ? `このページ ${shown} 件中、使用済み ${usedCount} 件、次回使う ${nextCount} 件。全 ${catalogCount} 件。`
         : "表示できるお題がありません。";
     }).catch((err) => {
       status.textContent = err.message;
