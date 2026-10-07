@@ -107,7 +107,11 @@ def register(bp):
             limit = int(request.args.get("limit") or 50)
         except ValueError:
             limit = 50
-        return jsonify({"ok": True, **search_titles(request.args.get("q") or "", limit=limit)})
+        try:
+            since = int(request.args.get("since") or 0) or None
+        except ValueError:
+            since = None
+        return jsonify({"ok": True, **search_titles(request.args.get("q") or "", limit=limit, since_year=since)})
 
     @bp.route("/api/cnn10/library/embeddings/status")
     @login_required
@@ -163,6 +167,21 @@ def register(bp):
             logger.exception("toolbox cnn10 highlight failed")
             return jsonify({"ok": False, "error": str(exc)}), 502
         return jsonify({"ok": True, "highlight": highlight})
+
+    @bp.route("/api/cnn10/translate-range", methods=["POST"])
+    @login_required
+    @tool_required("cnn10")
+    def cnn10_translate_range():
+        payload = request.get_json(silent=True) or {}
+        text = str(payload.get("text") or "").strip()
+        if not text:
+            return jsonify({"ok": False, "error": "訳す英文がありません。"}), 400
+        try:
+            result = translate_script(text)
+        except Exception as exc:
+            logger.exception("toolbox cnn10 range translation failed")
+            return jsonify({"ok": False, "error": str(exc)}), 502
+        return jsonify({"ok": True, "translation": result.get("translation") or ""})
 
     @bp.route("/api/cnn10/lesson", methods=["GET", "POST"])
     @login_required

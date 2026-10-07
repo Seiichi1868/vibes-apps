@@ -29,9 +29,16 @@
   .tb-cnn10-line.is-hit { background: #fef3c7; border-radius: 4px; }
   .tb-cnn10-banner { margin-bottom: 8px; padding: 8px; border: 1px solid #fcd34d; background: #fffbeb; border-radius: 8px; font-size: 12px; }
   .tb-cnn10-banner input[type="range"] { width: 100%; }
-  .tb-cnn10-actions { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+  .tb-cnn10-slider-head input[type="range"] { flex: 1; width: auto; }
+  .tb-cnn10-actions { display: flex; gap: 8px; align-items: center; margin-top: 2px; }
+  .tb-cnn10-actions .tb-btn { min-height: 26px; min-width: 0; padding: 0 8px; font-size: 12px; line-height: 1; }
+  .tb-cnn10-slider-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .tb-cnn10-slider-head p { margin: 0; }
+  .tb-cnn10-mini { min-height: 22px; min-width: 0; padding: 0 8px; font-size: 11px; line-height: 1; border-radius: 999px; border: 1px solid #d6b25e; background: #fff; cursor: pointer; }
+  .tb-cnn10-ja { margin: 6px 0 0; white-space: pre-wrap; }
   .tb-cnn10-search { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
   .tb-cnn10-search input[type="search"] { flex: 1; min-width: 12rem; min-height: 36px; padding: 4px 10px; border: 1px solid #d7e3d4; border-radius: 999px; }
+  .tb-cnn10-search select { min-height: 36px; padding: 0 8px; border: 1px solid #d7e3d4; border-radius: 999px; background: #fff; }
   @media (max-width: 720px) { .tb-cnn10-row.is-open .tb-cnn10-preview { grid-template-columns: 1fr; } }
   .tb-archive { display: flex; gap: 12px; align-items: flex-start; list-style: none; margin: 0 0 12px; padding: 8px; border: 1px solid #e5efe4; border-radius: 10px; background: #fff; }
   .tb-archive-thumb { width: 160px; height: 90px; object-fit: cover; border-radius: 6px; background: #e2e8f0; flex: none; }
@@ -214,6 +221,9 @@
     </div>
     <div class="tb-cnn10-search">
       <input id="cnn10-search" type="search" placeholder="文字検索（例: Mars, election）" autocomplete="off">
+      <select id="cnn10-since" title="この年以降の動画に絞る">
+        <option value="">全期間</option>
+      </select>
       <button class="tb-btn" type="button" id="cnn10-library-btn">一覧を取得</button>
       <label class="tb-check"><input id="cnn10-ai-toggle" type="checkbox"> AI検索</label>
       <button class="tb-btn" type="button" id="cnn10-ai-btn" hidden>AI検索を準備</button>

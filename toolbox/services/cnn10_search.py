@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import json
 import logging
 import math
+import re
 import threading
 import time
 import urllib.request
@@ -53,6 +54,61 @@ def load_library() -> dict:
     }
 
 
+_MONTHS = {
+    name: index
+    for index, name in enumerate(
+        (
+            "january", "february", "march", "april", "may", "june",
+            "july", "august", "september", "october", "november", "december",
+        ),
+        start=1,
+    )
+}
+_EN_DATE_RE = re.compile(
+    r"\b(January|February|March|April|May|June|July|August|September|October|November|December)"
+    r"\s+(\d{1,2}),?\s+(\d{4})\b",
+    re.IGNORECASE,
+)
+_JA_DATE_RE = re.compile(r"(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日")
+_ISO_DATE_RE = re.compile(r"^(20\d{2})-(\d{2})-(\d{2})")
+
+
+def episode_date(item: dict) -> str:
+    """公開日。保存値か、タイトルに含まれる日付（例: October 6, 2026）。"""
+    published = str(item.get("published") or "").strip()
+    if _ISO_DATE_RE.match(published):
+        return published[:10]
+    title = str(item.get("title") or "")
+    match = _EN_DATE_RE.search(title)
+    if match:
+        month = _MONTHS[match.group(1).lower()]
+        day, year = int(match.group(2)), int(match.group(3))
+    else:
+        match = _JA_DATE_RE.search(title) or _JA_DATE_RE.search(published)
+        if not match:
+            return published
+        year, month, day = (int(match.group(i)) for i in (1, 2, 3))
+    try:
+        return datetime(year, month, day).strftime("%Y-%m-%d")
+    except ValueError:
+        return published
+
+
+def episode_year(item: dict) -> int | None:
+    date = episode_date(item)
+    match = _ISO_DATE_RE.match(date)
+    if match:
+        return int(match.group(1))
+    found = re.search(r"20\d{2}", date)
+    return int(found.group(0)) if found else None
+
+
+def library_years(episodes: list[dict]) -> list[int]:
+    years = {episode_year(item) for item in episodes}
+    years.discard(None)
+    return sorted(years, reverse=True)
+
+
 def library_status() -> dict:
     library = load_library()
     job = _read(JOB_FILE)
@@ -61,6 +117,7 @@ def library_status() -> dict:
         "updated_at": library["updated_at"],
         "running": _jobs["library"],
         "job": job,
+        "years": library_years(library["episodes"]),
     }
 
 
@@ -125,17 +182,34 @@ def start_library_update(mode: str = "diff") -> dict:
     return {"started": True, **library_status()}
 
 
-def search_titles(query: str, limit: int = 50) -> dict:
+def _with_date(item: dict) -> dict:
+    return {**item, "date": episode_date(item)}
+
+
+def _since_ok(item: dict, since_year: int | None) -> bool:
+    if since_year is None:
+        return True
+    year = episode_year(item)
+    return year is not None and year >= since_year
+
+
+def search_titles(query: str, limit: int = 50, since_year: int | None = None) -> dict:
     terms = [part.casefold() for part in str(query or "").split() if part.strip()]
     limit = max(1, min(int(limit or 50), 100))
     if not terms:
-        return {"query": query, "total": 0, "episodes": []}
+        return {"query": query, "total": 0, "episodes": [], "since_year": since_year}
     matches = [
         item for item in load_library()["episodes"]
-        if all(term in str(item.get("title") or "").casefold() for term in terms)
+        if _since_ok(item, since_year)
+        and all(term in str(item.get("title") or "").casefold() for term in terms)
     ]
-    matches.sort(key=lambda item: str(item.get("published") or ""), reverse=True)
-    return {"query": query, "total": len(matches), "episodes": matches[:limit]}
+    matches.sort(key=lambda item: episode_date(item), reverse=True)
+    return {
+        "query": query,
+        "total": len(matches),
+        "episodes": [_with_date(item) for item in matches[:limit]],
+        "since_year": since_year,
+    }
 
 
 def _encode(vector: list[float]) -> str:
@@ -160,14 +234,14 @@ def embedding_status() -> dict:
     episodes = load_library()["episodes"]
     vectors = _vectors()
     embedded = sum(1 for item in episodes if item["video_id"] in vectors)
-    years = sorted({str(item.get("published") or "")[:4] for item in episodes if str(item.get("published") or "")[:4].isdigit()}, reverse=True)
+    years = library_years(episodes)
     return {
         "library_count": len(episodes),
         "embedded_count": embedded,
         "missing_count": len(episodes) - embedded,
         "ready": embedded > 0,
         "running": _jobs["embed"],
-        "years": [int(year) for year in years],
+        "years": years,
     }
 
 
@@ -242,16 +316,10 @@ def semantic_search(query: str, limit: int = 10, since_year: int | None = None) 
         raise OpenAIHttpError("AI検索の準備ができていません。先に「AI検索を準備」を押してください。")
     query_vec = _decode(_encode(_embed([query])[0]))
 
-    def included(item: dict) -> bool:
-        if since_year is None:
-            return True
-        year = str(item.get("published") or "")[:4]
-        return year.isdigit() and int(year) >= since_year
-
     episodes = {
         item["video_id"]: item
         for item in load_library()["episodes"]
-        if included(item)
+        if _since_ok(item, since_year)
     }
     scored = []
     for video_id, vector in vectors.items():
@@ -263,5 +331,5 @@ def semantic_search(query: str, limit: int = 10, since_year: int | None = None) 
     scored.sort(key=lambda pair: pair[0], reverse=True)
     results = []
     for score, item in scored[:limit]:
-        results.append({**item, "score": round(float(score), 4)})
+        results.append({**_with_date(item), "score": round(float(score), 4)})
     return {"query": query, "episodes": results, "since_year": since_year}

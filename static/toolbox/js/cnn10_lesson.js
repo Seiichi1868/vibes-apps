@@ -396,6 +396,27 @@
     });
   }
 
+  function episodeDate(episode) {
+    const given = String(episode.date || "").trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(given)) return given.slice(0, 10);
+    const published = String(episode.published || "").trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(published)) return published.slice(0, 10);
+    const title = String(episode.title || "");
+    const match = title.match(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})\b/i);
+    if (!match) return published;
+    const months = {
+      january: "01", february: "02", march: "03", april: "04", may: "05", june: "06",
+      july: "07", august: "08", september: "09", october: "10", november: "11", december: "12",
+    };
+    const month = months[match[1].toLowerCase()];
+    const day = String(match[2]).padStart(2, "0");
+    return month ? `${match[3]}-${month}-${day}` : published;
+  }
+
+  function episodeMeta(episode) {
+    return [episode.scoreLabel || "", episodeDate(episode)].filter(Boolean).join(" · ");
+  }
+
   function renderSliders(banner, highlight, maxSec, handlers) {
     banner.hidden = false;
     banner.innerHTML = "";
@@ -404,7 +425,15 @@
     heading.textContent = highlight.from_ai
       ? `タイトル（${story || "この動画"}）に対応する区間（AI推定・スライダーで調整可）`
       : "再生区間（スライダーで調整可）";
+    const translateBtn = document.createElement("button");
+    translateBtn.type = "button";
+    translateBtn.className = "tb-cnn10-mini";
+    translateBtn.textContent = "和訳";
+    translateBtn.title = "この区間の和訳を表示";
     banner.appendChild(heading);
+    const ja = document.createElement("p");
+    ja.className = "tb-cnn10-ja";
+    ja.hidden = true;
     if (highlight.note) {
       const note = document.createElement("p");
       note.textContent = highlight.note;
@@ -432,13 +461,18 @@
       input.max = String(maxSec);
       input.step = "1";
       input.value = String(value);
-      wrap.append(head, input);
-      return { wrap, input, shown };
+      const line = document.createElement("div");
+      line.className = "tb-cnn10-slider-head";
+      line.appendChild(input);
+      wrap.append(head, line);
+      return { wrap, input, shown, line };
     }
 
     const start = row("開始", highlight.start_sec);
     const end = row("終了", highlight.end_sec);
-    banner.append(start.wrap, end.wrap);
+    start.line.appendChild(translateBtn);
+    banner.append(start.wrap, end.wrap, ja);
+    translateBtn.addEventListener("click", () => handlers.onTranslate?.(ja, translateBtn));
 
     function emit(source) {
       let startSec = parseInt(start.input.value, 10) || 0;
@@ -477,7 +511,7 @@
     img.src = episode.thumbnail_url || (episode.video_id ? `https://i.ytimg.com/vi/${episode.video_id}/mqdefault.jpg` : "");
     thumb.appendChild(img);
     const body = document.createElement("div");
-    body.innerHTML = `<p class="tb-cnn10-meta">${esc(episode.published || "")}</p><p class="tb-cnn10-title">${esc(episode.title || "Untitled")}</p>`;
+    body.innerHTML = `<p class="tb-cnn10-meta">${esc(episodeMeta(episode))}</p><p class="tb-cnn10-title">${esc(episode.title || "Untitled")}</p>`;
     const url = document.createElement("p");
     url.className = "tb-cnn10-url";
     const link = document.createElement("a");
@@ -589,6 +623,31 @@
           onChange: (updated) => {
             paintLines(transcript, snippets, updated);
             seekPreview(iframe, episode.video_id, updated.start_sec, updated.end_sec);
+          },
+          onTranslate: async (box, btn) => {
+            const text = snippets
+              .filter((snippet) => {
+                const start = Number(snippet.start) || 0;
+                return start >= highlight.start_sec && start < highlight.end_sec;
+              })
+              .map((snippet) => snippet.text || "")
+              .join(" ")
+              .trim();
+            box.hidden = false;
+            if (!text) {
+              box.textContent = "この区間に英文がありません。";
+              return;
+            }
+            btn.disabled = true;
+            box.textContent = "和訳しています…";
+            try {
+              const data = await postJson("/toolbox/api/cnn10/translate-range", { text });
+              box.textContent = data.ok ? (data.translation || "和訳がありません。") : (data.error || "和訳に失敗しました。");
+            } catch (err) {
+              box.textContent = err.message || "和訳に失敗しました。";
+            } finally {
+              btn.disabled = false;
+            }
           },
         });
         paintLines(transcript, snippets, highlight);
@@ -717,11 +776,13 @@
   });
 
   const searchInput = document.getElementById("cnn10-search");
+  const sinceSelect = document.getElementById("cnn10-since");
   const searchStatus = document.getElementById("cnn10-search-status");
   const libraryBtn = document.getElementById("cnn10-library-btn");
   const aiToggle = document.getElementById("cnn10-ai-toggle");
   const aiBtn = document.getElementById("cnn10-ai-btn");
   let embedState = { ready: false, running: false, missing_count: 0 };
+  let sinceYearsKey = "";
   let searchTimer = null;
   let libraryTimer = null;
   let embedTimer = null;
@@ -743,6 +804,7 @@
     const res = await fetch("/toolbox/api/cnn10/library/status");
     const data = await res.json();
     if (!data.ok) return;
+    renderSinceYears(data.years);
     const job = data.job || {};
     libraryBtn.disabled = Boolean(data.running);
     libraryBtn.textContent = data.running ? "取得中…" : (data.count ? "新着を取り込む" : "一覧を取得");
@@ -789,6 +851,7 @@
       missing_count: Number(data.missing_count) || 0,
     };
     syncAiButton();
+    renderSinceYears(data.years);
     if (aiToggle.checked) {
       const missing = embedState.missing_count
         ? `（未準備 ${embedState.missing_count} 本）`
@@ -821,16 +884,17 @@
       refreshLibraryStatus();
       return;
     }
-    const res = await fetch(`/toolbox/api/cnn10/library/search?q=${encodeURIComponent(query)}&limit=50`);
+    const res = await fetch(`/toolbox/api/cnn10/library/search?q=${encodeURIComponent(query)}&limit=50${sinceParam()}`);
     const data = await res.json();
     if (!data.ok) {
       searchStatus.textContent = data.error || "文字検索に失敗しました。";
       return;
     }
     const episodes = data.episodes || [];
+    const scope = data.since_year ? `${data.since_year}年以降 · ` : "";
     showSearchRows(episodes, episodes.length
-      ? `${data.total} 件ヒット${data.total > episodes.length ? `（${episodes.length} 件表示）` : ""}`
-      : "該当する動画がありません。");
+      ? `${scope}${data.total} 件ヒット${data.total > episodes.length ? `（${episodes.length} 件表示）` : ""}`
+      : `${scope}該当する動画がありません。`);
   }
 
   async function runAiSearch() {
@@ -840,7 +904,7 @@
       return;
     }
     searchStatus.textContent = "AI検索中…";
-    const res = await fetch(`/toolbox/api/cnn10/library/search/semantic?q=${encodeURIComponent(query)}&limit=10`);
+    const res = await fetch(`/toolbox/api/cnn10/library/search/semantic?q=${encodeURIComponent(query)}&limit=10${sinceParam()}`);
     const data = await res.json();
     if (!data.ok) {
       searchStatus.textContent = data.error || "AI検索に失敗しました。";
@@ -848,9 +912,26 @@
     }
     const episodes = (data.episodes || []).map((episode) => ({
       ...episode,
-      published: [`類似度 ${Math.round((Number(episode.score) || 0) * 100)}%`, episode.published || ""].filter(Boolean).join(" · "),
+      scoreLabel: `類似度 ${Math.round((Number(episode.score) || 0) * 100)}%`,
     }));
-    showSearchRows(episodes, episodes.length ? `AI検索の結果 ${episodes.length} 件` : "近い動画がありません。");
+    const scope = data.since_year ? `${data.since_year}年以降 · ` : "";
+    showSearchRows(episodes, episodes.length ? `${scope}AI検索の結果 ${episodes.length} 件` : `${scope}近い動画がありません。`);
+  }
+
+  function sinceParam() {
+    const since = sinceSelect.value;
+    return since ? `&since=${encodeURIComponent(since)}` : "";
+  }
+
+  function renderSinceYears(years) {
+    const list = (years || []).map(String);
+    const key = list.join(",");
+    if (!list.length || key === sinceYearsKey) return;
+    sinceYearsKey = key;
+    const selected = sinceSelect.value;
+    sinceSelect.replaceChildren(new Option("全期間", ""));
+    list.forEach((year) => sinceSelect.appendChild(new Option(`${year}年以降`, year)));
+    if (list.includes(selected)) sinceSelect.value = selected;
   }
 
   searchInput.addEventListener("input", () => {
@@ -885,6 +966,9 @@
       aiBtn.hidden = true;
       runTextSearch();
     }
+  });
+  sinceSelect.addEventListener("change", () => {
+    if (!aiToggle.checked) runTextSearch();
   });
   aiBtn.addEventListener("click", () => {
     if (aiBtn.dataset.mode === "prep") startAiPrep();
