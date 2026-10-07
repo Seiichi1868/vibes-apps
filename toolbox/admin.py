@@ -52,13 +52,24 @@ def _cost_performance(score, est_cost: float | None):
     return round(ratio, 2)
 
 
-def _model_rows(kind: str) -> list[dict]:
-    selected = get_setting("transcribe_model" if kind == "transcribe" else "generate_model")
+CNN10_HIGHLIGHT_MODELS = ("gpt-5.6-terra", "gpt-5.6-luna")
+
+
+def _model_rows(kind: str, *, setting_key: str | None = None, only: tuple[str, ...] | None = None, radio_name: str | None = None) -> list[dict]:
+    if setting_key:
+        selected = get_setting(setting_key)
+    else:
+        selected = get_setting("transcribe_model" if kind == "transcribe" else "generate_model")
     assume_sec = float(get_setting("assume_transcribe_sec") or 180)
     assume_in = int(get_setting("assume_input_tokens") or 1500)
     assume_out = int(get_setting("assume_output_tokens") or 800)
     rows = []
-    for entry in resolved_catalog(kind):
+    catalog = resolved_catalog(kind)
+    if only:
+        order = {model_id: index for index, model_id in enumerate(only)}
+        catalog = [entry for entry in catalog if entry["id"] in order]
+        catalog.sort(key=lambda entry: order[entry["id"]])
+    for entry in catalog:
         measured = measured_stats(entry["id"], kind)
         if kind == "transcribe":
             est = estimate_transcribe_usd(entry["id"], assume_sec) if entry["priced"] else None
@@ -81,6 +92,7 @@ def _model_rows(kind: str) -> list[dict]:
                 "est_cost_usd": None if est is None else round(est, 6),
                 "measured": measured,
                 "cost_performance": _cost_performance(entry.get("quality_score"), est),
+                "radio_name": radio_name or kind,
             }
         )
     return rows
@@ -123,6 +135,12 @@ def admin_page():
         user_names=user_names,
         transcribe_models=_model_rows("transcribe"),
         generate_models=_model_rows("generate"),
+        highlight_models=_model_rows(
+            "generate",
+            setting_key="cnn10_highlight_model",
+            only=CNN10_HIGHLIGHT_MODELS,
+            radio_name="cnn10_highlight",
+        ),
     )
 
 
@@ -323,15 +341,21 @@ def admin_select_model():
     payload = request.get_json(silent=True) or {}
     kind = payload.get("kind")
     model_id = payload.get("model_id")
-    if kind not in ("transcribe", "generate"):
+    if kind not in ("transcribe", "generate", "cnn10_highlight"):
         return jsonify({"ok": False, "error": "種別が不正です。"}), 400
-    catalog = {row["id"]: row for row in resolved_catalog(kind)}
+    catalog_kind = "generate" if kind == "cnn10_highlight" else kind
+    catalog = {row["id"]: row for row in resolved_catalog(catalog_kind)}
     entry = catalog.get(model_id)
     if not entry:
         return jsonify({"ok": False, "error": "モデルが見つかりません。"}), 404
+    if kind == "cnn10_highlight" and model_id not in CNN10_HIGHLIGHT_MODELS:
+        return jsonify({"ok": False, "error": "区間推測は gpt-5.6-terra と gpt-5.6-luna から選んでください。"}), 400
     if not entry.get("priced"):
         return jsonify({"ok": False, "error": "価格未設定のモデルは選べません。"}), 400
-    key = "transcribe_model" if kind == "transcribe" else "generate_model"
+    if kind == "cnn10_highlight":
+        key = "cnn10_highlight_model"
+    else:
+        key = "transcribe_model" if kind == "transcribe" else "generate_model"
     update_app_settings({key: model_id})
     return jsonify({"ok": True, "settings": load_app_settings()})
 

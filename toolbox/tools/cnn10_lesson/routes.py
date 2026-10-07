@@ -8,7 +8,7 @@ import io
 from flask import jsonify, render_template, request, send_file
 
 from toolbox.auth import login_required
-from toolbox.config import DEFAULT_GENERATE_MODEL, get_openai_api_key
+from toolbox.config import get_openai_api_key
 from toolbox.routes import tool_required
 from toolbox.openai_http import OpenAIHttpError
 from toolbox.services.cnn10 import fetch_cnn10_episodes
@@ -156,10 +156,16 @@ def register(bp):
             return jsonify({"ok": False, "error": "文字起こしデータが必要です。"}), 400
         if not get_openai_api_key():
             return jsonify({"ok": True, "highlight": {"ok": False, "error": "OpenAI API キーが未設定です。"}})
-        model = str(get_setting("generate_model") or DEFAULT_GENERATE_MODEL)
+        model = str(get_setting("cnn10_highlight_model") or "gpt-5.6-terra")
+        if model not in ("gpt-5.6-terra", "gpt-5.6-luna"):
+            model = "gpt-5.6-terra"
         try:
             highlight = find_title_segment_in_transcript(
-                title, snippets, model=model, api_key=get_openai_api_key()
+                title,
+                snippets,
+                model=model,
+                api_key=get_openai_api_key(),
+                avoid=payload.get("avoid") or [],
             )
         except ValueError as exc:
             return jsonify({"ok": True, "highlight": {"ok": False, "error": str(exc)}})

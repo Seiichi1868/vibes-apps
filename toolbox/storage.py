@@ -305,6 +305,7 @@ DEFAULT_APP_SETTINGS = {
     "daily_limit_usd": DEFAULT_DAILY_LIMIT_USD,
     "transcribe_model": DEFAULT_TRANSCRIBE_MODEL,
     "generate_model": DEFAULT_GENERATE_MODEL,
+    "cnn10_highlight_model": "gpt-5.6-terra",
     "assume_transcribe_sec": DEFAULT_ASSUME_TRANSCRIBE_SEC,
     "assume_input_tokens": DEFAULT_ASSUME_INPUT_TOKENS,
     "assume_output_tokens": DEFAULT_ASSUME_OUTPUT_TOKENS,

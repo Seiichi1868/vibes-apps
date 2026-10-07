@@ -1,7 +1,7 @@
 <tr data-id="{{ row.id }}" data-cost="{{ row.est_cost_usd if row.est_cost_usd is not none else 999 }}" data-latency="{{ row.measured.avg_latency_ms or 999999 }}" data-quality="{{ row.quality_score or 0 }}">
   <td>
     {% if row.priced %}
-    <label><input type="radio" name="model-{{ row.kind }}" value="{{ row.id }}" {% if row.selected %}checked{% endif %}> {% if row.selected %}<span class="tb-badge">使用中</span>{% endif %}</label>
+    <label><input type="radio" name="model-{{ row.radio_name or row.kind }}" value="{{ row.id }}" {% if row.selected %}checked{% endif %}> {% if row.selected %}<span class="tb-badge">使用中</span>{% endif %}</label>
     {% else %}
     <span class="tb-muted">選択不可（価格未設定）</span>
     {% endif %}

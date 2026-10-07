@@ -430,6 +430,11 @@
     translateBtn.className = "tb-cnn10-mini";
     translateBtn.textContent = "和訳";
     translateBtn.title = "この区間の和訳を表示";
+    const researchBtn = document.createElement("button");
+    researchBtn.type = "button";
+    researchBtn.className = "tb-cnn10-mini";
+    researchBtn.textContent = "再検索";
+    researchBtn.title = "聞いてタイトルと違うときに、別の区間を推定し直します";
     banner.appendChild(heading);
     const ja = document.createElement("p");
     ja.className = "tb-cnn10-ja";
@@ -470,9 +475,10 @@
 
     const start = row("開始", highlight.start_sec);
     const end = row("終了", highlight.end_sec);
-    start.line.appendChild(translateBtn);
+    start.line.append(translateBtn, researchBtn);
     banner.append(start.wrap, end.wrap, ja);
     translateBtn.addEventListener("click", () => handlers.onTranslate?.(ja, translateBtn));
+    researchBtn.addEventListener("click", () => handlers.onResearch?.(researchBtn));
 
     function emit(source) {
       let startSec = parseInt(start.input.value, 10) || 0;
@@ -594,6 +600,77 @@
         const data = await window.YoutubeTranscript.fetchTranscript(episode.video_id, { languages: ["en", "ja"] });
         snippets = data.snippets || data.all_snippets || [];
         const maxSec = snippetDurationSec(data.all_snippets || snippets);
+        const avoided = [];
+
+        function showHighlight(guessed) {
+          highlight = {
+            ok: true,
+            start_sec: guessed?.ok ? guessed.start_sec : 0,
+            end_sec: guessed?.ok ? guessed.end_sec : maxSec,
+            start_display: guessed?.ok ? guessed.start_display : formatTime(0),
+            end_display: guessed?.ok ? guessed.end_display : formatTime(maxSec),
+            from_ai: Boolean(guessed?.ok),
+            note: guessed?.note || "",
+            error: guessed?.ok ? "" : (guessed?.error || ""),
+            confidence: guessed?.confidence || "",
+            story_title: episode.title || "",
+          };
+          if (highlight.end_sec <= highlight.start_sec) highlight.end_sec = Math.min(maxSec, highlight.start_sec + 1);
+          renderSliders(banner, highlight, maxSec, {
+            onInput: (updated) => paintLines(transcript, snippets, updated),
+            onChange: (updated) => {
+              paintLines(transcript, snippets, updated);
+              seekPreview(iframe, episode.video_id, updated.start_sec, updated.end_sec);
+            },
+            onTranslate: async (box, btn) => {
+              const text = snippets
+                .filter((snippet) => {
+                  const start = Number(snippet.start) || 0;
+                  return start >= highlight.start_sec && start < highlight.end_sec;
+                })
+                .map((snippet) => snippet.text || "")
+                .join(" ")
+                .trim();
+              box.hidden = false;
+              if (!text) {
+                box.textContent = "この区間に英文がありません。";
+                return;
+              }
+              btn.disabled = true;
+              box.textContent = "和訳しています…";
+              try {
+                const translated = await postJson("/toolbox/api/cnn10/translate-range", { text });
+                box.textContent = translated.ok ? (translated.translation || "和訳がありません。") : (translated.error || "和訳に失敗しました。");
+              } catch (err) {
+                box.textContent = err.message || "和訳に失敗しました。";
+              } finally {
+                btn.disabled = false;
+              }
+            },
+            onResearch: async (btn) => {
+              if (!highlight) return;
+              avoided.push({ start_sec: highlight.start_sec, end_sec: highlight.end_sec });
+              btn.disabled = true;
+              meta.textContent = "別の区間を探しています…";
+              try {
+                const payload = await postJson("/toolbox/api/cnn10/highlight", {
+                  title: episode.title || "",
+                  snippets: data.all_snippets || snippets,
+                  avoid: avoided,
+                });
+                if (!payload.ok) throw new Error(payload.error || "区間の再検索に失敗しました。");
+                showHighlight(payload.highlight);
+              } catch (err) {
+                meta.textContent = err.message || "区間の再検索に失敗しました。";
+                btn.disabled = false;
+              }
+            },
+          });
+          paintLines(transcript, snippets, highlight);
+          seekPreview(iframe, episode.video_id, highlight.start_sec, highlight.end_sec);
+          meta.textContent = `${data.language || "English"}${highlight.from_ai ? ` · AI推定 ${highlight.start_display}–${highlight.end_display}` : ""}`;
+        }
+
         let guessed = null;
         try {
           const payload = await postJson("/toolbox/api/cnn10/highlight", {
@@ -605,54 +682,7 @@
         } catch (err) {
           guessed = { ok: false, error: err.message || "区間推定に失敗しました。" };
         }
-        highlight = {
-          ok: true,
-          start_sec: guessed?.ok ? guessed.start_sec : 0,
-          end_sec: guessed?.ok ? guessed.end_sec : maxSec,
-          start_display: guessed?.ok ? guessed.start_display : formatTime(0),
-          end_display: guessed?.ok ? guessed.end_display : formatTime(maxSec),
-          from_ai: Boolean(guessed?.ok),
-          note: guessed?.note || "",
-          error: guessed?.ok ? "" : (guessed?.error || ""),
-          confidence: guessed?.confidence || "",
-          story_title: episode.title || "",
-        };
-        if (highlight.end_sec <= highlight.start_sec) highlight.end_sec = Math.min(maxSec, highlight.start_sec + 1);
-        renderSliders(banner, highlight, maxSec, {
-          onInput: (updated) => paintLines(transcript, snippets, updated),
-          onChange: (updated) => {
-            paintLines(transcript, snippets, updated);
-            seekPreview(iframe, episode.video_id, updated.start_sec, updated.end_sec);
-          },
-          onTranslate: async (box, btn) => {
-            const text = snippets
-              .filter((snippet) => {
-                const start = Number(snippet.start) || 0;
-                return start >= highlight.start_sec && start < highlight.end_sec;
-              })
-              .map((snippet) => snippet.text || "")
-              .join(" ")
-              .trim();
-            box.hidden = false;
-            if (!text) {
-              box.textContent = "この区間に英文がありません。";
-              return;
-            }
-            btn.disabled = true;
-            box.textContent = "和訳しています…";
-            try {
-              const data = await postJson("/toolbox/api/cnn10/translate-range", { text });
-              box.textContent = data.ok ? (data.translation || "和訳がありません。") : (data.error || "和訳に失敗しました。");
-            } catch (err) {
-              box.textContent = err.message || "和訳に失敗しました。";
-            } finally {
-              btn.disabled = false;
-            }
-          },
-        });
-        paintLines(transcript, snippets, highlight);
-        seekPreview(iframe, episode.video_id, highlight.start_sec, highlight.end_sec);
-        meta.textContent = `${data.language || "English"}${highlight.from_ai ? ` · AI推定 ${highlight.start_display}–${highlight.end_display}` : ""}`;
+        showHighlight(guessed);
         loaded = true;
       } catch (err) {
         transcript.textContent = err.message || "文字起こしの取得に失敗しました。";
