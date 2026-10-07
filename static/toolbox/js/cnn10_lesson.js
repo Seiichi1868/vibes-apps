@@ -342,24 +342,44 @@
     });
   });
 
+  const qaKind = document.getElementById("qa-add-kind");
+  const qaText = document.getElementById("qa-add-text");
+  const qaAnswer = document.getElementById("qa-add-answer");
+
+  function syncQaPlaceholders() {
+    if (qaKind.value === "writing") {
+      qaText.placeholder = "話題";
+      qaAnswer.placeholder = "和訳";
+    } else {
+      qaText.placeholder = "質問";
+      qaAnswer.placeholder = "模範解答";
+    }
+  }
+
+  qaKind.addEventListener("change", syncQaPlaceholders);
+
   document.getElementById("qa-compose").addEventListener("submit", (ev) => {
     ev.preventDefault();
-    const kind = document.getElementById("qa-add-kind").value;
-    const text = document.getElementById("qa-add-text").value.trim();
-    const answer = document.getElementById("qa-add-answer").value.trim();
-    if (kind !== "warmup" && kind !== "discussion") return;
+    const kind = qaKind.value;
+    const text = qaText.value.trim();
+    const answer = qaAnswer.value.trim();
+    if (kind !== "warmup" && kind !== "discussion" && kind !== "writing") return;
     if (!text) {
-      assistStatus.textContent = "質問を入力してください。";
+      assistStatus.textContent = kind === "writing" ? "話題を入力してください。" : "質問を入力してください。";
       return;
     }
     const items = Array.isArray(currentLesson[kind]) ? currentLesson[kind].slice() : [];
-    items.push({ text, answer, selected: true });
+    if (kind === "writing") {
+      items.push({ text, text_ja: answer, kind: "question", options: [], selected: true });
+    } else {
+      items.push({ text, answer, selected: true });
+    }
     assistStatus.textContent = "追加しています…";
     saveLesson({ [kind]: items }).then((lesson) => {
       renderAssist(lesson);
-      document.getElementById("qa-add-text").value = "";
-      document.getElementById("qa-add-answer").value = "";
-      assistStatus.textContent = "質問を追加しました。";
+      qaText.value = "";
+      qaAnswer.value = "";
+      assistStatus.textContent = kind === "writing" ? "話題を追加しました。" : "質問を追加しました。";
     }).catch((err) => {
       assistStatus.textContent = err.message;
     });

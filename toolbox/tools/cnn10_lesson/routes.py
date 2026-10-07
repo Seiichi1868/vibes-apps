@@ -332,8 +332,12 @@ def register(bp):
                 result = {base: (existing + fresh) if more else fresh}
             elif kind == "translation":
                 result = translate_script(script)
-            elif kind == "writing":
-                result = {"writing": extract_writing(script)}
+            elif kind in {"writing", "writing_more"}:
+                current = load_lesson().get("writing")
+                existing = current if isinstance(current, list) else []
+                more = kind == "writing_more"
+                fresh = extract_writing(script, existing if more else None)
+                result = {"writing": (existing + fresh) if more else fresh}
             else:
                 return jsonify({"ok": False, "error": "kind が不正です。"}), 400
         except Exception as exc:

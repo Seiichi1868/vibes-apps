@@ -85,7 +85,7 @@ def extract_questions(script: str, kind: str, avoid: list | None = None) -> list
         text = str(item.get("text") or item.get("q") or "").strip()
         if text:
             existing.append(text)
-    count = 2 if existing else 3
+    count = 5
     if kind == "warmup":
         instruction = (
             f"視聴前の導入質問を{count}つ。生徒はこの動画をまだ見ていない。"
@@ -111,34 +111,58 @@ def extract_questions(script: str, kind: str, avoid: list | None = None) -> list
     return _qa_items(payload, limit=count)
 
 
-def extract_writing(script: str) -> list[dict]:
+def extract_writing(script: str, avoid: list | None = None) -> list[dict]:
+    existing = []
+    for item in avoid or []:
+        if not isinstance(item, dict):
+            continue
+        text = str(item.get("text") or "").strip()
+        if text:
+            existing.append(text)
+    avoided = ""
+    if existing:
+        listed = "\n".join(f"- {text}" for text in existing[:24])
+        avoided = f"\nすでに次の話題がある。内容が重ならない新しい話題だけを5つ作る。\n{listed}\n"
     payload = _json_content([
         {
             "role": "system",
             "content": (
-                "高校生向けの英語ライティング話題を2つ。"
+                "高校生向けの英語ライティング話題をちょうど5つ。"
+                "3つは意見が分かれる2択（kind は opinion、options は短い英語の2つ）。"
+                "2つは理由を書いて答えるオープンな問い（kind は question、options は空配列）。"
                 " JSON {\"items\":[{\"text\",\"text_ja\",\"kind\":\"opinion\",\"options\":[\"A\",\"B\"]}]}。"
-                " text は英語の問い。options は意見が分かれる2択。"
+                " text は英語の問い。text_ja は自然な日本語。"
+                "動画の具体的な出来事の暗記ではなく、テーマから広げて自分の経験で書ける内容にする。"
             ),
         },
-        {"role": "user", "content": script[:12000]},
+        {"role": "user", "content": script[:12000] + avoided},
     ])
+    raw_items = payload.get("items") or payload.get("topics") or payload.get("writing") or []
     items = []
-    for item in payload.get("items") or []:
+    for item in raw_items:
         if not isinstance(item, dict):
             continue
-        text = str(item.get("text") or "").strip()
+        text = str(item.get("text") or item.get("prompt") or "").strip()
         if not text:
             continue
         options = [str(opt).strip() for opt in (item.get("options") or []) if str(opt).strip()]
+        kind = str(item.get("kind") or "").strip()
+        if kind == "question" or len(options) < 2:
+            kind = "question"
+            options = []
+        else:
+            kind = "opinion"
+            options = options[:2]
         items.append({
             "text": text,
-            "text_ja": str(item.get("text_ja") or "").strip(),
-            "kind": "opinion",
-            "options": options[:2],
+            "text_ja": str(item.get("text_ja") or item.get("prompt_ja") or "").strip(),
+            "kind": kind,
+            "options": options,
             "selected": True,
         })
-    return items[:4]
+    if not items:
+        raise RuntimeError("ライティングの話題を作れませんでした。もう一度お試しください。")
+    return items[:5]
 
 
 def translate_script(script: str) -> dict:

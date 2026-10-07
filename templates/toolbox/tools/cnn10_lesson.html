@@ -165,11 +165,12 @@
   </section>
 
   <details class="tb-rare">
-    <summary>質問を手入力で追加</summary>
+    <summary>手入力で追加</summary>
     <form id="qa-compose" class="tb-rare-form">
       <select id="qa-add-kind" aria-label="種類">
         <option value="warmup">Warm-up</option>
         <option value="discussion">Discussion</option>
+        <option value="writing">Writing</option>
       </select>
       <input id="qa-add-text" type="text" placeholder="質問" aria-label="質問">
       <input id="qa-add-answer" type="text" placeholder="模範解答" aria-label="模範解答">
@@ -183,6 +184,7 @@
     <h2>Writing</h2>
     <div class="tb-row-actions">
       <button class="tb-btn" type="button" data-assist="writing">Writingを作る</button>
+      <button class="tb-btn" type="button" data-assist="writing_more">追加作成</button>
     </div>
     <div id="preview-writing"></div>
   </section>
