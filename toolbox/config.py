@@ -24,6 +24,9 @@ USAGE_LOG_FILE = DATA_DIR / "usage_log.json"
 TALK_SESSIONS_DIR = DATA_DIR / "talk_sessions"
 AUDIO_TMP_DIR = DATA_DIR / "audio_tmp"
 TALK_AUDIO_DIR = DATA_DIR / "talk_audio"
+MINUTE_SPEECH_OVERLAY_FILE = DATA_DIR / "minute_speech_overlay.json"
+MINUTE_SPEECH_EMBEDDINGS_FILE = DATA_DIR / "minute_speech_embeddings.json"
+MINUTE_SPEECH_SEED_FILE = Path(__file__).resolve().parent / "data" / "minute_speech_topics_seed.json"
 
 COOKIE_NAME = "toolbox_session"
 COOKIE_MAX_AGE = 60 * 60 * 24 * 14
@@ -49,6 +52,7 @@ DEFAULT_ASSUME_OUTPUT_TOKENS = 800
 
 DEFAULT_TRANSCRIBE_MODEL = "whisper-1"
 DEFAULT_GENERATE_MODEL = "gpt-4o-mini"
+DEFAULT_EMBED_MODEL = "text-embedding-3-small"
 DEFAULT_PARALLEL_BROWSER_STT = True
 DEFAULT_LOGIN_REQUIRED = False
 

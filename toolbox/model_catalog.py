@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-from toolbox.pricing import GENERATE_PRICES, TRANSCRIBE_PRICES, has_price
+from toolbox.pricing import EMBED_PRICES, GENERATE_PRICES, TRANSCRIBE_PRICES, has_price
 from toolbox.storage import load_app_settings
 
 # 性能スコアは既存ディベート／音読の参考値に合わせた目安。画面では「参考値」と明示する。
@@ -89,6 +89,15 @@ MODEL_CATALOG: list[dict] = [
         "speed_note": "遅いことがある。",
         "last_verified": "2026-10-04",
     },
+    {
+        "id": "text-embedding-3-small",
+        "label": "text-embedding-3-small",
+        "kind": "embed",
+        "quality_score": 4,
+        "quality_note": "1分スピーチのお題検索用。短い検索語をベクトル化する。",
+        "speed_note": "速い。全件のインデックス作成は件数分かかる。",
+        "last_verified": "2026-10-07",
+    },
 ]
 
 
@@ -125,6 +134,9 @@ def resolved_catalog(kind: str | None = None) -> list[dict]:
         if row["kind"] == "transcribe":
             price = TRANSCRIBE_PRICES.get(row["id"]) or {}
             row["price"] = {"per_min": price.get("per_min")}
+        elif row["kind"] == "embed":
+            price = EMBED_PRICES.get(row["id"]) or {}
+            row["price"] = {"input_per_1m": price.get("input_per_1m")}
         else:
             price = GENERATE_PRICES.get(row["id"]) or {}
             row["price"] = {

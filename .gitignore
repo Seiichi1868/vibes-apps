@@ -37,6 +37,7 @@ Thumbs.db
 *.json
 !package.json
 !**/manifest.json
+!toolbox/data/minute_speech_topics_seed.json
 service-account-*.json
 
 # バックアップ・ログ

@@ -21,7 +21,7 @@ from toolbox.auth import (
 from toolbox.cli import USERNAME_RE
 from toolbox.config import MIN_PASSWORD_LEN
 from toolbox.model_catalog import resolved_catalog
-from toolbox.pricing import estimate_generate_usd, estimate_transcribe_usd
+from toolbox.pricing import estimate_embed_usd, estimate_generate_usd, estimate_transcribe_usd
 from toolbox.registry import all_tools, get_tool
 from toolbox.routes import main_bp
 from toolbox.storage import (
@@ -58,6 +58,8 @@ CNN10_HIGHLIGHT_MODELS = ("gpt-5.6-terra", "gpt-5.6-luna")
 def _model_rows(kind: str, *, setting_key: str | None = None, only: tuple[str, ...] | None = None, radio_name: str | None = None) -> list[dict]:
     if setting_key:
         selected = get_setting(setting_key)
+    elif kind == "embed":
+        selected = get_setting("embed_model")
     else:
         selected = get_setting("transcribe_model" if kind == "transcribe" else "generate_model")
     assume_sec = float(get_setting("assume_transcribe_sec") or 180)
@@ -74,6 +76,9 @@ def _model_rows(kind: str, *, setting_key: str | None = None, only: tuple[str, .
         if kind == "transcribe":
             est = estimate_transcribe_usd(entry["id"], assume_sec) if entry["priced"] else None
             unit = f"${entry['price']['per_min']}/分" if entry["priced"] else "未設定"
+        elif kind == "embed":
+            est = estimate_embed_usd(entry["id"], 40) if entry["priced"] else None
+            unit = f"${entry['price']['input_per_1m']}/1M" if entry["priced"] else "未設定"
         else:
             est = (
                 estimate_generate_usd(entry["id"], assume_in, assume_out)
@@ -135,6 +140,7 @@ def admin_page():
         user_names=user_names,
         transcribe_models=_model_rows("transcribe"),
         generate_models=_model_rows("generate"),
+        embed_models=_model_rows("embed"),
         highlight_models=_model_rows(
             "generate",
             setting_key="cnn10_highlight_model",
@@ -341,7 +347,7 @@ def admin_select_model():
     payload = request.get_json(silent=True) or {}
     kind = payload.get("kind")
     model_id = payload.get("model_id")
-    if kind not in ("transcribe", "generate", "cnn10_highlight"):
+    if kind not in ("transcribe", "generate", "embed", "cnn10_highlight"):
         return jsonify({"ok": False, "error": "種別が不正です。"}), 400
     catalog_kind = "generate" if kind == "cnn10_highlight" else kind
     catalog = {row["id"]: row for row in resolved_catalog(catalog_kind)}
@@ -354,6 +360,8 @@ def admin_select_model():
         return jsonify({"ok": False, "error": "価格未設定のモデルは選べません。"}), 400
     if kind == "cnn10_highlight":
         key = "cnn10_highlight_model"
+    elif kind == "embed":
+        key = "embed_model"
     else:
         key = "transcribe_model" if kind == "transcribe" else "generate_model"
     update_app_settings({key: model_id})

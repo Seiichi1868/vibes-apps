@@ -1,0 +1,78 @@
+{% extends "toolbox/base.html" %}
+{% block title %}1分スピーチのお題 · Toolbox{% endblock %}
+{% block body %}
+<section class="tb-tool">
+  <p><a href="{{ url_for('toolbox.admin_page') }}">管理画面へ戻る</a></p>
+  <h1>1分スピーチのお題</h1>
+  <p class="tb-note">編集は data/toolbox の上書きファイルに保存され、再デプロイしても残ります。シード自体は書き換えません。</p>
+
+  <h2>検索インデックス</h2>
+  <p id="ms-embed-status">モデル {{ embed_status.model or "未作成" }} / 件数 {{ embed_status.count }} / 未反映 {{ embed_status.stale }} / 更新 {{ embed_status.updated_at or "—" }}</p>
+  <p class="tb-note">差分 {{ embed_estimate.count }} 件の推定費用: {% if embed_estimate.est_cost_usd is not none %}${{ embed_estimate.est_cost_usd }}{% else %}算出できません{% endif %}（{{ embed_estimate.model or "モデル未選択" }}、{{ embed_estimate.dim }}次元）。検索1回の目安 {% if embed_estimate.search_est_usd is not none %}${{ embed_estimate.search_est_usd }}{% else %}—{% endif %}。</p>
+  <div class="tb-actions">
+    <button class="tb-btn" type="button" id="ms-embed-refresh">推定費用を確認</button>
+    <button class="tb-btn tb-btn-primary" type="button" id="ms-embed-start">作成／更新</button>
+  </div>
+  <p class="tb-note" id="ms-embed-job"></p>
+
+  <h2>難易度と日本語訳</h2>
+  <p class="tb-note">未付与 {{ classify_estimate.count }} 件、約 {{ classify_estimate.batches }} 回。推定費用 {% if classify_estimate.est_cost_usd is not none %}${{ classify_estimate.est_cost_usd }}{% else %}算出できません{% endif %}（{{ classify_estimate.model or "—" }}）。実行前に確認します。sensitive と判定されたお題は非公開になります。</p>
+  <div class="tb-actions">
+    <button class="tb-btn" type="button" id="ms-classify-refresh">推定費用を確認</button>
+    <button class="tb-btn tb-btn-primary" type="button" id="ms-classify-start">分類を実行</button>
+    <button class="tb-btn" type="button" id="ms-approve">未確認のAI判定を一括承認</button>
+    <button class="tb-btn" type="button" id="ms-hide-flags">フラグ付きをすべて非公開に</button>
+  </div>
+  <p class="tb-note" id="ms-classify-job"></p>
+
+  <form id="ms-admin-settings" class="tb-inline-form">
+    <label>AI検索の類似度しきい値
+      <input name="minute_speech_sim_min" type="number" min="0" max="0.95" step="0.01" value="{{ sim_min }}">
+    </label>
+    <label class="tb-check"><input name="minute_speech_translate_query" type="checkbox" {% if translate_query %}checked{% endif %}> 日本語訳がない索引では検索語を英語にしてから探す</label>
+    <button class="tb-btn" type="submit">保存</button>
+  </form>
+
+  <h2>一覧</h2>
+  <form id="ms-filters" class="tb-inline-form">
+    <input name="q" type="search" placeholder="本文・訳">
+    <select name="type"><option value="">タイプ</option><option value="1">1</option><option value="2">2</option></select>
+    <select name="status"><option value="">状態</option><option value="active">公開</option><option value="hidden">非公開</option></select>
+    <select name="flagged"><option value="">フラグ</option><option value="yes">あり</option><option value="no">なし</option></select>
+    <select name="level"><option value="">難易度</option><option value="none">未設定</option><option>1</option><option>2</option><option>3</option></select>
+    <select name="has_ja"><option value="">日本語訳</option><option value="yes">あり</option><option value="no">なし</option></select>
+    <button class="tb-btn" type="submit">絞り込み</button>
+  </form>
+  <div class="tb-table-wrap">
+    <table class="tb-table">
+      <thead><tr><th>タイプ</th><th>本文</th><th>訳・難易度</th><th></th></tr></thead>
+      <tbody id="ms-rows"></tbody>
+    </table>
+  </div>
+  <button class="tb-btn" type="button" id="ms-more">さらに表示</button>
+
+  <h2>オリジナルお題を追加</h2>
+  <form id="ms-add" class="tb-stack">
+    <label>タイプ <select name="type"><option value="1">タイプ1</option><option value="2">タイプ2</option></select></label>
+    <label>本文 <textarea name="text" rows="3" required></textarea></label>
+    <label>難易度 <select name="level"><option value="">未設定</option><option>1</option><option>2</option><option>3</option></select></label>
+    <label>日本語訳 <input name="ja" type="text"></label>
+    <button class="tb-btn tb-btn-primary" type="submit">追加</button>
+  </form>
+</section>
+<div class="tb-modal" id="tb-reauth" hidden>
+  <form class="tb-card tb-narrow" id="tb-reauth-form">
+    <h2>パスワード再入力</h2>
+    <p>重要な操作を続けるには、管理パスワードが必要です。</p>
+    <input name="password" type="password" required>
+    <p class="tb-error" id="tb-reauth-error" hidden></p>
+    <div class="tb-row-actions">
+      <button class="tb-btn tb-btn-primary" type="submit">確認</button>
+      <button class="tb-btn" type="button" id="tb-reauth-cancel">キャンセル</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='toolbox/js/minute_speech_admin.js', v=toolbox_cache) }}"></script>
+{% endblock %}

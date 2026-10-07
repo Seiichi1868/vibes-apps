@@ -146,6 +146,25 @@
     </table>
   </div>
 
+  <h3>検索用モデル（埋め込み）</h3>
+  <p class="tb-note">1分スピーチのAI検索で使います。推定/回は検索1回（約40トークン）です。全件のインデックス作成費用は <a href="{{ url_for('toolbox.minute_speech_admin_page') }}">1分スピーチのお題管理</a> に出します。価格未設定は選べません。</p>
+  <div class="tb-table-wrap">
+    <table class="tb-table tb-model-table" data-kind="embed">
+      <thead>
+        <tr>
+          <th>選択</th><th>モデル</th><th>価格</th><th>推定/検索</th>
+          <th>平均所要</th><th>平均費用</th>
+          <th>性能</th><th>コスパ</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in embed_models %}
+        {% include "toolbox/_model_row.html" %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
   <h3>News Talk の区間推測用</h3>
   <p class="tb-note">CNN10 の文字起こしから、タイトルに対応する範囲を推定するモデルです。gpt-5.6-terra と gpt-5.6-luna から選べます。初期値は terra です。</p>
   <div class="tb-table-wrap">
@@ -164,6 +183,9 @@
       </tbody>
     </table>
   </div>
+
+  <h2>1分スピーチ</h2>
+  <p class="tb-note"><a href="{{ url_for('toolbox.minute_speech_admin_page') }}">お題の管理・分類・検索インデックス</a></p>
 
   <h2>音声の保存先フォルダ</h2>
   <p class="tb-note">このブラウザで録音した音声の保存先です。選んだフォルダは、同じパソコンのスピーチ理解度チェックでも使われます。</p>

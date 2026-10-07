@@ -49,6 +49,17 @@ TOOLS: list[dict] = [
         "default_enabled": True,
     },
     {
+        "id": "minute-speech",
+        "name": "1分スピーチ",
+        "description": "お題を大きく出し、準備と発話の時間を計る。",
+        "icon": "speech",
+        "scene": "展開",
+        "route": "toolbox.minute_speech_page",
+        "path": "/toolbox/minute-speech",
+        "uses_ai": False,
+        "default_enabled": True,
+    },
+    {
         "id": "talk_check",
         "name": "スピーチ理解度チェック",
         "description": "スピーチを録音し、理解度チェックの質問を作る。",

@@ -47,6 +47,14 @@ TRANSCRIBE_PRICES: dict[str, dict] = {
 }
 
 
+# 埋め込み: 1M トークンあたり USD。
+EMBED_PRICES: dict[str, dict] = {
+    "text-embedding-3-small": {
+        "input_per_1m": 0.02,  # TODO: 要確認
+    },
+}
+
+
 def generate_price(model_id: str) -> dict | None:
     return GENERATE_PRICES.get(model_id)
 
@@ -55,10 +63,17 @@ def transcribe_price(model_id: str) -> dict | None:
     return TRANSCRIBE_PRICES.get(model_id)
 
 
+def embed_price(model_id: str) -> dict | None:
+    return EMBED_PRICES.get(model_id)
+
+
 def has_price(kind: str, model_id: str) -> bool:
     if kind == "transcribe":
         entry = TRANSCRIBE_PRICES.get(model_id) or {}
         return entry.get("per_min") is not None
+    if kind == "embed":
+        entry = EMBED_PRICES.get(model_id) or {}
+        return entry.get("input_per_1m") is not None
     entry = GENERATE_PRICES.get(model_id) or {}
     return entry.get("input_per_1m") is not None and entry.get("output_per_1m") is not None
 
@@ -71,6 +86,14 @@ def estimate_generate_usd(model_id: str, input_tokens: int, output_tokens: int) 
     return (input_tokens / 1_000_000.0) * float(entry["input_per_1m"]) + (
         output_tokens / 1_000_000.0
     ) * float(entry["output_per_1m"])
+
+
+def estimate_embed_usd(model_id: str, input_tokens: int) -> float | None:
+    entry = embed_price(model_id)
+    if not entry or entry.get("input_per_1m") is None:
+        logger.warning("Toolbox: 価格未設定の埋め込みモデルです: %s", model_id)
+        return None
+    return (max(0, int(input_tokens)) / 1_000_000.0) * float(entry["input_per_1m"])
 
 
 def estimate_transcribe_usd(model_id: str, audio_seconds: float) -> float | None:

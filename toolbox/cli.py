@@ -54,3 +54,31 @@ def register(app) -> None:
                 raise click.ClickException("パスワードが一致しません。")
         user = create_user_record(username, password, role)
         click.echo(f"作成しました: {user['username']} ({user['role']})")
+
+    @toolbox_cli.command("minute-speech-classify")
+    def minute_speech_classify():
+        """未付与のお題に難易度と日本語訳を付ける。"""
+        from toolbox.tools.minute_speech import classify
+        from toolbox.tools.minute_speech.topics import classification_count
+
+        estimate = classify.estimate()
+        click.echo(f"未付与 {estimate['count']} 件 / 推定費用 {estimate.get('est_cost_usd')}")
+        if not click.confirm("実行しますか？"):
+            return
+        while classification_count():
+            result = classify.run_batch("cli")
+            click.echo(f"保存 {result['applied']} / 残り {result['remaining']}")
+            if result["applied"] <= 0:
+                break
+
+    @toolbox_cli.command("minute-speech-embed")
+    def minute_speech_embed():
+        """お題の検索インデックスを差分更新する。"""
+        from toolbox.tools.minute_speech import embed
+
+        estimate = embed.index_estimate()
+        click.echo(f"未反映 {estimate['count']} 件 / 推定費用 {estimate.get('est_cost_usd')}")
+        if not click.confirm("実行しますか？"):
+            return
+        started = embed.start_index("cli")
+        click.echo("開始しました" if started.get("started") else "すでに実行中です")

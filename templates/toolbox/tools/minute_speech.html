@@ -1,0 +1,173 @@
+{% extends "toolbox/base.html" %}
+{% block title %}1分スピーチ · Toolbox{% endblock %}
+{% block head %}
+<style>
+  .ms-setup { display: grid; gap: 14px; }
+  .ms-tabs { display: flex; gap: 8px; }
+  .ms-panel[hidden] { display: none !important; }
+  .ms-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+  .ms-grid label, .ms-line { display: flex; flex-direction: column; gap: 4px; font-size: 0.92rem; }
+  .ms-checks { display: flex; flex-wrap: wrap; gap: 12px 18px; }
+  .ms-search { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .ms-search input[type="search"] { flex: 1; min-width: 12rem; }
+  .ms-results { display: grid; gap: 8px; }
+  .ms-card { background: #fff; border: 1px solid var(--tb-line); border-radius: 12px; padding: 10px 12px; }
+  .ms-card.is-blur .ms-card-text { filter: blur(6px); cursor: pointer; }
+  .ms-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 6px; }
+  .ms-hit { background: #f8e3b8; }
+  .ms-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ms-chips button { border-radius: 999px; }
+  .ms-stage { display: none; height: calc(100dvh - 72px); grid-template-rows: 6% minmax(0, 50%) minmax(25%, 38%) auto; background: #f4f7fb; color: #142033; border-radius: 16px; overflow: hidden; }
+  .ms-stage.is-on { display: grid; }
+  .ms-stage.is-long { grid-template-rows: 6% minmax(0, 60%) minmax(25%, 32%) auto; }
+  .ms-stage.is-prep { background: #e7eef8; }
+  .ms-stage.is-speak { background: #e5f4cf; color: #17300c; }
+  .ms-stage.is-warn { background: #f8e3b8; color: #5c4308; }
+  .ms-stage.is-end { background: #fff7ea; }
+  .ms-band, .ms-ops { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px; font-size: 0.85rem; }
+  .ms-topic { min-height: 0; display: flex; flex-direction: column; justify-content: center; padding: 4px 16px 8px; }
+  .ms-topic-text { margin: 0; font-weight: 700; line-height: 1.15; overflow-wrap: anywhere; }
+  .ms-suffix, .ms-ja { margin: 6px 0 0; font-size: clamp(0.85rem, 2vh, 1.2rem); font-weight: 500; opacity: 0.85; }
+  .ms-hint { margin: 4px 0 0; font-size: clamp(0.75rem, 1.8vh, 1rem); letter-spacing: 0.01em; }
+  .ms-clock { min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .ms-phase { margin: 0; font-size: clamp(1rem, 3vh, 1.6rem); letter-spacing: 0.12em; }
+  .ms-time { margin: 0; font-size: 28vh; line-height: 0.85; font-variant-numeric: tabular-nums; font-weight: 760; }
+  .ms-stage.is-long .ms-time { font-size: 22vh; }
+  .ms-time.is-time { animation: ms-blink 1.1s ease-in-out infinite; }
+  .ms-switch { font-size: 18vh; font-weight: 800; letter-spacing: 0.04em; }
+  @keyframes ms-blink { 50% { opacity: 0.45; } }
+  .ms-ops { flex-wrap: wrap; min-height: 48px; }
+  .ms-history-list { display: grid; gap: 8px; }
+  .ms-history-list .ms-card.is-blur .ms-card-text { filter: blur(6px); }
+  @media (max-aspect-ratio: 1/1) {
+    .ms-stage, .ms-stage.is-long { grid-template-rows: auto minmax(28vh, 1fr) minmax(25vh, 34vh) auto; height: auto; min-height: calc(100dvh - 72px); }
+    .ms-time, .ms-stage.is-long .ms-time { font-size: 22vh; }
+  }
+  body.tb-display-on .ms-stage.is-on { position: fixed; inset: 0; z-index: 12; height: 100dvh; border-radius: 0; }
+  body.tb-display-on .ms-ops { opacity: 0.2; }
+  body.tb-display-on .ms-ops:hover, body.tb-display-on .ms-ops:focus-within { opacity: 1; }
+</style>
+{% endblock %}
+{% block body %}
+<section class="tb-tool ms-setup" id="ms-setup">
+  <div class="ms-tabs">
+    <button class="tb-btn tb-btn-primary" type="button" id="ms-tab-setup">設定</button>
+    <button class="tb-btn" type="button" id="ms-tab-history">履歴</button>
+  </div>
+
+  <div id="ms-panel-setup">
+    <h1 class="tb-tool-title">1分スピーチ</h1>
+    <div class="ms-grid">
+      <label>クラス
+        <select id="ms-class"></select>
+      </label>
+      <label>タイプ
+        <select id="ms-type">
+          <option value="1">タイプ1：身近なテーマ</option>
+          <option value="2">タイプ2：立場を選んで意見</option>
+          <option value="mixed">両方からランダム</option>
+        </select>
+      </label>
+      <label>難易度
+        <select id="ms-level">
+          <option value="1">やさしめ（1）</option>
+          <option value="2" selected>標準まで（1〜2）</option>
+          <option value="3">すべて</option>
+        </select>
+      </label>
+      <label>準備（秒）
+        <input id="ms-prep" type="number" min="10" max="300" value="60">
+      </label>
+      <label>発話（秒）
+        <input id="ms-speak" type="number" min="10" max="300" value="60">
+      </label>
+      <label>活動形式
+        <select id="ms-format">
+          <option value="solo">個人（前で発表）</option>
+          <option value="pair">ペア交代</option>
+        </select>
+      </label>
+    </div>
+    <div class="ms-chips" id="ms-presets">
+      <button class="tb-btn" type="button" data-prep="30">準備30</button>
+      <button class="tb-btn" type="button" data-prep="60">準備60</button>
+      <button class="tb-btn" type="button" data-prep="90">準備90</button>
+      <button class="tb-btn" type="button" data-speak="30">発話30</button>
+      <button class="tb-btn" type="button" data-speak="60">発話60</button>
+      <button class="tb-btn" type="button" data-speak="90">発話90</button>
+      <button class="tb-btn" type="button" data-speak="120">発話120</button>
+    </div>
+    <div class="ms-checks">
+      <label class="tb-check"><input id="ms-unleveled" type="checkbox" checked> 難易度未設定も含める</label>
+      <label class="tb-check"><input id="ms-flagged" type="checkbox"> 配慮フラグ付きを含める</label>
+      <label class="tb-check"><input id="ms-auto" type="checkbox" checked> 準備から発話へ自動で切り替える</label>
+      <label class="tb-check"><input id="ms-ja" type="checkbox"> 日本語訳を表示</label>
+      <label class="tb-check"><input id="ms-hints" type="checkbox" checked> 構成ヒントを表示</label>
+    </div>
+    <button class="tb-btn tb-btn-primary" type="button" id="ms-draw">お題を出す</button>
+
+    <h2>お題を探す</h2>
+    <p class="tb-note">結果が画面に映ります。表示モード中は検索しません。</p>
+    <div class="ms-search">
+      <input id="ms-q" type="search" placeholder="一致検索（例: school, travel）" autocomplete="off">
+      <label class="tb-check"><input id="ms-ai" type="checkbox"> AI検索</label>
+      <label class="tb-check"><input id="ms-exclude-used" type="checkbox"> 使用済みを除く</label>
+      <label class="tb-check"><input id="ms-blur" type="checkbox" checked> ぼかして表示</label>
+      <button class="tb-btn" type="button" id="ms-search-btn">検索</button>
+    </div>
+    <div class="ms-chips" id="ms-themes"></div>
+    <div class="ms-chips" id="ms-recent"></div>
+    <p class="tb-note" id="ms-search-status"></p>
+    <div class="ms-results" id="ms-results"></div>
+  </div>
+
+  <div id="ms-panel-history" hidden>
+    <h2>使用履歴</h2>
+    <p class="tb-note">この端末に保存します。一覧はぼかしが既定です。</p>
+    <p id="ms-progress">読み込み中…</p>
+    <p class="tb-note" id="ms-backup-note"></p>
+    <div class="tb-actions">
+      <button class="tb-btn" type="button" id="ms-export">書き出す</button>
+      <button class="tb-btn" type="button" id="ms-import">読み込む</button>
+      <input id="ms-import-file" type="file" accept="application/json" hidden>
+      <button class="tb-btn" type="button" id="ms-reset-type">このクラス・このタイプの履歴をリセット</button>
+    </div>
+    <div class="ms-history-list" id="ms-history"></div>
+  </div>
+</section>
+
+<section class="ms-stage" id="ms-stage" data-display-root hidden>
+  <div class="ms-band">
+    <span id="ms-meta-type"></span>
+    <span id="ms-meta-class"></span>
+    <span id="ms-meta-no"></span>
+  </div>
+  <div class="ms-topic" id="ms-topic-box">
+    <p class="ms-topic-text" id="ms-topic-text"></p>
+    <p class="ms-suffix" id="ms-suffix" hidden></p>
+    <p class="ms-ja" id="ms-ja-line" hidden></p>
+    <p class="ms-hint" id="ms-hint" hidden></p>
+  </div>
+  <div class="ms-clock" id="ms-clock">
+    <p class="ms-phase" id="ms-phase">READY</p>
+    <p class="ms-time" id="ms-time">1:00</p>
+  </div>
+  <div class="ms-ops">
+    <button class="tb-btn tb-btn-primary" type="button" id="ms-start">Start</button>
+    <button class="tb-btn" type="button" id="ms-pause" hidden>一時停止</button>
+    <button class="tb-btn" type="button" id="ms-reset">リセット</button>
+    <button class="tb-btn" type="button" id="ms-next">次のお題</button>
+    <button class="tb-btn" type="button" id="ms-again" hidden>同じお題でもう一度</button>
+    <button class="tb-btn" type="button" id="ms-undo" hidden>使用済みを取り消す</button>
+    <button class="tb-btn" type="button" id="ms-skip">見送り</button>
+    <button class="tb-btn" type="button" id="ms-hide">今後出さない</button>
+    <button class="tb-btn" type="button" id="ms-toggle-ja">訳 J</button>
+    <button class="tb-btn" type="button" id="ms-toggle-hint">ヒント H</button>
+    <button class="tb-btn" type="button" id="ms-back">設定に戻る</button>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='toolbox/js/local_classes.js', v=toolbox_cache) }}"></script>
+<script src="{{ url_for('static', filename='toolbox/js/minute_speech.js', v=toolbox_cache) }}"></script>
+{% endblock %}

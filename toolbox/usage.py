@@ -1,8 +1,10 @@
 """OpenAI 呼び出しと利用量・上限。他アプリの usage は import しない。"""
 from __future__ import annotations
 
+import json
 import logging
 import time
+import urllib.request
 from datetime import datetime
 
 from toolbox.config import (
@@ -13,8 +15,8 @@ from toolbox.config import (
     get_openai_api_key,
 )
 from toolbox.model_catalog import resolved_catalog
-from toolbox.openai_http import OpenAIHttpError, chat_completions
-from toolbox.pricing import estimate_generate_usd, estimate_transcribe_usd, has_price
+from toolbox.openai_http import OpenAIHttpError, _ssl_context, chat_completions
+from toolbox.pricing import estimate_embed_usd, estimate_generate_usd, estimate_transcribe_usd, has_price
 from toolbox.storage import append_usage, get_setting, list_usage, now_dt
 
 logger = logging.getLogger(__name__)
@@ -58,7 +60,7 @@ def today_cost_usd() -> float:
         dt = _parse_ts(row.get("ts"))
         if not dt or dt.strftime("%Y-%m-%d") != key:
             continue
-        if row.get("kind") not in ("transcribe", "llm"):
+        if row.get("kind") not in ("transcribe", "llm", "embed"):
             continue
         try:
             total += float(row.get("est_cost_usd") or 0)
@@ -79,7 +81,12 @@ def check_daily_limit() -> None:
 
 
 def selected_model(kind: str) -> str:
-    key = "transcribe_model" if kind == "transcribe" else "generate_model"
+    if kind == "transcribe":
+        key = "transcribe_model"
+    elif kind == "embed":
+        key = "embed_model"
+    else:
+        key = "generate_model"
     model_id = str(get_setting(key) or "")
     catalog = {row["id"]: row for row in resolved_catalog(kind)}
     if model_id in catalog and catalog[model_id]["priced"]:
@@ -229,10 +236,68 @@ def generate_json(
     return raw, content
 
 
+def embed_texts(
+    *,
+    texts: list[str],
+    user_id: str,
+    tool_id: str,
+    dimensions: int = 256,
+) -> list[list[float]]:
+    """埋め込み API。利用ログと1日上限の対象。"""
+    check_daily_limit()
+    model_id = selected_model("embed")
+    if not has_price("embed", model_id):
+        raise UsageError("選択中の検索モデルは価格未設定のため使えません。")
+    api_key = get_openai_api_key()
+    if not api_key:
+        raise UsageError("OpenAI の API キーが設定されていません。管理者に連絡してください。")
+    started = time.monotonic()
+    payload = json.dumps({
+        "model": model_id,
+        "input": texts,
+        "dimensions": int(dimensions),
+    }).encode("utf-8")
+    request = urllib.request.Request(
+        "https://api.openai.com/v1/embeddings",
+        data=payload,
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=60, context=_ssl_context()) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except UsageLimitError:
+        raise
+    except Exception as exc:
+        logger.exception("Toolbox embed failed: %s", exc)
+        raise UsageError("検索用のベクトル化に失敗しました。一致検索を使ってください。") from exc
+    latency_ms = int((time.monotonic() - started) * 1000)
+    usage = data.get("usage") or {}
+    input_tokens = int(usage.get("prompt_tokens") or usage.get("total_tokens") or 0)
+    cost = estimate_embed_usd(model_id, input_tokens)
+    if cost is None:
+        raise UsageError("検索モデルの価格が未設定です。")
+    append_usage(
+        {
+            "user_id": user_id,
+            "tool_id": tool_id,
+            "kind": "embed",
+            "model": model_id,
+            "audio_seconds": None,
+            "input_tokens": input_tokens,
+            "output_tokens": 0,
+            "est_cost_usd": round(cost, 6),
+            "latency_ms": latency_ms,
+        }
+    )
+    ordered = sorted(data.get("data") or [], key=lambda item: item.get("index") or 0)
+    return [item["embedding"] for item in ordered]
+
+
 def usage_summary() -> dict:
     today = _today_key()
     month = _month_key()
-    rows = [row for row in list_usage() if row.get("kind") in ("transcribe", "llm")]
+    rows = [row for row in list_usage() if row.get("kind") in ("transcribe", "llm", "embed")]
     def _bucket(predicate):
         items = [row for row in rows if predicate(row)]
         return {
@@ -275,7 +340,12 @@ def usage_summary() -> dict:
 
 
 def measured_stats(model_id: str, kind: str) -> dict:
-    mapped = "transcribe" if kind == "transcribe" else "llm"
+    if kind == "transcribe":
+        mapped = "transcribe"
+    elif kind == "embed":
+        mapped = "embed"
+    else:
+        mapped = "llm"
     rows = [row for row in list_usage() if row.get("model") == model_id and row.get("kind") == mapped]
     if len(rows) < 3:
         return {"n": len(rows), "avg_latency_ms": None, "avg_cost_usd": None}

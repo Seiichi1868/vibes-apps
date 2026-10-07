@@ -277,6 +277,7 @@ html.tb-skip-opening .tb-opening { display: none !important; }
 .tb-icon-cnn10 { border-radius: 4px 4px 10px 10px; }
 .tb-icon-dice { transform: rotate(12deg); }
 .tb-icon-mic { border-radius: 14px 14px 6px 6px; }
+.tb-icon-speech { border-radius: 14px 14px 14px 4px; }
 .tb-icon-seats {
   border-radius: 4px;
   background:
