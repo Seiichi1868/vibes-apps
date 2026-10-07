@@ -721,7 +721,7 @@
   const libraryBtn = document.getElementById("cnn10-library-btn");
   const aiToggle = document.getElementById("cnn10-ai-toggle");
   const aiBtn = document.getElementById("cnn10-ai-btn");
-  const aiPrep = document.getElementById("cnn10-ai-prep");
+  let embedState = { ready: false, running: false, missing_count: 0 };
   let searchTimer = null;
   let libraryTimer = null;
   let embedTimer = null;
@@ -759,19 +759,58 @@
     }
   }
 
+  function syncAiButton() {
+    const on = aiToggle.checked;
+    aiBtn.hidden = !on;
+    if (!on) return;
+    const query = searchInput.value.trim();
+    if (embedState.running) {
+      aiBtn.disabled = true;
+      aiBtn.textContent = "準備しています…";
+      aiBtn.dataset.mode = "wait";
+    } else if (!embedState.ready || (embedState.missing_count && !query)) {
+      aiBtn.disabled = false;
+      aiBtn.textContent = embedState.ready ? "未準備分を準備" : "AI検索を準備";
+      aiBtn.dataset.mode = "prep";
+    } else {
+      aiBtn.disabled = !query;
+      aiBtn.textContent = "AIで検索";
+      aiBtn.dataset.mode = "search";
+    }
+  }
+
   async function refreshEmbedStatus() {
     const res = await fetch("/toolbox/api/cnn10/library/embeddings/status");
     const data = await res.json();
     if (!data.ok) return;
-    aiBtn.disabled = !data.ready || data.running;
-    aiPrep.hidden = !aiToggle.checked || data.running || (data.ready && !data.missing_count);
-    aiPrep.textContent = data.ready ? "未準備分を準備" : "AI検索を準備";
+    embedState = {
+      ready: Boolean(data.ready),
+      running: Boolean(data.running),
+      missing_count: Number(data.missing_count) || 0,
+    };
+    syncAiButton();
     if (aiToggle.checked) {
-      searchStatus.textContent = data.running
+      const missing = embedState.missing_count
+        ? `（未準備 ${embedState.missing_count} 本）`
+        : "";
+      searchStatus.textContent = embedState.running
         ? "AI検索を準備しています…"
-        : (data.ready ? `AI検索の準備済み ${data.embedded_count} 本` : "AI検索はまだ準備されていません。");
+        : (embedState.ready
+          ? `意味検索の準備済み ${data.embedded_count} 本${missing}`
+          : "意味検索はまだ準備されていません。");
     }
-    if (data.running) embedTimer = setTimeout(refreshEmbedStatus, 2000);
+    if (embedState.running) embedTimer = setTimeout(refreshEmbedStatus, 2000);
+  }
+
+  async function startAiPrep() {
+    aiBtn.disabled = true;
+    const data = await postJson("/toolbox/api/cnn10/library/embeddings/init", {});
+    if (!data.ok) {
+      searchStatus.textContent = data.error || "準備を開始できませんでした。";
+      syncAiButton();
+      return;
+    }
+    refreshEmbedStatus();
   }
 
   async function runTextSearch() {
@@ -815,15 +854,18 @@
   }
 
   searchInput.addEventListener("input", () => {
-    if (aiToggle.checked) return;
+    if (aiToggle.checked) {
+      syncAiButton();
+      return;
+    }
     clearTimeout(searchTimer);
     searchTimer = setTimeout(runTextSearch, 300);
   });
   searchInput.addEventListener("keydown", (ev) => {
-    if (aiToggle.checked && ev.key === "Enter") {
-      ev.preventDefault();
-      runAiSearch();
-    }
+    if (!aiToggle.checked || ev.key !== "Enter") return;
+    ev.preventDefault();
+    if (aiBtn.dataset.mode === "search") runAiSearch();
+    else if (aiBtn.dataset.mode === "prep") startAiPrep();
   });
   libraryBtn.addEventListener("click", async () => {
     const mode = libraryBtn.textContent.includes("新着") ? "diff" : "full";
@@ -838,25 +880,16 @@
   });
   aiToggle.addEventListener("change", () => {
     const on = aiToggle.checked;
-    aiBtn.hidden = !on;
-    aiPrep.hidden = !on;
-    searchInput.placeholder = on ? "AI検索（例: 健康診断の重要性）" : "文字検索（例: Mars, election）";
+    searchInput.placeholder = on ? "意味で探す（例: 健康診断の重要性）" : "文字検索（例: Mars, election）";
     if (on) refreshEmbedStatus();
     else {
-      aiPrep.hidden = true;
+      aiBtn.hidden = true;
       runTextSearch();
     }
   });
-  aiBtn.addEventListener("click", runAiSearch);
-  aiPrep.addEventListener("click", async () => {
-    aiPrep.disabled = true;
-    const data = await postJson("/toolbox/api/cnn10/library/embeddings/init", {});
-    aiPrep.disabled = false;
-    if (!data.ok) {
-      searchStatus.textContent = data.error || "準備を開始できませんでした。";
-      return;
-    }
-    refreshEmbedStatus();
+  aiBtn.addEventListener("click", () => {
+    if (aiBtn.dataset.mode === "prep") startAiPrep();
+    else if (aiBtn.dataset.mode === "search") runAiSearch();
   });
 
   document.getElementById("cnn10-open-btn").addEventListener("click", () => {
