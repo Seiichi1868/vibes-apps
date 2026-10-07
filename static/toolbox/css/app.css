@@ -388,7 +388,17 @@ html.tb-skip-opening .tb-opening { display: none !important; }
 }
 .tb-play-stage { display: grid; gap: 12px; }
 .tb-question { font-size: clamp(1.6rem, 4.5vw, 2.6rem); line-height: 1.35; margin: 0; }
-.tb-speak { margin-top: 0.75rem; }
+.tb-speak {
+  margin-top: 0.55rem;
+  min-height: 0;
+  min-width: 0;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  opacity: 0.3;
+}
+.tb-speak:hover,
+.tb-speak:focus-visible { opacity: 0.55; }
+.tb-speak:disabled { opacity: 0.3; }
 .tb-answer {
   margin: 0;
   padding: 16px;

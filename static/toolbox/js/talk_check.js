@@ -1042,7 +1042,7 @@
     stopSpeak();
     const ans = document.getElementById("tb-answer");
     ans.hidden = !state.showingAnswer;
-    ans.textContent = `${q.model_answer}  (${q.short_answer})`;
+    ans.textContent = q.model_answer || "";
     const ev = document.getElementById("tb-evidence");
     ev.hidden = true;
     ev.textContent = q.evidence || "";
@@ -1321,8 +1321,7 @@
       <li data-i="${i}">
         <label class="tb-check"><input type="checkbox" data-f="included" ${q.included === false ? "" : "checked"}> 出題する（問題 ${i + 1}${q.section ? ` / ${esc(q.section)}` : ""}）</label>
         <input data-f="question" value="${esc(q.question)}" placeholder="問題文">
-        <input data-f="model_answer" value="${esc(q.model_answer)}" placeholder="模範解答">
-        <input data-f="short_answer" value="${esc(q.short_answer)}" placeholder="要点">
+        <input data-f="model_answer" value="${esc(q.model_answer)}" placeholder="模範解答（英文）">
         <input data-f="evidence" value="${esc(q.evidence)}" placeholder="根拠（スピーチからの引用）">
         <button class="tb-btn" type="button" data-act="del">この問題を削除</button>
       </li>

@@ -148,7 +148,8 @@ body.tb-display-on [data-view="play"]:not([hidden]) .tb-teacher-actions {
 }
 
 body.tb-display-on [data-view="play"]:not([hidden]) .tb-speak {
-  margin-top: 1rem;
+  margin-top: 0.75rem;
+  opacity: 0.3;
 }
 
 body.tb-display-on .tb-seat-cell {
