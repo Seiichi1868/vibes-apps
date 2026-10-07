@@ -13,6 +13,10 @@
   .ms-results { display: grid; gap: 8px; }
   .ms-card { background: #fff; border: 1px solid var(--tb-line); border-radius: 12px; padding: 10px 12px; }
   .ms-card.is-blur .ms-card-text { filter: blur(6px); cursor: pointer; }
+  .ms-card.is-used { background: #f4efe2; border-color: #e2d3a8; }
+  .ms-card.is-used .ms-card-text { color: #6b6252; }
+  .ms-people { display: grid; gap: 8px; }
+  .ms-people .ms-chips { align-items: end; }
   .ms-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 6px; }
   .ms-hit { background: #f8e3b8; }
   .ms-chips { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -57,10 +61,28 @@
 
   <div id="ms-panel-setup">
     <h1 class="tb-tool-title">1分スピーチ</h1>
+    <div class="ms-people">
+      <div class="ms-grid">
+        <label>担当教員
+          <select id="ms-teacher"></select>
+        </label>
+        <div class="ms-chips">
+          <button class="tb-btn" type="button" id="ms-teacher-add">教員を追加</button>
+          <button class="tb-btn" type="button" id="ms-teacher-edit">名前を変える</button>
+          <button class="tb-btn" type="button" id="ms-teacher-del">削除</button>
+        </div>
+        <label>クラス
+          <select id="ms-class"></select>
+        </label>
+        <div class="ms-chips">
+          <button class="tb-btn" type="button" id="ms-class-add">クラスを追加</button>
+          <button class="tb-btn" type="button" id="ms-class-edit">クラスを編集</button>
+          <button class="tb-btn" type="button" id="ms-class-del">削除</button>
+        </div>
+      </div>
+      <p class="tb-note" id="ms-unassigned"></p>
+    </div>
     <div class="ms-grid">
-      <label>クラス
-        <select id="ms-class"></select>
-      </label>
       <label>タイプ
         <select id="ms-type">
           <option value="1">タイプ1：身近なテーマ</option>
@@ -105,6 +127,16 @@
       <label class="tb-check"><input id="ms-hints" type="checkbox" checked> 構成ヒントを表示</label>
     </div>
     <button class="tb-btn tb-btn-primary" type="button" id="ms-draw">お題を出す</button>
+
+    <h2>番号で選ぶ</h2>
+    <p class="tb-note">タイプごとに番号順です。選んだクラスで使ったお題には「使用済み」が付きます。</p>
+    <div class="ms-chips">
+      <button class="tb-btn tb-btn-primary" type="button" id="ms-cat-1">タイプ1</button>
+      <button class="tb-btn" type="button" id="ms-cat-2">タイプ2</button>
+    </div>
+    <div class="ms-chips" id="ms-cat-pages"></div>
+    <p class="tb-note" id="ms-cat-status"></p>
+    <div class="ms-results" id="ms-catalog"></div>
 
     <h2>お題を探す</h2>
     <p class="tb-note">結果が画面に映ります。表示モード中は検索しません。</p>

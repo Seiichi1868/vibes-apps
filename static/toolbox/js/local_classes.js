@@ -1,5 +1,6 @@
 (function () {
   const KEY = "toolbox.local_classes.v1";
+  const TEACHERS_KEY = "toolbox.local_teachers.v1";
   const SEATS_KEY = "toolbox.random_seats.rooms.v1";
 
   function read(key) {
@@ -37,6 +38,7 @@
         picked: nums(pick.picked),
         history: nums(pick.history),
       },
+      teacher_id: String(row.teacher_id || ""),
     };
   }
 
@@ -64,5 +66,27 @@
     return next;
   }
 
-  window.ToolboxClasses = { load, save, normalize, suggestGrid };
+  function loadTeachers() {
+    const stored = read(TEACHERS_KEY);
+    if (!Array.isArray(stored)) return [];
+    return stored
+      .map((row) => ({
+        id: String((row && row.id) || ""),
+        name: String((row && row.name) || "教員").slice(0, 40),
+      }))
+      .filter((row) => row.id);
+  }
+
+  function saveTeachers(rows) {
+    const next = (rows || [])
+      .map((row) => ({
+        id: String((row && row.id) || ""),
+        name: String((row && row.name) || "教員").slice(0, 40),
+      }))
+      .filter((row) => row.id);
+    localStorage.setItem(TEACHERS_KEY, JSON.stringify(next));
+    return next;
+  }
+
+  window.ToolboxClasses = { load, save, normalize, suggestGrid, loadTeachers, saveTeachers };
 })();

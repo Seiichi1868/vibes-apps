@@ -399,6 +399,33 @@ def _search_by_number(
     }
 
 
+def list_catalog(*, type_value, offset=0, limit=50) -> dict:
+    """タイプごとの番号順。1ページ分だけ返す。"""
+    type_num = _as_int(type_value, 1)
+    if type_num not in (1, 2):
+        type_num = 1
+    rows = []
+    for topic in merged_topics():
+        if int(topic.get("type") or 0) != type_num:
+            continue
+        if (topic.get("status") or "active") != "active":
+            continue
+        order = _as_int(topic.get("source_order"), 0)
+        if order <= 0 or order > 10000:
+            continue
+        rows.append(topic)
+    rows.sort(key=lambda topic: (_as_int(topic.get("source_order"), 0), str(topic.get("id"))))
+    offset = max(0, _as_int(offset, 0))
+    limit = max(1, min(_as_int(limit, 50), 100))
+    page = rows[offset:offset + limit]
+    return {
+        "results": [public_topic(topic) for topic in page],
+        "has_more": offset + len(page) < len(rows),
+        "count": len(rows),
+        "offset": offset,
+    }
+
+
 def content_hash(topic: dict) -> str:
     themes = " ".join(str(item) for item in (topic.get("themes") or []))
     source = "\n".join([topic.get("text") or "", topic.get("ja") or "", themes])

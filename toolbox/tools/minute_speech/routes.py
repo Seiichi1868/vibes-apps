@@ -19,6 +19,7 @@ from toolbox.tools.minute_speech.topics import (
     draw_topic,
     hide_flagged,
     keyword_search,
+    list_catalog,
     parse_number_query,
     merged_topics,
     passes_filters,
@@ -120,6 +121,19 @@ def register(bp):
     def minute_speech_stats():
         filters = _filters(request.args)
         return jsonify({"ok": True, **stats(**filters)})
+
+    @bp.route("/api/minute-speech/catalog")
+    @login_required
+    @tool_required("minute-speech")
+    def minute_speech_catalog():
+        if not _rate_ok("minute-catalog", 60):
+            return jsonify({"ok": False, "error": "一覧の取得が続いています。少し待ってからもう一度開いてください。"}), 429
+        data = list_catalog(
+            type_value=request.args.get("type") or 1,
+            offset=request.args.get("offset") or 0,
+            limit=request.args.get("limit") or 50,
+        )
+        return jsonify({"ok": True, **data})
 
     @bp.route("/api/minute-speech/search", methods=["POST"])
     @login_required

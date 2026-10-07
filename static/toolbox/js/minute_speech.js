@@ -26,7 +26,11 @@
   let wakeLock = null;
   let switchTimer = 0;
   let themes = [];
+  let teachers = [];
   let activeTheme = "";
+  let catType = 1;
+  let catOffset = 0;
+  const CAT_PAGE = 50;
   let searchOffset = 0;
   let audio = null;
 
@@ -88,6 +92,8 @@
     if (prefs.prep) els["ms-prep"].value = prefs.prep;
     if (prefs.speak) els["ms-speak"].value = prefs.speak;
     if (prefs.format) els["ms-format"].value = prefs.format;
+    if (prefs.teacherId) els["ms-teacher"].value = prefs.teacherId;
+    fillClasses();
     if (prefs.classId) els["ms-class"].value = prefs.classId;
     els["ms-unleveled"].checked = prefs.unleveled !== false;
     els["ms-flagged"].checked = !!prefs.flagged;
@@ -101,6 +107,7 @@
 
   function writePrefs() {
     store.prefs = {
+      teacherId: teacherId(),
       classId: classId(),
       type: typeValue(),
       level: Number(els["ms-level"].value),
@@ -119,18 +126,110 @@
     saveStore();
   }
 
-  function fillClasses() {
+  function teacherId() {
+    return els["ms-teacher"].value || "";
+  }
+
+  function newLocalId() {
+    return (crypto.randomUUID && crypto.randomUUID()) || String(Date.now());
+  }
+
+  function fillTeachers() {
+    teachers = window.ToolboxClasses ? window.ToolboxClasses.loadTeachers() : [];
     classes = window.ToolboxClasses ? window.ToolboxClasses.load() : [];
-    const select = els["ms-class"];
+    const select = els["ms-teacher"];
     const current = select.value;
-    select.innerHTML = '<option value="">クラスなし（記録しない）</option>';
-    classes.forEach((row) => {
+    select.innerHTML = "";
+    if (!teachers.length) {
+      const empty = document.createElement("option");
+      empty.value = "";
+      empty.textContent = "教員を追加してください";
+      select.appendChild(empty);
+    }
+    teachers.forEach((row) => {
       const option = document.createElement("option");
       option.value = row.id;
       option.textContent = row.name;
       select.appendChild(option);
     });
-    if (current) select.value = current;
+    if (current && teachers.some((row) => row.id === current)) select.value = current;
+  }
+
+  function fillClasses() {
+    classes = window.ToolboxClasses ? window.ToolboxClasses.load() : [];
+    const select = els["ms-class"];
+    const current = select.value;
+    const mine = classes.filter((row) => row.teacher_id === teacherId() && teacherId());
+    select.innerHTML = '<option value="">クラスなし（記録しない）</option>';
+    mine.forEach((row) => {
+      const option = document.createElement("option");
+      option.value = row.id;
+      option.textContent = row.name;
+      select.appendChild(option);
+    });
+    if (current && mine.some((row) => row.id === current)) select.value = current;
+    renderUnassigned();
+  }
+
+  function renderUnassigned() {
+    const box = els["ms-unassigned"];
+    box.innerHTML = "";
+    const loose = classes.filter((row) => !row.teacher_id);
+    if (!loose.length || !teacherId()) return;
+    box.textContent = "担当が未設定のクラス: ";
+    loose.forEach((row) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "tb-btn";
+      button.textContent = `${row.name} をこの教員へ`;
+      button.addEventListener("click", () => {
+        row.teacher_id = teacherId();
+        classes = window.ToolboxClasses.save(classes);
+        fillClasses();
+        els["ms-class"].value = row.id;
+        writePrefs();
+        loadCatalog();
+      });
+      box.appendChild(button);
+    });
+  }
+
+  function saveClassRow(existing) {
+    const name = prompt("クラス名", existing ? existing.name : "");
+    if (!name || !name.trim()) return;
+    if (!teacherId()) {
+      alert("先に担当教員を追加して選んでください。");
+      return;
+    }
+    const count = Number(prompt("人数（1〜60）", existing ? existing.student_count : "30"));
+    if (!Number.isFinite(count) || count < 1 || count > 60) {
+      alert("人数は1〜60で入力してください。");
+      return;
+    }
+    if (existing) {
+      existing.name = name.trim();
+      existing.student_count = count;
+      existing.teacher_id = teacherId();
+    } else {
+      const layout = window.ToolboxClasses.suggestGrid(count);
+      classes.push({
+        id: newLocalId(),
+        name: name.trim(),
+        student_count: count,
+        absent: [],
+        seats: [],
+        rows: layout.rows,
+        cols: layout.cols,
+        blocked: [],
+        pick: { absent: [], picked: [], history: [] },
+        teacher_id: teacherId(),
+      });
+      els["ms-class"].value = classes[classes.length - 1].id;
+    }
+    classes = window.ToolboxClasses.save(classes);
+    fillClasses();
+    if (!existing) els["ms-class"].value = classes[classes.length - 1].id;
+    writePrefs();
   }
 
   function topicNumber(item) {
@@ -731,7 +830,7 @@
     if (button.dataset.speak) els["ms-speak"].value = button.dataset.speak;
     writePrefs();
   });
-  ["ms-class", "ms-type", "ms-level", "ms-prep", "ms-speak", "ms-format", "ms-unleveled", "ms-flagged", "ms-auto", "ms-ja", "ms-hints", "ms-blur", "ms-exclude-used", "ms-ai"].forEach((id) => {
+  ["ms-teacher", "ms-class", "ms-type", "ms-level", "ms-prep", "ms-speak", "ms-format", "ms-unleveled", "ms-flagged", "ms-auto", "ms-ja", "ms-hints", "ms-blur", "ms-exclude-used", "ms-ai"].forEach((id) => {
     els[id].addEventListener("change", () => {
       writePrefs();
       if (els["ms-ai"].checked) els["ms-q"].placeholder = "AI検索（例: 旅行に関するお題）";
@@ -839,8 +938,130 @@
     });
   }
 
-  fillClasses();
+  fillTeachers();
   readPrefsIntoForm();
   renderRecent();
   loadStats().catch(() => {});
+  loadCatalog();
+
+  els["ms-teacher"].addEventListener("change", () => {
+    fillClasses();
+    writePrefs();
+    loadCatalog();
+  });
+  els["ms-class"].addEventListener("change", () => {
+    writePrefs();
+    loadCatalog();
+    if (!els["ms-panel-history"].hidden) renderHistory();
+  });
+  els["ms-teacher-add"].addEventListener("click", () => {
+    const name = prompt("担当教員名");
+    if (!name || !name.trim()) return;
+    teachers.push({ id: newLocalId(), name: name.trim() });
+    teachers = window.ToolboxClasses.saveTeachers(teachers);
+    fillTeachers();
+    els["ms-teacher"].value = teachers[teachers.length - 1].id;
+    fillClasses();
+    writePrefs();
+  });
+  els["ms-teacher-edit"].addEventListener("click", () => {
+    const row = teachers.find((item) => item.id === teacherId());
+    if (!row) return;
+    const name = prompt("担当教員名", row.name);
+    if (!name || !name.trim()) return;
+    row.name = name.trim();
+    teachers = window.ToolboxClasses.saveTeachers(teachers);
+    fillTeachers();
+    els["ms-teacher"].value = row.id;
+    writePrefs();
+  });
+  els["ms-teacher-del"].addEventListener("click", () => {
+    const row = teachers.find((item) => item.id === teacherId());
+    if (!row || !confirm(`${row.name} を削除しますか？クラスは担当未設定として残ります。`)) return;
+    classes.forEach((item) => {
+      if (item.teacher_id === row.id) item.teacher_id = "";
+    });
+    classes = window.ToolboxClasses.save(classes);
+    teachers = window.ToolboxClasses.saveTeachers(teachers.filter((item) => item.id !== row.id));
+    fillTeachers();
+    fillClasses();
+    writePrefs();
+  });
+  els["ms-class-add"].addEventListener("click", () => saveClassRow(null));
+  els["ms-class-edit"].addEventListener("click", () => {
+    const row = classes.find((item) => item.id === classId());
+    if (row) saveClassRow(row);
+  });
+  els["ms-class-del"].addEventListener("click", () => {
+    const row = classes.find((item) => item.id === classId());
+    if (!row || !confirm(`${row.name} をこの端末から削除しますか？`)) return;
+    classes = window.ToolboxClasses.save(classes.filter((item) => item.id !== row.id));
+    fillClasses();
+    writePrefs();
+    loadCatalog();
+  });
+  els["ms-cat-1"].addEventListener("click", () => {
+    catType = 1;
+    catOffset = 0;
+    els["ms-cat-1"].classList.add("tb-btn-primary");
+    els["ms-cat-2"].classList.remove("tb-btn-primary");
+    loadCatalog();
+  });
+  els["ms-cat-2"].addEventListener("click", () => {
+    catType = 2;
+    catOffset = 0;
+    els["ms-cat-2"].classList.add("tb-btn-primary");
+    els["ms-cat-1"].classList.remove("tb-btn-primary");
+    loadCatalog();
+  });
+
+  function loadCatalog() {
+    const status = els["ms-cat-status"];
+    status.textContent = "読み込み中…";
+    const params = new URLSearchParams({
+      type: String(catType),
+      offset: String(catOffset),
+      limit: String(CAT_PAGE),
+    });
+    toolboxFetch(`/toolbox/api/minute-speech/catalog?${params}`).then((data) => {
+      const used = new Set(usedRows(catType).map((row) => row.id));
+      const box = els["ms-catalog"];
+      box.innerHTML = "";
+      (data.results || []).forEach((item) => {
+        const card = document.createElement("article");
+        card.className = used.has(item.id) ? "ms-card is-used" : "ms-card";
+        card.innerHTML = `<div class="ms-meta"><span class="tb-badge">タイプ${item.type} ${topicNumber(item)}</span>${used.has(item.id) ? '<span class="tb-badge">使用済み</span>' : ""}</div><p class="ms-card-text">${esc(item.text)}</p>`;
+        const use = document.createElement("button");
+        use.type = "button";
+        use.className = "tb-btn tb-btn-primary";
+        use.textContent = "このお題を使う";
+        use.addEventListener("click", () => useSearched(Object.assign({ used: used.has(item.id) }, item)));
+        card.appendChild(use);
+        box.appendChild(card);
+      });
+      const count = Number(data.count) || 0;
+      const pages = els["ms-cat-pages"];
+      pages.innerHTML = "";
+      const pageCount = Math.ceil(count / CAT_PAGE);
+      for (let index = 0; index < pageCount; index += 1) {
+        const start = index * CAT_PAGE + 1;
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = catOffset === index * CAT_PAGE ? "tb-btn tb-btn-primary" : "tb-btn";
+        button.textContent = `${start}–${Math.min(count, start + CAT_PAGE - 1)}`;
+        button.addEventListener("click", () => {
+          catOffset = index * CAT_PAGE;
+          loadCatalog();
+        });
+        pages.appendChild(button);
+      }
+      const shown = (data.results || []).length;
+      const usedCount = (data.results || []).filter((item) => used.has(item.id)).length;
+      status.textContent = shown
+        ? `このページ ${shown} 件中、使用済み ${usedCount} 件。全 ${count} 件。`
+        : "表示できるお題がありません。";
+    }).catch((err) => {
+      status.textContent = err.message;
+    });
+  }
 })();
