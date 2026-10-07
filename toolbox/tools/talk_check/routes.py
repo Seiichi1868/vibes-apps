@@ -8,7 +8,7 @@ import zipfile
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from flask import jsonify, render_template, request, send_file
+from flask import Response, jsonify, render_template, request, send_file
 from werkzeug.utils import secure_filename
 
 from toolbox.auth import current_user, login_required
@@ -24,8 +24,18 @@ from toolbox.storage import (
     save_talk_session,
 )
 from toolbox.storage import JST
+from toolbox.openai_http import OpenAIHttpError
 from toolbox.tools.talk_check.generate import LEVELS, generate_questions, generate_replacement_question, make_title
-from toolbox.usage import UsageError, UsageLimitError, _is_reasoning_model, record_event, selected_model, transcribe_file
+from toolbox.tools.talk_check.tts import estimate_cost_usd, synthesize
+from toolbox.usage import (
+    UsageError,
+    UsageLimitError,
+    _is_reasoning_model,
+    check_daily_limit,
+    record_event,
+    selected_model,
+    transcribe_file,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -570,6 +580,37 @@ def register(bp):
             session["status"] = "ready" if questions else ("transcribed" if session.get("transcript") else "recorded")
         save_talk_session(session)
         return jsonify({"ok": True, "session": _public_session(session, include_questions=True)})
+
+    @bp.route("/api/talk/speak", methods=["POST"])
+    @login_required
+    @tool_required("talk_check")
+    def api_talk_speak():
+        payload = request.get_json(silent=True) or {}
+        text = str(payload.get("text") or "").strip()
+        if not text:
+            return jsonify({"ok": False, "error": "読み上げる文がありません。"}), 400
+        try:
+            from toolbox.tools.talk_check.tts import cache_path
+
+            cached = cache_path(text[:600]).is_file()
+            if not cached:
+                check_daily_limit()
+            audio, was_cached = synthesize(text)
+        except UsageLimitError as exc:
+            return jsonify({"ok": False, "error": exc.message, "code": "limit"}), 429
+        except OpenAIHttpError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
+        except Exception:
+            logger.exception("talk tts")
+            return jsonify({"ok": False, "error": "音声の生成に失敗しました。"}), 500
+        if not was_cached:
+            record_event(
+                current_user()["id"],
+                "talk_check",
+                "tts-1",
+                {"est_cost_usd": estimate_cost_usd(text)},
+            )
+        return Response(audio, mimetype="audio/mpeg")
 
     @bp.route("/api/talk/events", methods=["POST"])
     @login_required

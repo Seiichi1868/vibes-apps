@@ -147,6 +147,10 @@ body.tb-display-on [data-view="play"]:not([hidden]) .tb-teacher-actions {
   display: none;
 }
 
+body.tb-display-on [data-view="play"]:not([hidden]) .tb-speak {
+  margin-top: 1rem;
+}
+
 body.tb-display-on .tb-seat-cell {
   font-size: clamp(2.6rem, 11vmin, 8rem);
 }

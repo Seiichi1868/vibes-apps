@@ -1039,6 +1039,7 @@
     }
     document.getElementById("tb-q-progress").textContent = `${state.index + 1}/${qs.length}`;
     document.getElementById("tb-question").textContent = q.question;
+    stopSpeak();
     const ans = document.getElementById("tb-answer");
     ans.hidden = !state.showingAnswer;
     ans.textContent = `${q.model_answer}  (${q.short_answer})`;
@@ -1075,6 +1076,68 @@
       renderQuestion();
     }
   }
+
+  let speakAudio = null;
+  let speakUrl = "";
+  let speakGen = 0;
+
+  function stopSpeak() {
+    speakGen += 1;
+    const btn = document.getElementById("tb-speak");
+    if (speakAudio) {
+      speakAudio.pause();
+      speakAudio = null;
+    }
+    if (speakUrl) {
+      URL.revokeObjectURL(speakUrl);
+      speakUrl = "";
+    }
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "読み上げ";
+    }
+  }
+
+  document.getElementById("tb-speak").addEventListener("click", async () => {
+    const btn = document.getElementById("tb-speak");
+    const q = currentQ();
+    if (!q || !(q.question || "").trim()) return;
+    if (speakAudio && !speakAudio.paused) {
+      stopSpeak();
+      return;
+    }
+    stopSpeak();
+    const gen = speakGen;
+    btn.disabled = true;
+    btn.textContent = "音声を準備中…";
+    try {
+      const res = await fetch("/toolbox/api/talk/speak", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": window.TOOLBOX_CSRF || "",
+          "X-Toolbox-Device": deviceId(),
+        },
+        credentials: "same-origin",
+        body: JSON.stringify({ text: q.question }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "読み上げに失敗しました。");
+      }
+      const blob = await res.blob();
+      if (gen !== speakGen) return;
+      speakUrl = URL.createObjectURL(blob);
+      speakAudio = new Audio(speakUrl);
+      speakAudio.addEventListener("ended", stopSpeak);
+      await speakAudio.play();
+      btn.disabled = false;
+      btn.textContent = "停止";
+    } catch (err) {
+      stopSpeak();
+      alert(err.message);
+    }
+  });
 
   document.getElementById("tb-skip").addEventListener("click", () => {
     const q = currentQ();
