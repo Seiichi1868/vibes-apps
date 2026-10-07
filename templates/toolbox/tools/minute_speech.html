@@ -35,8 +35,13 @@
   .ms-results { display: grid; gap: 6px; }
   .ms-card { background: #fff; border: 1px solid var(--tb-line); border-radius: 10px; padding: 6px 8px; }
   .ms-card.is-blur .ms-card-text { filter: blur(6px); cursor: pointer; }
-  .ms-card.is-used { background: #f4efe2; border-color: #e2d3a8; }
-  .ms-card.is-used .ms-card-text { color: #6b6252; }
+  .ms-card.is-used { background: #e6e9ee; border-color: #c5ccd4; }
+  .ms-card.is-used .ms-card-text,
+  .ms-card.is-used .tb-muted { color: #6d7580; }
+  .ms-used-badge { background: #d5d8de; color: #4c5560; }
+  .ms-used-badge[hidden] { display: none; }
+  .ms-card-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .ms-used-list { max-height: 32rem; overflow: auto; }
   .ms-people { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: flex-end; }
   .ms-person { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px 6px; flex: 1 1 22rem; }
   .ms-person > label { display: flex; flex-direction: column; gap: 2px; flex: 0 0 auto; font-size: 0.86rem; }
@@ -156,7 +161,7 @@
     <button class="tb-btn tb-btn-primary" type="button" id="ms-draw">お題を出す</button>
 
     <h2>番号で選ぶ</h2>
-    <p class="tb-note">タイプごとに番号順です。選んだクラスで使ったお題には「使用済み」が付きます。</p>
+    <p class="tb-note">タイプごとに番号順です。選んだクラスで使ったお題はグレーになり「使用済み」が付きます。このアプリ以外で使ったお題は「使用済みにする」で登録できます。もう一度押すと取り消せます。</p>
     <div class="ms-chips">
       <button class="tb-btn tb-btn-primary" type="button" id="ms-cat-1">タイプ1</button>
       <button class="tb-btn" type="button" id="ms-cat-2">タイプ2</button>
@@ -164,6 +169,11 @@
     <div class="ms-chips" id="ms-cat-pages"></div>
     <p class="tb-note" id="ms-cat-status"></p>
     <div class="ms-results" id="ms-catalog"></div>
+
+    <h2>使用済み</h2>
+    <p class="tb-note">選んだクラスで使用済みにしたお題の一覧です。取り消しは各お題のボタンからできます。</p>
+    <p class="tb-note" id="ms-used-status"></p>
+    <div class="ms-results ms-used-list" id="ms-used"></div>
 
     <h2>お題を探す</h2>
     <p class="tb-note">結果が画面に映ります。表示モード中は検索しません。</p>

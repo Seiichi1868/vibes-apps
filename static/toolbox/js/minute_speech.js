@@ -613,34 +613,109 @@
     startRunning();
   }
 
-  function markUsed() {
+  function topicIsUsed(item) {
     const id = classId();
-    if (!id || !topic) return;
-    const typeKey = String(topic.type || 1);
+    if (!id || !item || !item.id) return false;
+    const bucket = store.history[id] || {};
+    const typeKey = item.type != null && item.type !== "" ? String(item.type) : "";
+    const lists = typeKey ? [bucket[typeKey] || []] : Object.values(bucket);
+    return lists.some((rows) => Array.isArray(rows) && rows.some((row) => row.id === item.id));
+  }
+
+  function pushUsed(item) {
+    const id = classId();
+    if (!id || !item || !item.id) return;
+    const typeKey = String(item.type || 1);
     store.history[id] = store.history[id] || { 1: [], 2: [] };
     store.history[id][typeKey] = store.history[id][typeKey] || [];
-    if (!store.history[id][typeKey].some((row) => row.id === topic.id)) {
+    if (!store.history[id][typeKey].some((row) => row.id === item.id)) {
       store.history[id][typeKey].push({
-        id: topic.id,
+        id: item.id,
         usedAt: new Date().toISOString(),
-        text: topic.text,
-        suffix: topic.suffix,
-        type: topic.type,
-        ja: topic.ja || "",
-        source_order: topic.source_order,
+        text: item.text,
+        suffix: item.suffix,
+        type: item.type,
+        ja: item.ja || "",
+        source_order: item.source_order,
       });
     }
     saveStore();
   }
 
-  function undoUsed() {
+  function removeUsed(item) {
     const id = classId();
-    if (!id || !topic) return;
-    const typeKey = String(topic.type || 1);
-    const rows = ((store.history[id] || {})[typeKey] || []).filter((row) => row.id !== topic.id);
-    store.history[id][typeKey] = rows;
-    marked = false;
+    if (!id || !item || !item.id) return;
+    const bucket = store.history[id] || {};
+    const typeKey = item.type != null && item.type !== "" ? String(item.type) : "";
+    Object.keys(bucket).forEach((key) => {
+      if (!Array.isArray(bucket[key])) return;
+      if (typeKey && key !== typeKey) return;
+      bucket[key] = bucket[key].filter((row) => row.id !== item.id);
+    });
     saveStore();
+  }
+
+  function markUsed() {
+    pushUsed(topic);
+  }
+
+  function undoUsed() {
+    removeUsed(topic);
+    marked = false;
+  }
+
+  function applyUsedLook(card, used) {
+    card.classList.toggle("is-used", !!used);
+    const badge = card.querySelector("[data-used-badge]");
+    if (badge) badge.hidden = !used;
+    const button = card.querySelector("[data-used-toggle]");
+    if (button) button.textContent = used ? "使用済みを取り消す" : "使用済みにする";
+  }
+
+  function refreshUsedSurfaces(topicId) {
+    renderUsedList();
+    document.querySelectorAll("#ms-catalog .ms-card, #ms-results .ms-card").forEach((card) => {
+      if (topicId && card.dataset.topicId !== topicId) return;
+      applyUsedLook(card, topicIsUsed({ id: card.dataset.topicId, type: card.dataset.topicType }));
+    });
+    const shown = els["ms-catalog"].querySelectorAll(".ms-card").length;
+    if (shown) {
+      const usedCount = els["ms-catalog"].querySelectorAll(".ms-card.is-used").length;
+      const total = (els["ms-cat-status"].textContent.match(/全 (\d+) 件/) || [])[1];
+      els["ms-cat-status"].textContent = `このページ ${shown} 件中、使用済み ${usedCount} 件。${total ? `全 ${total} 件。` : ""}`;
+    }
+    if (!els["ms-panel-history"].hidden) renderHistory();
+  }
+
+  function toggleTopicUsed(item) {
+    if (!classId()) {
+      alert("クラスを選ぶと使用済みを記録できます。");
+      return;
+    }
+    if (topicIsUsed(item)) removeUsed(item);
+    else pushUsed(item);
+    if (topic && item && topic.id === item.id) marked = topicIsUsed(item);
+    refreshUsedSurfaces(item.id);
+  }
+
+  function usedBadge(used) {
+    return `<span class="tb-badge ms-used-badge" data-used-badge ${used ? "" : "hidden"}>使用済み</span>`;
+  }
+
+  function usedToggleButton(item) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "tb-btn";
+    button.dataset.usedToggle = "1";
+    button.textContent = topicIsUsed(item) ? "使用済みを取り消す" : "使用済みにする";
+    button.addEventListener("click", () => toggleTopicUsed(item));
+    return button;
+  }
+
+  function cardActions() {
+    const actions = document.createElement("div");
+    actions.className = "ms-card-actions";
+    return actions;
   }
 
   function excludeIds() {
@@ -703,6 +778,7 @@
     setup.hidden = false;
     if (window.ToolboxDisplay && window.ToolboxDisplay.isOn()) window.ToolboxDisplay.exit();
     renderHistory();
+    loadCatalog();
   }
 
   function skipTopic() {
@@ -799,20 +875,16 @@
     rows.sort((a, b) => String(b.usedAt).localeCompare(String(a.usedAt)));
     rows.slice(0, 40).forEach((row) => {
       const card = document.createElement("article");
-      card.className = "ms-card is-blur";
-      card.innerHTML = `<div class="ms-meta"><span class="tb-badge">タイプ${row.type}${topicNumber(row) ? " " + topicNumber(row) : ""}</span><span class="tb-muted">${esc(row.usedAt || "").slice(0, 16).replace("T", " ")}</span></div><p class="ms-card-text">${esc(row.text)}</p>`;
+      card.className = "ms-card is-blur is-used";
+      card.innerHTML = `<div class="ms-meta"><span class="tb-badge">タイプ${row.type}${topicNumber(row) ? " " + topicNumber(row) : ""}</span>${usedBadge(true)}<span class="tb-muted">${esc(row.usedAt || "").slice(0, 16).replace("T", " ")}</span></div><p class="ms-card-text">${esc(row.text)}</p>`;
       card.querySelector(".ms-card-text").addEventListener("click", () => card.classList.remove("is-blur"));
       const button = document.createElement("button");
       button.type = "button";
       button.className = "tb-btn";
-      button.textContent = "未使用に戻す";
+      button.textContent = "使用済みを取り消す";
       button.addEventListener("click", () => {
-        const key = String(row.type);
-        const id = classId();
-        store.history[id][key] = (store.history[id][key] || []).filter((item) => item.id !== row.id);
-        saveStore();
-        renderHistory();
-        loadStats().catch(() => {});
+        removeUsed(row);
+        refreshUsedSurfaces(row.id);
       });
       card.appendChild(button);
       box.appendChild(card);
@@ -841,15 +913,19 @@
     if (!append) box.innerHTML = "";
     const blur = els["ms-blur"].checked;
     items.forEach((item) => {
+      const used = topicIsUsed(item);
       const card = document.createElement("article");
       card.className = blur ? "ms-card is-blur" : "ms-card";
-      card.innerHTML = `<div class="ms-meta"><span class="tb-badge">タイプ${item.type}${topicNumber(item) ? " " + topicNumber(item) : ""}</span>${item.level ? `<span class="tb-badge">L${item.level}</span>` : ""}${item.used ? '<span class="tb-badge">使用済み</span>' : ""}${(item.flags || []).length ? '<span class="tb-badge tb-badge-mute">配慮</span>' : ""}</div><p class="ms-card-text">${highlight(item.text, els["ms-q"].value)}</p>${item.ja ? `<p class="tb-muted">${esc(item.ja)}</p>` : ""}`;
+      card.dataset.topicId = item.id;
+      card.dataset.topicType = String(item.type || "");
+      card.innerHTML = `<div class="ms-meta"><span class="tb-badge">タイプ${item.type}${topicNumber(item) ? " " + topicNumber(item) : ""}</span>${item.level ? `<span class="tb-badge">L${item.level}</span>` : ""}${usedBadge(used)}${(item.flags || []).length ? '<span class="tb-badge tb-badge-mute">配慮</span>' : ""}</div><p class="ms-card-text">${highlight(item.text, els["ms-q"].value)}</p>${item.ja ? `<p class="tb-muted">${esc(item.ja)}</p>` : ""}`;
+      applyUsedLook(card, used);
       card.querySelector(".ms-card-text").addEventListener("click", () => card.classList.remove("is-blur"));
       const use = document.createElement("button");
       use.type = "button";
       use.className = "tb-btn tb-btn-primary";
       use.textContent = "このお題を使う";
-      use.addEventListener("click", () => useSearched(item));
+      use.addEventListener("click", () => useSearched(Object.assign({}, item, { used: topicIsUsed(item) })));
       const hide = document.createElement("button");
       hide.type = "button";
       hide.className = "tb-btn";
@@ -859,7 +935,9 @@
         saveStore();
         card.remove();
       });
-      card.append(use, hide);
+      const actions = cardActions();
+      actions.append(use, usedToggleButton(item), hide);
+      card.appendChild(actions);
       box.appendChild(card);
     });
   }
@@ -946,7 +1024,8 @@
         store.lastBackupAt = new Date().toISOString();
         saveStore();
         readPrefsIntoForm();
-        renderHistory();
+        refreshUsedSurfaces();
+        loadCatalog();
       } catch (err) {
         alert(err.message || "読み込めませんでした。");
       }
@@ -1044,7 +1123,8 @@
     }
     if (!confirm("このクラス・このタイプの履歴を消して、最初から出しますか？")) return;
     resetTypes();
-    renderHistory();
+    refreshUsedSurfaces();
+    loadCatalog();
   });
 
   document.addEventListener("keydown", (ev) => {
@@ -1165,7 +1245,55 @@
     loadCatalog();
   });
 
+  function allUsedRows() {
+    const id = classId();
+    if (!id) return [];
+    const rows = [];
+    Object.values(store.history[id] || {}).forEach((list) => {
+      if (Array.isArray(list)) list.forEach((row) => rows.push(row));
+    });
+    rows.sort((a, b) => {
+      const typeDiff = Number(a.type || 0) - Number(b.type || 0);
+      if (typeDiff) return typeDiff;
+      const orderDiff = Number(a.source_order || 0) - Number(b.source_order || 0);
+      if (orderDiff) return orderDiff;
+      return String(a.usedAt || "").localeCompare(String(b.usedAt || ""));
+    });
+    return rows;
+  }
+
+  function renderUsedList() {
+    const box = els["ms-used"];
+    const status = els["ms-used-status"];
+    if (!box || !status) return;
+    box.innerHTML = "";
+    if (!classId()) {
+      status.textContent = "クラスを選ぶと、使用済みを記録できます。";
+      return;
+    }
+    const rows = allUsedRows();
+    status.textContent = rows.length ? `使用済み ${rows.length} 件` : "このクラスの使用済みはまだありません。";
+    rows.forEach((row) => {
+      const card = document.createElement("article");
+      card.className = "ms-card is-used";
+      card.dataset.topicId = row.id;
+      card.dataset.topicType = String(row.type || "");
+      const when = esc(row.usedAt || "").slice(0, 16).replace("T", " ");
+      card.innerHTML = `<div class="ms-meta"><span class="tb-badge">タイプ${row.type}${topicNumber(row) ? " " + topicNumber(row) : ""}</span>${usedBadge(true)}<span class="tb-muted">${when}</span></div><p class="ms-card-text">${esc(row.text)}</p>`;
+      const use = document.createElement("button");
+      use.type = "button";
+      use.className = "tb-btn tb-btn-primary";
+      use.textContent = "このお題を使う";
+      use.addEventListener("click", () => useSearched(Object.assign({ used: true }, row)));
+      const actions = cardActions();
+      actions.append(use, usedToggleButton(row));
+      card.appendChild(actions);
+      box.appendChild(card);
+    });
+  }
+
   function loadCatalog() {
+    renderUsedList();
     const status = els["ms-cat-status"];
     status.textContent = "読み込み中…";
     const params = new URLSearchParams({
@@ -1178,15 +1306,21 @@
       const box = els["ms-catalog"];
       box.innerHTML = "";
       (data.results || []).forEach((item) => {
+        const isUsed = used.has(item.id);
         const card = document.createElement("article");
-        card.className = used.has(item.id) ? "ms-card is-used" : "ms-card";
-        card.innerHTML = `<div class="ms-meta"><span class="tb-badge">タイプ${item.type} ${topicNumber(item)}</span>${used.has(item.id) ? '<span class="tb-badge">使用済み</span>' : ""}</div><p class="ms-card-text">${esc(item.text)}</p>`;
+        card.className = "ms-card";
+        card.dataset.topicId = item.id;
+        card.dataset.topicType = String(item.type || "");
+        card.innerHTML = `<div class="ms-meta"><span class="tb-badge">タイプ${item.type} ${topicNumber(item)}</span>${usedBadge(isUsed)}</div><p class="ms-card-text">${esc(item.text)}</p>`;
+        applyUsedLook(card, isUsed);
         const use = document.createElement("button");
         use.type = "button";
         use.className = "tb-btn tb-btn-primary";
         use.textContent = "このお題を使う";
-        use.addEventListener("click", () => useSearched(Object.assign({ used: used.has(item.id) }, item)));
-        card.appendChild(use);
+        use.addEventListener("click", () => useSearched(Object.assign({}, item, { used: topicIsUsed(item) })));
+        const actions = cardActions();
+        actions.append(use, usedToggleButton(item));
+        card.appendChild(actions);
         box.appendChild(card);
       });
       const count = Number(data.count) || 0;
