@@ -854,18 +854,16 @@
   }
 
   searchInput.addEventListener("input", () => {
+    clearTimeout(searchTimer);
     if (aiToggle.checked) {
       syncAiButton();
       return;
     }
-    clearTimeout(searchTimer);
     searchTimer = setTimeout(runTextSearch, 300);
   });
   searchInput.addEventListener("keydown", (ev) => {
-    if (!aiToggle.checked || ev.key !== "Enter") return;
+    if (!aiToggle.checked || ev.key !== "Enter" || ev.isComposing) return;
     ev.preventDefault();
-    if (aiBtn.dataset.mode === "search") runAiSearch();
-    else if (aiBtn.dataset.mode === "prep") startAiPrep();
   });
   libraryBtn.addEventListener("click", async () => {
     const mode = libraryBtn.textContent.includes("新着") ? "diff" : "full";
@@ -880,6 +878,7 @@
   });
   aiToggle.addEventListener("change", () => {
     const on = aiToggle.checked;
+    clearTimeout(searchTimer);
     searchInput.placeholder = on ? "AI検索（例: 健康診断の重要性）" : "文字検索（例: Mars, election）";
     if (on) refreshEmbedStatus();
     else {
