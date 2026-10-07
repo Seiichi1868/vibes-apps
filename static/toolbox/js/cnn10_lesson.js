@@ -796,8 +796,8 @@
       searchStatus.textContent = embedState.running
         ? "AI検索を準備しています…"
         : (embedState.ready
-          ? `意味検索の準備済み ${data.embedded_count} 本${missing}`
-          : "意味検索はまだ準備されていません。");
+          ? `AI検索の準備済み ${data.embedded_count} 本${missing}`
+          : "AI検索はまだ準備されていません。");
     }
     if (embedState.running) embedTimer = setTimeout(refreshEmbedStatus, 2000);
   }
@@ -880,7 +880,7 @@
   });
   aiToggle.addEventListener("change", () => {
     const on = aiToggle.checked;
-    searchInput.placeholder = on ? "意味で探す（例: 健康診断の重要性）" : "文字検索（例: Mars, election）";
+    searchInput.placeholder = on ? "AI検索（例: 健康診断の重要性）" : "文字検索（例: Mars, election）";
     if (on) refreshEmbedStatus();
     else {
       aiBtn.hidden = true;
