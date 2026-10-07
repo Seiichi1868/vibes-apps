@@ -17,6 +17,7 @@
     font-size: 0.86rem;
   }
   .ms-setup select,
+  .ms-setup .ms-class-toggle,
   .ms-setup input[type="number"],
   .ms-setup input[type="search"] {
     min-height: 0;
@@ -52,8 +53,31 @@
   .ms-used-list { max-height: 32rem; overflow: auto; }
   .ms-people { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: flex-end; }
   .ms-person { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px 6px; flex: 1 1 22rem; }
-  .ms-person > label { display: flex; flex-direction: column; gap: 2px; flex: 0 0 auto; font-size: 0.86rem; }
-  .ms-person select { width: 11rem; max-width: 100%; }
+  .ms-person > label, .ms-class-pick > label { display: flex; flex-direction: column; gap: 2px; flex: 0 0 auto; font-size: 0.86rem; }
+  .ms-person select, .ms-class-toggle { width: 11rem; max-width: 100%; }
+  .ms-class-pick { position: relative; }
+  .ms-class-toggle { text-align: left; background: #fff; font: inherit; line-height: 1.2; box-sizing: border-box; }
+  .ms-class-menu {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% - 2px);
+    left: 0;
+    min-width: 18rem;
+    max-height: 24rem;
+    overflow: auto;
+    display: grid;
+    gap: 4px;
+    padding: 8px;
+    background: #fff;
+    border: 1px solid var(--tb-line);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(20, 32, 51, 0.12);
+  }
+  .ms-class-menu[hidden] { display: none; }
+  .ms-class-row { display: flex; gap: 4px; align-items: center; }
+  .ms-class-name { flex: 1; text-align: left; }
+  .ms-class-menu h3 { margin: 6px 0 0; font-size: 0.9rem; }
+  .ms-class-year { display: flex; align-items: center; gap: 6px; font-size: 0.86rem; }
   .ms-people > .tb-note { flex: 1 0 100%; }
   .ms-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 6px; }
   .ms-hit { background: #f8e3b8; }
@@ -113,12 +137,14 @@
         </div>
       </div>
       <div class="ms-person">
-        <label>クラス
-          <select id="ms-class"></select>
-        </label>
+        <div class="ms-class-pick">
+          <label>クラス
+            <button class="ms-class-toggle" type="button" id="ms-class-toggle" aria-haspopup="listbox" aria-expanded="false">クラスなし（記録しない）</button>
+          </label>
+          <select id="ms-class" hidden></select>
+          <div id="ms-class-menu" class="ms-class-menu" hidden></div>
+        </div>
         <div class="ms-chips">
-          <button class="tb-btn" type="button" id="ms-class-up">上へ</button>
-          <button class="tb-btn" type="button" id="ms-class-down">下へ</button>
           <button class="tb-btn" type="button" id="ms-class-add">クラスを追加</button>
           <button class="tb-btn" type="button" id="ms-class-edit">クラスを編集</button>
           <button class="tb-btn" type="button" id="ms-class-del">削除</button>

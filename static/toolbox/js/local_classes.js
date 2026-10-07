@@ -39,6 +39,7 @@
         history: nums(pick.history),
       },
       teacher_id: String(row.teacher_id || ""),
+      hidden_year: /^\d{4}$/.test(String(row.hidden_year || "")) ? String(row.hidden_year) : "",
     };
   }
 

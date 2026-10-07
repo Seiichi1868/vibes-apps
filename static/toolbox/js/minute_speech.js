@@ -30,6 +30,7 @@
   let scopeTeacher = "";
   let scopeClass = "";
   let activeTheme = "";
+  let classMenuOpen = false;
   let catType = 1;
   let catOffset = 0;
   const CAT_PAGE = 50;
@@ -266,6 +267,7 @@
     const select = els["ms-class"];
     const exists = Array.from(select.options).some((option) => option.value === (klass || ""));
     select.value = exists ? (klass || "") : "";
+    updateClassToggle();
   }
 
   function readPrefsIntoForm() {
@@ -319,21 +321,84 @@
     return classes.filter((row) => row.teacher_id === teacher);
   }
 
-  function moveClass(direction) {
-    const id = classId();
-    const mine = teacherClasses();
-    const index = mine.findIndex((row) => row.id === id);
+  function activeTeacherClasses() {
+    return teacherClasses().filter((row) => !row.hidden_year);
+  }
+
+  function moveListedClass(list, id, direction) {
+    const index = list.findIndex((row) => row.id === id);
     const next = index + direction;
-    if (!id || index < 0 || next < 0 || next >= mine.length) return;
-    const from = classes.indexOf(mine[index]);
-    const to = classes.indexOf(mine[next]);
+    if (!id || index < 0 || next < 0 || next >= list.length) return;
+    const from = classes.indexOf(list[index]);
+    const to = classes.indexOf(list[next]);
     if (from < 0 || to < 0) return;
     const swapped = classes[from];
     classes[from] = classes[to];
     classes[to] = swapped;
     classes = window.ToolboxClasses.save(classes);
+    const selected = classId();
     fillClasses();
-    selectClass(id);
+    selectClass(selected);
+    classMenuOpen = true;
+    updateClassToggle();
+  }
+
+  function classLabel() {
+    const row = classes.find((item) => item.id === classId());
+    if (!row) return "クラスなし（記録しない）";
+    return row.hidden_year ? `${row.name}（${row.hidden_year}）` : row.name;
+  }
+
+  function updateClassToggle() {
+    const button = els["ms-class-toggle"];
+    const menu = els["ms-class-menu"];
+    if (!button || !menu) return;
+    button.textContent = classLabel();
+    button.setAttribute("aria-expanded", classMenuOpen ? "true" : "false");
+    menu.hidden = !classMenuOpen;
+  }
+
+  function setClassHiddenYear(row, year) {
+    row.hidden_year = year ? String(year) : "";
+    classes = window.ToolboxClasses.save(classes);
+    const selected = classId();
+    fillClasses();
+    selectClass(selected);
+    classMenuOpen = true;
+    updateClassToggle();
+  }
+
+  function classMenuYear() {
+    const input = document.getElementById("ms-class-year");
+    const year = Number(input && input.value);
+    if (!Number.isInteger(year) || year < 2000 || year > 2100) return 0;
+    return year;
+  }
+
+  function classRow(row, list) {
+    const line = document.createElement("div");
+    line.className = "ms-class-row";
+    const name = document.createElement("button");
+    name.type = "button";
+    name.className = row.id === classId() ? "tb-btn tb-btn-primary ms-class-name" : "tb-btn ms-class-name";
+    name.textContent = row.name;
+    name.addEventListener("click", () => {
+      classMenuOpen = false;
+      selectClass(row.id);
+      els["ms-class"].dispatchEvent(new Event("change"));
+    });
+    const up = document.createElement("button");
+    up.type = "button";
+    up.className = "tb-btn";
+    up.textContent = "上";
+    up.addEventListener("click", () => moveListedClass(list, row.id, -1));
+    const down = document.createElement("button");
+    down.type = "button";
+    down.className = "tb-btn";
+    down.textContent = "下";
+    down.addEventListener("click", () => moveListedClass(list, row.id, 1));
+    line.append(name, up, down);
+    return line;
   }
 
   function fillClasses() {
@@ -345,11 +410,87 @@
     mine.forEach((row) => {
       const option = document.createElement("option");
       option.value = row.id;
-      option.textContent = row.name;
+      option.textContent = row.hidden_year ? `${row.name}（${row.hidden_year}）` : row.name;
       select.appendChild(option);
     });
     if (current && mine.some((row) => row.id === current)) select.value = current;
     renderUnassigned();
+    renderClassMenu();
+  }
+
+  function renderClassMenu() {
+    const menu = els["ms-class-menu"];
+    if (!menu) return;
+    const currentYear = document.getElementById("ms-class-year");
+    const keptYear = (currentYear && currentYear.value) || String(schoolYear());
+    menu.innerHTML = "";
+    const none = document.createElement("button");
+    none.type = "button";
+    none.className = classId() ? "tb-btn" : "tb-btn tb-btn-primary";
+    none.textContent = "クラスなし（記録しない）";
+    none.addEventListener("click", () => {
+      classMenuOpen = false;
+      selectClass("");
+      els["ms-class"].dispatchEvent(new Event("change"));
+    });
+    menu.appendChild(none);
+    const active = activeTeacherClasses();
+    active.forEach((row) => {
+      const line = classRow(row, active);
+      const hide = document.createElement("button");
+      hide.type = "button";
+      hide.className = "tb-btn";
+      hide.textContent = "非表示";
+      hide.addEventListener("click", () => {
+        const year = classMenuYear();
+        if (!year) {
+          alert("年度は2000〜2100で入力してください。");
+          return;
+        }
+        setClassHiddenYear(row, year);
+      });
+      line.appendChild(hide);
+      menu.appendChild(line);
+    });
+    const heading = document.createElement("h3");
+    heading.textContent = "非表示";
+    menu.appendChild(heading);
+    const yearLine = document.createElement("label");
+    yearLine.className = "ms-class-year";
+    yearLine.textContent = "年度";
+    const yearInput = document.createElement("input");
+    yearInput.id = "ms-class-year";
+    yearInput.type = "number";
+    yearInput.min = "2000";
+    yearInput.max = "2100";
+    yearInput.value = keptYear;
+    yearLine.appendChild(yearInput);
+    menu.appendChild(yearLine);
+    const hidden = teacherClasses().filter((row) => row.hidden_year);
+    if (!hidden.length) {
+      const empty = document.createElement("p");
+      empty.className = "tb-note";
+      empty.textContent = "まだありません。";
+      menu.appendChild(empty);
+    }
+    const years = [...new Set(hidden.map((row) => row.hidden_year))].sort((a, b) => Number(b) - Number(a));
+    years.forEach((year) => {
+      const sub = document.createElement("h3");
+      sub.textContent = year;
+      menu.appendChild(sub);
+      const group = hidden.filter((row) => row.hidden_year === year);
+      group.forEach((row) => {
+        const line = classRow(row, group);
+        const back = document.createElement("button");
+        back.type = "button";
+        back.className = "tb-btn";
+        back.textContent = "戻す";
+        back.addEventListener("click", () => setClassHiddenYear(row, ""));
+        line.appendChild(back);
+        menu.appendChild(line);
+      });
+    });
+    updateClassToggle();
   }
 
   function renderUnassigned() {
@@ -407,6 +548,7 @@
         blocked: [],
         pick: { absent: [], picked: [], history: [] },
         teacher_id: teacherId(),
+        hidden_year: "",
       });
     }
     classes = window.ToolboxClasses.save(classes);
@@ -1442,8 +1584,17 @@
     enterScope(teacherId(), classId());
     loadCatalog();
   });
-  els["ms-class-up"].addEventListener("click", () => moveClass(-1));
-  els["ms-class-down"].addEventListener("click", () => moveClass(1));
+  els["ms-class-toggle"].addEventListener("click", () => {
+    classMenuOpen = !classMenuOpen;
+    if (classMenuOpen) renderClassMenu();
+    else updateClassToggle();
+  });
+  document.addEventListener("click", (ev) => {
+    if (!classMenuOpen) return;
+    if (ev.target.closest && ev.target.closest(".ms-class-pick")) return;
+    classMenuOpen = false;
+    updateClassToggle();
+  });
   els["ms-class-add"].addEventListener("click", () => saveClassRow(null));
   els["ms-class-edit"].addEventListener("click", () => {
     const row = classes.find((item) => item.id === classId());
