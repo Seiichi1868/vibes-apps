@@ -748,6 +748,7 @@
     } finally {
       loading = false;
       moreBtn.disabled = false;
+      moreBtn.dataset.mode = "";
       moreBtn.textContent = "さらに古い動画を見る";
     }
   }
@@ -821,6 +822,8 @@
   const aiBtn = document.getElementById("cnn10-ai-btn");
   let embedState = { ready: false, running: false, missing_count: 0 };
   let sinceYearsKey = "";
+  let aiShown = 0;
+  let aiSince = "";
   let searchTimer = null;
   let libraryTimer = null;
   let embedTimer = null;
@@ -836,6 +839,7 @@
     }
     (episodes || []).forEach((episode) => list.appendChild(createRow(episode)));
     moreBtn.hidden = true;
+    moreBtn.dataset.mode = "";
   }
 
   async function refreshLibraryStatus() {
@@ -935,25 +939,55 @@
       : `${scope}該当する動画がありません。`);
   }
 
-  async function runAiSearch() {
+  function labelAiHits(episodes) {
+    return (episodes || []).map((episode) => ({
+      ...episode,
+      scoreLabel: `類似度 ${Math.round((Number(episode.score) || 0) * 100)}%`,
+    }));
+  }
+
+  function showAiMore(hasMore) {
+    moreBtn.hidden = !hasMore;
+    moreBtn.disabled = false;
+    moreBtn.dataset.mode = hasMore ? "ai" : "";
+    moreBtn.textContent = "さらに10件";
+  }
+
+  async function runAiSearch(more) {
     const query = searchInput.value.trim();
     if (!query) {
       searchStatus.textContent = "検索する文章を入力してください。";
       return;
     }
-    searchStatus.textContent = "AI検索中…";
-    const res = await fetch(`/toolbox/api/cnn10/library/search/semantic?q=${encodeURIComponent(query)}&limit=10${sinceParam()}`);
+    if (more && sinceSelect.value !== aiSince) more = false;
+    const offset = more ? aiShown : 0;
+    aiSince = sinceSelect.value;
+    if (more) {
+      moreBtn.disabled = true;
+      moreBtn.textContent = "読み込み中…";
+    } else {
+      searchStatus.textContent = "AI検索中…";
+    }
+    const res = await fetch(`/toolbox/api/cnn10/library/search/semantic?q=${encodeURIComponent(query)}&limit=10&offset=${offset}${sinceParam()}`);
     const data = await res.json();
     if (!data.ok) {
       searchStatus.textContent = data.error || "AI検索に失敗しました。";
+      showAiMore(false);
       return;
     }
-    const episodes = (data.episodes || []).map((episode) => ({
-      ...episode,
-      scoreLabel: `類似度 ${Math.round((Number(episode.score) || 0) * 100)}%`,
-    }));
+    const episodes = labelAiHits(data.episodes);
     const scope = data.since_year ? `${data.since_year}年以降 · ` : "";
-    showSearchRows(episodes, episodes.length ? `${scope}AI検索の結果 ${episodes.length} 件` : `${scope}近い動画がありません。`);
+    if (more) {
+      episodes.forEach((episode) => list.appendChild(createRow(episode)));
+      aiShown += episodes.length;
+      const note = list.querySelector(".tb-note");
+      if (note) note.textContent = `${scope}AI検索の結果 ${aiShown} 件`;
+    } else {
+      aiShown = episodes.length;
+      showSearchRows(episodes, episodes.length ? `${scope}AI検索の結果 ${episodes.length} 件` : `${scope}近い動画がありません。`);
+    }
+    searchStatus.textContent = "";
+    showAiMore(Boolean(data.has_more) && episodes.length > 0);
   }
 
   function sinceParam() {
@@ -1021,7 +1055,10 @@
   document.getElementById("cnn10-close-btn").addEventListener("click", () => {
     panel.hidden = true;
   });
-  moreBtn.addEventListener("click", () => loadEpisodes(false));
+  moreBtn.addEventListener("click", () => {
+    if (moreBtn.dataset.mode === "ai") runAiSearch(true);
+    else loadEpisodes(false);
+  });
 
   fetch("/toolbox/api/cnn10/lesson").then((res) => res.json()).then((data) => {
     if (!data.ok) return;

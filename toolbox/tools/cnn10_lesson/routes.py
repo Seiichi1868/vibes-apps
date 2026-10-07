@@ -136,10 +136,16 @@ def register(bp):
         try:
             limit = int(request.args.get("limit") or 10)
             since = int(request.args.get("since") or 0) or None
+            offset = int(request.args.get("offset") or 0)
         except ValueError:
-            limit, since = 10, None
+            limit, since, offset = 10, None, 0
         try:
-            return jsonify({"ok": True, **semantic_search(request.args.get("q") or "", limit=limit, since_year=since)})
+            return jsonify({"ok": True, **semantic_search(
+                request.args.get("q") or "",
+                limit=limit,
+                since_year=since,
+                offset=offset,
+            )})
         except OpenAIHttpError as exc:
             return jsonify({"ok": False, "error": str(exc)}), 400
 

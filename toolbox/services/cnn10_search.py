@@ -27,6 +27,7 @@ EMBED_DIM = 512
 _lock = threading.Lock()
 _jobs = {"library": False, "embed": False}
 _vector_cache = {"mtime": None, "vectors": {}}
+_query_vec_cache = {"query": "", "vec": None}
 
 
 def _now() -> str:
@@ -306,15 +307,21 @@ def _loaded_vectors() -> dict[str, array]:
     return _vector_cache["vectors"]
 
 
-def semantic_search(query: str, limit: int = 10, since_year: int | None = None) -> dict:
+def semantic_search(query: str, limit: int = 10, since_year: int | None = None, offset: int = 0) -> dict:
     query = str(query or "").strip()
     limit = max(1, min(int(limit or 10), 30))
+    offset = max(0, int(offset or 0))
     vectors = _loaded_vectors()
     if not query:
-        return {"query": query, "episodes": [], "since_year": since_year}
+        return {"query": query, "episodes": [], "since_year": since_year, "total": 0, "offset": offset, "has_more": False}
     if not vectors:
         raise OpenAIHttpError("AI検索の準備ができていません。先に「AI検索を準備」を押してください。")
-    query_vec = _decode(_encode(_embed([query])[0]))
+    if _query_vec_cache["query"] == query and _query_vec_cache["vec"] is not None:
+        query_vec = _query_vec_cache["vec"]
+    else:
+        query_vec = _decode(_encode(_embed([query])[0]))
+        _query_vec_cache["query"] = query
+        _query_vec_cache["vec"] = query_vec
 
     episodes = {
         item["video_id"]: item
@@ -329,7 +336,13 @@ def semantic_search(query: str, limit: int = 10, since_year: int | None = None) 
         score = sum(left * right for left, right in zip(query_vec, vector))
         scored.append((score, item))
     scored.sort(key=lambda pair: pair[0], reverse=True)
-    results = []
-    for score, item in scored[:limit]:
-        results.append({**_with_date(item), "score": round(float(score), 4)})
-    return {"query": query, "episodes": results, "since_year": since_year}
+    page = scored[offset:offset + limit]
+    results = [{**_with_date(item), "score": round(float(score), 4)} for score, item in page]
+    return {
+        "query": query,
+        "episodes": results,
+        "since_year": since_year,
+        "total": len(scored),
+        "offset": offset,
+        "has_more": offset + len(results) < len(scored),
+    }
