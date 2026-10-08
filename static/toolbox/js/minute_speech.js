@@ -629,7 +629,7 @@
   }
 
   function isPair() {
-    return els["ms-format"].value === "pair";
+    return els["ms-format"].value === "pair" || els["ms-format"].value === "trio";
   }
 
   function shownPhase() {
@@ -641,7 +641,7 @@
   function setPhaseClass() {
     const shown = shownPhase();
     stage.classList.toggle("is-prep", shown === "prep" || phase === "idle");
-    stage.classList.toggle("is-speak", shown === "speak" || shown === "speakA" || shown === "speakB");
+    stage.classList.toggle("is-speak", shown === "speak" || shown === "speakA" || shown === "speakB" || shown === "speakC");
     const warn = running && remainingMs > 0 && remainingMs <= 10000;
     stage.classList.toggle("is-warn", warn);
     stage.classList.toggle("is-end", phase === "done");
@@ -654,6 +654,7 @@
       speak: "SPEAK",
       speakA: "SPEAKER A",
       speakB: "SPEAKER B",
+      speakC: "SPEAKER C",
       done: "TIME!",
     };
     const shown = shownPhase();
@@ -736,12 +737,14 @@
   }
 
   function speakPhases() {
-    return isPair() ? ["speakA", "speakB"] : ["speak"];
+    const f = els["ms-format"].value;
+    if (f === "trio") return ["speakA", "speakB", "speakC"];
+    return f === "pair" ? ["speakA", "speakB"] : ["speak"];
   }
 
   function phaseDuration(next) {
     if (next === "prep") return (Number(els["ms-prep"].value) || 60) * 1000;
-    if (next === "speak" || next === "speakA" || next === "speakB") return (Number(els["ms-speak"].value) || 60) * 1000;
+    if (next === "speak" || next === "speakA" || next === "speakB" || next === "speakC") return (Number(els["ms-speak"].value) || 60) * 1000;
     return 0;
   }
 
@@ -759,6 +762,7 @@
   function nextPhaseAfter(current) {
     if (current === "prep") return speakPhases()[0];
     if (current === "speakA") return "speakB";
+    if (current === "speakB" && els["ms-format"].value === "trio") return "speakC";
     return "";
   }
 
@@ -1461,7 +1465,7 @@
     renderClock();
   });
   els["ms-next"].addEventListener("click", () => {
-    if (topic && phase !== "speak" && phase !== "speakA" && phase !== "speakB" && phase !== "done" && !marked) {
+    if (topic && phase !== "speak" && phase !== "speakA" && phase !== "speakB" && phase !== "speakC" && phase !== "done" && !marked) {
       if (!sessionSkipped.includes(topic.id)) sessionSkipped.push(topic.id);
     }
     drawNext().catch((err) => alert(err.message));

@@ -8,6 +8,14 @@
   const countEl = document.getElementById("tb-count");
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+  function showNums(list) {
+    if (list.length < 2) {
+      result.textContent = list.join("");
+      return;
+    }
+    result.innerHTML = list.map((n) => `<span class="tb-pick-ring">${n}</span>`).join(" ");
+  }
+
   function saveState(row, state) {
     row.pick = {
       absent: state.absent,
@@ -111,7 +119,7 @@
       state.picked = state.picked.concat(chosen);
       state.history = state.history.concat(chosen);
       saveState(row, state);
-      result.textContent = chosen.join("  ");
+      showNums(chosen);
       renderGrid();
     };
     if (reduce) {
@@ -125,7 +133,7 @@
       for (let i = 0; i < want; i += 1) {
         show.push(tmp[Math.floor(Math.random() * tmp.length)]);
       }
-      result.textContent = show.join("  ");
+      showNums(show);
       if (Date.now() - start < 1100) requestAnimationFrame(spin);
       else apply();
     };

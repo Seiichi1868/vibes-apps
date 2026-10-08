@@ -841,3 +841,19 @@ body.tb-display-on .tb-refresh-row:hover { opacity: 0.8; }
 .pwa-dialog.is-other .pwa-dialog__inapp { display: none; }
 body.tb-display-on .pwa-banner,
 body.tb-display-on #pwa-menu-install { display: none; }
+
+/* ランダム指名: 複数指名時は各番号を丸で囲む */
+.tb-pick-ring {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5em;
+  height: 1.5em;
+  padding: 0 0.1em;
+  margin: 0 0.06em;
+  border: 0.06em solid currentColor;
+  border-radius: 999px;
+  font-size: 0.6em;
+  line-height: 1;
+  box-sizing: border-box;
+}
