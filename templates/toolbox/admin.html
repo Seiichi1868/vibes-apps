@@ -194,6 +194,28 @@
     <button class="tb-btn" type="button" id="tb-dir-pick">保存先フォルダを選ぶ</button>
   </div>
 
+  <h2>設定の引き継ぎ（ブラウザ間コピー）</h2>
+  <p class="tb-note">クラス・教員・座席などの設定はブラウザごとに保存されるため、Safari から Chrome へは自動では引き継がれません。Safari で「コピー用データを作る」→ Chrome の管理画面で貼り付けて「反映する」を押してください。スピーチ理解度チェックの履歴（アーカイブ）はサーバー保存なので、同じアカウントでログインすれば自動で見られます。</p>
+  <div class="tb-dir-box">
+    <p><strong>コピーするツール</strong></p>
+    <label><input type="checkbox" name="tb-mig" value="classes" checked> クラス・教員（共通）</label><br>
+    <label><input type="checkbox" name="tb-mig" value="seats" checked> ランダム席替え</label><br>
+    <label><input type="checkbox" name="tb-mig" value="pick" checked> ランダム指名</label><br>
+    <label><input type="checkbox" name="tb-mig" value="speech" checked> 1分スピーチ</label><br>
+    <label><input type="checkbox" name="tb-mig" value="talk" checked> スピーチ理解度チェックの設定</label>
+    <div class="tb-row-actions">
+      <button class="tb-btn tb-btn-primary" type="button" id="tb-mig-export">コピー用データを作る</button>
+      <button class="tb-btn" type="button" id="tb-mig-copy">クリップボードにコピー</button>
+      <button class="tb-btn" type="button" id="tb-mig-download">ファイルで保存</button>
+    </div>
+    <textarea id="tb-mig-text" rows="6" style="width:100%" placeholder="ここにコピー用データが出ます。別のブラウザではここに貼り付けます。"></textarea>
+    <div class="tb-row-actions">
+      <input type="file" id="tb-mig-file" accept="application/json,.json">
+      <button class="tb-btn tb-btn-primary" type="button" id="tb-mig-import">反映する（このブラウザの同じ設定は上書き）</button>
+    </div>
+    <p class="tb-muted" id="tb-mig-status"></p>
+  </div>
+
   <h2>スピーチ理解度チェックの履歴</h2>
   <p class="tb-note">全ユーザーの文字起こしと問題です。見出しをクリックすると並び替えできます。</p>
   <div class="tb-table-wrap">

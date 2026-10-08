@@ -85,14 +85,14 @@
       withReauth(() => toolboxFetch("/toolbox/admin/api/settings", {
         method: "POST",
         body: JSON.stringify({ login_required_enabled: loginRequired.checked }),
-      })).then(() => {
+      }).then(() => {
         const note = document.getElementById("tb-login-required-note");
         if (note) {
           note.textContent = loginRequired.checked
             ? "オンのあいだは、ランチャーと各ツールで教員ログインが必要です。"
             : "オフのあいだは、ランチャーと各ツールにログインなしで入れます。";
         }
-      });
+      }));
     });
   }
 
@@ -263,4 +263,62 @@
       });
     });
   });
+
+  // ── 設定のブラウザ間コピー ──────────────
+  const MIG_GROUPS = {
+    classes: (k) => k === "toolbox.local_classes.v1" || k === "toolbox.local_teachers.v1",
+    seats: (k) => k.startsWith("toolbox.random_seats."),
+    pick: (k) => k.startsWith("toolbox.random_pick."),
+    speech: (k) => k.startsWith("toolbox.minuteSpeech."),
+    talk: (k) => k === "toolbox.talk_check.settings.v1",
+  };
+  const migText = document.getElementById("tb-mig-text");
+  const migStatus = document.getElementById("tb-mig-status");
+  function migSelected() {
+    return Array.from(document.querySelectorAll("input[name=tb-mig]:checked")).map((i) => i.value);
+  }
+  function migBuild() {
+    const groups = migSelected();
+    const data = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (groups.some((g) => MIG_GROUPS[g](k))) data[k] = localStorage.getItem(k);
+    }
+    return JSON.stringify({ app: "toolbox", version: 1, exportedAt: new Date().toISOString(), groups, data });
+  }
+  if (migText) {
+    document.getElementById("tb-mig-export").addEventListener("click", () => {
+      migText.value = migBuild();
+      migStatus.textContent = `${Object.keys(JSON.parse(migText.value).data).length} 件の設定を書き出しました。`;
+    });
+    document.getElementById("tb-mig-copy").addEventListener("click", async () => {
+      migText.value = migBuild();
+      try { await navigator.clipboard.writeText(migText.value); migStatus.textContent = "コピーしました。Chrome の管理画面に貼り付けてください。"; }
+      catch (_) { migText.select(); migStatus.textContent = "自動コピーできません。選択済みの文字を手動でコピーしてください。"; }
+    });
+    document.getElementById("tb-mig-download").addEventListener("click", () => {
+      const blob = new Blob([migBuild()], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "toolbox-settings.json";
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    });
+    document.getElementById("tb-mig-file").addEventListener("change", (ev) => {
+      const f = ev.target.files[0];
+      if (!f) return;
+      f.text().then((t) => { migText.value = t; migStatus.textContent = "ファイルを読み込みました。「反映する」を押してください。"; });
+    });
+    document.getElementById("tb-mig-import").addEventListener("click", () => {
+      let obj;
+      try { obj = JSON.parse(migText.value); } catch (_) { migStatus.textContent = "データを読み取れません。"; return; }
+      if (!obj || obj.app !== "toolbox" || typeof obj.data !== "object") { migStatus.textContent = "Toolbox のコピー用データではありません。"; return; }
+      const groups = migSelected();
+      const keys = Object.keys(obj.data).filter((k) => k.startsWith("toolbox.") && groups.some((g) => MIG_GROUPS[g](k)));
+      if (!keys.length) { migStatus.textContent = "反映対象がありません（チェックを確認してください）。"; return; }
+      if (!confirm(`${keys.length} 件の設定をこのブラウザに反映します。同じ設定は上書きされます。よろしいですか？`)) return;
+      keys.forEach((k) => localStorage.setItem(k, String(obj.data[k])));
+      migStatus.textContent = `${keys.length} 件を反映しました。各ツールを開き直してください。`;
+    });
+  }
 })();
