@@ -14,7 +14,7 @@ from toolbox.auth import (
     verify_admin_panel_password,
 )
 from toolbox.routes import tool_required
-from toolbox.storage import get_setting, update_app_settings
+from toolbox.storage import get_setting, get_user_pref, set_user_pref, update_app_settings
 from toolbox.tools.minute_speech import classify, embed
 from toolbox.tools.minute_speech.topics import (
     SEARCH_LIMIT,
@@ -155,6 +155,22 @@ def register(bp):
     def minute_speech_stats():
         filters = _filters(request.args)
         return jsonify({"ok": True, **stats(**filters)})
+
+    @bp.route("/api/minute-speech/catalog-pos", methods=["GET", "POST"])
+    @login_required
+    @tool_required("minute-speech")
+    def minute_speech_catalog_pos():
+        uid = _user_id()
+        if request.method == "POST":
+            body = request.get_json(silent=True) or {}
+            try:
+                t = 2 if int(body.get("type")) == 2 else 1
+                off = max(0, int(body.get("offset")))
+            except (TypeError, ValueError):
+                return jsonify({"ok": False}), 400
+            set_user_pref(uid, "minute_catalog_pos", {"type": t, "offset": off})
+        pos = get_user_pref(uid, "minute_catalog_pos") or {"type": 1, "offset": 0}
+        return jsonify({"ok": True, **pos})
 
     @bp.route("/api/minute-speech/catalog")
     @login_required

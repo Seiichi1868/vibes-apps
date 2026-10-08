@@ -34,6 +34,8 @@
   let classMenuOpen = false;
   let catType = 1;
   let catOffset = 0;
+  let catPosReady = false;
+  let lastSavedPos = "";
   const CAT_PAGE = 50;
   const catalogIds = { 1: null, 2: null };
   let catalogCount = 0;
@@ -1559,7 +1561,12 @@
     archiveRows(rows, year);
     loadCatalog();
   });
-  loadCatalog();
+  toolboxFetch("/toolbox/api/minute-speech/catalog-pos").then((pos) => {
+    catType = Number(pos.type) === 2 ? 2 : 1;
+    catOffset = Math.max(0, Number(pos.offset) || 0);
+    els["ms-cat-1"].classList.toggle("tb-btn-primary", catType === 1);
+    els["ms-cat-2"].classList.toggle("tb-btn-primary", catType === 2);
+  }).catch(() => {}).then(() => { catPosReady = true; loadCatalog(); });
 
   els["ms-teacher"].addEventListener("change", () => {
     rememberScope();
@@ -1788,6 +1795,17 @@
   }
 
   function loadCatalog() {
+    if (catPosReady) {
+      const posKey = `${catType}:${catOffset}`;
+      if (posKey !== lastSavedPos) {
+        lastSavedPos = posKey;
+        toolboxFetch("/toolbox/api/minute-speech/catalog-pos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: catType, offset: catOffset }),
+        }).catch(() => {});
+      }
+    }
     renderUsedList();
     renderArchived();
     const status = els["ms-cat-status"];

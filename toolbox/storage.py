@@ -256,6 +256,19 @@ def record_recent(user_id: str, tool_id: str) -> None:
         _write_json(RECENT_TOOLS_FILE, data)
 
 
+def get_user_pref(user_id: str, key: str, default=None):
+    data = _read_json(FAVORITES_FILE.with_name("user_prefs.json"), {})
+    return (data.get(user_id) or {}).get(key, default)
+
+
+def set_user_pref(user_id: str, key: str, value) -> None:
+    path = FAVORITES_FILE.with_name("user_prefs.json")
+    with _lock:
+        data = _read_json(path, {})
+        data.setdefault(user_id, {})[key] = value
+        _write_json(path, data)
+
+
 # ── classes ─────────────────────────────────────────────────
 
 def list_classes(user_id: str) -> list[dict]:
