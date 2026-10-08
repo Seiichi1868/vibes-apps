@@ -103,7 +103,8 @@
   .ms-time.is-time { animation: ms-blink 1.1s ease-in-out infinite; }
   .ms-switch { font-size: 18vh; font-weight: 800; letter-spacing: 0.04em; }
   @keyframes ms-blink { 50% { opacity: 0.45; } }
-  .ms-ops { flex-wrap: wrap; min-height: 48px; }
+  .ms-ops { flex-wrap: wrap; min-height: 32px; justify-content: flex-start; gap: 4px; }
+  .ms-ops .tb-btn { min-height: 0; padding: 2px 8px; font-size: 0.8rem; line-height: 1.3; }
   .ms-history-list { display: grid; gap: 6px; }
   .ms-history-list .ms-card.is-blur .ms-card-text { filter: blur(6px); }
   @media (max-aspect-ratio: 1/1) {
@@ -273,14 +274,10 @@
   <div class="ms-ops">
     <button class="tb-btn tb-btn-primary" type="button" id="ms-start">Start</button>
     <button class="tb-btn" type="button" id="ms-pause" hidden>一時停止</button>
+    <button class="tb-btn" type="button" id="ms-phase-prev" title="前のタイマー（←）" aria-label="前のタイマー">←</button>
+    <button class="tb-btn" type="button" id="ms-phase-next" title="次のタイマー（→）" aria-label="次のタイマー">→</button>
     <button class="tb-btn" type="button" id="ms-reset">リセット</button>
-    <button class="tb-btn" type="button" id="ms-next">次のお題</button>
-    <button class="tb-btn" type="button" id="ms-again" hidden>同じお題でもう一度</button>
-    <button class="tb-btn" type="button" id="ms-undo" hidden>使用済みを取り消す</button>
-    <button class="tb-btn" type="button" id="ms-skip">見送り</button>
-    <button class="tb-btn" type="button" id="ms-hide">今後出さない</button>
     <button class="tb-btn" type="button" id="ms-toggle-ja">訳 J</button>
-    <button class="tb-btn" type="button" id="ms-toggle-hint">ヒント H</button>
     <button class="tb-btn" type="button" id="ms-back">設定に戻る</button>
   </div>
 </section>

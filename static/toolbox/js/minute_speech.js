@@ -672,8 +672,6 @@
     els["ms-start"].textContent = phase === "done" ? "次の操作" : "Start";
     els["ms-pause"].hidden = phase === "idle" || phase === "done" || phase === "gate";
     els["ms-pause"].textContent = running ? "一時停止" : "再開";
-    els["ms-again"].hidden = phase !== "done";
-    els["ms-undo"].hidden = phase !== "done";
     setPhaseClass();
   }
 
@@ -1464,31 +1462,20 @@
     renderTopic();
     renderClock();
   });
-  els["ms-next"].addEventListener("click", () => {
-    if (topic && phase !== "speak" && phase !== "speakA" && phase !== "speakB" && phase !== "speakC" && phase !== "done" && !marked) {
-      if (!sessionSkipped.includes(topic.id)) sessionSkipped.push(topic.id);
-    }
-    drawNext().catch((err) => alert(err.message));
-  });
-  els["ms-again"].addEventListener("click", () => {
-    phase = "idle";
-    stopTick();
-    renderTopic();
-    renderClock();
-  });
-  els["ms-undo"].addEventListener("click", () => {
-    undoUsed();
-    alert("使用済みを取り消しました。");
-  });
-  els["ms-skip"].addEventListener("click", skipTopic);
-  els["ms-hide"].addEventListener("click", hideTopic);
+  function phaseSeq() {
+    return ["prep"].concat(speakPhases());
+  }
+  function stepPhase(delta) {
+    const seq = phaseSeq();
+    const cur = phase === "done" ? seq.length - 1 : Math.max(0, seq.indexOf(shownPhase()));
+    const to = Math.min(seq.length - 1, Math.max(0, cur + delta));
+    if (to === cur && phase !== "done") return;
+    armGate(seq[to]);
+  }
+  els["ms-phase-prev"].addEventListener("click", () => stepPhase(-1));
+  els["ms-phase-next"].addEventListener("click", () => stepPhase(1));
   els["ms-toggle-ja"].addEventListener("click", () => {
     els["ms-ja"].checked = !els["ms-ja"].checked;
-    writePrefs();
-    renderTopic();
-  });
-  els["ms-toggle-hint"].addEventListener("click", () => {
-    els["ms-hints"].checked = !els["ms-hints"].checked;
     writePrefs();
     renderTopic();
   });
@@ -1519,16 +1506,13 @@
       ev.preventDefault();
       toggleRun();
     }
-    if (key === "n") {
-      ev.preventDefault();
-      els["ms-next"].click();
-    }
+    if (key === "arrowleft") { ev.preventDefault(); els["ms-phase-prev"].click(); }
+    if (key === "arrowright") { ev.preventDefault(); els["ms-phase-next"].click(); }
     if (key === "r") {
       ev.preventDefault();
       els["ms-reset"].click();
     }
     if (key === "j") els["ms-toggle-ja"].click();
-    if (key === "h") els["ms-toggle-hint"].click();
   });
   document.addEventListener("visibilitychange", () => {
     if (running) tick();
