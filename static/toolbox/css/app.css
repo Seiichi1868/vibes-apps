@@ -102,6 +102,15 @@ h1, h2, h3 { margin: 0 0 12px; }
 
 .tb-btn-primary { background: var(--tb-accent); color: #17300c; font-weight: 700; }
 
+/* コンパクトボタン（1分スピーチ基準） */
+.tb-btn, .tb-presets button, .tb-tab {
+  min-height: 0;
+  min-width: 0;
+  padding: 2px 9px;
+  line-height: 1.3;
+  font-size: 0.86rem;
+}
+
 .tb-align {
   width: 100%;
   border-collapse: collapse;
