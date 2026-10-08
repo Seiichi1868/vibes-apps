@@ -25,6 +25,7 @@
   let tickId = 0;
   let wakeLock = null;
   let switchTimer = 0;
+  let phaseNext = "prep";
   let themes = [];
   let teachers = [];
   let scopeTeacher = "";
@@ -613,7 +614,7 @@
     const showJa = els["ms-ja"].checked && topic.ja;
     els["ms-ja-line"].hidden = !showJa;
     els["ms-ja-line"].textContent = showJa ? topic.ja : "";
-    const showHint = els["ms-hints"].checked && (phase === "prep" || phase === "idle");
+    const showHint = els["ms-hints"].checked && (shownPhase() === "prep" || phase === "idle");
     els["ms-hint"].hidden = !showHint;
     els["ms-hint"].textContent = showHint ? (HINTS[topic.type] || "") : "";
     stage.classList.toggle("is-long", Number(topic.words) >= 60);
@@ -625,12 +626,23 @@
     requestAnimationFrame(fitTopic);
   }
 
+  function isPair() {
+    return els["ms-format"].value === "pair";
+  }
+
+  function shownPhase() {
+    if (phase === "gate") return phaseNext;
+    if (phase === "idle" && isPair()) return "prep";
+    return phase;
+  }
+
   function setPhaseClass() {
-    stage.classList.toggle("is-prep", phase === "prep" || phase === "idle");
-    stage.classList.toggle("is-speak", phase === "speak" || phase === "speakA" || phase === "speakB");
-    const warn = running && remainingMs > 0 && remainingMs <= 10000 && phase !== "switch";
+    const shown = shownPhase();
+    stage.classList.toggle("is-prep", shown === "prep" || phase === "idle");
+    stage.classList.toggle("is-speak", shown === "speak" || shown === "speakA" || shown === "speakB");
+    const warn = running && remainingMs > 0 && remainingMs <= 10000;
     stage.classList.toggle("is-warn", warn);
-    stage.classList.toggle("is-end", phase === "done" || remainingMs <= 0 && phase !== "idle" && phase !== "switch");
+    stage.classList.toggle("is-end", phase === "done");
   }
 
   function renderClock() {
@@ -638,25 +650,24 @@
       idle: "READY",
       prep: "PREP",
       speak: "SPEAK",
-      speakA: "SPEAK A",
-      speakB: "SPEAK B",
-      switch: "SWITCH",
+      speakA: "SPEAKER A",
+      speakB: "SPEAKER B",
       done: "TIME!",
     };
-    els["ms-phase"].textContent = names[phase] || "";
-    if (phase === "switch") {
-      els["ms-time"].textContent = "Switch!";
-      els["ms-time"].className = "ms-time ms-switch";
-    } else if (phase === "done") {
+    const shown = shownPhase();
+    els["ms-phase"].textContent = names[shown] || "";
+    els["ms-phase"].style.letterSpacing = (names[shown] || "").length > 6 ? "0.04em" : "0.14em";
+    if (phase === "done") {
       els["ms-time"].textContent = "TIME!";
       els["ms-time"].className = "ms-time is-time";
     } else {
-      els["ms-time"].textContent = formatTime(phase === "idle" ? (Number(els["ms-prep"].value) || 60) * 1000 : remainingMs);
+      const idleMs = (Number(els["ms-prep"].value) || 60) * 1000;
+      els["ms-time"].textContent = formatTime(phase === "idle" ? idleMs : remainingMs);
       els["ms-time"].className = "ms-time";
     }
-    els["ms-start"].hidden = phase !== "idle" && phase !== "done";
+    els["ms-start"].hidden = phase !== "idle" && phase !== "done" && phase !== "gate";
     els["ms-start"].textContent = phase === "done" ? "次の操作" : "Start";
-    els["ms-pause"].hidden = phase === "idle" || phase === "done" || phase === "switch";
+    els["ms-pause"].hidden = phase === "idle" || phase === "done" || phase === "gate";
     els["ms-pause"].textContent = running ? "一時停止" : "再開";
     els["ms-again"].hidden = phase !== "done";
     els["ms-undo"].hidden = phase !== "done";
@@ -723,15 +734,36 @@
   }
 
   function speakPhases() {
-    return els["ms-format"].value === "pair" ? ["speakA", "speakB"] : ["speak"];
+    return isPair() ? ["speakA", "speakB"] : ["speak"];
+  }
+
+  function phaseDuration(next) {
+    if (next === "prep") return (Number(els["ms-prep"].value) || 60) * 1000;
+    if (next === "speak" || next === "speakA" || next === "speakB") return (Number(els["ms-speak"].value) || 60) * 1000;
+    return 0;
+  }
+
+  function armGate(next) {
+    clearTimeout(switchTimer);
+    stopTick();
+    phase = "gate";
+    phaseNext = next;
+    durationMs = phaseDuration(next);
+    remainingMs = durationMs;
+    renderTopic();
+    renderClock();
+  }
+
+  function nextPhaseAfter(current) {
+    if (current === "prep") return speakPhases()[0];
+    if (current === "speakA") return "speakB";
+    return "";
   }
 
   function beginPhase(next) {
     clearTimeout(switchTimer);
     phase = next;
-    if (next === "prep") durationMs = (Number(els["ms-prep"].value) || 60) * 1000;
-    else if (next === "speak" || next === "speakA" || next === "speakB") durationMs = (Number(els["ms-speak"].value) || 60) * 1000;
-    else durationMs = 0;
+    durationMs = phaseDuration(next);
     remainingMs = durationMs;
     if ((next === "speak" || next === "speakA") && !marked) {
       markUsed();
@@ -739,16 +771,25 @@
     }
     renderTopic();
     renderClock();
-    if (next === "switch") {
-      playCue();
-      switchTimer = setTimeout(() => beginPhase("speakB"), 1600);
-      return;
-    }
     if (next === "done") {
       playEnd();
       return;
     }
     startRunning();
+  }
+
+  function finishPhase() {
+    const upcoming = nextPhaseAfter(phase);
+    if (!upcoming) {
+      phase = "done";
+      playEnd();
+      renderClock();
+      return;
+    }
+    playCue();
+    const autoSolo = !isPair() && phase === "prep" && els["ms-auto"].checked;
+    if (autoSolo) beginPhase(upcoming);
+    else armGate(upcoming);
   }
 
   function startRunning() {
@@ -763,24 +804,12 @@
 
   function tick() {
     remainingMs = Math.max(0, endAt - Date.now());
-    renderClock();
-    if (remainingMs > 0) return;
-    stopTick();
-    if (phase === "prep") {
-      playCue();
-      if (els["ms-auto"].checked) beginPhase(speakPhases()[0]);
-      else renderClock();
-      return;
-    }
-    if (phase === "speakA") {
-      beginPhase("switch");
-      return;
-    }
-    if (phase === "speak" || phase === "speakB") {
-      phase = "done";
-      playEnd();
+    if (remainingMs > 0) {
       renderClock();
+      return;
     }
+    stopTick();
+    finishPhase();
   }
 
   function toggleRun() {
@@ -789,11 +818,11 @@
       beginPhase("prep");
       return;
     }
-    if (phase === "done" || phase === "switch") return;
-    if (phase === "prep" && !running && remainingMs <= 0) {
-      beginPhase(speakPhases()[0]);
+    if (phase === "gate") {
+      beginPhase(phaseNext);
       return;
     }
+    if (phase === "done") return;
     if (running) {
       remainingMs = Math.max(0, endAt - Date.now());
       stopTick();

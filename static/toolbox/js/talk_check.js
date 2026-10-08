@@ -22,6 +22,7 @@
     reviewed: false,
     localAudioName: "",
     questions: [],
+    queue: null,
     sessionId: null,
     detail: null,
     index: 0,
@@ -360,6 +361,7 @@
       sessionId: state.sessionId,
       index: state.index,
       showingAnswer: state.showingAnswer,
+      queueIds: state.queue ? state.queue.map((q) => q.id) : null,
     });
   }
 
@@ -378,6 +380,7 @@
     state.reviewed = false;
     state.localAudioName = "";
     state.questions = [];
+    state.queue = null;
     state.sessionId = null;
     state.detail = null;
     state.index = 0;
@@ -983,48 +986,100 @@
   });
 
   // ── 出題前の選択・出題 ───────────────────────────────────────
+  function isIncluded(q) {
+    return !!q && q.included !== false && q.included !== "false" && q.included !== 0;
+  }
+
   function visibleQuestions() {
-    return state.questions.filter((q) => q.included !== false);
+    if (state.queue) return state.queue;
+    return state.questions.filter(isIncluded);
+  }
+
+  function syncSelectChecks() {
+    if (state.view !== "select") return;
+    document.querySelectorAll("#tb-select-list input[data-i]").forEach((input) => {
+      const q = state.questions[Number(input.dataset.i)];
+      if (q) q.included = input.checked;
+    });
   }
 
   function renderSelect() {
     const list = document.getElementById("tb-select-list");
     list.innerHTML = state.questions.map((q, i) => `
       <li>
-        <label class="tb-check"><input type="checkbox" data-i="${i}" ${q.included === false ? "" : "checked"}> 問題 ${i + 1}${q.section ? ` <small class="tb-muted">(${esc(q.section)})</small>` : ""}</label>
-        <p class="tb-blur" data-reveal>${esc(q.question)}</p>
+        <label class="tb-check"><input type="checkbox" data-i="${i}" ${isIncluded(q) ? "checked" : ""}> 問題 ${i + 1}${q.section ? ` <small class="tb-muted">(${esc(q.section)})</small>` : ""}</label>
+        <p>${esc(q.question)}</p>
       </li>
     `).join("");
-    list.querySelectorAll("[data-reveal]").forEach((p) => {
-      p.addEventListener("click", () => p.classList.toggle("tb-blur"));
-    });
     list.querySelectorAll("input[data-i]").forEach((input) => {
       input.addEventListener("change", () => {
-        state.questions[Number(input.dataset.i)].included = input.checked;
+        const q = state.questions[Number(input.dataset.i)];
+        if (q) q.included = input.checked;
       });
     });
   }
 
-  function revealAllQuestions() {
-    document.querySelectorAll("#tb-select-list [data-reveal].tb-blur").forEach((p) => {
-      p.classList.remove("tb-blur");
-    });
+  function persistSelection() {
+    if (!state.sessionId || !state.questions.length) return Promise.resolve();
+    return toolboxFetch(`/toolbox/api/talk/sessions/${state.sessionId}`, {
+      method: "PUT",
+      body: JSON.stringify({ questions: state.questions }),
+    }).catch(() => {});
   }
 
-  document.getElementById("tb-reveal-all").addEventListener("click", revealAllQuestions);
+  function applyQueueIds(ids) {
+    if (!Array.isArray(ids)) return;
+    const byId = new Map(state.questions.map((q) => [q.id, q]));
+    const queued = ids.map((id) => byId.get(id)).filter(Boolean);
+    if (!queued.length) return;
+    const keep = new Set(ids);
+    state.questions.forEach((q) => { q.included = keep.has(q.id); });
+    state.queue = queued;
+  }
+
   document.getElementById("tb-start-selected").addEventListener("click", startPlay);
 
   function startPlay() {
-    const qs = visibleQuestions();
+    syncSelectChecks();
+    const qs = state.questions.filter(isIncluded);
     if (!qs.length) {
       alert("出す問題を1つ以上選んでください。");
       return;
     }
+    state.queue = qs.slice();
     state.index = 0;
     state.showingAnswer = false;
+    persistSelection();
     show("play");
     renderQuestion();
   }
+
+  function exitDisplay() {
+    if (window.ToolboxDisplay && window.ToolboxDisplay.isOn && window.ToolboxDisplay.isOn()) {
+      window.ToolboxDisplay.exit();
+    }
+  }
+
+  document.getElementById("tb-back-select").addEventListener("click", () => {
+    exitDisplay();
+    state.queue = null;
+    renderSelect();
+    show("select");
+  });
+  document.getElementById("tb-back-archive").addEventListener("click", () => {
+    exitDisplay();
+    state.queue = null;
+    if (!state.sessionId) {
+      alert("アーカイブがまだありません。");
+      return;
+    }
+    persistSelection().then(() => openArchive(state.sessionId)).catch((e) => alert(e.message));
+  });
+  document.getElementById("tb-back-settings").addEventListener("click", () => {
+    exitDisplay();
+    state.queue = null;
+    show("settings");
+  });
 
   function currentQ() {
     return visibleQuestions()[state.index];
@@ -1141,7 +1196,10 @@
 
   document.getElementById("tb-skip").addEventListener("click", () => {
     const q = currentQ();
-    if (q) q.included = false;
+    if (q) {
+      q.included = false;
+      if (state.queue) state.queue = state.queue.filter((item) => item !== q);
+    }
     if (!visibleQuestions()[state.index]) state.index = Math.max(0, visibleQuestions().length - 1);
     state.showingAnswer = false;
     if (!visibleQuestions().length) endPlay();
@@ -1171,7 +1229,12 @@
         body: JSON.stringify({ session_id: state.sessionId, index: realIndex }),
       });
       if (!data.question) throw new Error("新しい問題が返りませんでした。");
+      data.question.included = q.included !== false;
       state.questions[realIndex] = data.question;
+      if (state.queue) {
+        const slot = state.queue.indexOf(q);
+        if (slot >= 0) state.queue[slot] = data.question;
+      }
       state.showingAnswer = false;
       renderQuestion();
     } catch (err) {
@@ -1279,6 +1342,7 @@
     if (!(detail.questions || []).length) throw new Error("この履歴にはまだ問題がありません。開いて問題を作ってください。");
     state.sessionId = detail.id;
     state.questions = detail.questions;
+    state.queue = null;
     state.transcript = detail.transcript || "";
     state.source = detail.source || "paste";
     startPlay();
@@ -1483,6 +1547,7 @@
       const saved = await saveArchive();
       state.sessionId = saved.id;
       state.questions = saved.questions;
+      state.queue = null;
       state.transcript = saved.transcript || "";
       state.source = saved.source || "paste";
       startPlay();
@@ -1620,7 +1685,10 @@
       case "play":
         if (state.sessionId) {
           const detail = await fetchDetail(state.sessionId);
+          const queueIds = state.queue ? state.queue.map((q) => q.id) : null;
           state.questions = mergeIncluded(detail.questions);
+          state.queue = null;
+          if (queueIds) applyQueueIds(queueIds);
         }
         state.index = Math.min(state.index, Math.max(0, visibleQuestions().length - 1));
         renderQuestion();
@@ -1663,6 +1731,12 @@
 
   // ── ブラウザ再読み込み後の復元 ───────────────────────────────
   async function restore() {
+    const nav = performance.getEntriesByType("navigation")[0];
+    const reload = nav && nav.type === "reload";
+    if (!reload) {
+      writeJson(sessionStorage, RESUME_KEY, { view: "settings" });
+      return;
+    }
     const resume = readJson(sessionStorage, RESUME_KEY, null);
     if (!resume || resume.view === "settings") return;
     const drafts = readJson(sessionStorage, DRAFT_KEY, {});
@@ -1681,9 +1755,11 @@
       const detail = await fetchDetail(resume.sessionId);
       state.sessionId = detail.id;
       state.questions = detail.questions || [];
+      state.queue = null;
       state.transcript = detail.transcript || "";
       state.browserTranscript = detail.browser_transcript || "";
       state.source = detail.source || "paste";
+      applyQueueIds(resume.queueIds);
       state.index = resume.index || 0;
       state.showingAnswer = !!resume.showingAnswer;
       const hasQ = state.questions.length > 0;
@@ -1731,6 +1807,12 @@
     onPrev: () => {
       if (state.view === "play") stepPrev();
     },
+  });
+
+  window.addEventListener("pagehide", (ev) => {
+    if (!ev.persisted) return;
+    if (state.mediaRecorder && state.mediaRecorder.state === "recording") return;
+    if (state.view !== "settings") show("settings");
   });
 
   loadMics().catch(() => {});

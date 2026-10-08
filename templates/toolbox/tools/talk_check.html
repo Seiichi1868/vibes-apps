@@ -111,10 +111,9 @@
 
   <div data-view="select" hidden>
     <h2>出す問題を選ぶ</h2>
-    <p class="tb-note">ミラーリングでは問題文が見えます。通常はすぐ開始してください。項目をタップすると文面が見えます。</p>
+    <p class="tb-note">出したい問題だけにチェックを入れて Start してください。外した問題は出題しません。</p>
     <ul id="tb-select-list" class="tb-select-list"></ul>
     <div class="tb-actions">
-      <button class="tb-btn" type="button" id="tb-reveal-all">ぼかしをすべて解除</button>
       <button class="tb-btn tb-btn-primary tb-btn-lg" type="button" id="tb-start-selected">Start ▶</button>
     </div>
   </div>
@@ -130,6 +129,11 @@
         <p class="tb-answer" id="tb-answer" hidden></p>
         <p class="tb-evidence" id="tb-evidence" hidden></p>
       </div>
+    </div>
+    <div class="tb-actions tb-play-nav">
+      <button class="tb-btn" type="button" id="tb-back-select">問題を選ぶ</button>
+      <button class="tb-btn" type="button" id="tb-back-archive">アーカイブ</button>
+      <button class="tb-btn" type="button" id="tb-back-settings">設定に戻る</button>
     </div>
     <div class="tb-actions tb-teacher-actions">
       <button class="tb-btn" type="button" id="tb-skip">この問題をスキップ</button>
