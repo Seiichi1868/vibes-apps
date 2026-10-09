@@ -139,7 +139,25 @@ h1, h2, h3 { margin: 0 0 12px; }
 .tb-top-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+}
+
+.tb-top-right .tb-user-btn,
+.tb-blank-btn {
+  min-height: 34px;
+  min-width: 34px;
+  padding: 0 12px;
+  font-size: 0.78rem;
+}
+.tb-user-btn-logo {
+  padding: 0;
+  width: 34px;
+}
+.tb-user-btn-logo img {
+  width: 18px;
+  height: 18px;
+  display: block;
+  border-radius: 4px;
 }
 
 .tb-quick { position: relative; }
