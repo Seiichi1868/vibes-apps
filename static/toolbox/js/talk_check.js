@@ -1274,6 +1274,14 @@
     if (state.sessionId) openArchive(state.sessionId).catch((e) => alert(e.message));
   });
 
+  document.getElementById("tb-end-replay").addEventListener("click", () => {
+    if (!visibleQuestions().length) return;
+    state.index = 0;
+    state.showingAnswer = false;
+    show("play");
+    renderQuestion();
+  });
+
   function displayOn() {
     return !!(window.ToolboxDisplay && window.ToolboxDisplay.isOn && window.ToolboxDisplay.isOn());
   }
