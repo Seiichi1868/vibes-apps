@@ -80,6 +80,25 @@
     window.toolboxSetBlank && window.toolboxSetBlank(display.blank);
   }
 
+  function shouldIgnoreStageClick(ev) {
+    if (window.toolboxIsBlank && window.toolboxIsBlank()) return true;
+    if (ev.target.closest(".tb-display-bar")) return true;
+    if (ev.target.closest("button, a, input, select, textarea, label")) return true;
+    return false;
+  }
+
+  function fireStageAction(ev) {
+    if (shouldIgnoreStageClick(ev)) return;
+    if (ev.target.closest(".tb-seat-cell") && !display.on) return;
+    if (display.onNext) display.onNext();
+  }
+
+  function isStageMainClick(ev) {
+    if (ev.target.closest(".tb-stage-main")) return true;
+    const ms = ev.target.closest("#ms-stage");
+    return ms && !ms.hidden;
+  }
+
   function init(options) {
     display.onNext = options.onNext || null;
     display.onPrev = options.onPrev || null;
@@ -110,10 +129,12 @@
     const root = document.querySelector("[data-display-root]");
     if (root) {
       root.addEventListener("click", (ev) => {
+        if (isStageMainClick(ev)) {
+          fireStageAction(ev);
+          return;
+        }
         if (!display.on) return;
-        if (window.toolboxIsBlank && window.toolboxIsBlank()) return;
-        if (ev.target.closest("button, a, input, select, textarea, label")) return;
-        display.onNext && display.onNext();
+        fireStageAction(ev);
       });
     }
     document.addEventListener("mousemove", () => {

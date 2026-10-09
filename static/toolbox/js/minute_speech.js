@@ -1450,10 +1450,6 @@
   });
   els["ms-start"].addEventListener("click", toggleRun);
   els["ms-pause"].addEventListener("click", toggleRun);
-  els["ms-clock"].addEventListener("click", () => {
-    if (window.ToolboxDisplay && window.ToolboxDisplay.isOn()) return;
-    toggleRun();
-  });
   els["ms-reset"].addEventListener("click", () => {
     stopTick();
     clearTimeout(switchTimer);

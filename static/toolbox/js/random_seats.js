@@ -178,6 +178,7 @@
         cell.title = "番号を置ける席。空のままタップすると使えない席になります";
       }
       cell.addEventListener("click", () => {
+        if (window.ToolboxDisplay && window.ToolboxDisplay.isOn()) return;
         if (!row) return;
         const next = stateOf();
         const set = new Set(next.blocked || []);
