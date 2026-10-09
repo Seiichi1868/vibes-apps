@@ -1009,6 +1009,7 @@
       <li>
         <label class="tb-check"><input type="checkbox" data-i="${i}" ${isIncluded(q) ? "checked" : ""}> 問題 ${i + 1}${q.section ? ` <small class="tb-muted">(${esc(q.section)})</small>` : ""}</label>
         <p>${esc(q.question)}</p>
+        ${q.model_answer ? `<p class="tb-answer-line">模範解答: ${esc(q.model_answer)}</p>` : ""}
       </li>
     `).join("");
     list.querySelectorAll("input[data-i]").forEach((input) => {
