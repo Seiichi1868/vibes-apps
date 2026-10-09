@@ -3,15 +3,18 @@
 {% block head %}
 <script>
   (function () {
-    var key = "tbOpeningAt";
+    var seenKey = "tbOpeningSeen";
+    var atKey = "tbOpeningAt";
     var gapMs = 4 * 60 * 60 * 1000;
     try {
-      var last = Number(localStorage.getItem(key) || 0);
-      var now = Date.now();
-      if (last && now - last < gapMs) {
+      var seen = sessionStorage.getItem(seenKey) === "1";
+      var last = Number(localStorage.getItem(atKey) || 0);
+      var stale = !last || Date.now() - last >= gapMs;
+      if (seen && !stale) {
         document.documentElement.classList.add("tb-skip-opening");
       } else {
-        localStorage.setItem(key, String(now));
+        sessionStorage.setItem(seenKey, "1");
+        localStorage.setItem(atKey, String(Date.now()));
       }
     } catch (_) {}
   })();
@@ -25,7 +28,7 @@
     <p class="tb-opening-label">Welcome to</p>
     <img class="tb-opening-logo" src="{{ url_for('static', filename='toolbox/icons/icon-192x192.png') }}" width="192" height="192" alt="" decoding="async" aria-hidden="true">
     <h1 class="tb-opening-title">Toolbox</h1>
-    <p class="tb-opening-sub">Pick a tool. Start the class.</p>
+    <p class="tb-opening-sub">授業を便利に、楽しく。</p>
   </div>
 </div>
 <section class="tb-launcher">
