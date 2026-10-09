@@ -1574,26 +1574,29 @@
       const progress = document.createElement("span");
       progress.className = "ms-topic-progress";
       progress.textContent = complete ? "使用済み" : (doneN ? `${doneN}/${targets.length}` : "未着手");
-      targets.forEach((classRow) => {
-        const chip = document.createElement("button");
-        chip.type = "button";
-        chip.className = "ms-class-chip";
-        const done = entry.done && entry.done[classRow.id];
-        if (done) chip.classList.add("is-done");
-        if (classRow.id === classId()) chip.classList.add("is-today");
-        chip.textContent = done ? `${classRow.name} ✓` : classRow.name;
-        chip.addEventListener("click", () => {
+      MSC.targetClassIds(course, classes).forEach((cid) => {
+        const classRow = classes.find((c) => c.id === cid);
+        if (!classRow) return;
+        const label = document.createElement("label");
+        label.className = "ms-check-label";
+        if (classRow.id === classId()) label.classList.add("is-today");
+        const box = document.createElement("input");
+        box.type = "checkbox";
+        box.checked = !!(entry.done && entry.done[classRow.id]);
+        label.append(box, document.createTextNode(classRow.name));
+        box.addEventListener("change", () => {
           const before = JSON.parse(JSON.stringify(entry.done || {}));
+          const beforeCompleted = entry.completedAt;
           MSC.toggleClassDone(store, courseId(), classRow.id, MSC.entryTopicId(entry), listType);
           saveStore();
           showUndoToast("済の変更を元に戻しますか？", () => {
             entry.done = before;
-            MSC.recomputeCompletedAt(entry, targets);
+            entry.completedAt = beforeCompleted;
             saveStore();
           });
           renderTopicList();
         });
-        chips.appendChild(chip);
+        chips.appendChild(label);
       });
       row.append(left, chips, progress);
       (complete ? doneBox : openBox).appendChild(row);
@@ -2165,6 +2168,328 @@
       renderTopicList();
     });
   }
+  // ── クラスの振り分け（1年→論理表現 I / 2年→論理表現 II）──────────
+  const ASSIGN_DEFS = {
+    "1": { name: "論理表現 I", key: "論理表現i" },
+    "2": { name: "論理表現 II", key: "論理表現ii" },
+  };
+  const ASSIGN_LAST = "toolbox.minuteSpeech.assignBackupLast";
+  const ASSIGN_PREFIX = "toolbox.minuteSpeech.assignBackup.";
+  const RAW_KEYS = {
+    teachers: "toolbox.local_teachers.v1",
+    classes: "toolbox.local_classes.v1",
+    courses: "toolbox.local_courses.v1",
+    speech: KEY,
+  };
+
+  function nfkc(text) { return String(text || "").normalize("NFKC"); }
+  function courseKey(text) { return nfkc(text).toLowerCase().replace(/\s+/g, ""); }
+  function gradeOf(name) {
+    const m = nfkc(name).replace(/^\s+/, "").match(/^([12])(?!\d)/);
+    return m ? m[1] : "";
+  }
+  function naturalCompare(a, b) {
+    const fix = (t) => nfkc(t).replace(/前半/g, "~1").replace(/後半/g, "~2");
+    return fix(a).localeCompare(fix(b), "ja", { numeric: true });
+  }
+  function isMigrationCourse(course) { return nfkc(course.name).startsWith("(移行)"); }
+  function oldUsedCount(classKey) {
+    const hist = (store.history || {})[classKey] || {};
+    let n = 0;
+    Object.values(hist).forEach((list) => { if (Array.isArray(list)) n += list.length; });
+    n += (((store.nextUse || {})[classKey]) || []).length;
+    return n;
+  }
+
+  function assignCandidates() {
+    const teacher = teacherId();
+    const all = window.ToolboxClasses.load();
+    const allCourses = window.ToolboxClasses.loadCourses();
+    return all
+      .filter((row) => !row.hidden_year)
+      .filter((row) => !row.teacher_id || row.teacher_id === teacher)
+      .filter((row) => allCourses.filter((c) => c.class_ids.includes(row.id)).every(isMigrationCourse))
+      .sort((a, b) => naturalCompare(a.name, b.name));
+  }
+
+  function closeAssignDialog() {
+    els["ms-assign-dialog"].hidden = true;
+    els["ms-assign-box"].innerHTML = "";
+  }
+
+  function openAssignDialog() {
+    const teacher = teacherId();
+    if (!teacher) {
+      alert("先に担当教員を選んでください。");
+      return;
+    }
+    const all = window.ToolboxClasses.load();
+    const allCourses = window.ToolboxClasses.loadCourses();
+    const rows = assignCandidates();
+    const mine = all.filter((c) => c.teacher_id === teacher).length;
+    const none = all.filter((c) => !c.teacher_id).length;
+    const other = all.length - mine - none;
+    const box = els["ms-assign-box"];
+    const hasBackup = !!localStorage.getItem(ASSIGN_LAST);
+    box.innerHTML = `<h2>クラスを振り分ける</h2>
+      <p class="tb-note">診断: クラス ${all.length} 件（担当あり ${mine}／担当なし ${none}／他教員 ${other}）、授業 ${allCourses.length} 件（移行授業 ${allCourses.filter(isMigrationCourse).length}）。対象 ${rows.length} クラス。</p>`;
+    const table = document.createElement("table");
+    table.innerHTML = "<thead><tr><th>クラス名</th><th>振り分け先</th><th>旧データの使用済み</th></tr></thead>";
+    const tbody = document.createElement("tbody");
+    const selects = [];
+    rows.forEach((row) => {
+      const tr = document.createElement("tr");
+      const grade = gradeOf(row.name);
+      tr.innerHTML = `<td>${esc(row.name)}</td><td></td><td>${oldUsedCount(row.id)} 件</td>`;
+      const sel = document.createElement("select");
+      sel.innerHTML = `<option value="">振り分けない</option><option value="1">${ASSIGN_DEFS["1"].name}</option><option value="2">${ASSIGN_DEFS["2"].name}</option>`;
+      sel.value = grade;
+      tr.children[1].appendChild(sel);
+      selects.push({ row, sel });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    box.appendChild(table);
+    if (!rows.length) {
+      const empty = document.createElement("p");
+      empty.className = "tb-note";
+      empty.textContent = "振り分け対象のクラスはありません（未設定、または移行授業にだけ入っているクラス）。";
+      box.appendChild(empty);
+    }
+    const importLabel = document.createElement("label");
+    importLabel.className = "tb-check";
+    importLabel.innerHTML = '<input type="checkbox" checked> 旧データの使用済みを、済として取り込む';
+    box.appendChild(importLabel);
+    const actions = document.createElement("div");
+    actions.className = "ms-chips";
+    const run = document.createElement("button");
+    run.type = "button";
+    run.className = "tb-btn tb-btn-primary";
+    run.textContent = "実行";
+    run.disabled = !rows.length;
+    run.addEventListener("click", () => {
+      const plan = selects.map((s) => ({ row: s.row, grade: s.sel.value }));
+      runAssign(plan, importLabel.querySelector("input").checked);
+    });
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "tb-btn";
+    cancel.textContent = "閉じる";
+    cancel.addEventListener("click", closeAssignDialog);
+    actions.append(run, cancel);
+    if (hasBackup) actions.appendChild(undoAssignButton());
+    box.appendChild(actions);
+    els["ms-assign-dialog"].hidden = false;
+  }
+
+  function undoAssignButton() {
+    const undo = document.createElement("button");
+    undo.type = "button";
+    undo.className = "tb-btn";
+    undo.textContent = "直前の振り分けを元に戻す";
+    undo.addEventListener("click", () => {
+      const stamp = localStorage.getItem(ASSIGN_LAST);
+      let data = null;
+      try { data = JSON.parse(localStorage.getItem(ASSIGN_PREFIX + stamp) || "null"); } catch (_) {}
+      if (!data) {
+        alert("バックアップが見つかりません。");
+        return;
+      }
+      if (!confirm("直前の振り分けの前の状態に戻します。よろしいですか？")) return;
+      Object.keys(RAW_KEYS).forEach((name) => {
+        if (data[name] == null) localStorage.removeItem(RAW_KEYS[name]);
+        else localStorage.setItem(RAW_KEYS[name], data[name]);
+      });
+      localStorage.removeItem(ASSIGN_LAST);
+      location.reload();
+    });
+    return undo;
+  }
+
+  function runAssign(plan, doImport) {
+    const targets = plan.filter((p) => p.grade);
+    if (!targets.length) {
+      alert("振り分け先が選ばれたクラスがありません。");
+      return;
+    }
+    if (!confirm(`${targets.length} クラスを振り分けます。実行前に自動バックアップを取ります。よろしいですか？`)) return;
+    const teacher = teacherId();
+    const stamp = new Date().toISOString();
+    const backup = { at: stamp };
+    Object.keys(RAW_KEYS).forEach((name) => { backup[name] = localStorage.getItem(RAW_KEYS[name]); });
+    localStorage.setItem(ASSIGN_PREFIX + stamp, JSON.stringify(backup));
+    localStorage.setItem(ASSIGN_LAST, stamp);
+
+    const MSC = window.MinuteSpeechCourses;
+    let cs = window.ToolboxClasses.loadCourses();
+    const all = window.ToolboxClasses.load();
+    const created = [];
+    const ensureCourse = (grade) => {
+      const def = ASSIGN_DEFS[grade];
+      let course = cs.find((c) => c.teacher_id === teacher && courseKey(c.name) === def.key);
+      if (!course) {
+        course = { id: newLocalId(), name: def.name, teacher_id: teacher, class_ids: [], year: "", hidden_year: "", order: cs.length };
+        cs.push(course);
+        created.push(def.name);
+      }
+      return course;
+    };
+
+    const ops = [];
+    const summary = {};
+    const touchedSources = new Set();
+    targets.forEach(({ row, grade }) => {
+      const dst = ensureCourse(grade);
+      const dstBucket = MSC.ensureCourseBucket(store, dst.id);
+      const sources = cs.filter((c) => c.id !== dst.id && c.class_ids.includes(row.id) && isMigrationCourse(c));
+      if (!dstBucket.settings) {
+        const srcSettings = sources.map((s) => ((store.courseState || {})[s.id] || {}).settings).find(Boolean);
+        dstBucket.settings = JSON.parse(JSON.stringify(srcSettings || settingsFromForm()));
+      }
+      sources.forEach((src) => {
+        src.class_ids = src.class_ids.filter((id) => id !== row.id);
+        touchedSources.add(src.id);
+        const sb = (store.courseState || {})[src.id];
+        if (!sb) return;
+        ["1", "2"].forEach((typeKey) => {
+          (sb.lists[typeKey] || []).forEach((entry) => {
+            if (entry.done && entry.done[row.id]) {
+              ops.push({ dst, typeKey, id: MSC.entryTopicId(entry), meta: entry.meta || {}, date: entry.done[row.id], cid: row.id });
+            }
+          });
+        });
+      });
+      if (doImport) {
+        const hist = (store.history || {})[row.id] || {};
+        ["1", "2"].forEach((typeKey) => {
+          (hist[typeKey] || []).forEach((h) => {
+            if (!h || !h.id) return;
+            ops.push({
+              dst, typeKey, id: h.id, date: (h.usedAt || "").slice(0, 10) || MSC.todayIsoDate(), cid: row.id,
+              meta: { text: h.text, suffix: h.suffix, type: h.type, ja: h.ja || "", source_order: h.source_order },
+            });
+          });
+        });
+        (((store.nextUse || {})[row.id]) || []).forEach((n) => {
+          if (!n || !n.id) return;
+          ops.push({
+            dst, typeKey: String(n.type || 1), id: n.id, date: "", cid: "",
+            meta: { text: n.text, suffix: n.suffix, type: n.type, ja: n.ja || "", source_order: n.source_order },
+          });
+        });
+      }
+      if (!dst.class_ids.includes(row.id)) dst.class_ids.push(row.id);
+      summary[dst.name] = (summary[dst.name] || 0) + 1;
+    });
+
+    ops.sort((a, b) => String(a.date || "9999").localeCompare(String(b.date || "9999")));
+    let imported = 0;
+    const touchedDst = new Set();
+    ops.forEach((op) => {
+      const bucket = MSC.ensureCourseBucket(store, op.dst.id);
+      const list = bucket.lists[op.typeKey] = bucket.lists[op.typeKey] || [];
+      let entry = list.find((e) => MSC.entryTopicId(e) === op.id);
+      if (!entry) {
+        entry = { topicId: op.id, addedAt: new Date().toISOString(), done: {}, completedAt: null, meta: op.meta };
+        list.push(entry);
+      }
+      touchedDst.add(op.dst.id);
+      if (op.cid && !(entry.done || {})[op.cid]) {
+        entry.done = entry.done || {};
+        entry.done[op.cid] = op.date;
+        imported += 1;
+      }
+    });
+
+    cs.forEach((course) => {
+      course.class_ids = course.class_ids
+        .slice()
+        .sort((a, b) => {
+          const ra = all.find((c) => c.id === a);
+          const rb = all.find((c) => c.id === b);
+          return naturalCompare(ra ? ra.name : "", rb ? rb.name : "");
+        });
+    });
+    cs = window.ToolboxClasses.saveCourses(cs);
+    touchedDst.forEach((id) => {
+      const course = cs.find((c) => c.id === id);
+      const tg = MSC.targetClassIds(course, all);
+      const bucket = MSC.ensureCourseBucket(store, id);
+      ["1", "2"].forEach((k) => (bucket.lists[k] || []).forEach((e) => { if (!e.completedAt) MSC.recomputeCompletedAt(e, tg); }));
+    });
+    touchedSources.forEach((id) => {
+      const course = cs.find((c) => c.id === id);
+      const bucket = (store.courseState || {})[id];
+      if (!course || !bucket) return;
+      const tg = MSC.targetClassIds(course, all);
+      ["1", "2"].forEach((k) => (bucket.lists[k] || []).forEach((e) => MSC.recomputeCompletedAt(e, tg)));
+    });
+    saveStore();
+
+    courses = window.ToolboxClasses.loadCourses();
+    fillCourses();
+    const first = cs.find((c) => c.teacher_id === teacher && courseKey(c.name) === ASSIGN_DEFS["1"].key)
+      || cs.find((c) => c.teacher_id === teacher && courseKey(c.name) === ASSIGN_DEFS["2"].key);
+    if (first && els["ms-course"]) {
+      els["ms-course"].value = first.id;
+      scopeCourse = first.id;
+    }
+    fillClasses();
+    selectClass((courseBucket() && courseBucket().lastClassId) || "");
+    enterScope(teacherId(), classId(), courseId());
+    renderTopicList();
+    loadCatalog();
+    showAssignResult(summary, imported, created, Array.from(touchedSources), assignCandidates());
+  }
+
+  function showAssignResult(summary, imported, created, sourceIds, remaining) {
+    const box = els["ms-assign-box"];
+    box.innerHTML = "<h2>振り分け結果</h2>";
+    const lines = Object.keys(summary).map((name) => `${name}: ${summary[name]} クラス`);
+    const info = document.createElement("p");
+    info.textContent = `${lines.join(" ／ ")}。済の取り込み ${imported} 件。${created.length ? `新規作成: ${created.join("、")}。` : ""}`;
+    box.appendChild(info);
+    const rest = document.createElement("p");
+    rest.className = "tb-note";
+    rest.textContent = remaining.length ? `未設定のまま残ったクラス: ${remaining.map((r) => r.name).join("、")}` : "未設定のクラスは残っていません。";
+    box.appendChild(rest);
+    const cs = window.ToolboxClasses.loadCourses();
+    sourceIds.forEach((id) => {
+      const course = cs.find((c) => c.id === id);
+      if (!course || course.class_ids.length) return;
+      const line = document.createElement("div");
+      line.className = "ms-chips";
+      const label = document.createElement("span");
+      label.textContent = `「${course.name}」は空になりました。`;
+      const hide = document.createElement("button");
+      hide.type = "button";
+      hide.className = "tb-btn";
+      hide.textContent = "非表示にする";
+      hide.addEventListener("click", () => {
+        course.hidden_year = String(schoolYear());
+        window.ToolboxClasses.saveCourses(cs);
+        courses = window.ToolboxClasses.loadCourses();
+        fillCourses();
+        fillClasses();
+        renderTopicList();
+        hide.disabled = true;
+      });
+      line.append(label, hide);
+      box.appendChild(line);
+    });
+    const actions = document.createElement("div");
+    actions.className = "ms-chips";
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "tb-btn tb-btn-primary";
+    close.textContent = "閉じる";
+    close.addEventListener("click", closeAssignDialog);
+    actions.append(close, undoAssignButton());
+    box.appendChild(actions);
+  }
+
+  if (els["ms-assign-classes"]) els["ms-assign-classes"].addEventListener("click", openAssignDialog);
+
   if (els["ms-finalize-migration"]) {
     els["ms-finalize-migration"].addEventListener("click", () => {
       if (!confirm("移行用の旧データを削除します。先に書き出し済みですか？")) return;
