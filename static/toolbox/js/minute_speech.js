@@ -26,6 +26,8 @@
   let wakeLock = null;
   let switchTimer = 0;
   let phaseNext = "prep";
+  let endedPhase = "";
+  let ringing = false;
   let themes = [];
   let teachers = [];
   let scopeTeacher = "";
@@ -645,7 +647,15 @@
     stage.classList.toggle("is-speak", shown === "speak" || shown === "speakA" || shown === "speakB" || shown === "speakC");
     const warn = running && remainingMs > 0 && remainingMs <= 10000;
     stage.classList.toggle("is-warn", warn);
-    stage.classList.toggle("is-end", phase === "done");
+    stage.classList.toggle("is-end", timeUpVisible());
+  }
+
+  function isSpeakPhase(name) {
+    return name === "speak" || name === "speakA" || name === "speakB" || name === "speakC";
+  }
+
+  function timeUpVisible() {
+    return phase === "done" || (phase === "gate" && isSpeakPhase(endedPhase));
   }
 
   function renderClock() {
@@ -659,12 +669,13 @@
       done: "TIME!",
     };
     const shown = shownPhase();
-    els["ms-phase"].textContent = names[shown] || "";
-    els["ms-phase"].style.letterSpacing = (names[shown] || "").length > 6 ? "0.04em" : "0.14em";
-    if (phase === "done") {
-      els["ms-time"].textContent = "TIME!";
+    if (timeUpVisible()) {
+      els["ms-phase"].textContent = "";
+      els["ms-time"].textContent = "TIME UP";
       els["ms-time"].className = "ms-time is-time";
     } else {
+    els["ms-phase"].textContent = names[shown] || "";
+    els["ms-phase"].style.letterSpacing = (names[shown] || "").length > 6 ? "0.04em" : "0.14em";
       const idleMs = (Number(els["ms-prep"].value) || 60) * 1000;
       els["ms-time"].textContent = formatTime(phase === "idle" ? idleMs : remainingMs);
       els["ms-time"].className = "ms-time";
@@ -703,18 +714,24 @@
     } catch (_) {}
   }
 
-  function playEnd() {
-    if (audio) {
-      audio.loop = false;
-      audio.currentTime = 0;
-      audio.play().catch(() => beep(520, 0.35));
-      return;
-    }
-    beep(520, 0.35);
+  function stopEnd() {
+    ringing = false;
+    if (!audio) return;
+    audio.pause();
+    audio.currentTime = 0;
   }
 
-  function playCue() {
-    beep(880, 0.12);
+  function playEnd(loop) {
+    unlockAudio();
+    if (!audio) {
+      beep(520, 0.35);
+      return;
+    }
+    audio.playbackRate = Number(window.TOOLBOX_TIMER_END_RATE) || 3;
+    audio.loop = loop !== false;
+    audio.currentTime = 0;
+    ringing = audio.loop;
+    audio.play().catch(() => beep(520, 0.35));
   }
 
   async function requestWake() {
@@ -778,7 +795,7 @@
     renderTopic();
     renderClock();
     if (next === "done") {
-      playEnd();
+      playEnd(true);
       return;
     }
     startRunning();
@@ -786,16 +803,21 @@
 
   function finishPhase() {
     const upcoming = nextPhaseAfter(phase);
+    endedPhase = phase;
     if (!upcoming) {
       phase = "done";
-      playEnd();
+      playEnd(true);
       renderClock();
       return;
     }
-    playCue();
     const autoSolo = !isPair() && phase === "prep" && els["ms-auto"].checked;
-    if (autoSolo) beginPhase(upcoming);
-    else armGate(upcoming);
+    if (autoSolo) {
+      playEnd(false);
+      beginPhase(upcoming);
+      return;
+    }
+    playEnd(true);
+    armGate(upcoming);
   }
 
   function startRunning() {
@@ -821,10 +843,12 @@
   function toggleRun() {
     unlockAudio();
     if (phase === "idle") {
+      stopEnd();
       beginPhase("prep");
       return;
     }
     if (phase === "gate") {
+      stopEnd();
       beginPhase(phaseNext);
       return;
     }
@@ -1203,6 +1227,7 @@
 
   function showSetup() {
     stopTick();
+    stopEnd();
     clearTimeout(switchTimer);
     stage.classList.remove("is-on");
     stage.hidden = true;
@@ -1508,7 +1533,9 @@
   els["ms-pause"].addEventListener("click", toggleRun);
   els["ms-reset"].addEventListener("click", () => {
     stopTick();
+    stopEnd();
     clearTimeout(switchTimer);
+    endedPhase = "";
     phase = "idle";
     remainingMs = (Number(els["ms-prep"].value) || 60) * 1000;
     renderTopic();
@@ -1522,6 +1549,8 @@
     const cur = phase === "done" ? seq.length - 1 : Math.max(0, seq.indexOf(shownPhase()));
     const to = Math.min(seq.length - 1, Math.max(0, cur + delta));
     if (to === cur && phase !== "done") return;
+    stopEnd();
+    endedPhase = "";
     armGate(seq[to]);
   }
   els["ms-phase-prev"].addEventListener("click", () => stepPhase(-1));
@@ -1549,6 +1578,12 @@
     loadCatalog();
   });
 
+  document.addEventListener("pointerdown", (ev) => {
+    if (!ringing) return;
+    if (ev.target && ev.target.closest && ev.target.closest("#ms-start, #ms-pause, #ms-reset, #ms-phase-prev, #ms-phase-next")) return;
+    ev.preventDefault();
+    stopEnd();
+  }, true);
   document.addEventListener("keydown", (ev) => {
     if (ev.target && /INPUT|TEXTAREA|SELECT/.test(ev.target.tagName)) return;
     if (stage.hidden) return;
