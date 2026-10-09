@@ -27,6 +27,7 @@
     detail: null,
     index: 0,
     showingAnswer: false,
+    answerMode: true,
     mediaRecorder: null,
     stream: null,
     chunks: [],
@@ -361,6 +362,7 @@
       sessionId: state.sessionId,
       index: state.index,
       showingAnswer: state.showingAnswer,
+      answerMode: state.answerMode,
       queueIds: state.queue ? state.queue.map((q) => q.id) : null,
     });
   }
@@ -1097,16 +1099,21 @@
     document.getElementById("tb-question").textContent = q.question;
     stopSpeak();
     const ans = document.getElementById("tb-answer");
-    ans.hidden = !state.showingAnswer;
+    ans.hidden = !(state.answerMode && state.showingAnswer);
     ans.textContent = q.model_answer || "";
     const ev = document.getElementById("tb-evidence");
     ev.hidden = true;
     ev.textContent = q.evidence || "";
+    const modeBtn = document.getElementById("tb-answer-mode");
+    if (modeBtn) {
+      modeBtn.textContent = state.answerMode ? "解答: 表示する" : "解答: 表示しない";
+      modeBtn.classList.toggle("tb-btn-primary", !state.answerMode);
+    }
     saveResume();
   }
 
   function stepNext() {
-    if (!state.showingAnswer) {
+    if (state.answerMode && !state.showingAnswer) {
       state.showingAnswer = true;
       renderQuestion();
       return;
@@ -1121,16 +1128,25 @@
   }
 
   function stepPrev() {
-    if (state.showingAnswer) {
+    if (state.answerMode && state.showingAnswer) {
       state.showingAnswer = false;
       renderQuestion();
       return;
     }
     if (state.index > 0) {
       state.index -= 1;
-      state.showingAnswer = true;
+      state.showingAnswer = state.answerMode;
       renderQuestion();
     }
+  }
+
+  const answerModeBtn = document.getElementById("tb-answer-mode");
+  if (answerModeBtn) {
+    answerModeBtn.addEventListener("click", () => {
+      state.answerMode = !state.answerMode;
+      if (!state.answerMode) state.showingAnswer = false;
+      renderQuestion();
+    });
   }
 
   let speakAudio = null;
@@ -1763,6 +1779,7 @@
       applyQueueIds(resume.queueIds);
       state.index = resume.index || 0;
       state.showingAnswer = !!resume.showingAnswer;
+      state.answerMode = resume.answerMode !== false;
       const hasQ = state.questions.length > 0;
       if (resume.view === "archive") {
         renderArchive(detail);
