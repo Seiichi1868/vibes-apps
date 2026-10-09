@@ -32,8 +32,13 @@
   let teachers = [];
   let scopeTeacher = "";
   let scopeClass = "";
+  let scopeCourse = "";
+  let courses = [];
   let activeTheme = "";
-  let classMenuOpen = false;
+  let listType = 1;
+  let listFilter = "all";
+  let undoTimer = 0;
+  let undoSnapshot = null;
   let catType = 1;
   let catOffset = 0;
   let catPosReady = false;
@@ -58,14 +63,66 @@
         data.recentQueries = data.recentQueries || [];
         data.nextUse = data.nextUse || {};
         data.archived = data.archived || {};
+        data.courseState = data.courseState || {};
+        data.lastCourse = data.lastCourse || {};
+        if (window.MinuteSpeechCourses) {
+          const ensured = window.MinuteSpeechCourses.ensureLoaded(data);
+          return ensured.store;
+        }
         return data;
       }
     } catch (_) {}
-    return { history: {}, rounds: {}, hiddenTopicIds: [], prefs: {}, scopes: {}, lastClass: {}, recentQueries: [], nextUse: {}, archived: {}, lastBackupAt: null };
+    const empty = window.MinuteSpeechCourses
+      ? window.MinuteSpeechCourses.defaultStore()
+      : { history: {}, rounds: {}, hiddenTopicIds: [], prefs: {}, scopes: {}, lastClass: {}, recentQueries: [], nextUse: {}, archived: {}, lastBackupAt: null };
+    if (window.MinuteSpeechCourses) return window.MinuteSpeechCourses.ensureLoaded(empty).store;
+    return empty;
+  }
+
+  function patchStoreOnto(fresh) {
+    fresh.courseState = store.courseState || fresh.courseState || {};
+    fresh.prefs = Object.assign({ teacherId: "", courseId: "", classId: "" }, fresh.prefs, store.prefs);
+    fresh.lastCourse = Object.assign({}, fresh.lastCourse, store.lastCourse);
+    fresh.hiddenTopicIds = store.hiddenTopicIds || fresh.hiddenTopicIds || [];
+    fresh.recentQueries = store.recentQueries || fresh.recentQueries || [];
+    fresh.lastBackupAt = store.lastBackupAt != null ? store.lastBackupAt : fresh.lastBackupAt;
+    fresh.migrationNotes = store.migrationNotes || fresh.migrationNotes;
+    fresh.migrationPending = store.migrationPending != null ? store.migrationPending : fresh.migrationPending;
+    fresh.schemaVersion = store.schemaVersion || fresh.schemaVersion;
+    if (store.history) fresh.history = store.history;
+    if (store.scopes) fresh.scopes = store.scopes;
+    if (store.nextUse) fresh.nextUse = store.nextUse;
+    if (store.archived) fresh.archived = store.archived;
+    if (store.rounds) fresh.rounds = store.rounds;
+    if (store.lastClass) fresh.lastClass = store.lastClass;
   }
 
   function saveStore() {
+    if (window.MinuteSpeechCourses) {
+      store = window.MinuteSpeechCourses.mergeSave((fresh) => {
+        patchStoreOnto(fresh);
+      });
+      return;
+    }
     localStorage.setItem(KEY, JSON.stringify(store));
+  }
+
+  function courseMode() {
+    return !!(window.MinuteSpeechCourses && courseId() && currentCourse());
+  }
+
+  function courseId() {
+    return (store.prefs && store.prefs.courseId) || scopeCourse || "";
+  }
+
+  function currentCourse() {
+    const id = courseId();
+    return courses.find((row) => row.id === id) || null;
+  }
+
+  function courseBucket() {
+    if (!window.MinuteSpeechCourses || !courseId()) return null;
+    return window.MinuteSpeechCourses.ensureCourseBucket(store, courseId());
   }
 
   function classId() {
@@ -105,6 +162,7 @@
   }
 
   function usedIds() {
+    if (courseMode()) return window.MinuteSpeechCourses.allListTopicIds(store, courseId());
     const type = typeValue();
     const types = type === "mixed" ? [1, 2] : [Number(type)];
     const ids = [];
@@ -188,10 +246,15 @@
     const key = scopeKey(prefs.teacherId, prefs.classId);
     if (!store.scopes[key]) store.scopes[key] = legacy;
     if (prefs.teacherId) store.lastClass[prefs.teacherId] = prefs.classId || "";
-    store.prefs = { teacherId: prefs.teacherId || "", classId: prefs.classId || "" };
+    store.prefs = {
+      teacherId: prefs.teacherId || "",
+      courseId: prefs.courseId || "",
+      classId: prefs.classId || "",
+    };
   }
 
   function settingsFor(teacher, klass) {
+    if (courseId() && courseBucket() && courseBucket().settings) return courseBucket().settings;
     const scopes = store.scopes || {};
     const exact = scopes[scopeKey(teacher, klass)];
     if (exact) return exact;
@@ -224,32 +287,55 @@
   }
 
   function rememberScope() {
-    store.scopes = store.scopes || {};
+    const settings = settingsFromForm();
+    if (courseId() && courseBucket()) courseBucket().settings = settings;
+    else {
+      store.scopes = store.scopes || {};
+      store.scopes[scopeKey(scopeTeacher, scopeClass)] = settings;
+    }
     store.lastClass = store.lastClass || {};
-    store.scopes[scopeKey(scopeTeacher, scopeClass)] = settingsFromForm();
-    if (scopeTeacher) store.lastClass[scopeTeacher] = scopeClass;
-    store.prefs = { teacherId: scopeTeacher, classId: scopeClass };
+    store.lastCourse = store.lastCourse || {};
+    if (scopeTeacher) {
+      store.lastClass[scopeTeacher] = scopeClass;
+      if (scopeCourse) store.lastCourse[scopeTeacher] = scopeCourse;
+    }
+    if (courseId() && courseBucket() && scopeClass) courseBucket().lastClassId = scopeClass;
+    store.prefs = { teacherId: scopeTeacher, courseId: scopeCourse, classId: scopeClass };
     saveStore();
   }
 
-  function enterScope(teacher, klass) {
+  function enterScope(teacher, klass, course) {
     scopeTeacher = teacher || "";
     scopeClass = klass || "";
+    scopeCourse = course || courseId() || "";
     applySettings(settingsFor(scopeTeacher, scopeClass) || DEFAULT_SETTINGS);
     store.lastClass = store.lastClass || {};
-    if (scopeTeacher) store.lastClass[scopeTeacher] = scopeClass;
-    store.prefs = { teacherId: scopeTeacher, classId: scopeClass };
+    store.lastCourse = store.lastCourse || {};
+    if (scopeTeacher) {
+      store.lastClass[scopeTeacher] = scopeClass;
+      if (scopeCourse) store.lastCourse[scopeTeacher] = scopeCourse;
+    }
+    if (scopeCourse && courseBucket() && scopeClass) courseBucket().lastClassId = scopeClass;
+    store.prefs = { teacherId: scopeTeacher, courseId: scopeCourse, classId: scopeClass };
     saveStore();
   }
 
-  function bindScope(teacher, klass, settings) {
+  function bindScope(teacher, klass, settings, course) {
     scopeTeacher = teacher || "";
     scopeClass = klass || "";
-    store.scopes = store.scopes || {};
+    scopeCourse = course || courseId() || "";
+    if (scopeCourse && courseBucket()) courseBucket().settings = settings;
+    else {
+      store.scopes = store.scopes || {};
+      store.scopes[scopeKey(scopeTeacher, scopeClass)] = settings;
+    }
     store.lastClass = store.lastClass || {};
-    store.scopes[scopeKey(scopeTeacher, scopeClass)] = settings;
-    if (scopeTeacher) store.lastClass[scopeTeacher] = scopeClass;
-    store.prefs = { teacherId: scopeTeacher, classId: scopeClass };
+    store.lastCourse = store.lastCourse || {};
+    if (scopeTeacher) {
+      store.lastClass[scopeTeacher] = scopeClass;
+      if (scopeCourse) store.lastCourse[scopeTeacher] = scopeCourse;
+    }
+    store.prefs = { teacherId: scopeTeacher, courseId: scopeCourse, classId: scopeClass };
     saveStore();
   }
 
@@ -273,7 +359,7 @@
     const select = els["ms-class"];
     const exists = Array.from(select.options).some((option) => option.value === (klass || ""));
     select.value = exists ? (klass || "") : "";
-    updateClassToggle();
+    renderTodayClasses();
   }
 
   function readPrefsIntoForm() {
@@ -282,10 +368,102 @@
     if (prefs.teacherId && teachers.some((row) => row.id === prefs.teacherId)) {
       els["ms-teacher"].value = prefs.teacherId;
     }
+    fillCourses();
     fillClasses();
-    const savedClass = prefs.classId || (store.lastClass || {})[teacherId()] || "";
+    const savedCourse = prefs.courseId || (store.lastCourse || {})[teacherId()] || "";
+    if (savedCourse && courses.some((row) => row.id === savedCourse) && els["ms-course"]) {
+      els["ms-course"].value = savedCourse;
+      scopeCourse = savedCourse;
+    }
+    const savedClass = prefs.classId
+      || (courseBucket() && courseBucket().lastClassId)
+      || (store.lastClass || {})[teacherId()]
+      || "";
     selectClass(savedClass);
-    enterScope(teacherId(), classId());
+    enterScope(teacherId(), classId(), courseId());
+    showMigrationNotes();
+  }
+
+  function showMigrationNotes() {
+    const box = els["ms-migration-note"];
+    const fin = els["ms-finalize-migration"];
+    if (!box) return;
+    const notes = store.migrationNotes || [];
+    if (store.migrationPending && notes.length) {
+      box.hidden = false;
+      box.textContent = notes.join(" ");
+    } else {
+      box.hidden = true;
+      box.textContent = "";
+    }
+    if (fin) fin.hidden = !store.migrationPending;
+  }
+
+  function fillCourses() {
+    courses = window.ToolboxClasses ? window.ToolboxClasses.loadCourses() : [];
+    const select = els["ms-course"];
+    if (!select) return;
+    const current = select.value;
+    const list = window.ToolboxClasses
+      ? window.ToolboxClasses.coursesForTeacher(teacherId(), courses)
+      : [];
+    select.innerHTML = "";
+    if (!list.length) {
+      const empty = document.createElement("option");
+      empty.value = "";
+      empty.textContent = teacherId() ? "授業を追加してください" : "教員を選んでください";
+      select.appendChild(empty);
+    }
+    list.forEach((row) => {
+      const option = document.createElement("option");
+      option.value = row.id;
+      option.textContent = row.name;
+      select.appendChild(option);
+    });
+    if (current && list.some((row) => row.id === current)) select.value = current;
+    else if (list.length === 1) select.value = list[0].id;
+    scopeCourse = select.value || "";
+  }
+
+  function courseClassRows() {
+    const course = currentCourse();
+    if (!course) return [];
+    const order = course.class_ids || [];
+    return order
+      .map((id) => classes.find((row) => row.id === id))
+      .filter((row) => row && !row.hidden_year);
+  }
+
+  function renderTodayClasses() {
+    const box = els["ms-today-classes"];
+    if (!box) return;
+    box.innerHTML = "";
+    const none = document.createElement("button");
+    none.type = "button";
+    none.className = classId() ? "tb-btn" : "tb-btn tb-btn-primary";
+    none.textContent = "記録しない";
+    none.addEventListener("click", () => {
+      selectClass("");
+      enterScope(teacherId(), "", courseId());
+      renderTodayClasses();
+      renderTopicList();
+    });
+    box.appendChild(none);
+    courseClassRows().forEach((row) => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "ms-class-chip";
+      if (row.id === classId()) chip.classList.add("is-today");
+      chip.textContent = row.name;
+      chip.addEventListener("click", () => {
+        selectClass(row.id);
+        enterScope(teacherId(), classId(), courseId());
+        renderTodayClasses();
+        renderTopicList();
+        loadCatalog();
+      });
+      box.appendChild(chip);
+    });
   }
 
   function writePrefs() {
@@ -331,193 +509,75 @@
     return teacherClasses().filter((row) => !row.hidden_year);
   }
 
-  function moveListedClass(list, id, direction) {
-    const index = list.findIndex((row) => row.id === id);
+  function moveCourseClass(id, direction) {
+    const course = currentCourse();
+    if (!course || !id) return;
+    const ids = course.class_ids.slice();
+    const index = ids.indexOf(id);
     const next = index + direction;
-    if (!id || index < 0 || next < 0 || next >= list.length) return;
-    const from = classes.indexOf(list[index]);
-    const to = classes.indexOf(list[next]);
-    if (from < 0 || to < 0) return;
-    const swapped = classes[from];
-    classes[from] = classes[to];
-    classes[to] = swapped;
-    classes = window.ToolboxClasses.save(classes);
-    const selected = classId();
-    fillClasses();
-    selectClass(selected);
-    classMenuOpen = true;
-    updateClassToggle();
-  }
-
-  function classLabel() {
-    const row = classes.find((item) => item.id === classId());
-    if (!row) return "クラスなし（記録しない）";
-    return row.hidden_year ? `${row.name}（${row.hidden_year}）` : row.name;
-  }
-
-  function updateClassToggle() {
-    const button = els["ms-class-toggle"];
-    const menu = els["ms-class-menu"];
-    if (!button || !menu) return;
-    button.textContent = classLabel();
-    button.setAttribute("aria-expanded", classMenuOpen ? "true" : "false");
-    menu.hidden = !classMenuOpen;
-  }
-
-  function setClassHiddenYear(row, year) {
-    row.hidden_year = year ? String(year) : "";
-    classes = window.ToolboxClasses.save(classes);
-    const selected = classId();
-    fillClasses();
-    selectClass(selected);
-    classMenuOpen = true;
-    updateClassToggle();
-  }
-
-  function classMenuYear() {
-    const input = document.getElementById("ms-class-year");
-    const year = Number(input && input.value);
-    if (!Number.isInteger(year) || year < 2000 || year > 2100) return 0;
-    return year;
-  }
-
-  function classRow(row, list) {
-    const line = document.createElement("div");
-    line.className = "ms-class-row";
-    const name = document.createElement("button");
-    name.type = "button";
-    name.className = row.id === classId() ? "tb-btn tb-btn-primary ms-class-name" : "tb-btn ms-class-name";
-    name.textContent = row.name;
-    name.addEventListener("click", () => {
-      classMenuOpen = false;
-      selectClass(row.id);
-      els["ms-class"].dispatchEvent(new Event("change"));
-    });
-    const up = document.createElement("button");
-    up.type = "button";
-    up.className = "tb-btn";
-    up.textContent = "上";
-    up.addEventListener("click", () => moveListedClass(list, row.id, -1));
-    const down = document.createElement("button");
-    down.type = "button";
-    down.className = "tb-btn";
-    down.textContent = "下";
-    down.addEventListener("click", () => moveListedClass(list, row.id, 1));
-    line.append(name, up, down);
-    return line;
+    if (index < 0 || next < 0 || next >= ids.length) return;
+    const tmp = ids[index];
+    ids[index] = ids[next];
+    ids[next] = tmp;
+    course.class_ids = ids;
+    courses = window.ToolboxClasses.saveCourses(courses.map((row) => (row.id === course.id ? course : row)));
+    renderTodayClasses();
+    renderTopicList();
   }
 
   function fillClasses() {
     classes = window.ToolboxClasses ? window.ToolboxClasses.load() : [];
     const select = els["ms-class"];
     const current = select.value;
-    const mine = teacherClasses();
+    const rows = courseClassRows();
     select.innerHTML = '<option value="">クラスなし（記録しない）</option>';
-    mine.forEach((row) => {
+    rows.forEach((row) => {
       const option = document.createElement("option");
       option.value = row.id;
-      option.textContent = row.hidden_year ? `${row.name}（${row.hidden_year}）` : row.name;
+      option.textContent = row.name;
       select.appendChild(option);
     });
-    if (current && mine.some((row) => row.id === current)) select.value = current;
+    if (current && rows.some((row) => row.id === current)) select.value = current;
+    else if (rows.length && !current) select.value = rows[0].id;
     renderUnassigned();
-    renderClassMenu();
+    renderTodayClasses();
   }
 
-  function renderClassMenu() {
-    const menu = els["ms-class-menu"];
-    if (!menu) return;
-    const currentYear = document.getElementById("ms-class-year");
-    const keptYear = (currentYear && currentYear.value) || String(schoolYear());
-    menu.innerHTML = "";
-    const none = document.createElement("button");
-    none.type = "button";
-    none.className = classId() ? "tb-btn" : "tb-btn tb-btn-primary";
-    none.textContent = "クラスなし（記録しない）";
-    none.addEventListener("click", () => {
-      classMenuOpen = false;
-      selectClass("");
-      els["ms-class"].dispatchEvent(new Event("change"));
+  function classesNotInCourse() {
+    const course = currentCourse();
+    const inCourse = new Set((course && course.class_ids) || []);
+    const teacher = teacherId();
+    return classes.filter((row) => {
+      if (row.hidden_year) return false;
+      if (inCourse.has(row.id)) return false;
+      if (row.teacher_id === teacher || !row.teacher_id) return true;
+      return false;
     });
-    menu.appendChild(none);
-    const active = activeTeacherClasses();
-    active.forEach((row) => {
-      const line = classRow(row, active);
-      const hide = document.createElement("button");
-      hide.type = "button";
-      hide.className = "tb-btn";
-      hide.textContent = "非表示";
-      hide.addEventListener("click", () => {
-        const year = classMenuYear();
-        if (!year) {
-          alert("年度は2000〜2100で入力してください。");
-          return;
-        }
-        setClassHiddenYear(row, year);
-      });
-      line.appendChild(hide);
-      menu.appendChild(line);
-    });
-    const heading = document.createElement("h3");
-    heading.textContent = "非表示";
-    menu.appendChild(heading);
-    const yearLine = document.createElement("label");
-    yearLine.className = "ms-class-year";
-    yearLine.textContent = "年度";
-    const yearInput = document.createElement("input");
-    yearInput.id = "ms-class-year";
-    yearInput.type = "number";
-    yearInput.min = "2000";
-    yearInput.max = "2100";
-    yearInput.value = keptYear;
-    yearLine.appendChild(yearInput);
-    menu.appendChild(yearLine);
-    const hidden = teacherClasses().filter((row) => row.hidden_year);
-    if (!hidden.length) {
-      const empty = document.createElement("p");
-      empty.className = "tb-note";
-      empty.textContent = "まだありません。";
-      menu.appendChild(empty);
-    }
-    const years = [...new Set(hidden.map((row) => row.hidden_year))].sort((a, b) => Number(b) - Number(a));
-    years.forEach((year) => {
-      const sub = document.createElement("h3");
-      sub.textContent = year;
-      menu.appendChild(sub);
-      const group = hidden.filter((row) => row.hidden_year === year);
-      group.forEach((row) => {
-        const line = classRow(row, group);
-        const back = document.createElement("button");
-        back.type = "button";
-        back.className = "tb-btn";
-        back.textContent = "戻す";
-        back.addEventListener("click", () => setClassHiddenYear(row, ""));
-        line.appendChild(back);
-        menu.appendChild(line);
-      });
-    });
-    updateClassToggle();
   }
 
   function renderUnassigned() {
     const box = els["ms-unassigned"];
+    if (!box) return;
     box.innerHTML = "";
-    const loose = classes.filter((row) => !row.teacher_id);
-    if (!loose.length || !teacherId()) return;
-    box.textContent = "担当が未設定のクラス: ";
+    if (!teacherId() || !currentCourse()) return;
+    const loose = classesNotInCourse();
+    if (!loose.length) return;
+    box.textContent = "この授業に未登録のクラス: ";
     loose.forEach((row) => {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "tb-btn";
-      button.textContent = `${row.name} をこの教員へ`;
+      button.textContent = `${row.name} をこの授業へ`;
       button.addEventListener("click", () => {
         rememberScope();
-        row.teacher_id = teacherId();
+        if (!row.teacher_id) row.teacher_id = teacherId();
         classes = window.ToolboxClasses.save(classes);
+        courses = window.ToolboxClasses.addClassToCourse(courseId(), row.id, courses);
         fillClasses();
         selectClass(row.id);
-        enterScope(teacherId(), classId());
+        enterScope(teacherId(), classId(), courseId());
         loadCatalog();
+        renderTopicList();
       });
       box.appendChild(button);
     });
@@ -543,8 +603,9 @@
       existing.teacher_id = teacherId();
     } else {
       const layout = window.ToolboxClasses.suggestGrid(count);
+      const newId = newLocalId();
       classes.push({
-        id: newLocalId(),
+        id: newId,
         name: name.trim(),
         student_count: count,
         absent: [],
@@ -556,12 +617,16 @@
         teacher_id: teacherId(),
         hidden_year: "",
       });
+      if (courseId() && confirm(`${name.trim()} を現在の授業に追加しますか？`)) {
+        courses = window.ToolboxClasses.addClassToCourse(courseId(), newId, courses);
+      }
     }
     classes = window.ToolboxClasses.save(classes);
     fillClasses();
     selectClass(existing ? existing.id : classes[classes.length - 1].id);
-    bindScope(teacherId(), classId(), settings);
+    bindScope(teacherId(), classId(), settings, courseId());
     loadCatalog();
+    renderTopicList();
   }
 
   function topicNumber(item) {
@@ -625,8 +690,11 @@
     stage.classList.toggle("is-long", Number(topic.words) >= 60);
     const number = topicNumber(topic);
     els["ms-meta-type"].textContent = `${TYPE_LABEL[topic.type] || ""}${number ? " " + number : ""}`;
+    const course = currentCourse();
     const selected = classes.find((row) => row.id === classId());
-    els["ms-meta-class"].textContent = selected ? selected.name : "クラスなし";
+    const courseLabel = course ? course.name : "";
+    const classLabel = selected ? selected.name : "記録しない";
+    els["ms-meta-class"].textContent = courseLabel ? `${courseLabel} · ${classLabel}` : classLabel;
     els["ms-meta-no"].textContent = sessionNo ? `#${sessionNo}` : "";
     requestAnimationFrame(fitTopic);
   }
@@ -884,12 +952,30 @@
   }
 
   function topicIsUsed(item) {
+    if (courseMode()) {
+      if (!item || !item.id) return false;
+      return window.MinuteSpeechCourses.findListEntry(store, courseId(), item.id, item.type) != null;
+    }
     if (topicIsActiveUsed(item)) return true;
     if (!item || !item.id || !classId()) return false;
     return topicInLists(item, Object.values(archivedYears()));
   }
 
+  function topicIsCompleteForCourse(item) {
+    if (!courseMode() || !item || !item.id) return false;
+    const hit = window.MinuteSpeechCourses.findListEntry(store, courseId(), item.id, item.type);
+    return !!(hit && hit.entry.completedAt);
+  }
+
   function pushUsed(item) {
+    if (courseMode()) {
+      if (!classId() || !item || !item.id) return;
+      window.MinuteSpeechCourses.markClassDone(store, courseId(), classId(), item, item.type);
+      clearNext(item);
+      saveStore();
+      renderTopicList();
+      return;
+    }
     const id = classId();
     if (!id || !item || !item.id) return;
     const typeKey = String(item.type || 1);
@@ -911,6 +997,13 @@
   }
 
   function removeUsed(item) {
+    if (courseMode()) {
+      if (!classId() || !item || !item.id) return;
+      window.MinuteSpeechCourses.toggleClassDone(store, courseId(), classId(), item.id, item.type);
+      saveStore();
+      renderTopicList();
+      return;
+    }
     const id = classId();
     if (!id || !item || !item.id) return;
     const bucket = store.history[id] || {};
@@ -1073,6 +1166,27 @@
     return button;
   }
 
+  function addToCourseListButton(item) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "tb-btn";
+    button.textContent = topicIsUsed(item) ? "リストに追加済み" : "この授業のお題リストに追加";
+    button.disabled = topicIsUsed(item);
+    button.addEventListener("click", () => {
+      if (!courseId()) {
+        alert("授業を選んでください。");
+        return;
+      }
+      window.MinuteSpeechCourses.appendTopicToList(store, courseId(), item);
+      saveStore();
+      button.disabled = true;
+      button.textContent = "リストに追加済み";
+      renderTopicList();
+      refreshUsedSurfaces(item.id);
+    });
+    return button;
+  }
+
   function refreshNextSurfaces(topicId) {
     document.querySelectorAll("#ms-results .ms-card").forEach((card) => {
       if (topicId && card.dataset.topicId !== topicId) return;
@@ -1096,7 +1210,9 @@
   }
 
   function renderCatalogCards(items) {
-    const used = new Set(spentRows(catType).map((row) => row.id));
+    const used = courseMode()
+      ? new Set(window.MinuteSpeechCourses.allListTopicIds(store, courseId()))
+      : new Set(spentRows(catType).map((row) => row.id));
     const box = els["ms-catalog"];
     const status = els["ms-cat-status"];
     box.innerHTML = "";
@@ -1116,7 +1232,7 @@
       use.textContent = "このお題を使う";
       use.addEventListener("click", () => useSearched(Object.assign({}, item, { used: topicIsUsed(item) })));
       const actions = cardActions();
-      actions.append(use, nextToggleButton(item), usedToggleButton(item));
+      actions.append(use, courseMode() ? addToCourseListButton(item) : nextToggleButton(item), usedToggleButton(item));
       card.appendChild(actions);
       box.appendChild(card);
     });
@@ -1125,7 +1241,7 @@
     const nextCount = items.filter((item) => topicIsNext(item)).length;
     if (status) {
       status.textContent = shown
-        ? `このページ ${shown} 件中、使用済み ${usedCount} 件、次回使う ${nextCount} 件。全 ${catalogCount} 件。`
+        ? `このページ ${shown} 件中、使用済み ${usedCount} 件${courseMode() ? "" : `、次回使う ${nextCount} 件`}。全 ${catalogCount} 件。`
         : "表示できるお題がありません。";
     }
   }
@@ -1196,7 +1312,40 @@
     return usedIds().concat(sessionSkipped, store.hiddenTopicIds || []);
   }
 
+  function drawTypeNum() {
+    const type = typeValue();
+    if (type === "mixed") return Math.random() < 0.5 ? 1 : 2;
+    return Number(type);
+  }
+
   async function drawNext(retried) {
+    if (courseMode() && classId()) {
+      const typeNum = drawTypeNum();
+      const list = (courseBucket().lists[String(typeNum)] || []);
+      let pending = null;
+      for (let i = 0; i < list.length; i += 1) {
+        const entry = list[i];
+        if (entry.completedAt) continue;
+        const tid = window.MinuteSpeechCourses.entryTopicId(entry);
+        if (sessionSkipped.includes(tid)) continue;
+        if (!entry.done || !entry.done[classId()]) {
+          pending = entry;
+          break;
+        }
+      }
+      if (pending) {
+        topic = window.MinuteSpeechCourses.entryAsTopic(pending);
+        sessionNo += 1;
+        marked = false;
+        phase = "idle";
+        stopTick();
+        remainingMs = (Number(els["ms-prep"].value) || 60) * 1000;
+        showStage();
+        renderTopic();
+        renderClock();
+        return true;
+      }
+    }
     const data = await toolboxFetch("/toolbox/api/minute-speech/draw", {
       method: "POST",
       body: JSON.stringify(Object.assign({ exclude_ids: excludeIds() }, filters())),
@@ -1206,10 +1355,17 @@
         alert("条件に合うお題がありません。難易度やフラグの設定を確認してください。");
         return false;
       }
-      const ok = confirm("このクラスの選んだタイプは全部使い終わりました。履歴をリセットして最初から出しますか？");
+      const ok = courseMode()
+        ? confirm("この授業の選んだタイプは全部使い終わりました。リストをアーカイブして最初から出しますか？")
+        : confirm("このクラスの選んだタイプは全部使い終わりました。履歴をリセットして最初から出しますか？");
       if (!ok) return false;
       resetTypes();
       return drawNext(true);
+    }
+    if (courseMode() && classId()) {
+      window.MinuteSpeechCourses.appendTopicToList(store, courseId(), data.topic);
+      saveStore();
+      renderTopicList();
     }
     topic = data.topic;
     sessionNo += 1;
@@ -1224,6 +1380,25 @@
   }
 
   function resetTypes() {
+    if (courseMode() && courseId()) {
+      const bucket = courseBucket();
+      const types = typeValue() === "mixed" ? ["1", "2"] : [String(typeValue())];
+      const year = String(schoolYear());
+      bucket.archived = bucket.archived || {};
+      bucket.archived[year] = bucket.archived[year] || { 1: [], 2: [] };
+      types.forEach((key) => {
+        const completed = (bucket.lists[key] || []).filter((e) => e.completedAt);
+        bucket.archived[year][key] = (bucket.archived[year][key] || []).concat(
+          completed.map((e) => Object.assign({}, window.MinuteSpeechCourses.entryAsTopic(e), { archivedAt: new Date().toISOString() })),
+        );
+        bucket.lists[key] = (bucket.lists[key] || []).filter((e) => !e.completedAt);
+        bucket.rounds[key] = (Number(bucket.rounds[key]) || 1) + 1;
+      });
+      sessionSkipped = [];
+      saveStore();
+      renderTopicList();
+      return;
+    }
     const id = classId();
     if (!id) return;
     const types = typeValue() === "mixed" ? ["1", "2"] : [String(typeValue())];
@@ -1340,6 +1515,97 @@
     return data;
   }
 
+  function showUndoToast(message, undoFn) {
+    const toast = els["ms-undo-toast"];
+    const msg = els["ms-undo-msg"];
+    const btn = els["ms-undo-btn"];
+    if (!toast || !btn) return;
+    clearTimeout(undoTimer);
+    if (msg) msg.textContent = message;
+    undoSnapshot = undoFn;
+    toast.hidden = false;
+    undoTimer = setTimeout(() => {
+      toast.hidden = true;
+      undoSnapshot = null;
+    }, 5000);
+    btn.onclick = () => {
+      if (undoSnapshot) undoSnapshot();
+      toast.hidden = true;
+      undoSnapshot = null;
+      clearTimeout(undoTimer);
+      renderTopicList();
+      refreshUsedSurfaces();
+    };
+  }
+
+  function renderTopicList() {
+    const openBox = els["ms-topic-list-open"];
+    const doneBox = els["ms-topic-list-done"];
+    if (!openBox || !doneBox) return;
+    openBox.innerHTML = "";
+    doneBox.innerHTML = "";
+    const course = currentCourse();
+    if (!course || !courseId()) {
+      if (els["ms-topic-list-summary"]) els["ms-topic-list-summary"].textContent = "授業を選ぶと、お題リストが表示されます。";
+      return;
+    }
+    const MSC = window.MinuteSpeechCourses;
+    const targets = MSC.targetClassIds(course, classes);
+    const list = (courseBucket().lists[String(listType)] || []);
+    let completeCount = 0;
+    list.forEach((entry, index) => {
+      const complete = !!entry.completedAt;
+      if (complete) completeCount += 1;
+      const show = listFilter === "all"
+        || (listFilter === "done" && complete)
+        || (listFilter === "open" && !complete);
+      if (!show) return;
+      const row = document.createElement("div");
+      row.className = complete ? "ms-topic-row is-complete" : "ms-topic-row";
+      const left = document.createElement("div");
+      const topicObj = MSC.entryAsTopic(entry);
+      const jaLine = els["ms-ja"].checked && topicObj.ja
+        ? `<p class="tb-muted" style="margin:4px 0 0;font-size:0.82rem">${esc(topicObj.ja)}</p>`
+        : "";
+      left.innerHTML = `<strong>${index + 1}</strong> · ${esc(topicObj.text || "")}${jaLine}`;
+      const chips = document.createElement("div");
+      chips.className = "ms-topic-chips";
+      const doneN = MSC.entryDoneCount(entry, targets);
+      const progress = document.createElement("span");
+      progress.className = "ms-topic-progress";
+      progress.textContent = complete ? "使用済み" : (doneN ? `${doneN}/${targets.length}` : "未着手");
+      targets.forEach((classRow) => {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "ms-class-chip";
+        const done = entry.done && entry.done[classRow.id];
+        if (done) chip.classList.add("is-done");
+        if (classRow.id === classId()) chip.classList.add("is-today");
+        chip.textContent = done ? `${classRow.name} ✓` : classRow.name;
+        chip.addEventListener("click", () => {
+          const before = JSON.parse(JSON.stringify(entry.done || {}));
+          MSC.toggleClassDone(store, courseId(), classRow.id, MSC.entryTopicId(entry), listType);
+          saveStore();
+          showUndoToast("済の変更を元に戻しますか？", () => {
+            entry.done = before;
+            MSC.recomputeCompletedAt(entry, targets);
+            saveStore();
+          });
+          renderTopicList();
+        });
+        chips.appendChild(chip);
+      });
+      row.append(left, chips, progress);
+      (complete ? doneBox : openBox).appendChild(row);
+    });
+    if (els["ms-topic-list-title"]) els["ms-topic-list-title"].textContent = `${course.name} · タイプ${listType}`;
+    if (els["ms-topic-list-summary"]) {
+      els["ms-topic-list-summary"].textContent = `クラス ${targets.length} / 完了 ${completeCount} / リスト ${list.length}`;
+    }
+    const sum = els["ms-topic-list-done-summary"];
+    if (sum) sum.textContent = `使用済み（${completeCount}）`;
+  }
+
   function renderHistory() {
     const box = els["ms-history"];
     box.innerHTML = "";
@@ -1413,7 +1679,7 @@
         card.remove();
       });
       const actions = cardActions();
-      actions.append(use, nextToggleButton(item), usedToggleButton(item), hide);
+      actions.append(use, courseMode() ? addToCourseListButton(item) : nextToggleButton(item), usedToggleButton(item), hide);
       card.appendChild(actions);
       box.appendChild(card);
     });
@@ -1468,7 +1734,7 @@
 
   function exportHistory() {
     const blob = new Blob([JSON.stringify({
-      version: 1,
+      version: store.schemaVersion >= 2 ? 2 : 1,
       exportedAt: new Date().toISOString(),
       history: store.history,
       rounds: store.rounds,
@@ -1478,6 +1744,10 @@
       prefs: store.prefs,
       scopes: store.scopes,
       lastClass: store.lastClass,
+      courseState: store.courseState,
+      lastCourse: store.lastCourse,
+      schemaVersion: store.schemaVersion,
+      courses: window.ToolboxClasses ? window.ToolboxClasses.loadCourses() : [],
     }, null, 2)], { type: "application/json" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -1492,16 +1762,24 @@
     const reader = new FileReader();
     reader.onload = () => {
       try {
+        if (window.MinuteSpeechCourses) window.MinuteSpeechCourses.backupKeys();
         const data = JSON.parse(String(reader.result || ""));
-        if (!data || typeof data.history !== "object") throw new Error("形式が違います。");
-        store.history = data.history || {};
-        store.rounds = data.rounds || {};
+        if (!data || (typeof data.history !== "object" && !data.courseState)) throw new Error("形式が違います。");
+        if (Array.isArray(data.courses) && window.ToolboxClasses) {
+          window.ToolboxClasses.saveCourses(data.courses);
+        }
+        store.history = data.history || store.history || {};
+        store.rounds = data.rounds || store.rounds || {};
         store.hiddenTopicIds = data.hiddenTopicIds || [];
         if (data.nextUse && typeof data.nextUse === "object") store.nextUse = data.nextUse;
         if (data.archived && typeof data.archived === "object") store.archived = data.archived;
         if (data.prefs && typeof data.prefs === "object") store.prefs = data.prefs;
         if (data.scopes && typeof data.scopes === "object") store.scopes = data.scopes;
         if (data.lastClass && typeof data.lastClass === "object") store.lastClass = data.lastClass;
+        if (data.courseState && typeof data.courseState === "object") store.courseState = data.courseState;
+        if (data.lastCourse && typeof data.lastCourse === "object") store.lastCourse = data.lastCourse;
+        if (data.schemaVersion) store.schemaVersion = data.schemaVersion;
+        if (window.MinuteSpeechCourses) window.MinuteSpeechCourses.ensureLoaded(store);
         store.lastBackupAt = new Date().toISOString();
         saveStore();
         readPrefsIntoForm();
@@ -1514,15 +1792,24 @@
     reader.readAsText(file);
   }
 
-  document.getElementById("ms-tab-setup").addEventListener("click", () => {
-    els["ms-panel-setup"].hidden = false;
-    els["ms-panel-history"].hidden = true;
-  });
-  document.getElementById("ms-tab-history").addEventListener("click", () => {
-    els["ms-panel-setup"].hidden = true;
-    els["ms-panel-history"].hidden = false;
-    renderHistory();
-  });
+  function showPanel(name) {
+    els["ms-panel-setup"].hidden = name !== "setup";
+    if (els["ms-panel-topics"]) els["ms-panel-topics"].hidden = name !== "topics";
+    els["ms-panel-history"].hidden = name !== "history";
+    document.getElementById("ms-tab-setup").classList.toggle("tb-btn-primary", name === "setup");
+    if (document.getElementById("ms-tab-topics")) {
+      document.getElementById("ms-tab-topics").classList.toggle("tb-btn-primary", name === "topics");
+    }
+    document.getElementById("ms-tab-history").classList.toggle("tb-btn-primary", name === "history");
+    if (name === "topics") renderTopicList();
+    if (name === "history") renderHistory();
+  }
+
+  document.getElementById("ms-tab-setup").addEventListener("click", () => showPanel("setup"));
+  if (document.getElementById("ms-tab-topics")) {
+    document.getElementById("ms-tab-topics").addEventListener("click", () => showPanel("topics"));
+  }
+  document.getElementById("ms-tab-history").addEventListener("click", () => showPanel("history"));
   els["ms-presets"].addEventListener("click", (ev) => {
     const button = ev.target.closest("button");
     if (!button) return;
@@ -1535,6 +1822,7 @@
       writePrefs();
       if (els["ms-ai"].checked) els["ms-q"].placeholder = "AI検索（例: 旅行に関するお題）";
       else els["ms-q"].placeholder = "番号・語句（例: 12、1-12、school）";
+      if (id === "ms-ja") renderTopicList();
     });
   });
   els["ms-draw"].addEventListener("click", () => {
@@ -1634,6 +1922,7 @@
   fillTeachers();
   readPrefsIntoForm();
   renderRecent();
+  renderTopicList();
   loadStats().catch(() => {});
   if (els["ms-archive-year"]) els["ms-archive-year"].value = String(schoolYear());
   els["ms-archive-used"].addEventListener("click", () => {
@@ -1664,16 +1953,34 @@
 
   els["ms-teacher"].addEventListener("change", () => {
     rememberScope();
+    fillCourses();
     fillClasses();
-    selectClass((store.lastClass || {})[teacherId()] || "");
-    enterScope(teacherId(), classId());
+    const savedCourse = (store.lastCourse || {})[teacherId()] || "";
+    if (savedCourse && courses.some((row) => row.id === savedCourse) && els["ms-course"]) {
+      els["ms-course"].value = savedCourse;
+    }
+    selectClass((courseBucket() && courseBucket().lastClassId) || (store.lastClass || {})[teacherId()] || "");
+    enterScope(teacherId(), classId(), courseId());
     loadCatalog();
+    renderTopicList();
     if (!els["ms-panel-history"].hidden) renderHistory();
   });
+  if (els["ms-course"]) {
+    els["ms-course"].addEventListener("change", () => {
+      scopeCourse = els["ms-course"].value || "";
+      fillClasses();
+      selectClass((courseBucket() && courseBucket().lastClassId) || "");
+      enterScope(teacherId(), classId(), courseId());
+      loadCatalog();
+      renderTopicList();
+    });
+  }
   els["ms-class"].addEventListener("change", () => {
     rememberScope();
-    enterScope(teacherId(), classId());
+    enterScope(teacherId(), classId(), courseId());
+    renderTodayClasses();
     loadCatalog();
+    renderTopicList();
     if (!els["ms-panel-history"].hidden) renderHistory();
   });
   els["ms-teacher-add"].addEventListener("click", () => {
@@ -1684,9 +1991,10 @@
     teachers = window.ToolboxClasses.saveTeachers(teachers);
     fillTeachers();
     els["ms-teacher"].value = teachers[teachers.length - 1].id;
+    fillCourses();
     fillClasses();
     selectClass("");
-    enterScope(teacherId(), classId());
+    enterScope(teacherId(), classId(), courseId());
   });
   els["ms-teacher-edit"].addEventListener("click", () => {
     const row = teachers.find((item) => item.id === teacherId());
@@ -1706,25 +2014,190 @@
     classes.forEach((item) => {
       if (item.teacher_id === row.id) item.teacher_id = "";
     });
+    courses.forEach((item) => {
+      if (item.teacher_id === row.id) item.teacher_id = "";
+    });
     classes = window.ToolboxClasses.save(classes);
+    courses = window.ToolboxClasses.saveCourses(courses);
     teachers = window.ToolboxClasses.saveTeachers(teachers.filter((item) => item.id !== row.id));
     fillTeachers();
+    fillCourses();
     fillClasses();
     selectClass((store.lastClass || {})[teacherId()] || "");
-    enterScope(teacherId(), classId());
+    enterScope(teacherId(), classId(), courseId());
     loadCatalog();
   });
-  els["ms-class-toggle"].addEventListener("click", () => {
-    classMenuOpen = !classMenuOpen;
-    if (classMenuOpen) renderClassMenu();
-    else updateClassToggle();
+  if (els["ms-course-add"]) {
+    els["ms-course-add"].addEventListener("click", () => {
+      if (!teacherId()) {
+        alert("先に担当教員を選んでください。");
+        return;
+      }
+      const name = prompt("授業名");
+      if (!name || !name.trim()) return;
+      const classIds = activeTeacherClasses().map((row) => row.id);
+      const id = newLocalId();
+      courses.push({
+        id,
+        name: name.trim(),
+        teacher_id: teacherId(),
+        class_ids: classIds,
+        year: "",
+        hidden_year: "",
+        order: courses.length,
+      });
+      courses = window.ToolboxClasses.saveCourses(courses);
+      window.MinuteSpeechCourses.ensureCourseBucket(store, id).settings = settingsFromForm();
+      fillCourses();
+      els["ms-course"].value = id;
+      scopeCourse = id;
+      fillClasses();
+      enterScope(teacherId(), classId(), id);
+      saveStore();
+      renderTopicList();
+    });
+  }
+  if (els["ms-course-edit"]) {
+    els["ms-course-edit"].addEventListener("click", () => {
+      const course = currentCourse();
+      if (!course) return;
+      const name = prompt("授業名", course.name);
+      if (!name || !name.trim()) return;
+      course.name = name.trim();
+      courses = window.ToolboxClasses.saveCourses(courses.map((row) => (row.id === course.id ? course : row)));
+      fillCourses();
+      els["ms-course"].value = course.id;
+      renderTopicList();
+    });
+  }
+  if (els["ms-course-split"]) {
+    els["ms-course-split"].addEventListener("click", () => {
+      const course = currentCourse();
+      if (!course || !course.class_ids.length) return;
+      const names = courseClassRows().map((row) => row.name).join("、");
+      const pick = prompt(`新しい授業へ分けるクラス名（例: 1-2）\nこの授業: ${names}`);
+      if (!pick || !pick.trim()) return;
+      const tokens = pick.split(/[,、]/).map((s) => s.trim()).filter(Boolean);
+      const moveIds = courseClassRows().filter((row) => tokens.includes(row.name)).map((row) => row.id);
+      if (!moveIds.length) {
+        alert("クラス名が一致しませんでした。");
+        return;
+      }
+      const newName = prompt("新しい授業名", "論理表現II");
+      if (!newName || !newName.trim()) return;
+      const newId = newLocalId();
+      const newCourse = {
+        id: newId,
+        name: newName.trim(),
+        teacher_id: course.teacher_id,
+        class_ids: moveIds.slice(),
+        year: "",
+        hidden_year: "",
+        order: courses.length,
+      };
+      const srcBucket = courseBucket();
+      const dstBucket = window.MinuteSpeechCourses.ensureCourseBucket(store, newId);
+      dstBucket.settings = JSON.parse(JSON.stringify(srcBucket.settings || settingsFromForm()));
+      dstBucket.lists = { 1: [], 2: [] };
+      ["1", "2"].forEach((typeKey) => {
+        (srcBucket.lists[typeKey] || []).forEach((entry) => {
+          const copy = JSON.parse(JSON.stringify(entry));
+          copy.done = {};
+          moveIds.forEach((cid) => {
+            if (entry.done && entry.done[cid]) copy.done[cid] = entry.done[cid];
+            if (entry.done && entry.done[cid]) delete entry.done[cid];
+          });
+          const targets = window.MinuteSpeechCourses.targetClassIds(course, classes);
+          window.MinuteSpeechCourses.recomputeCompletedAt(entry, targets);
+          if (Object.keys(copy.done).length) dstBucket.lists[typeKey].push(copy);
+        });
+      });
+      course.class_ids = course.class_ids.filter((id) => !moveIds.includes(id));
+      courses = courses.concat([newCourse]);
+      courses = window.ToolboxClasses.saveCourses(courses);
+      saveStore();
+      fillCourses();
+      els["ms-course"].value = course.id;
+      fillClasses();
+      renderTopicList();
+    });
+  }
+  if (els["ms-course-copy"]) {
+    els["ms-course-copy"].addEventListener("click", () => {
+      const course = currentCourse();
+      if (!course) return;
+      const name = prompt("来年度用の授業名", `${course.name}（2027）`);
+      if (!name || !name.trim()) return;
+      const year = prompt("元の授業を非表示にする年度（空ならそのまま）", String(schoolYear()));
+      const id = newLocalId();
+      const newCourse = {
+        id,
+        name: name.trim(),
+        teacher_id: course.teacher_id,
+        class_ids: [],
+        year: "",
+        hidden_year: "",
+        order: courses.length,
+      };
+      if (/^\d{4}$/.test(String(year || ""))) course.hidden_year = String(year);
+      const bucket = courseBucket();
+      window.MinuteSpeechCourses.ensureCourseBucket(store, id).settings = JSON.parse(JSON.stringify(bucket.settings || settingsFromForm()));
+      courses = window.ToolboxClasses.saveCourses(courses.map((row) => (row.id === course.id ? course : row)).concat([newCourse]));
+      fillCourses();
+      els["ms-course"].value = id;
+      scopeCourse = id;
+      fillClasses();
+      saveStore();
+      renderTopicList();
+    });
+  }
+  if (els["ms-course-del"]) {
+    els["ms-course-del"].addEventListener("click", async () => {
+      const course = currentCourse();
+      if (!course) return;
+      if (!await confirmDelete(`${course.name} を削除しますか？お題リストも消えます。書き出しを済ませてください。`)) return;
+      delete store.courseState[course.id];
+      courses = window.ToolboxClasses.saveCourses(courses.filter((row) => row.id !== course.id));
+      fillCourses();
+      fillClasses();
+      enterScope(teacherId(), classId(), courseId());
+      saveStore();
+      renderTopicList();
+    });
+  }
+  if (els["ms-finalize-migration"]) {
+    els["ms-finalize-migration"].addEventListener("click", () => {
+      if (!confirm("移行用の旧データを削除します。先に書き出し済みですか？")) return;
+      window.MinuteSpeechCourses.finalizeMigration(store);
+      saveStore();
+      showMigrationNotes();
+    });
+  }
+  document.querySelectorAll("[data-ms-list-filter]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      listFilter = btn.dataset.msListFilter || "all";
+      document.querySelectorAll("[data-ms-list-filter]").forEach((b) => {
+        b.classList.toggle("tb-btn-primary", b.dataset.msListFilter === listFilter);
+      });
+      renderTopicList();
+    });
   });
-  document.addEventListener("click", (ev) => {
-    if (!classMenuOpen) return;
-    if (ev.target.closest && ev.target.closest(".ms-class-pick")) return;
-    classMenuOpen = false;
-    updateClassToggle();
-  });
+  if (els["ms-list-type-1"]) {
+    els["ms-list-type-1"].addEventListener("click", () => {
+      listType = 1;
+      els["ms-list-type-1"].classList.add("tb-btn-primary");
+      els["ms-list-type-2"].classList.remove("tb-btn-primary");
+      renderTopicList();
+    });
+  }
+  if (els["ms-list-type-2"]) {
+    els["ms-list-type-2"].addEventListener("click", () => {
+      listType = 2;
+      els["ms-list-type-2"].classList.add("tb-btn-primary");
+      els["ms-list-type-1"].classList.remove("tb-btn-primary");
+      renderTopicList();
+    });
+  }
   els["ms-class-add"].addEventListener("click", () => saveClassRow(null));
   els["ms-class-edit"].addEventListener("click", () => {
     const row = classes.find((item) => item.id === classId());
@@ -1734,10 +2207,16 @@
     const row = classes.find((item) => item.id === classId());
     if (!row) return;
     if (!await confirmDelete(`${row.name} をこの端末から削除しますか？`)) return;
-    classes = window.ToolboxClasses.save(classes.filter((item) => item.id !== row.id));
+    const deletedId = row.id;
+    classes = window.ToolboxClasses.save(classes.filter((item) => item.id !== deletedId));
+    if (window.MinuteSpeechCourses) {
+      courses = window.MinuteSpeechCourses.purgeClassFromStore(store, deletedId, courses, classes);
+    }
+    saveStore();
     fillClasses();
-    enterScope(teacherId(), classId());
+    enterScope(teacherId(), classId(), courseId());
     loadCatalog();
+    renderTopicList();
   });
   els["ms-cat-1"].addEventListener("click", () => {
     catType = 1;
