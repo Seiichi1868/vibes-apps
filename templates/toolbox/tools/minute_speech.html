@@ -83,54 +83,6 @@
   .ms-hit { background: #f8e3b8; }
   .ms-chips { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
   .ms-chips button { border-radius: 999px; }
-  .ms-course-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0; }
-  .ms-class-chip {
-    min-height: 48px;
-    min-width: 48px;
-    padding: 6px 12px;
-    border-radius: 999px;
-    border: 2px solid var(--tb-accent, #2d6a4f);
-    background: #fff;
-    font: inherit;
-    font-size: 0.82rem;
-    cursor: pointer;
-  }
-  .ms-class-chip.is-done { background: var(--tb-accent, #2d6a4f); color: #fff; border-color: var(--tb-accent, #2d6a4f); }
-  .ms-class-chip.is-today { box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.35); }
-  .ms-topic-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 8px;
-    align-items: start;
-    padding: 8px;
-    border: 1px solid var(--tb-line);
-    border-radius: 10px;
-    background: #fff;
-  }
-  .ms-topic-row.is-complete { background: #eceff3; border-color: #c5ccd4; color: #6d7580; }
-  .ms-topic-row.is-complete .ms-class-chip { border-color: #aab2bc; background: #dfe3e8; color: #5c6570; }
-  .ms-topic-chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
-  .ms-topic-progress { font-size: 0.82rem; white-space: nowrap; align-self: center; }
-  .ms-topic-list-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; justify-content: space-between; }
-  .ms-undo-toast {
-    position: fixed;
-    bottom: 16px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 40;
-    padding: 10px 14px;
-    background: #142033;
-    color: #fff;
-    border-radius: 10px;
-    display: flex;
-    gap: 10px;
-    align-items: center;
-  }
-  .ms-undo-toast[hidden] { display: none !important; }
-  @media (max-width: 640px) {
-    .ms-topic-row { grid-template-columns: 1fr; }
-    .ms-topic-chips { justify-content: flex-start; }
-  }
   .ms-stage { display: none; height: calc(100dvh - 72px); grid-template-rows: auto minmax(0, 1fr) auto auto; background: #f4f7fb; color: #142033; border-radius: 16px; overflow: hidden; }
   .ms-stage.is-on { display: grid; }
   .ms-stage.is-long { grid-template-rows: auto minmax(0, 1fr) auto auto; }
@@ -159,7 +111,6 @@
     .ms-stage, .ms-stage.is-long { grid-template-rows: auto minmax(28vh, 1fr) auto auto; height: auto; min-height: calc(100dvh - 72px); }
     .ms-clock { padding-bottom: 3vh; }
     .ms-time, .ms-stage.is-long .ms-time { font-size: 19vh; }
-    .ms-time.is-time { font-size: 12vh; }
     .ms-phase { font-size: clamp(2.1rem, 6.5vh, 3.4rem); }
   }
   body.tb-display-on .ms-stage.is-on { position: fixed; inset: 0; z-index: 12; height: 100dvh; border-radius: 0; }
@@ -171,7 +122,6 @@
 <section class="tb-tool ms-setup" id="ms-setup">
   <div class="ms-tabs">
     <button class="tb-btn tb-btn-primary" type="button" id="ms-tab-setup">設定</button>
-    <button class="tb-btn" type="button" id="ms-tab-topics">お題リスト</button>
     <button class="tb-btn" type="button" id="ms-tab-history">履歴</button>
   </div>
 
@@ -189,29 +139,20 @@
         </div>
       </div>
       <div class="ms-person">
-        <label>授業
-          <select id="ms-course"></select>
-        </label>
+        <div class="ms-class-pick">
+          <label>クラス
+            <button class="ms-class-toggle" type="button" id="ms-class-toggle" aria-haspopup="listbox" aria-expanded="false">クラスなし（記録しない）</button>
+          </label>
+          <select id="ms-class" hidden></select>
+          <div id="ms-class-menu" class="ms-class-menu" hidden></div>
+        </div>
         <div class="ms-chips">
-          <button class="tb-btn" type="button" id="ms-course-add">授業を追加</button>
-          <button class="tb-btn" type="button" id="ms-course-edit">編集</button>
-          <button class="tb-btn" type="button" id="ms-course-split">分割</button>
-          <button class="tb-btn" type="button" id="ms-course-copy">来年度用コピー</button>
-          <button class="tb-btn" type="button" id="ms-course-del">削除</button>
+          <button class="tb-btn" type="button" id="ms-class-add">クラスを追加</button>
+          <button class="tb-btn" type="button" id="ms-class-edit">クラスを編集</button>
+          <button class="tb-btn" type="button" id="ms-class-del">削除</button>
         </div>
       </div>
-      <div class="ms-person ms-class-pick-wide">
-        <label>今日のクラス</label>
-        <div class="ms-chips" id="ms-today-classes"></div>
-        <select id="ms-class" hidden></select>
-      </div>
-      <div class="ms-chips">
-        <button class="tb-btn" type="button" id="ms-class-add">クラスを追加</button>
-        <button class="tb-btn" type="button" id="ms-class-edit">クラスを編集</button>
-        <button class="tb-btn" type="button" id="ms-class-del">削除</button>
-      </div>
       <p class="tb-note" id="ms-unassigned"></p>
-      <p class="tb-note" id="ms-migration-note" hidden></p>
     </div>
     <div class="ms-grid">
       <label>タイプ
@@ -300,27 +241,6 @@
     <div class="ms-results" id="ms-results"></div>
   </div>
 
-  <div id="ms-panel-topics" hidden>
-    <div class="ms-topic-list-head">
-      <h2 id="ms-topic-list-title">お題リスト</h2>
-      <div class="ms-chips">
-        <button class="tb-btn tb-btn-primary" type="button" data-ms-list-filter="all">すべて</button>
-        <button class="tb-btn" type="button" data-ms-list-filter="open">未完了</button>
-        <button class="tb-btn" type="button" data-ms-list-filter="done">使用済み</button>
-      </div>
-    </div>
-    <p class="tb-note" id="ms-topic-list-summary"></p>
-    <div class="ms-chips">
-      <button class="tb-btn tb-btn-primary" type="button" id="ms-list-type-1">タイプ1</button>
-      <button class="tb-btn" type="button" id="ms-list-type-2">タイプ2</button>
-    </div>
-    <div class="ms-results" id="ms-topic-list-open"></div>
-    <details id="ms-topic-list-done-wrap">
-      <summary id="ms-topic-list-done-summary">使用済み（0）</summary>
-      <div class="ms-results" id="ms-topic-list-done"></div>
-    </details>
-  </div>
-
   <div id="ms-panel-history" hidden>
     <h2>使用履歴</h2>
     <p class="tb-note">この端末に保存します。一覧はぼかしが既定です。</p>
@@ -330,17 +250,11 @@
       <button class="tb-btn" type="button" id="ms-export">書き出す</button>
       <button class="tb-btn" type="button" id="ms-import">読み込む</button>
       <input id="ms-import-file" type="file" accept="application/json" hidden>
-      <button class="tb-btn" type="button" id="ms-reset-type">この授業・このタイプのリストをアーカイブ</button>
-      <button class="tb-btn" type="button" id="ms-finalize-migration" hidden>移行を完了する</button>
+      <button class="tb-btn" type="button" id="ms-reset-type">このクラス・このタイプの履歴をリセット</button>
     </div>
     <div class="ms-history-list" id="ms-history"></div>
   </div>
 </section>
-
-<div class="ms-undo-toast" id="ms-undo-toast" hidden>
-  <span id="ms-undo-msg">元に戻す</span>
-  <button class="tb-btn" type="button" id="ms-undo-btn">元に戻す</button>
-</div>
 
 <section class="ms-stage" id="ms-stage" data-display-root hidden>
   <div class="ms-band">
@@ -371,6 +285,5 @@
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='toolbox/js/local_classes.js', v=toolbox_cache) }}"></script>
-<script src="{{ url_for('static', filename='toolbox/js/minute_speech_courses.js', v=toolbox_cache) }}"></script>
 <script src="{{ url_for('static', filename='toolbox/js/minute_speech.js', v=toolbox_cache) }}"></script>
 {% endblock %}

@@ -291,7 +291,7 @@
 
   // ── 設定のブラウザ間コピー ──────────────
   const MIG_GROUPS = {
-    classes: (k) => k === "toolbox.local_classes.v1" || k === "toolbox.local_teachers.v1" || k === "toolbox.local_courses.v1",
+    classes: (k) => k === "toolbox.local_classes.v1" || k === "toolbox.local_teachers.v1",
     seats: (k) => k.startsWith("toolbox.random_seats."),
     pick: (k) => k.startsWith("toolbox.random_pick."),
     speech: (k) => k.startsWith("toolbox.minuteSpeech."),
