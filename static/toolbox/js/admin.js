@@ -106,17 +106,27 @@
   });
 
   const soundForm = document.getElementById("tb-sound-form");
+  const soundStatus = document.getElementById("tb-sound-status");
+  let soundStatusTimer = 0;
   if (soundForm) {
     soundForm.addEventListener("submit", (ev) => {
       ev.preventDefault();
       const rate = Number(new FormData(ev.target).get("timer_end_rate"));
-      withReauth(() => toolboxFetch("/toolbox/admin/api/settings", {
+      toolboxFetch("/toolbox/admin/api/settings", {
         method: "POST",
         body: JSON.stringify({ timer_end_rate: rate }),
       }).then((data) => {
-        if (!data.ok) throw new Error(data.error || "保存できませんでした。");
-        alert("保存しました。");
-      }).catch((err) => alert(err.message)));
+        if (data.settings && data.settings.timer_end_rate != null) {
+          window.TOOLBOX_TIMER_END_RATE = data.settings.timer_end_rate;
+        }
+        if (soundStatus) {
+          soundStatus.textContent = "保存しました";
+          window.clearTimeout(soundStatusTimer);
+          soundStatusTimer = window.setTimeout(() => {
+            soundStatus.textContent = "";
+          }, 2000);
+        }
+      }).catch((err) => alert(err.message));
     });
   }
 

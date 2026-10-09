@@ -42,6 +42,9 @@ from toolbox.storage import (
 )
 from toolbox.usage import measured_stats, usage_summary
 
+# 管理パスワード解除のみで保存可（再入力不要）
+SETTINGS_NO_REAUTH_KEYS = frozenset({"timer_end_rate"})
+
 
 def _cost_performance(score, est_cost: float | None):
     if not score or est_cost is None:
@@ -304,10 +307,13 @@ def admin_set_tool(tool_id):
 @main_bp.route("/admin/api/settings", methods=["POST"])
 @admin_panel_required
 def admin_save_settings():
-    guard = require_admin_reauth()
-    if guard:
-        return guard
     payload = request.get_json(silent=True) or {}
+    payload_keys = set(payload.keys())
+    needs_reauth = bool(payload_keys - SETTINGS_NO_REAUTH_KEYS)
+    if needs_reauth:
+        guard = require_admin_reauth()
+        if guard:
+            return guard
     updates = {}
     if "daily_limit_usd" in payload:
         try:
