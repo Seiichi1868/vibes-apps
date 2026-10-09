@@ -39,6 +39,7 @@
   const CAT_PAGE = 50;
   const catalogIds = { 1: null, 2: null };
   let catalogCount = 0;
+  let catalogPageSnapshot = null;
   let searchOffset = 0;
   let audio = null;
 
@@ -973,6 +974,17 @@
     return nextList().some((row) => row.id === item.id);
   }
 
+  function nextTopicsForCatalogType(typeNum) {
+    return nextList().filter((row) => Number(row.type) === Number(typeNum));
+  }
+
+  function catalogItemsWithNextPinned(pageResults, typeNum) {
+    const pinned = nextTopicsForCatalogType(typeNum);
+    if (!pinned.length) return pageResults.slice();
+    const pinnedIds = new Set(pinned.map((row) => row.id));
+    return pinned.concat((pageResults || []).filter((item) => !pinnedIds.has(item.id)));
+  }
+
   function clearNext(item) {
     if (!item || !item.id) return;
     const rows = nextList();
@@ -1019,16 +1031,59 @@
   }
 
   function refreshNextSurfaces(topicId) {
-    document.querySelectorAll("#ms-catalog .ms-card, #ms-results .ms-card").forEach((card) => {
+    document.querySelectorAll("#ms-results .ms-card").forEach((card) => {
       if (topicId && card.dataset.topicId !== topicId) return;
       applyNextLook(card, topicIsNext({ id: card.dataset.topicId }));
     });
+    if (catalogPageSnapshot !== null) {
+      renderCatalogCards(catalogItemsWithNextPinned(catalogPageSnapshot, catType));
+    } else {
+      document.querySelectorAll("#ms-catalog .ms-card").forEach((card) => {
+        if (topicId && card.dataset.topicId !== topicId) return;
+        applyNextLook(card, topicIsNext({ id: card.dataset.topicId }));
+      });
+      const shown = els["ms-catalog"].querySelectorAll(".ms-card").length;
+      if (shown && catalogCount) {
+        const usedCount = els["ms-catalog"].querySelectorAll(".ms-card.is-used").length;
+        const nextCount = els["ms-catalog"].querySelectorAll(".ms-card.is-next").length;
+        els["ms-cat-status"].textContent = `このページ ${shown} 件中、使用済み ${usedCount} 件、次回使う ${nextCount} 件。全 ${catalogCount} 件。`;
+      }
+    }
     paintCatalogPages(catalogCount);
-    const shown = els["ms-catalog"].querySelectorAll(".ms-card").length;
-    if (shown && catalogCount) {
-      const usedCount = els["ms-catalog"].querySelectorAll(".ms-card.is-used").length;
-      const nextCount = els["ms-catalog"].querySelectorAll(".ms-card.is-next").length;
-      els["ms-cat-status"].textContent = `このページ ${shown} 件中、使用済み ${usedCount} 件、次回使う ${nextCount} 件。全 ${catalogCount} 件。`;
+  }
+
+  function renderCatalogCards(items) {
+    const used = new Set(spentRows(catType).map((row) => row.id));
+    const box = els["ms-catalog"];
+    const status = els["ms-cat-status"];
+    box.innerHTML = "";
+    items.forEach((item) => {
+      const isUsed = used.has(item.id);
+      const next = topicIsNext(item);
+      const card = document.createElement("article");
+      card.className = "ms-card";
+      card.dataset.topicId = item.id;
+      card.dataset.topicType = String(item.type || "");
+      card.innerHTML = `<div class="ms-meta"><span class="tb-badge">タイプ${item.type} ${topicNumber(item)}</span>${usedBadge(isUsed)}${nextBadge(next)}</div><p class="ms-card-text">${esc(item.text)}</p>`;
+      applyUsedLook(card, isUsed);
+      applyNextLook(card, next);
+      const use = document.createElement("button");
+      use.type = "button";
+      use.className = "tb-btn tb-btn-primary";
+      use.textContent = "このお題を使う";
+      use.addEventListener("click", () => useSearched(Object.assign({}, item, { used: topicIsUsed(item) })));
+      const actions = cardActions();
+      actions.append(use, nextToggleButton(item), usedToggleButton(item));
+      card.appendChild(actions);
+      box.appendChild(card);
+    });
+    const shown = items.length;
+    const usedCount = items.filter((item) => used.has(item.id)).length;
+    const nextCount = items.filter((item) => topicIsNext(item)).length;
+    if (status) {
+      status.textContent = shown
+        ? `このページ ${shown} 件中、使用済み ${usedCount} 件、次回使う ${nextCount} 件。全 ${catalogCount} 件。`
+        : "表示できるお題がありません。";
     }
   }
 
@@ -1780,6 +1835,7 @@
   }
 
   function loadCatalog() {
+    catalogPageSnapshot = null;
     if (catPosReady) {
       const posKey = `${catType}:${catOffset}`;
       if (posKey !== lastSavedPos) {
@@ -1804,36 +1860,9 @@
     toolboxFetch(`/toolbox/api/minute-speech/catalog?${params}`).then((data) => {
       if (Array.isArray(data.ids)) catalogIds[catType] = data.ids;
       catalogCount = Number(data.count) || 0;
-      const used = new Set(spentRows(catType).map((row) => row.id));
-      const box = els["ms-catalog"];
-      box.innerHTML = "";
-      (data.results || []).forEach((item) => {
-        const isUsed = used.has(item.id);
-        const next = topicIsNext(item);
-        const card = document.createElement("article");
-        card.className = "ms-card";
-        card.dataset.topicId = item.id;
-        card.dataset.topicType = String(item.type || "");
-        card.innerHTML = `<div class="ms-meta"><span class="tb-badge">タイプ${item.type} ${topicNumber(item)}</span>${usedBadge(isUsed)}${nextBadge(next)}</div><p class="ms-card-text">${esc(item.text)}</p>`;
-        applyUsedLook(card, isUsed);
-        applyNextLook(card, next);
-        const use = document.createElement("button");
-        use.type = "button";
-        use.className = "tb-btn tb-btn-primary";
-        use.textContent = "このお題を使う";
-        use.addEventListener("click", () => useSearched(Object.assign({}, item, { used: topicIsUsed(item) })));
-        const actions = cardActions();
-        actions.append(use, nextToggleButton(item), usedToggleButton(item));
-        card.appendChild(actions);
-        box.appendChild(card);
-      });
+      catalogPageSnapshot = data.results || [];
+      renderCatalogCards(catalogItemsWithNextPinned(catalogPageSnapshot, catType));
       paintCatalogPages(catalogCount);
-      const shown = (data.results || []).length;
-      const usedCount = (data.results || []).filter((item) => used.has(item.id)).length;
-      const nextCount = (data.results || []).filter((item) => topicIsNext(item)).length;
-      status.textContent = shown
-        ? `このページ ${shown} 件中、使用済み ${usedCount} 件、次回使う ${nextCount} 件。全 ${catalogCount} 件。`
-        : "表示できるお題がありません。";
     }).catch((err) => {
       status.textContent = err.message;
     });
