@@ -9,6 +9,7 @@
   const board = document.getElementById("tb-seats");
   const rowsEl = document.getElementById("tb-rows");
   const colsEl = document.getElementById("tb-cols");
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   function storageKey(id) {
     return `toolbox.random_seats.${id}`;
@@ -148,9 +149,9 @@
     }
   }
 
-  function renderBoard() {
+  function renderBoard(previewState) {
     const row = currentClass();
-    const state = stateOf();
+    const state = previewState || stateOf();
     rowsEl.value = String(state.rows);
     colsEl.value = String(state.cols);
     board.style.gridTemplateColumns = `repeat(${state.cols}, minmax(0, 1fr))`;
@@ -231,22 +232,49 @@
       alert(`席が足りません。${pool.length}人に対して席は${capacity}です。`);
       return;
     }
-    for (let i = pool.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(Math.random() * (i + 1));
-      const tmp = pool[i];
-      pool[i] = pool[j];
-      pool[j] = tmp;
-    }
     const total = state.rows * state.cols;
-    state.seats = [];
-    let placed = 0;
-    for (let i = 0; i < total; i += 1) {
-      if (blocked.has(i)) state.seats.push(null);
-      else state.seats.push(pool[placed++] || null);
+
+    function arrange(list) {
+      const seats = [];
+      let placed = 0;
+      for (let i = 0; i < total; i += 1) {
+        if (blocked.has(i)) seats.push(null);
+        else seats.push(list[placed++] || null);
+      }
+      return seats;
     }
-    Object.assign(row, state);
-    writeRooms();
-    renderAll();
+
+    function shuffledPool() {
+      const copy = pool.slice();
+      for (let i = copy.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = copy[i];
+        copy[i] = copy[j];
+        copy[j] = tmp;
+      }
+      return copy;
+    }
+
+    const apply = () => {
+      state.seats = arrange(shuffledPool());
+      Object.assign(row, state);
+      writeRooms();
+      renderAll();
+    };
+
+    if (reduceMotion) {
+      apply();
+      return;
+    }
+
+    const start = Date.now();
+    const spin = () => {
+      const preview = Object.assign({}, state, { seats: arrange(shuffledPool()) });
+      renderBoard(preview);
+      if (Date.now() - start < 1100) requestAnimationFrame(spin);
+      else apply();
+    };
+    spin();
   }
 
   document.getElementById("tb-shuffle").addEventListener("click", shuffle);
