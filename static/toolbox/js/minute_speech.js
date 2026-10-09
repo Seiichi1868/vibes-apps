@@ -1598,11 +1598,10 @@
   });
 
   document.addEventListener("pointerdown", (ev) => {
-    if (!ringing) return;
+    if (!ringing || phase === "gate") return;
     if (ev.target && ev.target.closest && ev.target.closest("#ms-start, #ms-pause, #ms-reset, #ms-phase-prev, #ms-phase-next")) return;
     ev.preventDefault();
-    if (phase === "gate") silenceGateRing();
-    else stopEnd();
+    stopEnd();
   }, true);
   document.addEventListener("keydown", (ev) => {
     if (ev.target && /INPUT|TEXTAREA|SELECT/.test(ev.target.tagName)) return;
