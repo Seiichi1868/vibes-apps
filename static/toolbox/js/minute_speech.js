@@ -721,6 +721,14 @@
     audio.currentTime = 0;
   }
 
+  function silenceGateRing() {
+    if (phase !== "gate" || !ringing) return false;
+    stopEnd();
+    endedPhase = "";
+    renderClock();
+    return true;
+  }
+
   function playEnd(loop) {
     unlockAudio();
     if (!audio) {
@@ -848,7 +856,7 @@
       return;
     }
     if (phase === "gate") {
-      stopEnd();
+      if (silenceGateRing()) return;
       beginPhase(phaseNext);
       return;
     }
@@ -1593,7 +1601,8 @@
     if (!ringing) return;
     if (ev.target && ev.target.closest && ev.target.closest("#ms-start, #ms-pause, #ms-reset, #ms-phase-prev, #ms-phase-next")) return;
     ev.preventDefault();
-    stopEnd();
+    if (phase === "gate") silenceGateRing();
+    else stopEnd();
   }, true);
   document.addEventListener("keydown", (ev) => {
     if (ev.target && /INPUT|TEXTAREA|SELECT/.test(ev.target.tagName)) return;
