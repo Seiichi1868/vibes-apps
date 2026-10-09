@@ -998,8 +998,19 @@
     return nextList().some((row) => row.id === item.id);
   }
 
+  function nextTopicOrder(item) {
+    const order = Number(item && item.source_order);
+    if (order > 0 && order <= 10000) return order;
+    const ids = catalogIds[Number(item.type)] || [];
+    const idx = ids.indexOf(item.id);
+    return idx >= 0 ? idx + 1 : 1e9;
+  }
+
   function nextTopicsForCatalogType(typeNum) {
-    return nextList().filter((row) => Number(row.type) === Number(typeNum));
+    return nextList()
+      .filter((row) => Number(row.type) === Number(typeNum))
+      .slice()
+      .sort((a, b) => nextTopicOrder(a) - nextTopicOrder(b));
   }
 
   function catalogItemsWithNextPinned(pageResults, typeNum) {
