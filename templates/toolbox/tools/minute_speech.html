@@ -95,30 +95,6 @@
     font-size: 0.82rem;
     cursor: pointer;
   }
-  .ms-check-label {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    min-height: 48px;
-    min-width: 48px;
-    padding: 4px 10px;
-    border: 1px solid var(--tb-line);
-    border-radius: 10px;
-    background: #fff;
-    cursor: pointer;
-    font-size: 0.86rem;
-  }
-  .ms-check-label input { width: 22px; height: 22px; }
-  .ms-check-label.is-today { box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.35); }
-  .ms-topic-row.is-complete .ms-check-label { background: #dfe3e8; color: #5c6570; border-color: #aab2bc; }
-  .ms-assign-dialog {
-    position: fixed; inset: 0; z-index: 50; background: rgba(20, 32, 51, 0.45);
-    display: flex; align-items: center; justify-content: center; padding: 12px;
-  }
-  .ms-assign-dialog[hidden] { display: none !important; }
-  .ms-assign-box { background: #fff; border-radius: 12px; padding: 14px; max-width: 760px; width: 100%; max-height: 90vh; overflow: auto; display: grid; gap: 8px; }
-  .ms-assign-box table { border-collapse: collapse; width: 100%; font-size: 0.88rem; }
-  .ms-assign-box th, .ms-assign-box td { border-bottom: 1px solid var(--tb-line); padding: 4px 6px; text-align: left; }
   .ms-class-chip.is-done { background: var(--tb-accent, #2d6a4f); color: #fff; border-color: var(--tb-accent, #2d6a4f); }
   .ms-class-chip.is-today { box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.35); }
   .ms-topic-row {
@@ -221,7 +197,6 @@
           <button class="tb-btn" type="button" id="ms-course-edit">編集</button>
           <button class="tb-btn" type="button" id="ms-course-split">分割</button>
           <button class="tb-btn" type="button" id="ms-course-copy">来年度用コピー</button>
-          <button class="tb-btn" type="button" id="ms-assign-classes">クラスを振り分ける（1年→論理表現 I／2年→論理表現 II）</button>
           <button class="tb-btn" type="button" id="ms-course-del">削除</button>
         </div>
       </div>
@@ -361,8 +336,6 @@
     <div class="ms-history-list" id="ms-history"></div>
   </div>
 </section>
-
-<div class="ms-assign-dialog" id="ms-assign-dialog" hidden><div class="ms-assign-box" id="ms-assign-box"></div></div>
 
 <div class="ms-undo-toast" id="ms-undo-toast" hidden>
   <span id="ms-undo-msg">元に戻す</span>
