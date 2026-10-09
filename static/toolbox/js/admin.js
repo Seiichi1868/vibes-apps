@@ -105,6 +105,21 @@
     });
   });
 
+  const soundForm = document.getElementById("tb-sound-form");
+  if (soundForm) {
+    soundForm.addEventListener("submit", (ev) => {
+      ev.preventDefault();
+      const rate = Number(new FormData(ev.target).get("timer_end_rate"));
+      withReauth(() => toolboxFetch("/toolbox/admin/api/settings", {
+        method: "POST",
+        body: JSON.stringify({ timer_end_rate: rate }),
+      }).then((data) => {
+        if (!data.ok) throw new Error(data.error || "保存できませんでした。");
+        alert("保存しました。");
+      }).catch((err) => alert(err.message)));
+    });
+  }
+
   document.getElementById("tb-limit-form").addEventListener("submit", (ev) => {
     ev.preventDefault();
     const fd = new FormData(ev.target);

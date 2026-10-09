@@ -83,7 +83,8 @@
     {% block body %}{% endblock %}
   </main>
   <button class="tb-blank-btn" type="button" id="tb-blank-btn" title="blank (B)">blank</button>
-  <script>window.TOOLBOX_CSRF = {{ csrf_token|tojson }};</script>
+  <script>window.TOOLBOX_CSRF = {{ csrf_token|tojson }};
+  window.TOOLBOX_TIMER_END_RATE = {{ timer_end_rate|tojson }};</script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", function () {

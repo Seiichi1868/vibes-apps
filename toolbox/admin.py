@@ -333,6 +333,14 @@ def admin_save_settings():
             updates["assume_output_tokens"] = max(1, int(payload["assume_output_tokens"]))
         except (TypeError, ValueError):
             return jsonify({"ok": False, "error": "想定出力トークンが不正です。"}), 400
+    if "timer_end_rate" in payload:
+        try:
+            rate = float(payload["timer_end_rate"])
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "終了音の速さは数字で入力してください。"}), 400
+        if rate < 0.5 or rate > 4:
+            return jsonify({"ok": False, "error": "終了音の速さは 0.5〜4 で指定してください。"}), 400
+        updates["timer_end_rate"] = round(rate, 2)
     if updates:
         update_app_settings(updates)
     return jsonify({"ok": True, "settings": load_app_settings()})

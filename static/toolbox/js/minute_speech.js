@@ -680,6 +680,7 @@
     audio = new Audio("/static/toolbox/sounds/timer_end.wav");
     audio.preload = "auto";
     audio.volume = 0.35;
+    audio.playbackRate = Number(window.TOOLBOX_TIMER_END_RATE) || 3;
     audio.play().then(() => {
       audio.pause();
       audio.currentTime = 0;

@@ -328,6 +328,7 @@ DEFAULT_APP_SETTINGS = {
     "assume_output_tokens": DEFAULT_ASSUME_OUTPUT_TOKENS,
     "parallel_browser_stt": DEFAULT_PARALLEL_BROWSER_STT,
     "login_required_enabled": DEFAULT_LOGIN_REQUIRED,
+    "timer_end_rate": 3.0,
     "model_overrides": {},
 }
 

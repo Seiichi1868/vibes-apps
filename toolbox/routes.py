@@ -135,6 +135,7 @@ def _inject():
         "login_required_enabled": login_is_required(),
         "is_guest": bool(user and user.get("is_guest")),
         "toolbox_cache": _static_version(),
+        "timer_end_rate": get_setting("timer_end_rate", 3.0),
     }
 
 
