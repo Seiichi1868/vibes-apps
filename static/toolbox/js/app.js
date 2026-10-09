@@ -40,6 +40,45 @@
     }
   }
 
+  const quickToggle = document.getElementById("tb-quick-toggle");
+  const quickMenu = document.getElementById("tb-quick-menu");
+  if (quickToggle && quickMenu) {
+    const quick = quickToggle.closest(".tb-quick");
+    const setQuickOpen = (open) => quickToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    if (quick) {
+      quick.addEventListener("mouseenter", () => setQuickOpen(true));
+      quick.addEventListener("mouseleave", () => setQuickOpen(false));
+      quick.addEventListener("focusin", () => setQuickOpen(true));
+      quick.addEventListener("focusout", () => setQuickOpen(false));
+      quickToggle.addEventListener("click", () => {
+        const open = quick.classList.toggle("is-open");
+        setQuickOpen(open);
+      });
+    }
+  }
+
+  const QUICK_SIZES = {
+    s: { w: 420, h: 520 },
+    m: { w: 640, h: 720 },
+    l: { w: 960, h: 860 },
+  };
+  document.querySelectorAll(".tb-quick-row").forEach((row) => {
+    const url = row.dataset.quickTool;
+    const id = row.dataset.quickId || "tool";
+    if (!url) return;
+    row.querySelectorAll("button[data-size]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const size = QUICK_SIZES[btn.dataset.size] || QUICK_SIZES.m;
+        const left = Math.max(0, Math.round((window.screen.width - size.w) / 2));
+        const top = Math.max(0, Math.round((window.screen.height - size.h) / 2));
+        const features = `popup=yes,width=${size.w},height=${size.h},left=${left},top=${top}`;
+        window.open(url, `tb-quick-${id}-${btn.dataset.size}`, features);
+        const quick = document.getElementById("tb-quick");
+        if (quick) quick.classList.remove("is-open");
+      });
+    });
+  });
+
   const opening = document.getElementById("tb-opening");
   if (opening && document.documentElement.classList.contains("tb-skip-opening")) {
     opening.remove();

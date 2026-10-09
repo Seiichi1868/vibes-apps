@@ -22,7 +22,40 @@
   <div id="tb-blank" class="tb-blank" hidden role="button" tabindex="0">タップまたはEnterで戻る</div>
   <header class="tb-top">
     <a class="tb-brand" href="{{ url_for('toolbox.launcher') }}">Toolbox</a>
+    <div class="tb-top-right">
     {% if current_user %}
+    <div class="tb-quick" id="tb-quick">
+      <button class="tb-user-btn" type="button" id="tb-quick-toggle" aria-expanded="false" aria-haspopup="true">別窓ツール</button>
+      <div class="tb-quick-menu" id="tb-quick-menu">
+        <div class="tb-quick-menu-inner">
+          <p class="tb-quick-hint">サイズを選んで別窓で開きます。今の画面は閉じません。</p>
+          <div class="tb-quick-row" data-quick-tool="{{ url_for('toolbox.random_seats_page') }}" data-quick-id="random_seats">
+            <span class="tb-quick-name">ランダム座席</span>
+            <div class="tb-quick-sizes">
+              <button type="button" data-size="s">小</button>
+              <button type="button" data-size="m">中</button>
+              <button type="button" data-size="l">大</button>
+            </div>
+          </div>
+          <div class="tb-quick-row" data-quick-tool="{{ url_for('toolbox.random_pick_page') }}" data-quick-id="random_pick">
+            <span class="tb-quick-name">ランダム指名</span>
+            <div class="tb-quick-sizes">
+              <button type="button" data-size="s">小</button>
+              <button type="button" data-size="m">中</button>
+              <button type="button" data-size="l">大</button>
+            </div>
+          </div>
+          <div class="tb-quick-row" data-quick-tool="{{ url_for('toolbox.timer_page') }}" data-quick-id="timer">
+            <span class="tb-quick-name">タイマー</span>
+            <div class="tb-quick-sizes">
+              <button type="button" data-size="s">小</button>
+              <button type="button" data-size="m">中</button>
+              <button type="button" data-size="l">大</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="tb-user">
       <button class="tb-user-btn" type="button" id="tb-user-toggle" aria-expanded="false" aria-haspopup="true">画面</button>
       <div class="tb-user-menu" id="tb-user-menu">
@@ -42,6 +75,7 @@
       </div>
     </div>
     {% endif %}
+    </div>
   </header>
   <main class="tb-main">
     {% block body %}{% endblock %}
