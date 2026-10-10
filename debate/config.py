@@ -99,10 +99,10 @@ PART_LABELS = {
 # 授業フロー準拠のパート役割（進行画面表示＋ジャッジ判定の共通ソース）
 PART_ROLES = {
     "PM": "論題の定義／2論点の提示（Point 1は詳しく、Point 2は概要でよい）",
-    "LO": "Gov論点の再構築・反駁／自陣2論点の提示（Point 1は詳しく、Point 2は概要でよい）",
+    "LO": "Gov Point 1の再構築・反駁（PMがPoint 2をタイトルだけにしたことは攻撃しない。詳細はMG）／自陣2論点の提示（Point 1は詳しく、Point 2は概要でよい）",
     "MG": "Opp Point 1への反駁／Gov Point 1の再構築・防御／Gov Point 2の詳細展開",
-    "MO": "Gov Point 1への反駁／Opp Point 1の再構築・防御／Opp Point 2の詳細展開",
-    "LOR": "対立点の整理／Opp優位の総括（新規論点不可）",
+    "MO": "MGによるGov Point 1再構築への反駁／その直後にGov Point 2への反駁／Opp Point 1の再構築・防御／Opp Point 2の詳細展開",
+    "LOR": "対立点の整理／Opp優位の総括（Gov Point 2への反論はここでは行わない。それはMO。新規論点不可）",
     "PMR": "Opp Point 2への反駁のうえ総括／Gov優位の主張（新規論点不可）",
 }
 
@@ -117,9 +117,10 @@ PART_GUIDES = {
     "MG": "We believe that ___ should... First, let me rebut Opposition's 1st point... "
     "They said, however, Therefore... Next, let me reconstruct Government's 1st point... "
     "Then let me explain our 2nd point...",
-    "MO": "We believe that ___ should not... Let me rebut Government's 1st point... "
-    "They said, however, Therefore... Next, let me reconstruct Opposition's 1st point... "
-    "Then let me explain our 2nd point...",
+    "MO": "We believe that ___ should not... First, let me rebut the reconstruction of Government's 1st point... "
+    "They said, however, Therefore... Next, let me rebut Government's 2nd point... "
+    "They said, however, Therefore... Then, let me reconstruct Opposition's 1st point... "
+    "Finally, let me explain our 2nd point...",
     "LOR": "Let me summarize today's debate. The most important point is... "
     "On this point, their idea is... However, our argument is superior because...",
     "PMR": "First, I will rebut Opposition's 2nd point... They said, however, Therefore... "

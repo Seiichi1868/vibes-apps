@@ -41,21 +41,21 @@ Control argument strength only. English must remain grammatically correct and na
 - Depth: give a claim and a reason. Use almost no concrete examples.
 - Defence: after being rebutted, leave at least one of your own in-role points undefended.
 - Language: simple vocabulary and shorter sentences. Never add grammar mistakes or awkward phrasing.
-- Never use difficulty as a reason to develop Point 2 early or to rebut a point reserved for a later speech.""",
+- Never use difficulty as a reason to develop Point 2 early, to attack a title-only Point 2, or to rebut a point reserved for a later speech.""",
     "normal": """Difficulty: normal
 Control argument strength only. English must remain grammatically correct and natural.
 - Rebuttal coverage: rebut only the opponent points assigned to this part. Do not rebut both sides' Point 2 just to look complete.
 - Depth: for the point this part must develop, include claim, reason, and a concrete example.
 - Defence: reconstruct and defend the point this part is responsible for defending.
 - Language: standard parliamentary debate phrasing.
-- Never use difficulty as a reason to develop Point 2 early or to rebut a point reserved for a later speech.""",
+- Never use difficulty as a reason to develop Point 2 early, to attack a title-only Point 2, or to rebut a point reserved for a later speech.""",
     "hard": """Difficulty: hard
 Control argument strength only. English must remain grammatically correct and natural.
 - Rebuttal coverage: strongly rebut the opponent points assigned to this part, and attack an unstated assumption or missing burden on those same points only.
 - Depth: for the point this part must develop, include claim, reason, concrete example, and explicit comparative weighing.
 - Defence: defend the point this part is responsible for and show why the opponent's reply is weaker.
 - Language: use debate terms such as comparative weighing and burden of proof naturally. Do not make the English worse.
-- Never use difficulty as a reason to develop Point 2 early or to rebut a point reserved for a later speech.""",
+- Never use difficulty as a reason to develop Point 2 early, to attack a title-only Point 2, or to rebut a point reserved for a later speech. A title-only Point 2 is not a missing burden.""",
 }
 
 # 授業フローの2論点分担。難易度より優先する。
@@ -69,14 +69,18 @@ POINT_SPLIT_RULES = {
         "If you need more words, spend them on the definition and Point 1, never on Point 2."
     ),
     "LO": (
-        "Reconstruct and rebut the Government case, focusing on Government Point 1. "
-        "A one-sentence note on Government Point 2 is enough; do not treat that preview as a full argument. "
+        "Reconstruct and rebut Government Point 1 only. "
+        "Do not attack the Prime Minister for leaving Government Point 2 as a title or one-sentence preview. "
+        "That is correct. Of the two Government points, Point 2 is only named in PM and is fully explained later by MG, who has not spoken yet. "
+        "A missing detailed explanation of Government Point 2 in PM is not a flaw, a dropped argument, or a missing burden. "
+        "Do not say that PM failed to explain, develop, substantiate, or prove Point 2. "
+        "You may repeat the Point 2 label in one sentence without calling it incomplete. "
         "Announce exactly two Opposition points by keyword or short label. "
         "Fully explain Opposition Point 1 only. "
         "For Opposition Point 2, say the name and at most one short preview sentence. "
         "Do not give a second reason, mechanism, example, or impact for Opposition Point 2. "
         "Leave the full explanation of Opposition Point 2 for MO. "
-        "If you need more words, spend them on the Government rebuttal and Opposition Point 1."
+        "If you need more words, spend them on the Government Point 1 rebuttal and Opposition Point 1."
     ),
     "MG": (
         "Rebut Opposition Point 1, reconstruct Government Point 1, then fully develop Government Point 2. "
@@ -84,12 +88,20 @@ POINT_SPLIT_RULES = {
         "Do not fully rebut Opposition Point 2; it has only been named. Leave that to PMR."
     ),
     "MO": (
-        "Rebut Government Point 1, reconstruct Opposition Point 1, then fully develop Opposition Point 2. "
-        "This is the first time Opposition Point 2 may be explained in depth. "
+        "Speak in this order. Do not move any section into LOR. "
+        "1. Rebut MG's reconstruction of Government Point 1. "
+        "2. Immediately next, rebut Government Point 2 in full. This is the only speech that rebuts Government Point 2. "
+        "MG has just explained it. Do not save this rebuttal for LOR, and do not put it first. "
+        "3. Reconstruct and defend Opposition Point 1. "
+        "4. Fully develop Opposition Point 2. This is the first time Opposition Point 2 may be explained in depth. "
+        "This order overrides difficulty. On easy, make section 2 shorter, but still say it here. "
         "Do not open a third Opposition point."
     ),
     "LOR": (
-        "Summarise the clash and why Opposition is ahead. "
+        "Open by summarising the clash and why Opposition is ahead. "
+        "Do not rebut Government Point 2 in this speech, and do not put that rebuttal at the start. "
+        "The rebuttal of Government Point 2 is section 2 of MO, immediately after MO rebuts MG's reconstruction of Government Point 1. "
+        "If MO already rebutted it, refer to that only as part of the summary. If MO did not, still do not deliver it here. "
         "Do not introduce new points, and do not newly develop a point that was only previewed."
     ),
     "PMR": (
@@ -111,11 +123,14 @@ Keep paragraph breaks so the student can follow which point you are answering.
 Hard role constraints (these beat difficulty and word-count targets):
 - Each side has exactly two regular points (Point 1 and Point 2). Never create a third point.
 - PM and LO must NOT develop Point 2. They only name it. The full case for Government Point 2 is MG. The full case for Opposition Point 2 is MO.
+- LO must not attack PM for giving Government Point 2 only as a title. That explanation belongs to MG and has not happened yet.
 - "Name Point 2" means a keyword or short label, plus at most one short sentence. No second reason, no example, no impact calculus.
 - Do not pad Point 2 to hit the word count. Extra length goes to definition, rebuttal, or Point 1.
-- Difficulty never authorises an early Point 2 explanation or an out-of-role rebuttal.
+- Difficulty never authorises an early Point 2 explanation, an attack on a title-only Point 2, or an out-of-role rebuttal.
+- MO section 2, immediately after rebutting MG's reconstruction of Government Point 1, is the full rebuttal of Government Point 2.
+- LOR must not open with, or newly deliver, the rebuttal of Government Point 2. That rebuttal belongs only in MO.
 - LOR and PMR must not introduce new points.
-- PMR must first rebut Opposition Point 2, then summarise.
+- PMR must first rebut Opposition Point 2, then summarise. Do not copy that opening into LOR.
 
 Follow the assigned part's point-split rule exactly.
 """

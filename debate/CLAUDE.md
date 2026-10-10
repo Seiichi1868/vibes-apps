@@ -27,10 +27,10 @@
 正規論点は各陣営 Point1+Point2 のみ。
 
 - **PM** 定義+2論点予告。P1詳しく、P2は名前・概要でよい
-- **LO** Gov再構築→反駁。自陣2論点予告。P1詳しく、P2概要でよい
+- **LO** Gov P1再構築→反駁。自陣2論点予告。P1詳しく、P2概要でよい。PMがGov P2をタイトルだけにしたことは攻撃しない（詳細はMG）
 - **MG** Opp P1反駁 → Gov P1再構築 → Gov P2詳細。Opp P2への反論不足は減点しない
-- **MO** Gov P1反駁 → Opp P1再構築 → Opp P2詳細
-- **LOR** 対立整理・Opp総括。新規論点不可
+- **MO** MGによるGov P1再構築への反駁 → その直後にGov P2反駁 → Opp P1再構築 → Opp P2詳細
+- **LOR** 対立整理・Opp総括。新規論点不可。Gov P2への反論は冒頭で行わない（MOの2番目）
 - **PMR** 先に Opp P2反駁、その後総括。新規論点不可
 
 役割文・定型ガイド・ジャッジプロンプトの正本: `debate/config.py` の `PART_ROLES`/`PART_GUIDES` と `debate/judge.py`。矛盾させない。
@@ -93,7 +93,7 @@ Whisper: `debate/transcription.py`（短タイムアウト）。ジョブ: `tran
 
 ## ジャッジ
 
-プロンプト正本は `debate/judge.py`（授業フロー準拠）。**PM/LOのP2概要は減点しない。Gov P2の深さはMG、Opp P2はMO。Opp P2本格反論はPMR。**
+プロンプト正本は `debate/judge.py`（授業フロー準拠）。**PM/LOのP2概要は減点しない。LOがPMのGov P2説明不足を攻撃してもGovの欠点にしない。Gov P2の深さはMG、本格反論はMOの2番目（LORの冒頭ではない）。Opp P2の深さはMO。Opp P2本格反論はPMR。**
 モデル選択肢: `judge_model_pricing.py`（既定 `5.6-luna`）。結果画面にコストは出さない。ジャッジ中は擬似進捗ログ。
 
 ## 管理

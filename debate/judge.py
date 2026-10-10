@@ -24,21 +24,29 @@ JUDGE_SYSTEM_PROMPT = """あなたはPDA形式の即興ディベートを審査�
 各陣営の正規論点は Point 1 と Point 2 の2つのみ。
 
 - PM: 論題を定義し、2論点を予告する。Point 1 を詳しく述べ、Point 2 は名前・概要でよい。
-- LO: Govの議論を再構築したうえで反駁する。自陣の2論点を予告し、Point 1 を詳しく述べ、
-  Point 2 は名前・概要でよい。
+- LO: Gov Point 1 を再構築したうえで反駁する。自陣の2論点を予告し、Point 1 を詳しく述べ、
+  Point 2 は名前・概要でよい。PMが Gov Point 2 をタイトルだけにしたことを攻撃してはならない。
+  その詳しい説明は次のMGの仕事であり、PMで詳しくないことは欠点ではない。
 - MG: ①Opp Point 1 に反駁する ②Gov Point 1 を再構築・防御する ③Gov Point 2 を詳しく展開する。
   この時点では Opp Point 2 はまだ詳しく出ていない。Opp Point 2 への反論不足を減点してはならない。
-- MO: ①Gov Point 1 に反駁する ②Opp Point 1 を再構築・防御する ③Opp Point 2 を詳しく展開する。
+- MO: ①MGによる Gov Point 1 再構築に反駁する ②その直後に Gov Point 2 に反駁する
+  ③Opp Point 1 を再構築・防御する ④Opp Point 2 を詳しく展開する。
+  Gov Point 2 への反論をLORへ回してはならない。
 - LOR: 最も重要な対立を整理し、Opp優位を総括する。新規論点は不可。
+  Gov Point 2 への反論を冒頭で行ってはならない。それはMOの2番目である。
 - PMR: 先に Opp Point 2 に反駁し、その後で試合を総括してGov優位を主張する。新規論点は不可。
 
 # 2論点の分担（重要：誤ると判定が歪む）
 - Gov Point 2 の深さ・具体例は MG で評価する。PMで詳しくなくても減点しない。
+  LOが「PMはPoint 2を詳しく説明しなかった」と攻撃していても、その攻撃は役割違反であり、
+  Govの欠点にはしない。
 - Opp Point 2 の深さ・具体例は MO で評価する。LOで詳しくなくても減点しない。
 - MG が Gov Point 1 を守り直していない場合は、Point 2 不足より先にその役割不履行を書く。
 - MO が Opp Point 1 を守り直していない場合も同様。
 - Opp Point 2 への本格反論は PMR の仕事である。MG に求めてはならない。
-- 論点フローでは Gov Point 2 を PM で raised、MG で extended と記録してよい。
+- Gov Point 2 への本格反論は MO の2番目（MGによる Gov Point 1 再構築への反論の直後）である。
+  LORの冒頭に置くのは役割違反。LORがそこで初めて反論していても、MOがやるべき仕事の肩代わりとして扱う。
+- 論点フローでは Gov Point 2 を PM で raised、MG で extended、MO で rebutted と記録してよい。
   Opp Point 2 は LO で raised、MO で extended、PMR で rebutted と記録してよい。
 
 # 勝敗判定の中心ロジック：論点のフロー分析（Standing Points）
@@ -77,7 +85,7 @@ Point 2 の理由・具体例は、GovはPM+MG、OppはLO+MOをセットで見�
 
 ## 構成・議論運び (Method)
 1. 反駁の的確さ：相手の主張を正確に理解した上で、有効に反論できているか
-   （MGはOpp Point 1、MOはGov Point 1、PMRはOpp Point 2 を主対象とする）
+   （MGはOpp Point 1、MOはGov Point 1の再構築とGov Point 2、PMRはOpp Point 2 を主対象とする）
 2. フローの一貫性・応答性：前のスピーカーの議論を無視せず、話が噛み合っているか
 3. 役割遂行：上記「正規の試合フロー」の各パート役割を果たしているか
 
@@ -126,7 +134,8 @@ AIが使ったモデル名には触れないでください。
       "status": "extended",
       "history": [
         { "part": "PM", "action": "raised" },
-        { "part": "MG", "action": "extended" }
+        { "part": "MG", "action": "extended" },
+        { "part": "MO", "action": "rebutted" }
       ]
     },
     {
@@ -253,7 +262,7 @@ def build_judge_payload(session: dict) -> dict:
         "expected_flow": {
             "regular_points": "各陣営 Point 1 と Point 2 のみ。Point 3 以降は加点しない。",
             "gov_point_1": "PMで詳しく展開し、LOの反論のあとMGが再構築・防御する。",
-            "gov_point_2": "PMで概要提示し、MGで詳しく展開する。PMで詳しくなくても減点しない。",
+            "gov_point_2": "PMではタイトルのみ。詳しい説明はMG。PMで詳しくないことは欠点ではなく、LOがそれを攻撃してもGovの減点理由にしない。本格反論はMOの2番目（Gov Point 1再構築への反論の直後）。LORの冒頭では行わない。",
             "opp_point_1": "LOで詳しく展開し、MGの反論のあとMOが再構築・防御する。",
             "opp_point_2": "LOで概要提示し、MOで詳しく展開する。本格反論はPMR。MGには求めない。",
         },
