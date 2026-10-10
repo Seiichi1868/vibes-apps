@@ -91,6 +91,30 @@
       </div>
     </div>
 
+    <div class="vsc-vocab-card">
+      <p class="vsc-vocab-kicker">NOUNS</p>
+      <h3 class="vsc-vocab-title">名詞をカテゴリーごとに練習</h3>
+      <p class="vsc-vocab-body">カテゴリーを選ぶと、その中の名詞だけを4択で練習できます。</p>
+      {% for cat in noun_categories %}
+      <div class="vsc-noun-cat">
+        <div class="vsc-noun-cat-head">
+          <span class="vsc-noun-cat-name">{{ cat.label }}</span>
+          <span class="vsc-noun-cat-count">{{ cat.count }}語</span>
+        </div>
+        <div class="vsc-vocab-actions">
+          <button type="button" class="vsc-vocab-btn" data-noun-category="{{ cat.id }}" data-noun-direction="ja_to_es">
+            <span class="vsc-vocab-btn-label">日本語 → スペイン語</span>
+            <span class="vsc-vocab-btn-meta">{{ cat.label }}</span>
+          </button>
+          <button type="button" class="vsc-vocab-btn" data-noun-category="{{ cat.id }}" data-noun-direction="es_to_ja">
+            <span class="vsc-vocab-btn-label">スペイン語 → 日本語</span>
+            <span class="vsc-vocab-btn-meta">{{ cat.label }}</span>
+          </button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
 
     <div class="vsc-promo-card" id="practice">
       <p class="vsc-promo-kicker">本日のおすすめ</p>
@@ -232,5 +256,5 @@
   window.CONJUGATE_OPENING_MS = {{ appearance.opening_ms | tojson }};
   window.CONJUGATE_PROGRESS = {{ progress | tojson }};
 </script>
-<script src="{{ url_for('conjugate.static', filename='js/index.js', v='20260923c') }}"></script>
+<script src="{{ url_for('conjugate.static', filename='js/index.js', v='20261010a') }}"></script>
 {% endblock %}

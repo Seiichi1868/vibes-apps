@@ -838,6 +838,29 @@
   margin-bottom: 12px;
 }
 
+.vsc-noun-cat + .vsc-noun-cat {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line, rgba(0, 0, 0, 0.08));
+}
+
+.vsc-noun-cat-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.vsc-noun-cat-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.vsc-noun-cat-count {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
 .vsc-vocab-master-split {
   display: grid;
   grid-template-columns: 1fr 1fr;

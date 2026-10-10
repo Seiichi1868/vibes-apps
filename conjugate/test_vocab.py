@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from conjugate.judge import grade_regular
 from conjugate.vocab import (
+    build_noun_questions,
     build_vocab_questions,
     build_vocab_summary,
     public_vocab_question,
@@ -80,6 +81,24 @@ class VocabQuizTests(unittest.TestCase):
         self.assertGreaterEqual(len(pool), 4)
         self.assertTrue(any(v["infinitive"] == "gustar" for v in pool))
         self.assertTrue(any(v["infinitive"] == "ser" for v in pool))
+
+
+class NounQuizTests(unittest.TestCase):
+    def test_vegetables_cover_the_list_once_each(self):
+        questions = build_noun_questions("vegetables", "ja_to_es")
+        self.assertEqual(len(questions), 10)
+        prompts = {q["prompt"] for q in questions}
+        self.assertIn("にんじん", prompts)
+        self.assertIn("じゃがいも", prompts)
+        for q in questions:
+            labels = [c["label"] for c in q["choices"]]
+            self.assertEqual(len(set(labels)), 4)
+            self.assertEqual(q["prompt_kicker"], "この日本語の名詞は？")
+        papa = next(q for q in questions if q["meaning_ja"] == "じゃがいも")
+        self.assertIn("la papa / la patata", [c["label"] for c in papa["choices"]])
+
+    def test_unknown_category_is_empty(self):
+        self.assertEqual(build_noun_questions("fruits", "es_to_ja"), [])
 
 
 if __name__ == "__main__":

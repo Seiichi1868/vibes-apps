@@ -150,6 +150,35 @@
     });
   });
 
+  async function startNoun({ category, direction, button }) {
+    errorEl.classList.add("hidden");
+    button.disabled = true;
+    try {
+      const res = await fetch("/conjugate/api/nouns", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category, direction }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || "名詞クイズの開始に失敗しました。");
+      if (window.vscNavigate) window.vscNavigate(`/conjugate/vocab/${data.session_id}`);
+      else window.location.href = `/conjugate/vocab/${data.session_id}`;
+    } catch (err) {
+      showError(err.message);
+      button.disabled = false;
+    }
+  }
+
+  document.querySelectorAll("[data-noun-category]").forEach((el) => {
+    el.addEventListener("click", async () => {
+      await startNoun({
+        category: el.dataset.nounCategory,
+        direction: el.dataset.nounDirection,
+        button: el,
+      });
+    });
+  });
+
   const progressState = Object.assign(
     {
       practice_dates: [],

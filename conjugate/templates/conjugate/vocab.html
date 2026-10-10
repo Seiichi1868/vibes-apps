@@ -1,6 +1,6 @@
 {% extends "conjugate/base.html" %}
-{% block title %}意味クイズ - Spanish Lab Conjugate{% endblock %}
-{% block greeting %}意味クイズ{% endblock %}
+{% block title %}{{ quiz_title }} - Spanish Lab Conjugate{% endblock %}
+{% block greeting %}{{ quiz_title }}{% endblock %}
 {% block header_actions %}
 <span id="progress-label" class="vsc-progress-chip">0/0問</span>
 {% endblock %}
@@ -31,5 +31,5 @@
 <script>
   window.CONJUGATE_VOCAB_SESSION_ID = {{ session_id | tojson }};
 </script>
-<script src="{{ url_for('conjugate.static', filename='js/vocab.js', v='20260819a') }}"></script>
+<script src="{{ url_for('conjugate.static', filename='js/vocab.js', v='20261010a') }}"></script>
 {% endblock %}

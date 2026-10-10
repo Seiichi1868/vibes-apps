@@ -55,7 +55,7 @@
     feedbackBox.innerHTML = "";
     nextBtn.classList.add("hidden");
     directionPill.textContent = copy.pill;
-    promptKicker.textContent = copy.kicker;
+    promptKicker.textContent = q.prompt_kicker || copy.kicker;
     promptWord.textContent = q.prompt;
     updateProgress();
 

@@ -6,6 +6,7 @@ import random
 import uuid
 from collections import Counter
 
+from conjugate.data.nouns import NOUN_CATEGORY_LABELS, nouns_in_category
 from conjugate.data.verbs import VERBS
 from conjugate.storage import record_progress
 
@@ -53,6 +54,54 @@ def _pick_distractors(correct: dict, pool: list[dict], key: str, n: int = 3) -> 
         if len(picked) >= n:
             break
     return picked
+
+
+def build_noun_questions(category: str, direction: str, count: int | None = None) -> list[dict]:
+    """カテゴリー内の名詞を4択にする。日本語⇔スペイン語。"""
+    if direction not in DIRECTIONS:
+        direction = "ja_to_es"
+    pool = nouns_in_category(category)
+    if len(pool) < 4:
+        return []
+
+    if count is None:
+        count = len(pool)
+    count = max(4, min(20, int(count), len(pool) if len(pool) >= 4 else 4))
+    random.shuffle(pool)
+    chosen = list(pool[:count])
+    while len(chosen) < count:
+        chosen.append(random.choice(pool))
+
+    key = "es" if direction == "ja_to_es" else "ja"
+    kicker = "この日本語の名詞は？" if direction == "ja_to_es" else "このスペイン語の意味は？"
+    questions = []
+    for noun in chosen:
+        distractors = _pick_distractors(noun, pool, key, n=3)
+        if len(distractors) < 3:
+            continue
+        options = [noun] + distractors
+        random.shuffle(options)
+        choice_ids = [uuid.uuid4().hex[:8] for _ in options]
+        correct_idx = next(i for i, opt in enumerate(options) if opt["id"] == noun["id"])
+        questions.append(
+            {
+                "question_id": uuid.uuid4().hex[:10],
+                "kind": "noun",
+                "verb_id": noun["id"],
+                "infinitive": noun["es"],
+                "meaning_ja": noun["ja"],
+                "reading": noun.get("reading", ""),
+                "category": category,
+                "category_label": NOUN_CATEGORY_LABELS.get(category, category),
+                "direction": direction,
+                "prompt": noun["ja"] if direction == "ja_to_es" else noun["es"],
+                "prompt_kicker": kicker,
+                "choices": [{"id": cid, "label": opt[key]} for cid, opt in zip(choice_ids, options)],
+                "correct_choice_id": choice_ids[correct_idx],
+                "answer": None,
+            }
+        )
+    return questions
 
 
 def build_vocab_questions(direction: str, count: int = DEFAULT_VOCAB_COUNT) -> list[dict]:
@@ -115,6 +164,7 @@ def public_vocab_question(question: dict) -> dict:
         "kind": "vocab",
         "direction": question["direction"],
         "prompt": question["prompt"],
+        "prompt_kicker": question.get("prompt_kicker") or "",
         "choices": list(question["choices"]),
         "answer": None,
     }
@@ -123,6 +173,7 @@ def public_vocab_question(question: dict) -> dict:
         q["correct_choice_id"] = question["correct_choice_id"]
         q["infinitive"] = question.get("infinitive", "")
         q["meaning_ja"] = question.get("meaning_ja", "")
+        q["reading"] = question.get("reading", "")
     return q
 
 
@@ -131,22 +182,33 @@ def grade_vocab_choice(question: dict, choice_id: str) -> dict:
     is_correct = choice_id == correct_id
     chosen = next((c for c in question["choices"] if c["id"] == choice_id), None)
     correct_choice = next((c for c in question["choices"] if c["id"] == correct_id), None)
+    is_noun = question.get("kind") == "noun"
     progress = record_progress(
-        verb_id=question.get("verb_id"),
+        verb_id=None if is_noun else question.get("verb_id"),
         tense=None,
         is_correct=is_correct,
-        kind="vocab",
-        direction=question.get("direction"),
+        kind="conjugation" if is_noun else "vocab",
+        direction=None if is_noun else question.get("direction"),
+        track_mastery=not is_noun,
     )
+    correct_label = (correct_choice or {}).get("label", "")
+    reading = question.get("reading") or ""
+    if is_correct:
+        message = "正解！"
+    else:
+        message = f"不正解。正解は「{correct_label}」です。"
+    if reading and question.get("direction") == "ja_to_es":
+        message = f"{message}（{reading}）"
     result = {
         "correct": is_correct,
         "choice_id": choice_id,
         "chosen_label": (chosen or {}).get("label", ""),
         "correct_choice_id": correct_id,
-        "correct_label": (correct_choice or {}).get("label", ""),
+        "correct_label": correct_label,
         "infinitive": question.get("infinitive", ""),
         "meaning_ja": question.get("meaning_ja", ""),
-        "message": "正解！" if is_correct else f"不正解。正解は「{(correct_choice or {}).get('label', '')}」です。",
+        "reading": reading,
+        "message": message,
         "newly_mastered": bool(progress.get("newly_mastered")),
         "progress": progress,
     }
