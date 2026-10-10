@@ -195,6 +195,124 @@
     motionPicker.value = matched || "";
   });
 
+  const passwordDialog = document.getElementById("affiliation-password-dialog");
+  const passwordForm = document.getElementById("affiliation-password-form");
+  const passwordInput = document.getElementById("affiliation-password-input");
+  const passwordError = document.getElementById("affiliation-password-error");
+  const passwordCancel = document.getElementById("affiliation-password-cancel");
+  const passwordSubmit = document.getElementById("affiliation-password-submit");
+  let previousAffiliationId = affiliationPicker?.value || "";
+  let updateCheckPassword = "";
+  let affiliationChangeLock = false;
+
+  function selectedAffiliationOption() {
+    return affiliationPicker?.selectedOptions?.[0] || null;
+  }
+
+  function affiliationNeedsPassword() {
+    return selectedAffiliationOption()?.dataset.requiresPassword === "1";
+  }
+
+  function syncAffiliationAppearance() {
+    affiliationPicker?.classList.toggle("is-update-check", affiliationNeedsPassword());
+  }
+
+  function showPasswordError(message) {
+    if (!passwordError) return;
+    passwordError.textContent = message || "";
+    passwordError.classList.toggle("hidden", !message);
+  }
+
+  function requestUpdateCheckPassword() {
+    return new Promise((resolve) => {
+      if (!passwordDialog || !passwordForm || !passwordInput) {
+        resolve("");
+        return;
+      }
+      let settled = false;
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        passwordForm.removeEventListener("submit", onSubmit);
+        passwordCancel?.removeEventListener("click", onCancel);
+        passwordDialog.removeEventListener("cancel", onCancel);
+        if (passwordDialog.open) passwordDialog.close();
+        resolve(value);
+      };
+      const onCancel = (event) => {
+        event?.preventDefault?.();
+        finish("");
+      };
+      const onSubmit = async (event) => {
+        event.preventDefault();
+        const password = passwordInput.value;
+        if (!password.trim()) {
+          showPasswordError("パスワードを入力してください。");
+          passwordInput.focus();
+          return;
+        }
+        if (passwordSubmit) passwordSubmit.disabled = true;
+        showPasswordError("");
+        try {
+          const response = await fetch("/debate/api/admin-password-check", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ admin_password: password }),
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || !data.ok) {
+            showPasswordError(data.error || "管理パスワードが違います。");
+            passwordInput.select();
+            return;
+          }
+          finish(password);
+        } catch (err) {
+          showPasswordError("確認に失敗しました。もう一度入力してください。");
+        } finally {
+          if (passwordSubmit) passwordSubmit.disabled = false;
+        }
+      };
+      passwordForm.addEventListener("submit", onSubmit);
+      passwordCancel?.addEventListener("click", onCancel);
+      passwordDialog.addEventListener("cancel", onCancel);
+      passwordInput.value = "";
+      showPasswordError("");
+      passwordDialog.showModal();
+      passwordInput.focus();
+    });
+  }
+
+  function revertAffiliation() {
+    if (!affiliationPicker) return;
+    affiliationChangeLock = true;
+    affiliationPicker.value = previousAffiliationId;
+    affiliationChangeLock = false;
+    updateCheckPassword = "";
+    syncAffiliationAppearance();
+  }
+
+  affiliationPicker?.addEventListener("change", async () => {
+    if (affiliationChangeLock) return;
+    syncAffiliationAppearance();
+    if (!affiliationNeedsPassword()) {
+      updateCheckPassword = "";
+      previousAffiliationId = affiliationPicker.value;
+      return;
+    }
+    affiliationPicker.disabled = true;
+    if (startBtn) startBtn.disabled = true;
+    const password = await requestUpdateCheckPassword();
+    affiliationPicker.disabled = false;
+    if (startBtn) startBtn.disabled = false;
+    if (!password) {
+      revertAffiliation();
+      return;
+    }
+    updateCheckPassword = password;
+    previousAffiliationId = affiliationPicker.value;
+  });
+  syncAffiliationAppearance();
+
   function showError(message) {
     errorBox.textContent = message;
     errorBox.classList.remove("hidden");
@@ -223,8 +341,19 @@
       affiliationPicker?.focus();
       return;
     }
+    if (affiliationNeedsPassword() && !updateCheckPassword) {
+      const password = await requestUpdateCheckPassword();
+      if (!password) {
+        revertAffiliation();
+        return;
+      }
+      updateCheckPassword = password;
+    }
 
     const payload = { motion, affiliation_id: affiliationId };
+    if (affiliationNeedsPassword()) {
+      payload.admin_password = updateCheckPassword;
+    }
     const mode = selectedMode();
     if (mode === "solo") {
       payload.mode = "solo";

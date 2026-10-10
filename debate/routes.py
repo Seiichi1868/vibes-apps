@@ -35,7 +35,14 @@ from debate.config import (
 )
 from debate.judge_jobs import start_judge_job
 from debate.models import new_judge_result, new_session, normalize_pois, now_iso
-from debate.settings import get_affiliation, list_affiliations, load_settings, resolve_background
+from debate.settings import (
+    UPDATE_CHECK_AFFILIATION_NAME,
+    affiliation_requires_admin,
+    get_affiliation,
+    list_affiliations,
+    load_settings,
+    resolve_background,
+)
 from debate.solo import (
     CONFLICT,
     generation_guard,
@@ -246,8 +253,24 @@ def index():
         "debate/index.html",
         default_motions=DEFAULT_MOTIONS,
         affiliations=list_affiliations(),
+        update_check_affiliation=UPDATE_CHECK_AFFILIATION_NAME,
         **_background_context(),
     )
+
+
+def _admin_password_matches(password) -> bool:
+    from debate.admin import ADMIN_PASSWORD
+
+    return str(password or "") == ADMIN_PASSWORD
+
+
+@debate_bp.route("/api/admin-password-check", methods=["POST"])
+def admin_password_check():
+    """アップデート確認用の所属を選んだときだけ、管理パスワードが合うか返す。"""
+    payload = request.get_json(silent=True) or {}
+    if not _admin_password_matches(payload.get("admin_password")):
+        return jsonify({"ok": False, "error": "管理パスワードが違います。"}), 403
+    return jsonify({"ok": True})
 
 
 @debate_bp.route("/api/sessions", methods=["POST"])
@@ -268,6 +291,10 @@ def create_session():
     affiliation = get_affiliation(str(payload.get("affiliation_id") or ""))
     if not affiliation:
         return jsonify({"error": "所属を選択してください。"}), 400
+    if affiliation_requires_admin(affiliation.get("name")) and not _admin_password_matches(
+        payload.get("admin_password")
+    ):
+        return jsonify({"error": "管理パスワードが違います。"}), 403
 
     user_side = None
     ai_difficulty = None

@@ -274,6 +274,14 @@ def get_affiliation(affiliation_id: str) -> dict | None:
     return None
 
 
+# 修正確認用。生徒向け所属の一番下に置く想定で、開始時だけ管理パスワードが要る。
+UPDATE_CHECK_AFFILIATION_NAME = "アップデート確認用"
+
+
+def affiliation_requires_admin(name) -> bool:
+    return str(name or "").strip() == UPDATE_CHECK_AFFILIATION_NAME
+
+
 def add_affiliation(name: str) -> tuple[list[dict], str | None]:
     cleaned = _normalize_affiliation_name(name)
     if not cleaned:

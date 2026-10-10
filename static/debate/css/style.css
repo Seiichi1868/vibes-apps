@@ -646,6 +646,13 @@ body {
 .pwa-dialog.is-other .pwa-dialog__steps,
 .pwa-dialog.is-other .pwa-dialog__note,
 .pwa-dialog.is-other .pwa-dialog__inapp { display: none; }
+#affiliation-picker option.affiliation-option--private {
+  opacity: 0.3;
+}
+#affiliation-picker.is-update-check {
+  color: rgba(51, 65, 85, 0.3);
+}
+
 .ai-player {
   padding: 0.75rem 0.85rem;
   border-radius: 0.8rem;
