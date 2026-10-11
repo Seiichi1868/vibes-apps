@@ -2,16 +2,16 @@
 
 {% set level_labels = {"easy": "やさしい", "normal": "ふつう", "hard": "むずかしい"} %}
 
-{% block title %}お手本 | Parliamentary Debate Practice{% endblock %}
+{% block title %}AI対戦を観戦 | Parliamentary Debate Practice{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='debate/css/watch.css', v='20261011g') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='debate/css/watch.css', v='20261011h') }}">
 {% endblock %}
 
 {% block header_actions %}
 <a href="{{ url_for('debate.watch_list') }}"
   class="text-xs px-3 py-1.5 rounded-full bg-white/60 text-slate-600 hover:bg-emerald-50 hover:text-teal-700 font-medium transition-colors border border-white/80">
-  ← お手本一覧
+  ← 観戦一覧
 </a>
 {% endblock %}
 
@@ -113,5 +113,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='debate/js/watch.js', v='20261011g') }}"></script>
+<script src="{{ url_for('static', filename='debate/js/watch.js', v='20261011h') }}"></script>
 {% endblock %}

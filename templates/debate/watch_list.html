@@ -11,7 +11,7 @@
 
 {% block body %}
 <section class="glass-card rounded-2xl p-6 md:p-8">
-  <h2 class="text-xl font-bold text-brand-dark mb-1">AI対戦を観戦する（お手本）</h2>
+  <h2 class="text-xl font-bold text-brand-dark mb-1">AI対戦を観戦する</h2>
   <p class="text-sm text-slate-500 mb-4">公開されているお手本だけ表示します。読む・聞く練習用です。</p>
   {% if scripts %}
   <div id="watch-level-filter" class="flex flex-wrap gap-2 mb-4">
@@ -42,9 +42,9 @@
 {% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='debate/css/watch.css', v='20261011g') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='debate/css/watch.css', v='20261011h') }}">
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='debate/js/watch.js', v='20261011g') }}"></script>
+<script src="{{ url_for('static', filename='debate/js/watch.js', v='20261011h') }}"></script>
 {% endblock %}

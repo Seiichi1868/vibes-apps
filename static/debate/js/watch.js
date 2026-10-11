@@ -202,7 +202,6 @@ function bindWatchFilter() {
 
 function usesFile(card) {
   if (!card) return false;
-  if (player?.dataset.speechMode === "browser") return false;
   return card.dataset.audioReady === "1" && Boolean(card.dataset.audioUrl);
 }
 
@@ -265,7 +264,7 @@ function setPlayingUi(playing) {
   const now = document.getElementById("watch-now");
   if (now) now.textContent = card ? `${card.dataset.part} · ${card.dataset.side}` : "—";
   const seek = document.getElementById("watch-seek");
-  if (seek) seek.disabled = playback.engine === "speech";
+
 }
 
 function markSentence(card, ratio) {
@@ -298,84 +297,31 @@ function updateClock(current, duration) {
   }
 }
 
-function pickVoice(side) {
-  const voices = window.speechSynthesis?.getVoices?.() || [];
-  const english = voices.filter((voice) => String(voice.lang || "").toLowerCase().startsWith("en"));
-  const pool = english.length ? english : voices;
-  if (!pool.length) return null;
-  if (side === "Opp") return pool[Math.min(1, pool.length - 1)];
-  return pool[0];
-}
-
-function playSpeech(index, ratio) {
+function showNoAudio(index) {
   const card = partCards()[index];
-  const synth = window.speechSynthesis;
-  if (!card || !synth) return;
-  const text = rawText(card);
-  const start = Math.min(text.length, Math.max(0, Math.floor(ratio * text.length)));
-  const spoken = text.slice(start).trim();
-  if (!spoken) return;
-  if (playback.speechTimer) {
-    clearInterval(playback.speechTimer);
-    playback.speechTimer = null;
+  const el = document.getElementById("watch-now");
+  stopPlayback();
+  if (card) {
+    card.classList.add("is-active");
+    playback.index = index;
   }
-  if (audio) {
-    audio.pause();
-    audio.removeAttribute("src");
+  if (el) el.textContent = "音声がありません";
+  let note = card?.querySelector(".watch-no-audio");
+  if (card && !note) {
+    note = document.createElement("p");
+    note.className = "watch-no-audio text-xs text-rose-600 font-medium mt-2";
+    note.textContent = "音声がありません";
+    card.appendChild(note);
   }
-  playback.index = index;
-  playback.engine = "speech";
-  playback.ratio = ratio;
-  const utterance = new SpeechSynthesisUtterance(spoken);
-  utterance.rate = playback.rate;
-  utterance.lang = "en-US";
-  const voice = pickVoice(card.dataset.side);
-  if (voice) utterance.voice = voice;
-  const duration = estimateSeconds(card.dataset.words, playback.rate) * (1 - ratio);
-  utterance.onend = () => {
-    if (playback.engine !== "speech" || playback.index !== index) return;
-    if (playback.speechTimer) {
-      clearInterval(playback.speechTimer);
-      playback.speechTimer = null;
-    }
-    playback.ratio = 1;
-    if (playback.continuous && index + 1 < partCards().length) playPart(index + 1, 0);
-    else setPlayingUi(false);
-  };
-  utterance.onerror = (event) => {
-    const reason = event?.error || "";
-    if (reason === "interrupted" || reason === "canceled") return;
-    if (playback.engine === "speech" && playback.index === index) setPlayingUi(false);
-  };
-  const begin = () => {
-    if (playback.engine !== "speech" || playback.index !== index) return;
-    const started = performance.now();
-    playback.speechTimer = setInterval(() => {
-      const elapsed = (performance.now() - started) / 1000;
-      const covered = duration > 0 ? Math.min(0.999, elapsed / duration) : 0;
-      playback.ratio = ratio + (1 - ratio) * covered;
-      markSentence(card, playback.ratio);
-      updateClock(elapsed, duration);
-    }, 200);
-    synth.speak(utterance);
-    setPlayingUi(true);
-    card.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  };
-  if (synth.speaking || synth.pending) {
-    synth.cancel();
-    setTimeout(begin, 80);
-  } else {
-    begin();
-  }
+  if (note) setTimeout(() => note.remove(), 3000);
 }
 
 function playFile(index, ratio) {
   const card = partCards()[index];
   if (!audio || !usesFile(card)) {
-    playSpeech(index, ratio);
+    showNoAudio(index);
     return;
   }
-  stopSpeech();
   playback.index = index;
   playback.engine = "file";
   playback.ratio = ratio;
@@ -384,7 +330,7 @@ function playFile(index, ratio) {
     applyAudioRate();
     if (audio.duration) audio.currentTime = (ratio || 0) * audio.duration;
   };
-    if (audio.dataset.loadedSrc !== nextSrc) {
+  if (audio.dataset.loadedSrc !== nextSrc) {
     audio.dataset.loadedSrc = nextSrc;
     audio.src = nextSrc;
     audio.addEventListener("loadedmetadata", function once() {
@@ -398,22 +344,13 @@ function playFile(index, ratio) {
   audio.play().then(() => {
     setPlayingUi(true);
     card.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }).catch(() => fallbackToSpeech(index, ratio));
+  }).catch(() => showNoAudio(index));
 }
 
 function playPart(index, ratio) {
   const cards = partCards();
   if (index < 0 || index >= cards.length) return;
-  const card = cards[index];
-  if (usesFile(card)) playFile(index, ratio || 0);
-  else playSpeech(index, ratio || 0);
-}
-
-function fallbackToSpeech(index, ratio) {
-  const card = partCards()[index];
-  if (card) card.dataset.audioReady = "0";
-  if (playback.engine === "speech" && playback.index === index) return;
-  playSpeech(index, ratio || 0);
+  playFile(index, ratio || 0);
 }
 
 function toggleCurrent() {
@@ -425,18 +362,12 @@ function toggleCurrent() {
     return;
   }
   if (playback.engine === "file" && audio && audio.paused && audio.src && playback.index >= 0) {
-    audio.play().catch(() => fallbackToSpeech(playback.index, playback.ratio || 0));
+    audio.play().catch(() => showNoAudio(playback.index));
     setPlayingUi(true);
     return;
   }
-  if (playback.engine === "speech" && window.speechSynthesis?.speaking) {
-    stopSpeech();
-    playback.engine = "speech-paused";
-    setPlayingUi(false);
-    return;
-  }
   const index = playback.index >= 0 ? playback.index : 0;
-  const ratio = playback.engine === "speech-paused" ? playback.ratio : 0;
+  const ratio = 0;
   playPart(index, ratio);
 }
 
@@ -447,7 +378,12 @@ function bindPlayer() {
   refreshRateButtons();
   refreshEtas();
   const continuousBtn = document.getElementById("watch-continuous");
-  if (continuousBtn) continuousBtn.setAttribute("aria-pressed", playback.continuous ? "true" : "false");
+  const syncContinuous = () => {
+    if (!continuousBtn) return;
+    continuousBtn.setAttribute("aria-pressed", playback.continuous ? "true" : "false");
+    continuousBtn.textContent = playback.continuous ? "通し再生: ON" : "通し再生: OFF";
+  };
+  syncContinuous();
 
   document.getElementById("watch-toggle")?.addEventListener("click", toggleCurrent);
   document.getElementById("watch-prev")?.addEventListener("click", () => {
@@ -465,17 +401,14 @@ function bindPlayer() {
     refreshRateButtons();
     refreshEtas();
     applyAudioRate();
-    if (playback.engine === "speech" && window.speechSynthesis?.speaking) {
-      playSpeech(playback.index, playback.ratio);
-    }
   });
   continuousBtn?.addEventListener("click", () => {
     playback.continuous = !playback.continuous;
     writeFlag(CONTINUOUS_KEY, playback.continuous);
-    continuousBtn.setAttribute("aria-pressed", playback.continuous ? "true" : "false");
+    syncContinuous();
   });
   document.getElementById("watch-seek")?.addEventListener("input", (event) => {
-    if (playback.engine === "speech" || !audio.duration) return;
+    if (!audio.duration) return;
     const ratio = Number(event.target.value) / 1000;
     audio.currentTime = ratio * audio.duration;
     playback.ratio = ratio;
@@ -487,7 +420,7 @@ function bindPlayer() {
     if (!card) return;
     const index = partCards().indexOf(card);
     if (sentence) {
-      if (!usesFile(card)) return;
+      if (!usesFile(card)) { showNoAudio(index); return; }
       const text = rawText(card);
       const ratio = text.length ? Number(sentence.dataset.start) / text.length : 0;
       playPart(index, ratio);
@@ -512,14 +445,18 @@ function bindPlayer() {
   audio.addEventListener("ended", () => {
     if (playback.engine !== "file") return;
     playback.ratio = 0;
-    if (playback.continuous && playback.index + 1 < partCards().length) playPart(playback.index + 1, 0);
-    else setPlayingUi(false);
+    if (playback.continuous && playback.index + 1 < partCards().length) {
+      playback.engine = null;
+      playPart(playback.index + 1, 0);
+    } else {
+      playback.engine = null;
+      setPlayingUi(false);
+    }
   });
   audio.addEventListener("error", () => {
     if (playback.engine !== "file") return;
-    fallbackToSpeech(playback.index, playback.ratio || 0);
+    showNoAudio(playback.index);
   });
-  window.speechSynthesis?.addEventListener?.("voiceschanged", () => {});
 }
 
 bindWatchToggles();
