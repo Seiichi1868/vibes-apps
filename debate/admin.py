@@ -402,6 +402,11 @@ def admin_script_preview_token(script_id):
         return denied
     from debate.script_storage import issue_preview_token, load_script
 
-    if not load_script(script_id):
+    script = load_script(script_id)
+    if not script:
         return jsonify({"ok": False, "error": "スクリプトが見つかりません。"}), 404
+    if script.get("generation_status") == "error":
+        return jsonify({"ok": False, "error": "生成に失敗したためプレビューできません。"}), 409
+    if script.get("generation_status") != "draft":
+        return jsonify({"ok": False, "error": "まだ生成が終わっていません。"}), 409
     return jsonify({"ok": True, "token": issue_preview_token(script_id)})

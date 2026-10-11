@@ -107,7 +107,9 @@ AI同士の6パートを保存して生徒は再生するだけ。生成APIは�
 
 - 一覧 `/debate/watch` は `published` のみ。観戦 `/debate/watch/<script_id>`。下書きは `?preview=1&token=` のときだけ。
 - JSON: `data/debate/scripts/<id>.json`。音声ディレクトリは `data/debate/script_audio/`（音声生成は未実装）。
-- 生成: `debate/ai_script.py`（プロンプトは `PART_ROLES` / `PART_GUIDES`）。ジョブ: `debate/script_jobs.py`。保存: `debate/script_storage.py`。
+- 生成: `debate/ai_script.py`（プロンプトは `PART_ROLES` / `PART_GUIDES`）。出力キーは `argument_map`。ジャッジの `argument_flow` は生成プロンプトに書かない。共有するのは `argument_status_rules_text()` だけ。ジョブ: `debate/script_jobs.py`。保存: `debate/script_storage.py`。
+- 失敗した生レスポンスは `data/debate/scripts/_failed/`（最新20件）。費用は失敗したAPI呼び出しも `gen_cost_usd` に足す。
+- 下書きプレビューのトークンは署名付き（ワーカーが2つでも有効）。error の行はプレビューしない。
 - 管理画面「観戦用スクリプト」。モデル既定 `5.6-terra`。`speech_mode` 既定 `openai`（読み上げ本体は次段階）。
 - 生徒画面にコスト・モデル名は出さない。
 

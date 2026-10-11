@@ -1055,10 +1055,23 @@ function renderScripts() {
       const seconds =
         item.generation_seconds === null || item.generation_seconds === undefined || item.generation_seconds === ""
           ? ""
-          : ` · ${Number(item.generation_seconds)}秒`;
+          : ` · 合計${Number(item.generation_seconds)}秒`;
+      const attemptSeconds = (item.generation_attempt_seconds || [])
+        .map((value) => `${Number(value)}秒`)
+        .join(" / ");
+      const attempts = item.generation_attempts ? ` · ${item.generation_attempts}回` : "";
+      const attemptLine = attemptSeconds ? ` · 各 ${attemptSeconds}` : "";
+      const calls = (item.generation_calls || [])
+        .map((call) => `in ${call.prompt_tokens || 0} / out ${call.completion_tokens || 0}`)
+        .join(" · ");
+      const tokenLine = calls ? `<p class="text-[0.65rem] text-slate-400 mt-0.5">${escapeHtml(calls)}</p>` : "";
       const score = item.score_line ? ` · ${escapeHtml(item.score_line)}` : "";
+      const failed = item.generation_status === "error";
       const error = item.generation_error
         ? `<p class="text-xs text-rose-600 mt-1">${escapeHtml(item.generation_error)}</p>`
+        : "";
+      const previewNote = failed
+        ? `<p class="text-[0.65rem] text-slate-500 mt-1">生成に失敗したためプレビューできません</p>`
         : "";
       return `<article class="panel-soft rounded-xl px-3 py-2.5" data-script-id="${escapeHtml(item.script_id)}">
         <div class="flex flex-wrap items-start justify-between gap-2">
@@ -1066,13 +1079,15 @@ function renderScripts() {
             <p class="text-sm font-semibold text-slate-800">${escapeHtml(item.motion)}</p>
             <p class="text-[0.65rem] text-slate-500 mt-0.5">
               ${escapeHtml(item.level)} · ${escapeHtml(item.intended_winner || "—")} · ${scriptStatusLabel(item)}
-              · $${cost}${seconds}${score}
+              · $${cost}${attempts}${attemptLine}${seconds}${score}
             </p>
+            ${tokenLine}
             ${warnings ? `<ul class="text-[0.65rem] text-amber-800 mt-1 space-y-0.5">${warnings}</ul>` : ""}
             ${error}
+            ${previewNote}
           </div>
           <div class="flex flex-wrap gap-1">
-            <button type="button" data-script-action="preview" class="text-[0.65rem] px-2 py-1 rounded-full border border-slate-200">プレビュー</button>
+            <button type="button" data-script-action="preview" class="text-[0.65rem] px-2 py-1 rounded-full border border-slate-200 disabled:opacity-40" ${failed ? "disabled" : ""}>プレビュー</button>
             <button type="button" data-script-action="edit" class="text-[0.65rem] px-2 py-1 rounded-full border border-slate-200">編集</button>
             <button type="button" data-script-action="publish" class="text-[0.65rem] px-2 py-1 rounded-full border border-slate-200">公開</button>
             <button type="button" data-script-action="unpublish" class="text-[0.65rem] px-2 py-1 rounded-full border border-slate-200">非公開</button>

@@ -68,6 +68,25 @@ _FABRICATION_PATTERNS = (
 
 CONSTRUCTIVE_PARTS = {"PM", "LO", "MG", "MO"}
 REPLY_PARTS = {"LOR", "PMR"}
+SCRIPT_MAX_OUTPUT_TOKENS = int(os.environ.get("DEBATE_SCRIPT_MAX_OUTPUT_TOKENS", "24000"))
+
+# 生成の出力キー。ジャッジの argument_flow とは別名にする。
+_ARGUMENT_MAP_ALIASES = (
+    "argument_flow",
+    "arguments",
+    "argumentMap",
+    "flow",
+    "points_status",
+)
+
+
+class ScriptGenerationError(ValueError):
+    """検証かAPIが失敗したとき。費用と試行時間は捨てない。"""
+
+    def __init__(self, message: str, *, cost_usd: float, attempts: list[dict]):
+        super().__init__(message)
+        self.cost_usd = round(float(cost_usd or 0), 6)
+        self.attempts = attempts
 
 
 def word_count(text: str) -> int:
@@ -154,18 +173,136 @@ Begin each speech with, and use throughout, the signpost templates below (verbat
 - Word counts per speech: {_word_ranges_text(level)}. Sentence length: {spec["sentence_rule"]}.
 - Before you output JSON, count the words in each speech and rewrite any speech that is outside its range.
 
-# Output
-JSON only, no preface. Keys in this order (plan first, then write):
-motion, intended_winner, points, argument_map, parts, summary_ja
-- points: Gov and Opp, each a list of two objects {{id, summary_ja, summary_en}}. ids must be gov_1, gov_2, opp_1, opp_2.
-- argument_map: one object per point id, with id, side, raised_in, status (intact, weakened, or collapsed only), reason_ja (Japanese, one sentence, 60 characters or fewer), history (list of {{part, action}}).
+# Output keys (generation only)
+JSON only, no preface. Use these key names exactly. The point-status array key is argument_map.
+Required keys: intended_winner, points, argument_map, parts, summary_ja
+- intended_winner: exactly Gov or Opp.
+- points: object with Gov and Opp. Each is a list of two objects {{id, summary_ja, summary_en}}. ids must be gov_1, gov_2, opp_1, opp_2.
+- argument_map: a JSON array of exactly four objects, one per point id. Each object has id, side, raised_in, status (intact, weakened, or collapsed only), reason_ja (Japanese, one sentence, 60 characters or fewer), history (list of {{part, action}}).
   Actions are raised, rebutted, defended, or extended. extended is an action, never a status.
 - parts: 6 items in order PM, LO, MG, MO, LOR, PMR, each {{part, side, text, signpost_phrases, key_point_ja}}
   - signpost_phrases: exact substrings of text that are signpost expressions
   - key_point_ja: Japanese, 40 characters or fewer, what this speech does
 - summary_ja: Japanese, 200 characters or fewer, why the intended winner won, described in terms of which points stood or fell.
-- intended_winner must be exactly Gov or Opp.
 """
+
+
+def script_output_template() -> str:
+    """Structured Outputs 非対応モデル用。キー名の見本だけを足す。"""
+    return """
+# Output template
+Return one JSON object with every key below. Replace the placeholders. Do not rename keys.
+
+{
+  "intended_winner": "Gov",
+  "points": {
+    "Gov": [
+      {"id": "gov_1", "summary_ja": "日本語", "summary_en": "English"},
+      {"id": "gov_2", "summary_ja": "日本語", "summary_en": "English"}
+    ],
+    "Opp": [
+      {"id": "opp_1", "summary_ja": "日本語", "summary_en": "English"},
+      {"id": "opp_2", "summary_ja": "日本語", "summary_en": "English"}
+    ]
+  },
+  "argument_map": [
+    {"id": "gov_1", "side": "Gov", "raised_in": "PM", "status": "intact", "reason_ja": "日本語1文", "history": [{"part": "PM", "action": "raised"}]},
+    {"id": "gov_2", "side": "Gov", "raised_in": "PM", "status": "weakened", "reason_ja": "日本語1文", "history": [{"part": "PM", "action": "raised"}]},
+    {"id": "opp_1", "side": "Opp", "raised_in": "LO", "status": "intact", "reason_ja": "日本語1文", "history": [{"part": "LO", "action": "raised"}]},
+    {"id": "opp_2", "side": "Opp", "raised_in": "LO", "status": "collapsed", "reason_ja": "日本語1文", "history": [{"part": "LO", "action": "raised"}]}
+  ],
+  "parts": [
+    {"part": "PM", "side": "Gov", "text": "speech", "signpost_phrases": ["We believe that"], "key_point_ja": "日本語"},
+    {"part": "LO", "side": "Opp", "text": "speech", "signpost_phrases": ["We oppose"], "key_point_ja": "日本語"},
+    {"part": "MG", "side": "Gov", "text": "speech", "signpost_phrases": ["They said"], "key_point_ja": "日本語"},
+    {"part": "MO", "side": "Opp", "text": "speech", "signpost_phrases": ["They said"], "key_point_ja": "日本語"},
+    {"part": "LOR", "side": "Opp", "text": "speech", "signpost_phrases": ["Let me summarize"], "key_point_ja": "日本語"},
+    {"part": "PMR", "side": "Gov", "text": "speech", "signpost_phrases": ["First, I will rebut"], "key_point_ja": "日本語"}
+  ],
+  "summary_ja": "日本語"
+}
+"""
+
+
+def _schema_enum(values) -> dict:
+    return {"type": "string", "enum": list(values)}
+
+
+def script_output_schema() -> dict:
+    """Chat Completions の json_schema strict。全プロパティを required にする。"""
+    point = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["id", "summary_ja", "summary_en"],
+        "properties": {
+            "id": _schema_enum(("gov_1", "gov_2", "opp_1", "opp_2")),
+            "summary_ja": {"type": "string"},
+            "summary_en": {"type": "string"},
+        },
+    }
+    history_item = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["part", "action"],
+        "properties": {
+            "part": _schema_enum(PART_ORDER),
+            "action": _schema_enum(("raised", "rebutted", "defended", "extended")),
+        },
+    }
+    argument = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["id", "side", "raised_in", "status", "reason_ja", "history"],
+        "properties": {
+            "id": _schema_enum(("gov_1", "gov_2", "opp_1", "opp_2")),
+            "side": _schema_enum(("Gov", "Opp")),
+            "raised_in": _schema_enum(PART_ORDER),
+            "status": _schema_enum(("intact", "weakened", "collapsed")),
+            "reason_ja": {"type": "string"},
+            "history": {"type": "array", "items": history_item},
+        },
+    }
+    part = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["part", "side", "text", "signpost_phrases", "key_point_ja"],
+        "properties": {
+            "part": _schema_enum(PART_ORDER),
+            "side": _schema_enum(("Gov", "Opp")),
+            "text": {"type": "string"},
+            "signpost_phrases": {"type": "array", "items": {"type": "string"}},
+            "key_point_ja": {"type": "string"},
+        },
+    }
+    side_points = {"type": "array", "minItems": 2, "maxItems": 2, "items": point}
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["intended_winner", "points", "argument_map", "parts", "summary_ja"],
+        "properties": {
+            "intended_winner": _schema_enum(("Gov", "Opp")),
+            "points": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["Gov", "Opp"],
+                "properties": {"Gov": side_points, "Opp": side_points},
+            },
+            "argument_map": {"type": "array", "minItems": 4, "maxItems": 4, "items": argument},
+            "parts": {"type": "array", "minItems": 6, "maxItems": 6, "items": part},
+            "summary_ja": {"type": "string"},
+        },
+    }
+
+
+def script_response_format() -> dict:
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "debate_model_script",
+            "strict": True,
+            "schema": script_output_schema(),
+        },
+    }
 
 
 def _get_client():
@@ -210,20 +347,96 @@ def _extract_text(completion) -> str:
     return (content or "").strip()
 
 
-def _usage_cost_usd(completion, model_mode: str) -> float:
+def _usage_record(completion, model_mode: str) -> dict:
     from debate.judge_models import resolve_judge_model_metadata
 
     usage = getattr(completion, "usage", None)
-    if usage is None:
-        return 0.0
-    prompt_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
-    completion_tokens = int(getattr(usage, "completion_tokens", 0) or 0)
+    prompt_tokens = int(getattr(usage, "prompt_tokens", 0) or 0) if usage is not None else 0
+    completion_tokens = int(getattr(usage, "completion_tokens", 0) or 0) if usage is not None else 0
     meta = resolve_judge_model_metadata(model_mode)
     cost = (
         prompt_tokens * float(meta["input_price_per_1m"]) / 1_000_000
         + completion_tokens * float(meta["output_price_per_1m"]) / 1_000_000
     )
-    return round(cost, 6)
+    return {
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "cost_usd": round(cost, 6),
+    }
+
+
+def _schema_unsupported(exc: Exception) -> bool:
+    text = str(exc).lower()
+    markers = (
+        "response_format",
+        "json_schema",
+        "structured",
+        "unsupported",
+        "not support",
+    )
+    return any(marker in text for marker in markers) and (
+        "json_schema" in text or "response_format" in text or "structured" in text
+    )
+
+
+def _argument_list_from_dict(raw: dict) -> list:
+    items = []
+    for key, value in raw.items():
+        if isinstance(value, dict):
+            item = dict(value)
+            item.setdefault("id", str(key))
+            items.append(item)
+    return items
+
+
+def coerce_script_payload(data: dict) -> tuple[dict, str]:
+    """別名キーを生成用の argument_map に揃える。戻り値は (データ, 使った別名)。"""
+    out = dict(data)
+    alias = ""
+    current = out.get("argument_map")
+    if isinstance(current, dict):
+        out["argument_map"] = _argument_list_from_dict(current)
+        alias = "argument_map:object"
+    elif not isinstance(current, list):
+        for key in _ARGUMENT_MAP_ALIASES:
+            candidate = out.get(key)
+            if isinstance(candidate, list):
+                out["argument_map"] = candidate
+                alias = key
+                break
+            if isinstance(candidate, dict):
+                out["argument_map"] = _argument_list_from_dict(candidate)
+                alias = key
+                break
+    mapped = []
+    for item in out.get("argument_map") or []:
+        if not isinstance(item, dict):
+            mapped.append(item)
+            continue
+        row = dict(item)
+        if not str(row.get("id") or "").strip() and row.get("argument_id"):
+            row["id"] = row.get("argument_id")
+        if not str(row.get("raised_in") or "").strip() and row.get("raised_in_part"):
+            row["raised_in"] = row.get("raised_in_part")
+        mapped.append(row)
+    if isinstance(out.get("argument_map"), list):
+        out["argument_map"] = mapped
+    return out, alias
+
+
+def _top_level_keys(data: dict | None) -> list[str]:
+    if not isinstance(data, dict):
+        return []
+    return [str(key) for key in data.keys()]
+
+
+def _save_failed_response(record: dict) -> None:
+    from debate.script_storage import save_failed_script_response
+
+    try:
+        save_failed_script_response(record)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Failed to store script error response: %s", exc)
 
 
 def _clean_speech_text(text: str) -> str:
@@ -481,7 +694,7 @@ def _normalize_parts(raw, level: str, warnings: list[dict], fatal: list[str]) ->
 
 
 def generate_model_script(motion: str, level: str, intended_winner: str, model_mode: str) -> dict:
-    """1回生成し、致命的不備ならもう1回だけ再生成する。成功時は保存用フィールドを返す。"""
+    """1回生成し、致命的不備ならもう1回だけ再生成する。失敗した呼び出しの費用も返す。"""
     client = _get_client()
     if not client:
         raise RuntimeError("OPENAI_API_KEYが設定されていないため、スクリプトを生成できません。")
@@ -490,33 +703,24 @@ def generate_model_script(motion: str, level: str, intended_winner: str, model_m
 
     selected_mode = resolve_judge_model_mode(model_mode, fallback_mode="5.6-terra")
     model = resolve_judge_model_id(selected_mode)
-    prompt = build_script_prompt(motion, level, intended_winner)
-    messages = [{"role": "user", "content": prompt}]
-    total_cost = 0.0
+    base_prompt = build_script_prompt(motion, level, intended_winner)
+    use_schema = True
+    messages = [{"role": "user", "content": base_prompt}]
+    calls: list[dict] = []
     last_fatal: list[str] = []
     fallback: tuple[dict, list[dict], str] | None = None
 
     for attempt in range(2):
-        kwargs: dict = {
-            "model": model,
-            "response_format": {"type": "json_object"},
-            "messages": messages,
-        }
-        if not _is_reasoning_model(model):
-            kwargs["temperature"] = 0.4
-        started = time.monotonic()
-        try:
-            completion = client.chat.completions.create(**kwargs)
-        except Exception as exc:
-            elapsed = time.monotonic() - started
-            logger.warning(
-                "Script request failed after %.1fs (model=%s attempt=%s): %s",
-                elapsed,
-                model,
-                attempt + 1,
-                exc,
-            )
-            last_fatal = [f"生成APIが失敗しました（{exc}）。"]
+        call = _request_script(client, model, selected_mode, messages, use_schema)
+        if call.get("schema_unsupported"):
+            use_schema = False
+            logger.warning("Script model %s rejected json_schema; falling back to json_object", model)
+            messages = [{"role": "user", "content": base_prompt + script_output_template()}]
+            call = _request_script(client, model, selected_mode, messages, False)
+        calls.append(call)
+        prompt = base_prompt if use_schema else base_prompt + script_output_template()
+        if call.get("error") and not call.get("raw"):
+            last_fatal = [call["error"]]
             if attempt == 0:
                 messages = [
                     {"role": "user", "content": prompt},
@@ -524,26 +728,45 @@ def generate_model_script(motion: str, level: str, intended_winner: str, model_m
                 ]
                 continue
             break
-        total_cost += _usage_cost_usd(completion, selected_mode)
-        elapsed = time.monotonic() - started
-        raw = _extract_text(completion)
-        logger.info("Script finished in %.1fs (model=%s attempt=%s)", elapsed, model, attempt + 1)
+        raw = call.get("raw") or ""
         try:
             data = _parse_json_object(raw)
         except (json.JSONDecodeError, ValueError) as exc:
-            last_fatal = [f"JSONとして読めませんでした（{exc}）。"]
+            last_fatal = [_json_failure_message(exc, call)]
+            _save_failed_response(
+                _failed_record(motion, level, model, attempt + 1, last_fatal, call, None, "")
+            )
             if attempt == 0:
                 messages = _retry_messages(prompt, last_fatal)
                 continue
             break
-        normalized, fatal, warnings, balance = validate_generated(data, level)
+        coerced, alias = coerce_script_payload(data)
+        keys = _top_level_keys(data)
+        logger.info(
+            "Script response keys (attempt=%s finish=%s alias=%s): %s",
+            attempt + 1,
+            call.get("finish_reason") or "",
+            alias or "-",
+            ", ".join(keys),
+        )
+        normalized, fatal, warnings, balance = validate_generated(coerced, level)
         if not fatal and not balance:
-            return _pack_script(normalized, warnings, model, total_cost)
+            return _pack_script(normalized, warnings, model, calls)
         reasons = list(fatal)
         if balance:
             reasons.append(balance)
+        if alias:
+            reasons.append(f"受信キーを {alias} から argument_map に読み替えました。")
+        elif "argument_map" not in keys:
+            reasons.append(f"受信したトップレベルキー: {', '.join(keys) or 'なし'}。")
+        if call.get("finish_reason") == "length":
+            reasons.append("応答が出力上限で途中までしか返っていません。")
         last_fatal = reasons
-        logger.info("Script validation failed (attempt=%s): %s", attempt + 1, "; ".join(reasons))
+        logger.info("Script validation failed (attempt=%s): %s", attempt + 1, " / ".join(reasons))
+        if fatal:
+            _save_failed_response(
+                _failed_record(motion, level, model, attempt + 1, reasons, call, data, alias)
+            )
         if not fatal:
             fallback = (normalized, warnings, balance)
         if attempt == 0:
@@ -556,17 +779,141 @@ def generate_model_script(motion: str, level: str, intended_winner: str, model_m
         kept = list(warnings)
         if balance:
             kept.append(make_warning(balance, "strong"))
-        return _pack_script(normalized, kept, model, total_cost)
+        return _pack_script(normalized, kept, model, calls)
 
-    raise ValueError(" / ".join(last_fatal) or "スクリプトを生成できませんでした。")
+    raise ScriptGenerationError(
+        " / ".join(last_fatal) or "スクリプトを生成できませんでした。",
+        cost_usd=sum(float(item.get("cost_usd") or 0) for item in calls),
+        attempts=calls,
+    )
 
 
-def _pack_script(normalized: dict, warnings: list, model: str, total_cost: float) -> dict:
+def _request_script(client, model: str, model_mode: str, messages: list[dict], use_schema: bool) -> dict:
+    kwargs: dict = {
+        "model": model,
+        "messages": messages,
+        "max_completion_tokens": SCRIPT_MAX_OUTPUT_TOKENS,
+        "response_format": script_response_format() if use_schema else {"type": "json_object"},
+    }
+    if not _is_reasoning_model(model):
+        kwargs["temperature"] = 0.4
+    started = time.monotonic()
+    try:
+        completion = client.chat.completions.create(**kwargs)
+    except Exception as exc:
+        elapsed = round(time.monotonic() - started, 1)
+        if use_schema and _schema_unsupported(exc):
+            logger.warning("Structured Outputs rejected after %.1fs (model=%s): %s", elapsed, model, exc)
+            return {
+                "schema_unsupported": True,
+                "seconds": elapsed,
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "cost_usd": 0.0,
+                "error": "",
+                "raw": "",
+                "finish_reason": "",
+                "response_format": "json_schema",
+            }
+        logger.warning("Script request failed after %.1fs (model=%s): %s", elapsed, model, exc)
+        return {
+            "seconds": elapsed,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "cost_usd": 0.0,
+            "error": f"生成APIが失敗しました（{exc}）。",
+            "raw": "",
+            "finish_reason": "",
+            "response_format": "json_schema" if use_schema else "json_object",
+        }
+    elapsed = round(time.monotonic() - started, 1)
+    usage = _usage_record(completion, model_mode)
+    finish = ""
+    if completion.choices:
+        finish = str(getattr(completion.choices[0], "finish_reason", "") or "")
+    raw = _extract_text(completion)
+    logger.info(
+        "Script finished in %.1fs (model=%s format=%s finish=%s in=%s out=%s)",
+        elapsed,
+        model,
+        "json_schema" if use_schema else "json_object",
+        finish,
+        usage["prompt_tokens"],
+        usage["completion_tokens"],
+    )
+    return {
+        "seconds": elapsed,
+        "prompt_tokens": usage["prompt_tokens"],
+        "completion_tokens": usage["completion_tokens"],
+        "cost_usd": usage["cost_usd"],
+        "error": "",
+        "raw": raw,
+        "finish_reason": finish,
+        "response_format": "json_schema" if use_schema else "json_object",
+    }
+
+
+def _json_failure_message(exc: Exception, call: dict) -> str:
+    message = f"JSONとして読めませんでした（{exc}）。"
+    if call.get("finish_reason") == "length":
+        message += "応答が途中で切れています。"
+    return message
+
+
+def _failed_record(
+    motion: str,
+    level: str,
+    model: str,
+    attempt: int,
+    reasons: list[str],
+    call: dict,
+    data: dict | None,
+    alias: str,
+) -> dict:
+    keys = _top_level_keys(data)
+    key_types = {}
+    if isinstance(data, dict):
+        key_types = {str(key): type(value).__name__ for key, value in data.items()}
+    return {
+        "motion": motion,
+        "level": level,
+        "model": model,
+        "attempt": attempt,
+        "reasons": reasons,
+        "top_level_keys": keys,
+        "top_level_types": key_types,
+        "alias": alias,
+        "finish_reason": call.get("finish_reason") or "",
+        "response_format": call.get("response_format") or "",
+        "prompt_tokens": call.get("prompt_tokens") or 0,
+        "completion_tokens": call.get("completion_tokens") or 0,
+        "cost_usd": call.get("cost_usd") or 0,
+        "seconds": call.get("seconds") or 0,
+        "raw": call.get("raw") or "",
+    }
+
+
+def _pack_script(normalized: dict, warnings: list, model: str, calls: list[dict]) -> dict:
     packed = dict(normalized)
     packed["script_model"] = model
-    packed["gen_cost_usd"] = round(total_cost, 6)
+    packed["gen_cost_usd"] = round(sum(float(item.get("cost_usd") or 0) for item in calls), 6)
+    packed["generation_attempts"] = len(calls)
+    packed["generation_attempt_seconds"] = [float(item.get("seconds") or 0) for item in calls]
+    packed["generation_calls"] = [_public_call(item) for item in calls]
     packed["warnings"] = [normalize_warning(item) for item in warnings]
     return packed
+
+
+def _public_call(call: dict) -> dict:
+    return {
+        "seconds": float(call.get("seconds") or 0),
+        "prompt_tokens": int(call.get("prompt_tokens") or 0),
+        "completion_tokens": int(call.get("completion_tokens") or 0),
+        "cost_usd": float(call.get("cost_usd") or 0),
+        "finish_reason": call.get("finish_reason") or "",
+        "response_format": call.get("response_format") or "",
+        "error": call.get("error") or "",
+    }
 
 
 def _retry_messages(prompt: str, fatal: list[str]) -> list[dict]:
@@ -576,7 +923,8 @@ def _retry_messages(prompt: str, fatal: list[str]) -> list[dict]:
         {
             "role": "user",
             "content": (
-                "The previous JSON failed these checks. Regenerate the full JSON and fix only these problems:\n"
+                "The previous JSON failed these checks. Regenerate the full JSON and fix only these problems.\n"
+                "The point-status array key must be argument_map.\n"
                 f"{reason}"
             ),
         },

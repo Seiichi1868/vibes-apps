@@ -7,7 +7,7 @@ import time
 import uuid
 from datetime import datetime
 
-from debate.ai_script import LEVELS, generate_model_script
+from debate.ai_script import LEVELS, ScriptGenerationError, generate_model_script
 from debate.models import JST, now_iso
 from debate.script_storage import get_script_lock, load_script, save_script
 
@@ -115,8 +115,18 @@ def run_script_job(script_id: str) -> None:
             script.get("requested_winner") or "auto",
             script.get("model_mode") or "5.6-terra",
         )
-    except Exception as exc:  # noqa: BLE001
+    except ScriptGenerationError as exc:
         logger.warning("Script job failed (%s): %s", script_id, exc)
+        _save_error(
+            script_id,
+            str(exc) or "スクリプトを生成できませんでした。",
+            seconds=round(time.monotonic() - started, 1),
+            cost_usd=exc.cost_usd,
+            attempts=exc.attempts,
+        )
+        return
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Script job failed (%s)", script_id)
         _save_error(
             script_id,
             str(exc) or "スクリプトを生成できませんでした。",
@@ -143,6 +153,9 @@ def _save_success(script_id: str, generated: dict) -> None:
                 "warnings": generated.get("warnings") or [],
                 "script_model": generated.get("script_model") or "",
                 "gen_cost_usd": generated.get("gen_cost_usd") or 0,
+                "generation_attempts": generated.get("generation_attempts") or 0,
+                "generation_attempt_seconds": generated.get("generation_attempt_seconds") or [],
+                "generation_calls": generated.get("generation_calls") or [],
                 "generation_seconds": generated.get("generation_seconds"),
                 "generation_status": "draft",
                 "generation_error": "",
@@ -152,7 +165,13 @@ def _save_success(script_id: str, generated: dict) -> None:
         save_script(script)
 
 
-def _save_error(script_id: str, message: str, seconds: float | None = None) -> None:
+def _save_error(
+    script_id: str,
+    message: str,
+    seconds: float | None = None,
+    cost_usd: float | None = None,
+    attempts: list | None = None,
+) -> None:
     with get_script_lock(script_id):
         script = load_script(script_id)
         if not script:
@@ -162,6 +181,15 @@ def _save_error(script_id: str, message: str, seconds: float | None = None) -> N
         script["status"] = "draft"
         if seconds is not None:
             script["generation_seconds"] = seconds
+        if cost_usd is not None:
+            script["gen_cost_usd"] = round(float(cost_usd), 6)
+        if attempts:
+            from debate.ai_script import _public_call
+
+            calls = [_public_call(item) if isinstance(item, dict) else {} for item in attempts]
+            script["generation_calls"] = calls
+            script["generation_attempts"] = len(calls)
+            script["generation_attempt_seconds"] = [float(item.get("seconds") or 0) for item in calls]
         save_script(script)
 
 

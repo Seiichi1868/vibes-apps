@@ -9,9 +9,9 @@
   <p class="text-sm text-slate-500 mb-6">
     {% if message %}{{ message }}{% elif session_id %}session_id: {{ session_id }}{% endif %}
   </p>
-  <a href="{{ url_for('debate.index') }}"
+  <a href="{{ back_href or url_for('debate.index') }}"
     class="inline-block px-5 py-2.5 rounded-xl bg-brand text-white text-sm font-bold shadow hover:bg-brand-dark transition-colors">
-    論題入力画面に戻る
+    {{ back_label or "論題入力画面に戻る" }}
   </a>
 </section>
 {% endblock %}

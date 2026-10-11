@@ -329,50 +329,58 @@ def watch_list():
     )
 
 
+def _watch_not_found(heading: str, message: str, *, admin: bool = False, status: int = 404):
+    back_href = url_for("debate_admin.admin_page") if admin else url_for("debate.index")
+    back_label = "管理画面に戻る" if admin else "論題入力画面に戻る"
+    return render_template(
+        "debate/not_found.html",
+        session_id="",
+        heading=heading,
+        message=message,
+        back_href=back_href,
+        back_label=back_label,
+        **_background_context(),
+    ), status
+
+
 @debate_bp.route("/watch/<script_id>")
 def watch_screen(script_id):
     from debate.script_storage import load_script, preview_token_valid
 
     script = load_script(script_id)
     if not script:
-        return render_template(
-            "debate/not_found.html",
-            session_id="",
-            heading="読み込めませんでした",
-            message="もう一度お試しください。",
-            **_background_context(),
-        ), 404
+        return _watch_not_found("読み込めませんでした", "もう一度お試しください。")
     preview = request.args.get("preview") == "1"
     token = str(request.args.get("token") or "")
     published = script.get("status") == "published" and script.get("generation_status") == "draft"
     admin_preview = preview and preview_token_valid(script_id, token)
+    if preview and not admin_preview:
+        logger.warning("Watch preview rejected (script_id=%s): invalid or missing token", script_id)
+        return _watch_not_found("管理パスワードが必要です", "管理画面でプレビューを開き直してください。", admin=True, status=403)
     if not published and not admin_preview:
-        return render_template(
-            "debate/not_found.html",
-            session_id="",
-            heading="読み込めませんでした",
-            message="もう一度お試しください。",
-            **_background_context(),
-        ), 404
-    if admin_preview and script.get("generation_status") == "error":
-        return render_template(
-            "debate/watch.html",
-            script=_public_watch_script(script, show_admin=True),
-            show_admin=True,
-            failed=True,
-            **_background_context(),
+        return _watch_not_found("読み込めませんでした", "もう一度お試しください。")
+    if script.get("generation_status") == "error":
+        logger.info("Watch preview blocked for failed script %s", script_id)
+        return _watch_not_found(
+            "生成に失敗したためプレビューできません",
+            script.get("generation_error") or "生成に失敗したためプレビューできません。",
+            admin=True,
+            status=409,
         )
     if script.get("generation_status") != "draft":
-        return render_template(
-            "debate/not_found.html",
-            session_id="",
-            heading="読み込めませんでした",
-            message="もう一度お試しください。",
-            **_background_context(),
-        ), 404
+        if admin_preview:
+            return _watch_not_found("まだ生成が終わっていません", "一覧で生成中が終わるまで待ってください。", admin=True, status=409)
+        return _watch_not_found("読み込めませんでした", "もう一度お試しください。")
+    try:
+        view = _public_watch_script(script, show_admin=admin_preview)
+    except Exception:
+        logger.exception("Watch script could not be displayed (script_id=%s)", script_id)
+        if admin_preview:
+            return _watch_not_found("データの形式が古く表示できません", "管理画面でスクリプトを確認してください。", admin=True, status=500)
+        return _watch_not_found("読み込めませんでした", "もう一度お試しください。", status=500)
     return render_template(
         "debate/watch.html",
-        script=_public_watch_script(script, show_admin=admin_preview),
+        script=view,
         show_admin=admin_preview,
         failed=False,
         **_background_context(),

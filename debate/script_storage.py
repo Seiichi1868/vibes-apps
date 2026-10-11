@@ -5,7 +5,10 @@
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
+import os
 import shutil
 import threading
 import time
@@ -18,9 +21,8 @@ _lock = threading.Lock()
 _script_locks: dict[str, threading.Lock] = {}
 _script_locks_guard = threading.Lock()
 
-_preview_tokens: dict[str, tuple[str, float]] = {}
-_preview_guard = threading.Lock()
 PREVIEW_TOKEN_TTL_SEC = 15 * 60
+FAILED_KEEP = 20
 
 MAX_TEACHER_NOTE_LEN = 500
 
@@ -114,13 +116,16 @@ def part_audio_path(script_id: str, part: str) -> Path | None:
     return script_audio_dir(script_id) / f"{part}.mp3"
 
 
+def _preview_secret() -> bytes:
+    return os.environ.get("DEBATE_ADMIN_PASSWORD", "2479").encode("utf-8")
+
+
 def issue_preview_token(script_id: str) -> str:
-    token = uuid.uuid4().hex
-    expires = time.time() + PREVIEW_TOKEN_TTL_SEC
-    with _preview_guard:
-        _preview_tokens[token] = (_safe_id(script_id), expires)
-        _prune_preview_tokens_locked()
-    return token
+    """ワーカーが複数でも同じトークンを検証できるよう署名する。"""
+    expires = int(time.time()) + PREVIEW_TOKEN_TTL_SEC
+    body = f"{_safe_id(script_id)}.{expires}"
+    sig = hmac.new(_preview_secret(), body.encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"{body}.{sig}"
 
 
 def preview_token_valid(script_id: str, token: str) -> bool:
@@ -128,21 +133,48 @@ def preview_token_valid(script_id: str, token: str) -> bool:
     raw = str(token or "").strip()
     if not wanted or not raw:
         return False
-    now = time.time()
-    with _preview_guard:
-        _prune_preview_tokens_locked(now)
-        found = _preview_tokens.get(raw)
-        if not found:
-            return False
-        stored_id, expires = found
-        return stored_id == wanted and expires >= now
+    parts = raw.split(".")
+    if len(parts) != 3:
+        return False
+    stored_id, expires_text, sig = parts
+    if stored_id != wanted:
+        return False
+    try:
+        expires = int(expires_text)
+    except ValueError:
+        return False
+    if expires < time.time():
+        return False
+    body = f"{stored_id}.{expires_text}"
+    expected = hmac.new(_preview_secret(), body.encode("utf-8"), hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, sig)
 
 
-def _prune_preview_tokens_locked(now: float | None = None) -> None:
-    current = time.time() if now is None else now
-    expired = [key for key, (_sid, expires) in _preview_tokens.items() if expires < current]
-    for key in expired:
-        _preview_tokens.pop(key, None)
+def failed_scripts_dir() -> Path:
+    return SCRIPTS_DIR / "_failed"
+
+
+def save_failed_script_response(record: dict) -> Path:
+    """失敗時の生レスポンス。管理者向け。最新20件だけ残す。"""
+    from debate.models import now_iso
+
+    ensure_dirs()
+    folder = failed_scripts_dir()
+    folder.mkdir(parents=True, exist_ok=True)
+    stamp = f"{now_iso().replace(':', '').replace('+', '')}-{uuid.uuid4().hex[:6]}"
+    payload = dict(record)
+    payload["saved_at"] = now_iso()
+    path = folder / f"{stamp}.json"
+    with _lock:
+        tmp_path = path.with_suffix(".json.tmp")
+        with tmp_path.open("w", encoding="utf-8") as handle:
+            json.dump(payload, handle, ensure_ascii=False, indent=2)
+        tmp_path.replace(path)
+        kept = sorted(folder.glob("*.json"), key=lambda item: item.name)
+        while len(kept) > FAILED_KEEP:
+            oldest = kept.pop(0)
+            oldest.unlink(missing_ok=True)
+    return path
 
 
 def audio_is_stale(part: dict) -> bool:
@@ -189,6 +221,9 @@ def script_admin_summary(script: dict) -> dict:
         "score_line": score_line,
         "created_at": script.get("created_at") or "",
         "gen_cost_usd": script.get("gen_cost_usd") or 0,
+        "generation_attempts": script.get("generation_attempts") or 0,
+        "generation_attempt_seconds": script.get("generation_attempt_seconds") or [],
+        "generation_calls": script.get("generation_calls") or [],
         "script_model": script.get("script_model") or "",
         "teacher_note": script.get("teacher_note") or "",
         "parts": parts,
