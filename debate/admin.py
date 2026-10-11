@@ -410,3 +410,51 @@ def admin_script_preview_token(script_id):
     if script.get("generation_status") != "draft":
         return jsonify({"ok": False, "error": "まだ生成が終わっていません。"}), 409
     return jsonify({"ok": True, "token": issue_preview_token(script_id)})
+
+
+@debate_admin_bp.route("/api/scripts/<script_id>/checks/estimate", methods=["POST"])
+def admin_estimate_script_check(script_id):
+    payload, denied = _protected_payload()
+    if denied:
+        return denied
+    from debate.script_checks import estimate_check_cost, parse_check_request
+    from debate.script_storage import load_script
+
+    script = load_script(script_id)
+    if not script:
+        return jsonify({"ok": False, "error": "スクリプトが見つかりません。"}), 404
+    if script.get("generation_status") != "draft" or not script.get("parts"):
+        return jsonify({"ok": False, "error": "生成が終わった本文があるスクリプトだけ照合できます。"}), 400
+    try:
+        modes, runs = parse_check_request(payload)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, "estimate": estimate_check_cost(script, modes, runs)})
+
+
+@debate_admin_bp.route("/api/scripts/<script_id>/checks", methods=["GET"])
+def admin_get_script_checks(script_id):
+    if not _admin_password_from_request():
+        return jsonify({"ok": False, "error": "管理パスワードが違います。"}), 403
+    from debate.script_check_jobs import checks_view
+    from debate.script_storage import load_script
+
+    if not load_script(script_id):
+        return jsonify({"ok": False, "error": "スクリプトが見つかりません。"}), 404
+    return jsonify({"ok": True, "checks": checks_view(script_id)})
+
+
+@debate_admin_bp.route("/api/scripts/<script_id>/checks", methods=["POST"])
+def admin_start_script_check(script_id):
+    payload, denied = _protected_payload()
+    if denied:
+        return denied
+    from debate.script_check_jobs import start_check_job
+
+    if not payload.get("confirmed"):
+        return jsonify({"ok": False, "error": "概算を確認してから実行してください。"}), 400
+    try:
+        checks = start_check_job(script_id, payload)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, "checks": checks})

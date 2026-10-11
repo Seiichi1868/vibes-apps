@@ -4,7 +4,6 @@ GTECアプリの管理画面と同様の考え方だが、依存関係を持た�
 （data/debate/settings.json に保存）。
 """
 import json
-import threading
 import uuid
 from copy import deepcopy
 from pathlib import Path
@@ -25,7 +24,8 @@ from debate.judge_models import (
     resolve_judge_model_mode,
 )
 
-_lock = threading.Lock()
+from debate.file_lock import get_named_lock
+
 SETTINGS_FILE = DATA_DIR / "settings.json"
 
 BACKGROUND_PRESETS = {
@@ -233,9 +233,13 @@ def resolve_background(background_id: str | None = None) -> dict:
     }
 
 
+def _settings_lock():
+    return get_named_lock(DATA_DIR / "locks" / "settings.lock")
+
+
 def load_settings() -> dict:
     ensure_dirs()
-    with _lock:
+    with _settings_lock():
         if not SETTINGS_FILE.is_file():
             return deepcopy(DEFAULT_SETTINGS)
         try:
@@ -248,16 +252,17 @@ def load_settings() -> dict:
 def save_settings(data: dict) -> dict:
     ensure_dirs()
     normalized = _normalize(data)
-    with _lock:
+    with _settings_lock():
         with SETTINGS_FILE.open("w", encoding="utf-8") as handle:
             json.dump(normalized, handle, ensure_ascii=False, indent=2)
     return normalized
 
 
 def update_settings(**kwargs) -> dict:
-    current = load_settings()
-    current.update(kwargs)
-    return save_settings(current)
+    with _settings_lock():
+        current = load_settings()
+        current.update(kwargs)
+        return save_settings(current)
 
 
 def public_settings() -> dict:

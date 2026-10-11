@@ -53,6 +53,7 @@ const FILTER_UNSET = "";
 const FILTER_NONE = "__none__";
 
 let unlocked = false;
+let availableJudgeModes = [];
 let saveTimer = null;
 let notesSaveTimers = new Map();
 let currentBackgroundId = null;
@@ -204,6 +205,7 @@ function renderJudgeModelRatingRow(label, level) {
 }
 
 function renderJudgeModelOptions(modes, selectedMode) {
+  availableJudgeModes = Array.isArray(modes) ? modes : [];
   renderModelOptions(judgeModelPicker, "judge_model_mode", modes, selectedMode);
 }
 
@@ -1067,6 +1069,9 @@ function renderScripts() {
       const tokenLine = calls ? `<p class="text-[0.65rem] text-slate-400 mt-0.5">${escapeHtml(calls)}</p>` : "";
       const score = item.score_line ? ` · ${escapeHtml(item.score_line)}` : "";
       const failed = item.generation_status === "error";
+      const checkable = item.generation_status !== "generating" && item.generation_status !== "error" && (item.parts || []).length;
+      const checkCost = Number(item.check_cost_usd || 0);
+      const checkCostLine = checkCost > 0 ? ` · 照合 $${checkCost.toFixed(4)}` : "";
       const error = item.generation_error
         ? `<p class="text-xs text-rose-600 mt-1">${escapeHtml(item.generation_error)}</p>`
         : "";
@@ -1079,7 +1084,7 @@ function renderScripts() {
             <p class="text-sm font-semibold text-slate-800">${escapeHtml(item.motion)}</p>
             <p class="text-[0.65rem] text-slate-500 mt-0.5">
               ${escapeHtml(item.level)} · ${escapeHtml(item.intended_winner || "—")} · ${scriptStatusLabel(item)}
-              · $${cost}${attempts}${attemptLine}${seconds}${score}
+              · $${cost}${attempts}${attemptLine}${seconds}${score}<span data-row-check-cost>${checkCostLine}</span>
             </p>
             ${tokenLine}
             ${warnings ? `<ul class="text-[0.65rem] text-amber-800 mt-1 space-y-0.5">${warnings}</ul>` : ""}
@@ -1088,6 +1093,7 @@ function renderScripts() {
           </div>
           <div class="flex flex-wrap gap-1">
             <button type="button" data-script-action="preview" class="text-[0.65rem] px-2 py-1 rounded-full border border-slate-200 disabled:opacity-40" ${failed ? "disabled" : ""}>プレビュー</button>
+            <button type="button" data-script-action="check" class="text-[0.65rem] px-2 py-1 rounded-full border border-slate-200 disabled:opacity-40" ${checkable ? "" : "disabled"}>ジャッジ照合</button>
             <button type="button" data-script-action="edit" class="text-[0.65rem] px-2 py-1 rounded-full border border-slate-200">編集</button>
             <button type="button" data-script-action="publish" class="text-[0.65rem] px-2 py-1 rounded-full border border-slate-200">公開</button>
             <button type="button" data-script-action="unpublish" class="text-[0.65rem] px-2 py-1 rounded-full border border-slate-200">非公開</button>
@@ -1095,6 +1101,7 @@ function renderScripts() {
           </div>
         </div>
         <div class="script-editor hidden mt-2 space-y-2"></div>
+        <div class="script-check hidden mt-2 space-y-2"></div>
       </article>`;
     })
     .join("");
@@ -1216,8 +1223,159 @@ scriptsRefreshBtn?.addEventListener("click", () => {
   loadScripts();
 });
 
+const checkPollers = {};
+
+function stopCheckPoll(scriptId) {
+  if (!checkPollers[scriptId]) return;
+  clearInterval(checkPollers[scriptId]);
+  delete checkPollers[scriptId];
+}
+
+function scheduleCheckPoll(card) {
+  const scriptId = card.dataset.scriptId;
+  if (!scriptId || checkPollers[scriptId]) return;
+  checkPollers[scriptId] = setInterval(() => {
+    refreshScriptCheck(card).catch(() => stopCheckPoll(scriptId));
+  }, 3000);
+}
+
+function selectedCheckModels(panel) {
+  return [...panel.querySelectorAll("[data-check-model]:checked")].map((el) => el.value);
+}
+
+function checkRequestBody(panel, extra) {
+  return {
+    admin_password: getAdminPassword(),
+    models: selectedCheckModels(panel),
+    runs: Number(panel.querySelector("[data-check-runs]")?.value || 1),
+    ...(extra || {}),
+  };
+}
+
+function renderCheckResults(panel, checks) {
+  const host = panel.querySelector("[data-check-results]");
+  if (!host) return;
+  const rows = checks.results || [];
+  const body = rows
+    .map((row, index) => {
+      const mismatch =
+        row.status === "done" &&
+        (row.point_count_mismatch || row.winner_match === false || (row.status_match && row.status_match !== "4/4"));
+      const statusCell = row.point_count_mismatch ? "論点数不一致" : escapeHtml(row.status_match || "—");
+      const gov = row.gov === null || row.gov === undefined ? "—" : row.gov;
+      const opp = row.opp === null || row.opp === undefined ? "—" : row.opp;
+      const detail = mismatch ? checkPointDetail(row) : "";
+      return `<tr class="border-t border-teal-50">
+        <td class="py-1 pr-2">${escapeHtml(row.model || row.model_mode || "")}</td>
+        <td class="py-1 pr-2">${escapeHtml(String(row.run || ""))}</td>
+        <td class="py-1 pr-2">${escapeHtml(row.winner || row.error || "—")}</td>
+        <td class="py-1 pr-2">${escapeHtml(String(gov))}</td>
+        <td class="py-1 pr-2">${escapeHtml(String(opp))}</td>
+        <td class="py-1 pr-2">${row.status === "done" ? (row.winner_match ? "一致" : "不一致") : "—"}</td>
+        <td class="py-1 pr-2">${statusCell}</td>
+        <td class="py-1 pr-2">$${Number(row.cost_usd || 0).toFixed(4)}</td>
+        <td class="py-1">${Number(row.seconds || 0)}秒</td>
+      </tr>${detail ? `<tr><td colspan="9" class="pb-2">${detail}</td></tr>` : ""}`;
+    })
+    .join("");
+  const summaries = (checks.summaries || [])
+    .map((item) => {
+      const statusAvg = item.status_avg === null || item.status_avg === undefined ? "—" : item.status_avg;
+      const sameWinner = item.same_winner === null ? "—" : item.same_winner ? "同じ" : "違う";
+      const sameStatus = item.same_status === null ? "—" : item.same_status ? "同じ" : "違う";
+      return `<li>${escapeHtml(item.model)}: 勝者の一致率 ${Math.round(item.winner_rate * 100)}% / 状態の一致の平均 ${statusAvg} / 毎回同じ勝者か ${sameWinner} / 毎回同じ状態か ${sameStatus}</li>`;
+    })
+    .join("");
+  const table = rows.length
+    ? `<table class="w-full text-[0.65rem] text-slate-700">
+        <thead><tr class="text-left text-slate-500">
+          <th class="py-1 pr-2">Model</th><th class="py-1 pr-2">Run</th><th class="py-1 pr-2">Winner</th>
+          <th class="py-1 pr-2">Gov</th><th class="py-1 pr-2">Opp</th><th class="py-1 pr-2">設計の勝者と一致</th>
+          <th class="py-1 pr-2">論点の状態の一致</th><th class="py-1 pr-2">費用</th><th class="py-1">秒数</th>
+        </tr></thead><tbody>${body}</tbody></table>`
+    : "";
+  host.innerHTML = `
+    ${checks.status === "running" ? '<p class="text-[0.65rem] text-slate-500">照合を実行中です。</p>' : ""}
+    ${checks.error ? `<p class="text-[0.65rem] text-rose-600">${escapeHtml(checks.error)}</p>` : ""}
+    ${table}
+    ${summaries ? `<ul class="text-[0.65rem] text-slate-600 space-y-0.5">${summaries}</ul>` : ""}
+    <p class="text-[0.65rem] text-slate-500">${escapeHtml(checks.note || "")}</p>
+    <p class="text-[0.65rem] text-slate-500">照合の累計費用 $${Number(checks.total_cost_usd || 0).toFixed(4)}</p>`;
+}
+
+function checkPointDetail(row) {
+  if (row.point_count_mismatch) {
+    return `<p class="text-[0.65rem] text-slate-500">設計 Gov ${row.design_gov ?? "—"} / Opp ${row.design_opp ?? "—"}。ジャッジ Gov ${row.gov ?? "—"} / Opp ${row.opp ?? "—"}。</p>`;
+  }
+  const lines = (row.points || [])
+    .filter((point) => !point.same)
+    .map(
+      (point) =>
+        `<li>${escapeHtml(point.label)}: 設計 ${escapeHtml(point.design_status)} / ジャッジ ${escapeHtml(point.judge_status)} / ${escapeHtml(point.reason_ja || "")}</li>`
+    )
+    .join("");
+  if (!lines && row.winner_match === false) {
+    return `<p class="text-[0.65rem] text-slate-500">勝者だけが違います。設計 ${escapeHtml(row.intended_winner || "")} / ジャッジ ${escapeHtml(row.winner || "")}</p>`;
+  }
+  return lines ? `<ul class="text-[0.65rem] text-slate-600 space-y-0.5">${lines}</ul>` : "";
+}
+
+async function openScriptCheck(card) {
+  const panel = card.querySelector(".script-check");
+  if (!panel) return;
+  if (!panel.classList.contains("hidden") && panel.childElementCount) {
+    panel.classList.add("hidden");
+    return;
+  }
+  panel.classList.remove("hidden");
+  const modes = availableJudgeModes.length ? availableJudgeModes : [{ id: "5.6-luna", model: "gpt-5.6-luna" }];
+  const boxes = modes
+    .map((mode) => {
+      const id = escapeHtml(mode.id || "");
+      const checked = mode.id === "5.6-luna" ? "checked" : "";
+      return `<label class="inline-flex items-center gap-1 mr-2 mb-1"><input type="checkbox" data-check-model value="${id}" ${checked}><span>${escapeHtml(mode.model || mode.id || "")}</span></label>`;
+    })
+    .join("");
+  panel.innerHTML = `
+    <div class="text-[0.65rem] text-slate-600">${boxes}</div>
+    <label class="text-[0.65rem] text-slate-600">1モデルあたり
+      <select data-check-runs class="ml-1 rounded border border-teal-100 bg-white px-1 py-0.5">
+        <option value="1" selected>1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+      </select>
+    </label>
+    <div class="flex flex-wrap gap-1">
+      <button type="button" data-check-estimate class="text-[0.65rem] px-2 py-1 rounded-full border border-slate-200">概算を見る</button>
+      <button type="button" data-check-run class="text-[0.65rem] px-2 py-1 rounded-full bg-brand text-white" disabled>確認して実行</button>
+    </div>
+    <p data-check-estimate-text class="text-[0.65rem] text-slate-500"></p>
+    <div data-check-results></div>`;
+  panel.querySelectorAll("[data-check-model], [data-check-runs]").forEach((el) => {
+    el.addEventListener("change", () => {
+      const run = panel.querySelector("[data-check-run]");
+      if (run) run.disabled = true;
+    });
+  });
+  await refreshScriptCheck(card);
+}
+
+async function refreshScriptCheck(card) {
+  const panel = card.querySelector(".script-check");
+  const scriptId = card.dataset.scriptId;
+  const res = await fetch(`/debate/admin/api/scripts/${scriptId}/checks`, { headers: adminAuthHeaders() });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "照合結果を取得できませんでした");
+  renderCheckResults(panel, data.checks || {});
+  const costEl = card.querySelector("[data-row-check-cost]");
+  const cost = Number((data.checks || {}).total_cost_usd || 0);
+  if (costEl) costEl.textContent = cost > 0 ? ` · 照合 $${cost.toFixed(4)}` : "";
+  if ((data.checks || {}).status === "running") scheduleCheckPoll(card);
+  else stopCheckPoll(scriptId);
+}
+
 scriptsList?.addEventListener("click", async (event) => {
-  const button = event.target.closest("[data-script-action], [data-save-part], [data-save-note]");
+  const button = event.target.closest("[data-script-action], [data-save-part], [data-save-note], [data-check-estimate], [data-check-run]");
   if (!button) return;
   if (!requireUnlocked("この操作")) return;
   const card = button.closest("[data-script-id]");
@@ -1227,6 +1385,41 @@ scriptsList?.addEventListener("click", async (event) => {
   try {
     if (button.dataset.scriptAction === "edit") {
       await openScriptEditor(card);
+      return;
+    }
+    if (button.dataset.scriptAction === "check") {
+      await openScriptCheck(card);
+      return;
+    }
+    if (button.dataset.checkEstimate !== undefined) {
+      const panel = card.querySelector(".script-check");
+      const res = await fetch(`/debate/admin/api/scripts/${scriptId}/checks/estimate`, {
+        method: "POST",
+        headers: adminAuthHeaders(),
+        body: JSON.stringify(checkRequestBody(panel)),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "概算できませんでした");
+      const estimate = data.estimate || {};
+      const text = panel.querySelector("[data-check-estimate-text]");
+      if (text) {
+        text.textContent = `概算 $${Number(estimate.cost_usd || 0).toFixed(4)}（${estimate.calls || 0}回）。${estimate.note || ""}`;
+      }
+      const run = panel.querySelector("[data-check-run]");
+      if (run) run.disabled = false;
+      return;
+    }
+    if (button.dataset.checkRun !== undefined) {
+      const panel = card.querySelector(".script-check");
+      const res = await fetch(`/debate/admin/api/scripts/${scriptId}/checks`, {
+        method: "POST",
+        headers: adminAuthHeaders(),
+        body: JSON.stringify(checkRequestBody(panel, { confirmed: true })),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "照合を開始できませんでした");
+      renderCheckResults(panel, data.checks || {});
+      scheduleCheckPoll(card);
       return;
     }
     if (button.dataset.scriptAction === "preview") {

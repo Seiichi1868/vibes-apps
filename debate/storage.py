@@ -10,16 +10,11 @@ import uuid
 from copy import deepcopy
 from pathlib import Path
 
-from debate.config import AUDIO_DIR, SESSIONS_DIR, ensure_dirs
+from debate.config import AUDIO_DIR, DATA_DIR, SESSIONS_DIR, ensure_dirs
+from debate.file_lock import get_named_lock
 
 _lock = threading.Lock()
 MAX_ADMIN_NOTES_LEN = 200
-
-# パートごとの非同期文字起こし（バックグラウンドスレッド）と、通常のリクエスト処理
-# （録音開始・確定・リセット等）が同じセッションJSONを並行して読み書きしても
-# 更新内容を失わないよう、セッションIDごとに排他ロックを提供する。
-_session_locks: dict[str, threading.Lock] = {}
-_session_locks_guard = threading.Lock()
 
 
 def _safe_id(session_id: str) -> str:
@@ -30,15 +25,10 @@ def _session_path(session_id: str) -> Path:
     return SESSIONS_DIR / f"{_safe_id(session_id)}.json"
 
 
-def get_session_lock(session_id: str) -> threading.Lock:
-    """「読み込み→一部更新→書き込み」を一連の操作として直列化するためのロック。"""
+def get_session_lock(session_id: str):
+    """読み込みから書き込みまでを直列化する。別ワーカーとも flock で待つ。"""
     safe_id = _safe_id(session_id)
-    with _session_locks_guard:
-        lock = _session_locks.get(safe_id)
-        if lock is None:
-            lock = threading.Lock()
-            _session_locks[safe_id] = lock
-        return lock
+    return get_named_lock(DATA_DIR / "locks" / f"session-{safe_id}.lock")
 
 
 def save_session(session: dict) -> dict:

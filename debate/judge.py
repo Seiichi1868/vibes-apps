@@ -400,25 +400,93 @@ def _normalize_result(data: dict) -> dict:
     }
 
 
-def run_judge(session: dict) -> dict:
+# 観戦スクリプトの照合で、ジャッジに渡してはいけない設計情報。
+SCRIPT_CHECK_FORBIDDEN_KEYS = frozenset(
+    {
+        "intended_winner",
+        "argument_map",
+        "points",
+        "key_point_ja",
+        "summary_ja",
+        "reason_ja",
+        "level",
+        "teacher_note",
+    }
+)
+
+
+def build_script_check_session(script: dict) -> dict:
+    """照合用の仮セッション。保存しない。設計の答えは入れない。
+
+    elapsed_sec と time_limit_sec は null（タイムマネジメントは対象外）。
+    speaker は ai。既存プロンプトでは ai の持ち時間を見ない。
+    """
+    parts = []
+    for part in script.get("parts") or []:
+        if not isinstance(part, dict):
+            continue
+        parts.append(
+            {
+                "part": part.get("part"),
+                "side": part.get("side"),
+                "speaker": "ai",
+                "transcript_edited": part.get("text") or "",
+                "elapsed_sec": None,
+                "time_limit_sec": None,
+                "pois": [],
+            }
+        )
+    return {"motion": script.get("motion") or "", "mode": "duo", "parts": parts}
+
+
+def forbidden_keys_in(value, path: str = "") -> list[str]:
+    found = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            here = f"{path}.{key}" if path else str(key)
+            if key in SCRIPT_CHECK_FORBIDDEN_KEYS:
+                found.append(here)
+            found.extend(forbidden_keys_in(child, here))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            found.extend(forbidden_keys_in(child, f"{path}[{index}]"))
+    return found
+
+
+def run_judge(session: dict, *, model_mode: str | None = None, include_usage: bool = False) -> dict:
     """LLMを呼び出し、正規化済みのジャッジ結果（新しい判定内容の各フィールド）を返す。
 
     戻り値はnew_judge_result()のうちstatus/error/started_at/judged_at/transcription_mode
     以外のフィールド（argument_flow, winner, score_total, scores,
     overall_feedback, part_feedback, model）を含む。
+    model_mode を渡したときだけ、管理画面のジャッジモデルではなくそのモデルを使う。
     """
     client = _get_client()
     if not client:
         raise RuntimeError("OPENAI_API_KEYが設定されていないため、ジャッジを実行できません。")
 
-    from debate.judge_models import resolve_judge_model_metadata, resolve_judge_model_mode
+    from debate.judge_models import resolve_judge_model_id, resolve_judge_model_metadata, resolve_judge_model_mode
     from debate.settings import load_settings, resolve_judge_model
 
-    settings = load_settings()
-    judge_mode = resolve_judge_model_mode(settings.get("judge_model_mode"))
-    judge_model = resolve_judge_model(judge_mode)
+    if model_mode:
+        judge_mode = resolve_judge_model_mode(model_mode)
+        judge_model = resolve_judge_model_id(judge_mode)
+    else:
+        settings = load_settings()
+        judge_mode = resolve_judge_model_mode(settings.get("judge_model_mode"))
+        judge_model = resolve_judge_model(judge_mode)
     judge_model_info = resolve_judge_model_metadata(judge_mode)
     payload = build_judge_payload(session)
+    leaked = forbidden_keys_in(payload)
+    if model_mode and leaked:
+        raise RuntimeError("照合の入力に設計情報が入っています: " + ", ".join(leaked))
+    if model_mode:
+        part_keys = sorted((payload.get("parts") or [{}])[0].keys()) if payload.get("parts") else []
+        logger.info(
+            "Script check judge payload keys=%s part_keys=%s elapsed_sec=null time_limit_sec=null",
+            sorted(payload.keys()),
+            part_keys,
+        )
     system_prompt = JUDGE_SYSTEM_PROMPT
     if payload.get("partial_practice"):
         system_prompt += PARTIAL_PRACTICE_ADDENDUM
@@ -452,5 +520,26 @@ def run_judge(session: dict) -> dict:
     result = _normalize_result(data)
     result["model"] = judge_model
     result["judge_model"] = judge_model_info
+    if include_usage:
+        result["usage"] = _completion_usage(completion, judge_mode, elapsed)
     logger.info("Judge finished in %.1fs (model=%s, winner=%s)", elapsed, judge_model, result.get("winner"))
     return result
+
+
+def _completion_usage(completion, model_mode: str, elapsed: float) -> dict:
+    from debate.judge_models import resolve_judge_model_metadata
+
+    usage = getattr(completion, "usage", None)
+    prompt_tokens = int(getattr(usage, "prompt_tokens", 0) or 0) if usage is not None else 0
+    completion_tokens = int(getattr(usage, "completion_tokens", 0) or 0) if usage is not None else 0
+    meta = resolve_judge_model_metadata(model_mode)
+    cost = (
+        prompt_tokens * float(meta["input_price_per_1m"]) / 1_000_000
+        + completion_tokens * float(meta["output_price_per_1m"]) / 1_000_000
+    )
+    return {
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "cost_usd": round(cost, 6),
+        "seconds": round(elapsed, 1),
+    }

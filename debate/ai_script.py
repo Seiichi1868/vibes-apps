@@ -171,7 +171,8 @@ Begin each speech with, and use throughout, the signpost templates below (verbat
 {argument_status_rules_text()}
 - Write for the ear: plain text only, no markdown, bullets, parentheses, emoji, or abbreviations.
 - Word counts per speech: {_word_ranges_text(level)}. Sentence length: {spec["sentence_rule"]}.
-- Before you output JSON, count the words in each speech and rewrite any speech that is outside its range.
+- LOR and PMR must not exceed the maximum of that word range. Also write each of LOR and PMR as 10 to 14 sentences. Word counts are easy to miscount, so count the sentences as well before you finish.
+- Before you output JSON, count the words in each speech and rewrite any speech that is outside its range. A speech must also fit its speaking time at about {SCRIPT_WORDS_PER_MINUTE} words per minute: 210 seconds means at most 490 words, and 150 seconds means at most 350 words.
 
 # Output keys (generation only)
 JSON only, no preface. Use these key names exactly. The point-status array key is argument_map.
@@ -592,6 +593,37 @@ def _normalize_argument_map(raw, points: dict, fatal: list[str], warnings: list[
     return normalized
 
 
+def _time_word_cap(part: str) -> tuple[int, int]:
+    """制限秒と、140語/分での語数上限。(210秒, 490語) または (150秒, 350語)。"""
+    limit = int(PART_DEFS[part]["time_limit_sec"])
+    cap = int(limit * SCRIPT_WORDS_PER_MINUTE / 60)
+    return limit, cap
+
+
+def over_time_lines(parts: list) -> list[str]:
+    """制限時間を超えたパート。再生成プロンプトにそのまま渡す。"""
+    lines = []
+    for item in parts or []:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("part") or "").strip()
+        if name not in PART_DEFS:
+            continue
+        count = int(item.get("word_count") or 0)
+        if count <= 0:
+            continue
+        limit, cap = _time_word_cap(name)
+        est = round(count / SCRIPT_WORDS_PER_MINUTE * 60)
+        if est <= limit:
+            continue
+        lines.append(
+            f"{name} is over the speaking time limit. "
+            f"Word cap for {name}: {limit} seconds = {cap} words. "
+            f"Actual word count: {count}."
+        )
+    return lines
+
+
 def _margin_problem(argument_map: list, winner: str) -> str:
     totals = side_score_totals(argument_map)
     gov = float(totals["gov"])
@@ -750,11 +782,13 @@ def generate_model_script(motion: str, level: str, intended_winner: str, model_m
             ", ".join(keys),
         )
         normalized, fatal, warnings, balance = validate_generated(coerced, level)
-        if not fatal and not balance:
+        over_time = [] if fatal else over_time_lines(normalized.get("parts") or [])
+        if not fatal and not balance and not over_time:
             return _pack_script(normalized, warnings, model, calls)
         reasons = list(fatal)
         if balance:
             reasons.append(balance)
+        reasons.extend(over_time)
         if alias:
             reasons.append(f"受信キーを {alias} から argument_map に読み替えました。")
         elif "argument_map" not in keys:

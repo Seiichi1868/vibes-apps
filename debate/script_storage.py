@@ -15,11 +15,18 @@ import time
 import uuid
 from pathlib import Path
 
-from debate.config import PART_ORDER, SCRIPT_AUDIO_DIR, SCRIPTS_DIR, ensure_dirs, format_score_total, side_score_totals
+from debate.config import (
+    DATA_DIR,
+    PART_ORDER,
+    SCRIPT_AUDIO_DIR,
+    SCRIPTS_DIR,
+    ensure_dirs,
+    format_score_total,
+    side_score_totals,
+)
+from debate.file_lock import get_named_lock
 
 _lock = threading.Lock()
-_script_locks: dict[str, threading.Lock] = {}
-_script_locks_guard = threading.Lock()
 
 PREVIEW_TOKEN_TTL_SEC = 15 * 60
 FAILED_KEEP = 20
@@ -35,18 +42,18 @@ def script_path(script_id: str) -> Path:
     return SCRIPTS_DIR / f"{_safe_id(script_id)}.json"
 
 
+def checks_path(script_id: str) -> Path:
+    return SCRIPTS_DIR / f"{_safe_id(script_id)}.checks.json"
+
+
 def script_audio_dir(script_id: str) -> Path:
     return SCRIPT_AUDIO_DIR / _safe_id(script_id)
 
 
-def get_script_lock(script_id: str) -> threading.Lock:
+def get_script_lock(script_id: str):
+    """スクリプトJSONと照合JSONの更新を、ワーカーをまたいで直列化する。"""
     safe_id = _safe_id(script_id)
-    with _script_locks_guard:
-        lock = _script_locks.get(safe_id)
-        if lock is None:
-            lock = threading.Lock()
-            _script_locks[safe_id] = lock
-        return lock
+    return get_named_lock(DATA_DIR / "locks" / f"script-{safe_id}.lock")
 
 
 def save_script(script: dict) -> dict:
@@ -61,6 +68,37 @@ def save_script(script: dict) -> dict:
             json.dump(script, handle, ensure_ascii=False, indent=2)
         tmp_path.replace(path)
     return script
+
+
+def save_checks(script_id: str, checks: dict) -> dict:
+    from debate.models import now_iso
+
+    checks["script_id"] = _safe_id(script_id)
+    checks["updated_at"] = now_iso()
+    ensure_dirs()
+    path = checks_path(script_id)
+    with _lock:
+        tmp_path = path.with_suffix(".json.tmp")
+        with tmp_path.open("w", encoding="utf-8") as handle:
+            json.dump(checks, handle, ensure_ascii=False, indent=2)
+        tmp_path.replace(path)
+    return checks
+
+
+def load_checks(script_id: str) -> dict | None:
+    ensure_dirs()
+    path = checks_path(script_id)
+    if not path.is_file():
+        return None
+    with _lock:
+        try:
+            with path.open(encoding="utf-8") as handle:
+                data = json.load(handle)
+        except (json.JSONDecodeError, OSError):
+            return None
+    if not isinstance(data, dict):
+        return None
+    return data
 
 
 def load_script(script_id: str) -> dict | None:
@@ -83,6 +121,8 @@ def list_scripts() -> list[dict]:
     ensure_dirs()
     items = []
     for path in SCRIPTS_DIR.glob("*.json"):
+        if path.name.endswith(".checks.json"):
+            continue
         script = load_script(path.stem)
         if script:
             items.append(script)
@@ -99,12 +139,18 @@ def delete_script(script_id: str) -> bool:
     path = script_path(script_id)
     audio_dir = script_audio_dir(script_id)
     existed = path.is_file() or audio_dir.is_dir()
+    checks = checks_path(script_id)
     with _lock:
         if path.is_file():
             path.unlink()
         tmp_path = path.with_suffix(".json.tmp")
         if tmp_path.is_file():
             tmp_path.unlink()
+        if checks.is_file():
+            checks.unlink()
+        checks_tmp = checks.with_suffix(".json.tmp")
+        if checks_tmp.is_file():
+            checks_tmp.unlink()
     if audio_dir.is_dir():
         shutil.rmtree(audio_dir, ignore_errors=True)
     return existed
@@ -226,8 +272,19 @@ def script_admin_summary(script: dict) -> dict:
         "generation_calls": script.get("generation_calls") or [],
         "script_model": script.get("script_model") or "",
         "teacher_note": script.get("teacher_note") or "",
+        "check_cost_usd": _check_cost(script.get("script_id")),
         "parts": parts,
     }
+
+
+def _check_cost(script_id: str | None) -> float:
+    checks = load_checks(str(script_id or ""))
+    if not checks:
+        return 0.0
+    try:
+        return round(float(checks.get("total_cost_usd") or 0), 6)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def normalize_teacher_note(note: str) -> str:

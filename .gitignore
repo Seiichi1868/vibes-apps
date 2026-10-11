@@ -53,6 +53,7 @@ static/audio/*.wav
 
 # Debate app: 録音データ（ユーザーの音声。data/debate/*.json は上の *.json ルールで除外済み）
 data/debate/audio/*
+data/debate/locks/
 
 # Level Check app: 録音データ・セッションデータ（data/level_check/*.json は上の *.json ルールで除外済み）
 data/level_check/audio/*
