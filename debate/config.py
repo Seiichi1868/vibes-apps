@@ -12,6 +12,8 @@ DATA_DIR = Path(
 ).expanduser()
 SESSIONS_DIR = DATA_DIR / "sessions"
 AUDIO_DIR = DATA_DIR / "audio"
+SCRIPTS_DIR = DATA_DIR / "scripts"
+SCRIPT_AUDIO_DIR = DATA_DIR / "script_audio"
 
 WHISPER_MODEL = os.environ.get("DEBATE_WHISPER_MODEL", "whisper-1")
 
@@ -163,3 +165,5 @@ STATUS_LABELS = {
 def ensure_dirs() -> None:
     SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
     AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+    SCRIPTS_DIR.mkdir(parents=True, exist_ok=True)
+    SCRIPT_AUDIO_DIR.mkdir(parents=True, exist_ok=True)

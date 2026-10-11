@@ -33,6 +33,19 @@ const affiliationNameInput = document.getElementById("affiliation-name-input");
 const affiliationAddBtn = document.getElementById("affiliation-add-btn");
 const affiliationLockHint = document.getElementById("affiliation-lock-hint");
 const transcriptionModePicker = document.getElementById("transcription-mode-picker");
+const scriptModelPicker = document.getElementById("script-model-picker");
+const scriptModelDefaultPicker = document.getElementById("script-model-default-picker");
+const scriptModelCurrent = document.getElementById("script-model-current");
+const speechModePicker = document.getElementById("speech-mode-picker");
+const scriptsList = document.getElementById("scripts-list");
+const scriptsRefreshBtn = document.getElementById("scripts-refresh-btn");
+const scriptsLockHint = document.getElementById("scripts-lock-hint");
+const scriptCreateForm = document.getElementById("script-create-form");
+const scriptMotionPicker = document.getElementById("script-motion-picker");
+const scriptMotion = document.getElementById("script-motion");
+const scriptLevel = document.getElementById("script-level");
+const scriptWinner = document.getElementById("script-winner");
+const scriptCreateStatus = document.getElementById("script-create-status");
 
 const SESSIONS_SORT_KEY = "debate_admin_sessions_sort";
 const SESSIONS_FILTER_KEY = "debate_admin_sessions_filter";
@@ -45,6 +58,10 @@ let notesSaveTimers = new Map();
 let currentBackgroundId = null;
 let currentJudgeModelMode = "5.6-luna";
 let currentOpponentModelMode = "5.6-luna";
+let currentScriptModelMode = "5.6-terra";
+let currentSpeechMode = "openai";
+let allScripts = [];
+let scriptPollTimer = null;
 let allSessions = [];
 let allAffiliations = [];
 let currentSessionsSort = "updated";
@@ -81,10 +98,12 @@ function applyUnlockUI() {
   syncProtectedControls();
   renderAffiliations(allAffiliations);
   renderVisibleSessions();
+  loadScripts();
 }
 
 function syncProtectedControls() {
   affiliationLockHint?.classList.toggle("hidden", unlocked);
+  scriptsLockHint?.classList.toggle("hidden", unlocked);
 }
 
 function requireUnlocked(actionLabel) {
@@ -191,6 +210,11 @@ function renderOpponentModelOptions(modes, selectedMode) {
   renderModelOptions(opponentModelPicker, "opponent_model_mode", modes, selectedMode);
 }
 
+function renderScriptModelOptions(modes, selectedMode) {
+  renderModelOptions(scriptModelPicker, "script_form_model", modes, selectedMode);
+  renderModelOptions(scriptModelDefaultPicker, "script_model_mode", modes, selectedMode);
+}
+
 function renderModelOptions(picker, inputName, modes, selectedMode) {
   if (!picker || !Array.isArray(modes) || !modes.length) return;
   picker.innerHTML = modes
@@ -242,6 +266,42 @@ function getSelectedOpponentModelMode() {
   return checked?.value || currentOpponentModelMode || "5.6-luna";
 }
 
+function getSelectedScriptModelMode() {
+  const checked = scriptModelDefaultPicker?.querySelector('input[name="script_model_mode"]:checked');
+  return checked?.value || currentScriptModelMode || "5.6-terra";
+}
+
+function getScriptFormModel() {
+  const checked = scriptModelPicker?.querySelector('input[name="script_form_model"]:checked');
+  return checked?.value || currentScriptModelMode || "5.6-terra";
+}
+
+function applyScriptModelMode(mode, activeModel) {
+  currentScriptModelMode = mode || "5.6-terra";
+  if (scriptModelCurrent) scriptModelCurrent.textContent = activeModel || "—";
+  scriptModelDefaultPicker?.querySelectorAll('input[name="script_model_mode"]').forEach((input) => {
+    input.checked = input.value === currentScriptModelMode;
+  });
+  const formChecked = scriptModelPicker?.querySelector('input[name="script_form_model"]:checked');
+  if (!formChecked) {
+    scriptModelPicker?.querySelectorAll('input[name="script_form_model"]').forEach((input) => {
+      input.checked = input.value === currentScriptModelMode;
+    });
+  }
+}
+
+function applySpeechMode(mode) {
+  currentSpeechMode = mode === "browser" ? "browser" : "openai";
+  speechModePicker?.querySelectorAll('input[name="speech_mode"]').forEach((input) => {
+    input.checked = input.value === currentSpeechMode;
+  });
+}
+
+function getSelectedSpeechMode() {
+  const checked = speechModePicker?.querySelector('input[name="speech_mode"]:checked');
+  return checked?.value === "browser" ? "browser" : "openai";
+}
+
 async function fetchSettings() {
   const res = await fetch("/debate/admin/api/settings");
   if (!res.ok) throw new Error("設定の取得に失敗しました");
@@ -286,6 +346,9 @@ async function loadSettingsIntoUI() {
   applyJudgeModelMode(data.judge_model_mode || "5.6-luna", data.judge_model);
   renderOpponentModelOptions(data.judge_model_modes || [], data.opponent_model_mode || "5.6-luna");
   applyOpponentModelMode(data.opponent_model_mode || "5.6-luna", data.opponent_model);
+  renderScriptModelOptions(data.judge_model_modes || [], data.script_model_mode || "5.6-terra");
+  applyScriptModelMode(data.script_model_mode || "5.6-terra", data.script_model);
+  applySpeechMode(data.speech_mode || "openai");
 }
 
 function schedulePoiProtectedSave() {
@@ -340,10 +403,14 @@ function scheduleSensitiveSave() {
         transcription_mode: getSelectedTranscriptionMode(),
         judge_model_mode: getSelectedJudgeModelMode(),
         opponent_model_mode: getSelectedOpponentModelMode(),
+        script_model_mode: getSelectedScriptModelMode(),
+        speech_mode: getSelectedSpeechMode(),
       });
       applyTranscriptionMode(saved.transcription_mode ?? "batch");
       applyJudgeModelMode(saved.judge_model_mode || "5.6-luna", saved.judge_model);
       applyOpponentModelMode(saved.opponent_model_mode || "5.6-luna", saved.opponent_model);
+      applyScriptModelMode(saved.script_model_mode || "5.6-terra", saved.script_model);
+      applySpeechMode(saved.speech_mode || "openai");
       if (statusMessage) statusMessage.textContent = "保存しました";
       hideLockMessage();
     } catch (err) {
@@ -844,6 +911,9 @@ async function tryUnlock() {
     applyJudgeModelMode(data.judge_model_mode || "5.6-luna", data.judge_model);
     renderOpponentModelOptions(data.judge_model_modes || [], data.opponent_model_mode || "5.6-luna");
     applyOpponentModelMode(data.opponent_model_mode || "5.6-luna", data.opponent_model);
+    renderScriptModelOptions(data.judge_model_modes || [], data.script_model_mode || "5.6-terra");
+    applyScriptModelMode(data.script_model_mode || "5.6-terra", data.script_model);
+    applySpeechMode(data.speech_mode || "openai");
     if (statusMessage) statusMessage.textContent = "管理設定を解除しました";
   } catch (err) {
     showLockMessage(err.message);
@@ -877,6 +947,9 @@ async function restoreUnlockFromStorage() {
     applyJudgeModelMode(data.judge_model_mode || "5.6-luna", data.judge_model);
     renderOpponentModelOptions(data.judge_model_modes || [], data.opponent_model_mode || "5.6-luna");
     applyOpponentModelMode(data.opponent_model_mode || "5.6-luna", data.opponent_model);
+    renderScriptModelOptions(data.judge_model_modes || [], data.script_model_mode || "5.6-terra");
+    applyScriptModelMode(data.script_model_mode || "5.6-terra", data.script_model);
+    applySpeechMode(data.speech_mode || "openai");
   } catch (_) {
     // 保存済み解除の復元に失敗した場合はロックのまま
   }
@@ -904,6 +977,16 @@ opponentModelPicker?.addEventListener("change", () => {
   scheduleSensitiveSave();
 });
 
+scriptModelDefaultPicker?.addEventListener("change", () => {
+  if (!unlocked) return;
+  scheduleSensitiveSave();
+});
+
+speechModePicker?.addEventListener("change", () => {
+  if (!unlocked) return;
+  scheduleSensitiveSave();
+});
+
 bgOpacitySlider?.addEventListener("input", () => {
   applyBackgroundOpacity(getBackgroundOpacityFromSlider());
   scheduleBackgroundSave();
@@ -919,6 +1002,237 @@ poiProtectedEndSlider?.addEventListener("input", () => {
 transcriptionModePicker?.addEventListener("change", () => {
   if (!unlocked) return;
   scheduleSensitiveSave();
+});
+
+function adminAuthHeaders() {
+  return {
+    "Content-Type": "application/json",
+    "X-Debate-Admin-Password": getAdminPassword(),
+  };
+}
+
+function scriptStatusLabel(item) {
+  if (item.generation_status === "generating") return "生成中";
+  if (item.generation_status === "error") return "error";
+  if (item.status === "published") return "published";
+  return "draft";
+}
+
+function scheduleScriptPoll() {
+  const generating = allScripts.some((item) => item.generation_status === "generating");
+  if (!generating) {
+    clearInterval(scriptPollTimer);
+    scriptPollTimer = null;
+    return;
+  }
+  if (scriptPollTimer) return;
+  scriptPollTimer = setInterval(() => {
+    loadScripts();
+  }, 3000);
+}
+
+function renderScripts() {
+  if (!scriptsList) return;
+  if (!unlocked) {
+    scriptsList.innerHTML = '<p class="text-sm text-slate-400">パスワードを解除すると一覧を表示します。</p>';
+    return;
+  }
+  if (!allScripts.length) {
+    scriptsList.innerHTML = '<p class="text-sm text-slate-400">まだスクリプトはありません。</p>';
+    return;
+  }
+  scriptsList.innerHTML = allScripts
+    .map((item) => {
+      const warnings = (item.warnings || []).map((warning) => `<li>${escapeHtml(warning)}</li>`).join("");
+      const cost = Number(item.gen_cost_usd || 0).toFixed(4);
+      const error = item.generation_error
+        ? `<p class="text-xs text-rose-600 mt-1">${escapeHtml(item.generation_error)}</p>`
+        : "";
+      return `<article class="panel-soft rounded-xl px-3 py-2.5" data-script-id="${escapeHtml(item.script_id)}">
+        <div class="flex flex-wrap items-start justify-between gap-2">
+          <div class="min-w-0">
+            <p class="text-sm font-semibold text-slate-800">${escapeHtml(item.motion)}</p>
+            <p class="text-[0.65rem] text-slate-500 mt-0.5">
+              ${escapeHtml(item.level)} · ${escapeHtml(item.intended_winner || "—")} · ${scriptStatusLabel(item)}
+              · $${cost}
+            </p>
+            ${warnings ? `<ul class="text-[0.65rem] text-amber-800 mt-1 space-y-0.5">${warnings}</ul>` : ""}
+            ${error}
+          </div>
+          <div class="flex flex-wrap gap-1">
+            <button type="button" data-script-action="preview" class="text-[0.65rem] px-2 py-1 rounded-full border border-slate-200">プレビュー</button>
+            <button type="button" data-script-action="edit" class="text-[0.65rem] px-2 py-1 rounded-full border border-slate-200">編集</button>
+            <button type="button" data-script-action="publish" class="text-[0.65rem] px-2 py-1 rounded-full border border-slate-200">公開</button>
+            <button type="button" data-script-action="unpublish" class="text-[0.65rem] px-2 py-1 rounded-full border border-slate-200">非公開</button>
+            <button type="button" data-script-action="delete" class="text-[0.65rem] px-2 py-1 rounded-full border border-rose-200 text-rose-700">削除</button>
+          </div>
+        </div>
+        <div class="script-editor hidden mt-2 space-y-2"></div>
+      </article>`;
+    })
+    .join("");
+}
+
+async function loadScripts() {
+  if (!scriptsList) return;
+  if (!unlocked) {
+    renderScripts();
+    return;
+  }
+  try {
+    const res = await fetch("/debate/admin/api/scripts", { headers: adminAuthHeaders() });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "一覧を取得できませんでした");
+    allScripts = data.scripts || [];
+    renderScripts();
+    scheduleScriptPoll();
+  } catch (err) {
+    scriptsList.innerHTML = `<p class="text-sm text-rose-600">${escapeHtml(err.message)}</p>`;
+  }
+}
+
+async function openScriptEditor(card) {
+  const editor = card.querySelector(".script-editor");
+  if (!editor) return;
+  if (!editor.classList.contains("hidden") && editor.childElementCount) {
+    editor.classList.add("hidden");
+    return;
+  }
+  editor.classList.remove("hidden");
+  editor.innerHTML = '<p class="text-xs text-slate-400">読み込み中...</p>';
+  const scriptId = card.dataset.scriptId;
+  const res = await fetch(`/debate/admin/api/scripts/${scriptId}`, { headers: adminAuthHeaders() });
+  const data = await res.json();
+  if (!res.ok) {
+    editor.innerHTML = `<p class="text-xs text-rose-600">${escapeHtml(data.error || "読み込めませんでした")}</p>`;
+    return;
+  }
+  const script = data.script || {};
+  const parts = (script.parts || [])
+    .map(
+      (part) => `<label class="block text-[0.65rem] font-semibold text-slate-600">${escapeHtml(part.part)}
+        <textarea data-part="${escapeHtml(part.part)}" rows="6" class="mt-1 w-full text-sm font-normal rounded-lg border border-teal-100 bg-white/80 px-2 py-1.5">${escapeHtml(part.text || "")}</textarea>
+        <button type="button" data-save-part="${escapeHtml(part.part)}" class="mt-1 text-[0.65rem] px-2 py-1 rounded-full bg-brand text-white">このパートを保存</button>
+      </label>`
+    )
+    .join("");
+  editor.innerHTML = `
+    <label class="block text-[0.65rem] font-semibold text-slate-600">先生メモ
+      <textarea data-teacher-note rows="2" class="mt-1 w-full text-sm font-normal rounded-lg border border-teal-100 bg-white/80 px-2 py-1.5">${escapeHtml(script.teacher_note || "")}</textarea>
+    </label>
+    <button type="button" data-save-note class="text-[0.65rem] px-2 py-1 rounded-full border border-slate-200">メモを保存</button>
+    ${parts || '<p class="text-xs text-slate-400">本文は生成後に編集できます。</p>'}
+    <p class="script-editor-status text-[0.65rem] text-slate-500"></p>`;
+}
+
+async function scriptAction(action, scriptId, extra) {
+  const res = await fetch(`/debate/admin/api/scripts/${scriptId}/${action}`, {
+    method: "POST",
+    headers: adminAuthHeaders(),
+    body: JSON.stringify({ admin_password: getAdminPassword(), ...(extra || {}) }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "操作に失敗しました");
+  return data;
+}
+
+scriptMotionPicker?.addEventListener("change", () => {
+  if (scriptMotion && scriptMotionPicker.value) scriptMotion.value = scriptMotionPicker.value;
+});
+
+scriptCreateForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!requireUnlocked("スクリプトの生成")) return;
+  const motion = scriptMotion?.value.trim() || "";
+  if (!motion) {
+    if (scriptCreateStatus) scriptCreateStatus.textContent = "論題を入力してください。";
+    return;
+  }
+  if (scriptCreateStatus) scriptCreateStatus.textContent = "生成を開始しました。";
+  try {
+    const res = await fetch("/debate/admin/api/scripts", {
+      method: "POST",
+      headers: adminAuthHeaders(),
+      body: JSON.stringify({
+        admin_password: getAdminPassword(),
+        motion,
+        level: scriptLevel?.value || "normal",
+        intended_winner: scriptWinner?.value || "auto",
+        model_mode: getScriptFormModel(),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "生成を開始できませんでした");
+    if (scriptCreateStatus) scriptCreateStatus.textContent = "生成中です。一覧に状態が出ます。";
+    await loadScripts();
+  } catch (err) {
+    if (scriptCreateStatus) scriptCreateStatus.textContent = err.message;
+  }
+});
+
+scriptsRefreshBtn?.addEventListener("click", () => {
+  if (!requireUnlocked("一覧の表示")) return;
+  loadScripts();
+});
+
+scriptsList?.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-script-action], [data-save-part], [data-save-note]");
+  if (!button) return;
+  if (!requireUnlocked("この操作")) return;
+  const card = button.closest("[data-script-id]");
+  const scriptId = card?.dataset.scriptId;
+  if (!scriptId) return;
+  const status = card.querySelector(".script-editor-status");
+  try {
+    if (button.dataset.scriptAction === "edit") {
+      await openScriptEditor(card);
+      return;
+    }
+    if (button.dataset.scriptAction === "preview") {
+      const data = await scriptAction("preview-token", scriptId);
+      window.open(`/debate/watch/${scriptId}?preview=1&token=${encodeURIComponent(data.token)}`, "_blank");
+      return;
+    }
+    if (button.dataset.scriptAction === "publish") {
+      await scriptAction("status", scriptId, { status: "published" });
+      await loadScripts();
+      return;
+    }
+    if (button.dataset.scriptAction === "unpublish") {
+      await scriptAction("status", scriptId, { status: "draft" });
+      await loadScripts();
+      return;
+    }
+    if (button.dataset.scriptAction === "delete") {
+      if (!window.confirm("このスクリプトを削除しますか？")) return;
+      await scriptAction("delete", scriptId);
+      await loadScripts();
+      return;
+    }
+    if (button.dataset.saveNote !== undefined) {
+      const note = card.querySelector("[data-teacher-note]")?.value || "";
+      await scriptAction("note", scriptId, { teacher_note: note });
+      if (status) status.textContent = "メモを保存しました";
+      return;
+    }
+    if (button.dataset.savePart) {
+      const part = button.dataset.savePart;
+      const text = card.querySelector(`textarea[data-part="${part}"]`)?.value || "";
+      await fetch(`/debate/admin/api/scripts/${scriptId}/parts/${part}`, {
+        method: "POST",
+        headers: adminAuthHeaders(),
+        body: JSON.stringify({ admin_password: getAdminPassword(), text }),
+      }).then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "保存に失敗しました");
+      });
+      if (status) status.textContent = `${part} を保存しました。音声は次の段階で古く扱います。`;
+      await loadScripts();
+    }
+  } catch (err) {
+    if (status) status.textContent = err.message;
+    else showLockMessage(err.message);
+  }
 });
 
 (async function initAdminPage() {
@@ -944,4 +1258,7 @@ transcriptionModePicker?.addEventListener("change", () => {
   }
   await Promise.all([loadAffiliations(), loadSessions()]);
   await restoreUnlockFromStorage();
+  if (!unlocked && scriptsList) {
+    scriptsList.innerHTML = '<p class="text-sm text-slate-400">パスワードを解除すると一覧を表示します。</p>';
+  }
 })();

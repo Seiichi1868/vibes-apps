@@ -258,6 +258,122 @@ def index():
     )
 
 
+def _public_watch_script(script: dict, *, show_admin: bool) -> dict:
+    """生徒向けにコスト・モデル名・内部エラーを落とす。"""
+    parts = []
+    for part in script.get("parts") or []:
+        if not isinstance(part, dict):
+            continue
+        parts.append(
+            {
+                "part": part.get("part"),
+                "side": part.get("side"),
+                "text": part.get("text") or "",
+                "signpost_phrases": list(part.get("signpost_phrases") or []),
+                "key_point_ja": part.get("key_point_ja") or "",
+                "word_count": part.get("word_count") or 0,
+            }
+        )
+    view = {
+        "script_id": script.get("script_id"),
+        "motion": script.get("motion") or "",
+        "level": script.get("level") or "",
+        "intended_winner": script.get("intended_winner") or "",
+        "summary_ja": script.get("summary_ja") or "",
+        "argument_map": script.get("argument_map") or [],
+        "parts": parts,
+        "status": script.get("status") or "draft",
+    }
+    if show_admin:
+        view["warnings"] = list(script.get("warnings") or [])
+        view["teacher_note"] = script.get("teacher_note") or ""
+        view["generation_status"] = script.get("generation_status") or ""
+        view["generation_error"] = script.get("generation_error") or ""
+    return view
+
+
+def _watch_minutes(script: dict) -> float | None:
+    words = 0
+    for part in script.get("parts") or []:
+        if isinstance(part, dict):
+            words += int(part.get("word_count") or 0)
+    if words <= 0:
+        return None
+    return round(words / 140, 1)
+
+
+@debate_bp.route("/watch")
+def watch_list():
+    from debate.script_storage import list_published_scripts
+
+    scripts = []
+    for item in list_published_scripts():
+        scripts.append(
+            {
+                "script_id": item.get("script_id"),
+                "motion": item.get("motion") or "",
+                "level": item.get("level") or "",
+                "minutes": _watch_minutes(item),
+                "part_count": len(item.get("parts") or []),
+            }
+        )
+    return render_template(
+        "debate/watch_list.html",
+        scripts=scripts,
+        **_background_context(),
+    )
+
+
+@debate_bp.route("/watch/<script_id>")
+def watch_screen(script_id):
+    from debate.script_storage import load_script, preview_token_valid
+
+    script = load_script(script_id)
+    if not script:
+        return render_template(
+            "debate/not_found.html",
+            session_id="",
+            heading="読み込めませんでした",
+            message="もう一度お試しください。",
+            **_background_context(),
+        ), 404
+    preview = request.args.get("preview") == "1"
+    token = str(request.args.get("token") or "")
+    published = script.get("status") == "published" and script.get("generation_status") == "draft"
+    admin_preview = preview and preview_token_valid(script_id, token)
+    if not published and not admin_preview:
+        return render_template(
+            "debate/not_found.html",
+            session_id="",
+            heading="読み込めませんでした",
+            message="もう一度お試しください。",
+            **_background_context(),
+        ), 404
+    if admin_preview and script.get("generation_status") == "error":
+        return render_template(
+            "debate/watch.html",
+            script=_public_watch_script(script, show_admin=True),
+            show_admin=True,
+            failed=True,
+            **_background_context(),
+        )
+    if script.get("generation_status") != "draft":
+        return render_template(
+            "debate/not_found.html",
+            session_id="",
+            heading="読み込めませんでした",
+            message="もう一度お試しください。",
+            **_background_context(),
+        ), 404
+    return render_template(
+        "debate/watch.html",
+        script=_public_watch_script(script, show_admin=admin_preview),
+        show_admin=admin_preview,
+        failed=False,
+        **_background_context(),
+    )
+
+
 def _admin_password_matches(password) -> bool:
     from debate.admin import ADMIN_PASSWORD
 

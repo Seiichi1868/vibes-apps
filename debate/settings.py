@@ -41,12 +41,18 @@ DEFAULT_BACKGROUND_OPACITY = 0.32
 
 TRANSCRIPTION_MODES = ("batch", "realtime")
 
+DEFAULT_SCRIPT_MODEL_MODE = "5.6-terra"
+SPEECH_MODES = ("openai", "browser")
+DEFAULT_SPEECH_MODE = "openai"
+
 DEFAULT_SETTINGS = {
     "background_id": DEFAULT_BACKGROUND_ID,
     "background_opacity": DEFAULT_BACKGROUND_OPACITY,
     "transcription_mode": "batch",
     "judge_model_mode": DEFAULT_JUDGE_MODEL_MODE,
     "opponent_model_mode": DEFAULT_JUDGE_MODEL_MODE,
+    "script_model_mode": DEFAULT_SCRIPT_MODEL_MODE,
+    "speech_mode": DEFAULT_SPEECH_MODE,
     "poi_protected_start_sec": POI_PROTECTED_SEC,
     "poi_protected_end_sec": POI_PROTECTED_SEC,
     "affiliations": [],
@@ -65,6 +71,22 @@ def resolve_judge_model(mode: str | None = None) -> str:
         stored = load_settings().get("judge_model_mode", DEFAULT_JUDGE_MODEL_MODE)
         selected = resolve_judge_model_mode(stored, fallback_mode=DEFAULT_JUDGE_MODEL_MODE)
     return resolve_judge_model_id(selected)
+
+
+def resolve_script_model(mode: str | None = None) -> str:
+    """観戦用スクリプト生成モデル。既定は gpt-5.6-terra。"""
+    selected = mode if mode in get_judge_model_options() else None
+    if selected is None:
+        stored = load_settings().get("script_model_mode", DEFAULT_SCRIPT_MODEL_MODE)
+        selected = resolve_judge_model_mode(stored, fallback_mode=DEFAULT_SCRIPT_MODEL_MODE)
+    return resolve_judge_model_id(selected)
+
+
+def resolve_speech_mode(mode: str | None = None) -> str:
+    if mode in SPEECH_MODES:
+        return mode
+    stored = load_settings().get("speech_mode", DEFAULT_SPEECH_MODE)
+    return stored if stored in SPEECH_MODES else DEFAULT_SPEECH_MODE
 
 
 def resolve_opponent_model(mode: str | None = None) -> str:
@@ -180,6 +202,18 @@ def _normalize(raw: dict | None) -> dict:
         data["opponent_model_mode"] = opponent_mode
     elif opponent_mode:
         data["opponent_model_mode"] = DEFAULT_JUDGE_MODEL_MODE
+
+    script_mode = raw.get("script_model_mode")
+    if script_mode in get_judge_model_options():
+        data["script_model_mode"] = script_mode
+    elif script_mode:
+        data["script_model_mode"] = DEFAULT_SCRIPT_MODEL_MODE
+
+    speech_mode = raw.get("speech_mode")
+    if speech_mode in SPEECH_MODES:
+        data["speech_mode"] = speech_mode
+    elif speech_mode:
+        data["speech_mode"] = DEFAULT_SPEECH_MODE
 
     start_sec, end_sec = resolve_poi_protected_times(raw)
     data["poi_protected_start_sec"] = start_sec

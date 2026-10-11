@@ -1,0 +1,120 @@
+{% extends "debate/base.html" %}
+
+{% set level_labels = {"easy": "やさしい", "normal": "ふつう", "hard": "むずかしい"} %}
+{% set action_labels = {"raised": "提示", "rebutted": "反論", "defended": "再反論・防御", "extended": "補強", "reinforced": "補強"} %}
+{% set status_labels = {"standing": "残っている", "knocked_down": "倒れた", "extended": "広がった"} %}
+
+{% block title %}お手本 | Parliamentary Debate Practice{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='debate/css/watch.css', v='20261011b') }}">
+{% endblock %}
+
+{% block header_actions %}
+<a href="{{ url_for('debate.watch_list') }}"
+  class="text-xs px-3 py-1.5 rounded-full bg-white/60 text-slate-600 hover:bg-emerald-50 hover:text-teal-700 font-medium transition-colors border border-white/80">
+  ← お手本一覧
+</a>
+{% endblock %}
+
+{% block body %}
+<section class="glass-card rounded-2xl p-5 md:p-6 mb-4">
+  <p class="text-xs font-semibold text-brand uppercase tracking-wide mb-1">Motion</p>
+  <h2 class="text-xl md:text-2xl font-bold text-slate-800 leading-snug">{{ script.motion }}</h2>
+  <div class="flex flex-wrap items-center gap-2 mt-3 text-xs">
+    <span class="status-pill">{{ level_labels.get(script.level, script.level) }}</span>
+    <span class="status-pill side-badge-Gov">Gov（賛成）</span>
+    <span class="status-pill side-badge-Opp">Opp（反対）</span>
+    {% if show_admin %}
+    <span class="status-pill">下書きプレビュー</span>
+    {% endif %}
+  </div>
+  {% if show_admin and script.teacher_note %}
+  <p class="text-xs text-slate-500 mt-3">メモ: {{ script.teacher_note }}</p>
+  {% endif %}
+  {% if show_admin and script.warnings %}
+  <ul class="mt-3 text-xs text-amber-800 space-y-1">
+    {% for warning in script.warnings %}
+    <li>{{ warning }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+
+{% if failed %}
+<section class="glass-card rounded-2xl p-6 mb-4">
+  <p class="text-sm text-slate-600">読み込めませんでした。もう一度お試しください。</p>
+</section>
+{% else %}
+<div class="flex flex-wrap gap-2 mb-4">
+  <button id="watch-hide-text" type="button" class="text-xs px-3 py-1.5 rounded-full border border-teal-200 font-semibold" aria-pressed="false">英文を隠す</button>
+  <button id="watch-highlight" type="button" class="text-xs px-3 py-1.5 rounded-full border border-teal-200 font-semibold" aria-pressed="true">定型表現をハイライト</button>
+  <button id="watch-show-ja" type="button" class="text-xs px-3 py-1.5 rounded-full border border-teal-200 font-semibold" aria-pressed="true">日本語ポイント</button>
+</div>
+
+<div class="space-y-3 mb-4">
+  {% for part in script.parts %}
+  <article class="glass-card watch-part watch-part--{{ part.side|lower }} rounded-2xl p-4 md:p-5">
+    <div class="flex flex-wrap items-center gap-2 mb-2">
+      <h3 class="text-sm font-bold text-slate-800">{{ part.part }}</h3>
+      <span class="status-pill side-badge-{{ part.side }}">{{ part.side }}</span>
+      <span class="text-xs text-slate-400">{{ part.word_count }}語</span>
+    </div>
+    {% if part.key_point_ja %}
+    <p class="watch-key-point text-sm text-slate-600 mb-2">{{ part.key_point_ja }}</p>
+    {% endif %}
+    <p class="watch-text text-sm leading-relaxed text-slate-800" data-phrases='{{ part.signpost_phrases|tojson }}'>{{ part.text }}</p>
+  </article>
+  {% endfor %}
+</div>
+
+<section class="glass-card rounded-2xl p-5 md:p-6 mb-4">
+  <h3 class="font-bold text-slate-800 mb-1">論点の流れ図</h3>
+  <p class="text-xs text-slate-500 mb-3">これはお手本の流れの解説です。実際のAIジャッジの判定とは別のものです。</p>
+  {% if script.argument_map %}
+  <div class="overflow-x-auto -mx-1">
+    <table class="w-full text-sm min-w-[560px]">
+      <thead>
+        <tr class="text-left text-xs text-slate-400 border-b border-slate-200">
+          <th class="py-2 px-1 font-semibold">論点</th>
+          <th class="py-2 px-1 font-semibold">提示した陣営とパート</th>
+          <th class="py-2 px-1 font-semibold">反論・防御の推移</th>
+          <th class="py-2 px-1 font-semibold">最終ステータス</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for arg in script.argument_map %}
+        <tr class="border-b border-slate-100 align-top">
+          <td class="py-2.5 px-1 text-slate-700 max-w-[220px]">{{ arg.summary }}</td>
+          <td class="py-2.5 px-1">
+            <span class="status-pill side-badge-{{ arg.side }}">{{ arg.side }}</span>
+            <span class="text-slate-500 ml-1">{{ arg.raised_in_part or arg.raised_in }}</span>
+          </td>
+          <td class="py-2.5 px-1">
+            <div class="flex flex-wrap gap-1">
+              {% for h in arg.history %}
+              <span class="history-chip history-action-{{ h.action }}">{{ h.part }}: {{ action_labels.get(h.action, h.action) }}</span>
+              {% endfor %}
+            </div>
+          </td>
+          <td class="py-2.5 px-1">
+            <span class="status-pill arg-status-{{ arg.status }}">{{ status_labels.get(arg.status, arg.status) }}</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+  {% if script.summary_ja %}
+  <p class="text-sm text-slate-700 mt-4 leading-relaxed">{{ script.summary_ja }}</p>
+  {% endif %}
+</section>
+{% endif %}
+
+<p class="text-xs text-slate-500 text-center px-2">このスクリプトはAIが作成したお手本です。内容や例が事実として正しいとは限りません。</p>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='debate/js/watch.js', v='20261011b') }}"></script>
+{% endblock %}

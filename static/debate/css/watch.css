@@ -1,0 +1,26 @@
+.watch-part {
+  border-left: 4px solid transparent;
+}
+.watch-part--gov {
+  border-left-color: #0d9488;
+}
+.watch-part--opp {
+  border-left-color: #e11d48;
+}
+.watch-part.is-hidden-text .watch-text {
+  display: none;
+}
+.watch-signpost {
+  background: rgba(250, 204, 21, 0.45);
+  color: inherit;
+  border-radius: 0.2rem;
+  padding: 0 0.15rem;
+}
+.watch-text {
+  white-space: pre-wrap;
+}
+.watch-filter-btn.is-active {
+  background: #0d9488;
+  color: #fff;
+  border-color: #0d9488;
+}

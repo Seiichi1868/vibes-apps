@@ -76,6 +76,70 @@
   </div>
 </section>
 
+<section id="watch-scripts-section" class="glass-card rounded-2xl p-5 md:p-6 mb-4">
+  <div class="flex items-center justify-between gap-2 mb-2">
+    <h2 class="font-bold text-slate-800">観戦用スクリプト</h2>
+    <button id="scripts-refresh-btn" type="button"
+      class="text-xs px-2.5 py-1 rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">
+      更新
+    </button>
+  </div>
+  <p class="text-xs text-slate-500 mb-3 leading-snug">
+    お手本はここで作って確認してから公開します。生成・編集・公開・削除には管理パスワードが必要です。音声の再生は次の段階です。
+  </p>
+  <p id="scripts-lock-hint" class="text-xs text-amber-700 mb-3">
+    下の管理設定でパスワードを解除してください。
+  </p>
+  <form id="script-create-form" class="space-y-3 mb-4">
+    <div>
+      <label for="script-motion-picker" class="block text-xs font-semibold text-slate-600 mb-1">お題から選ぶ</label>
+      <select id="script-motion-picker"
+        class="w-full text-sm rounded-lg border border-teal-100 bg-white/80 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand">
+        <option value="">— お題を選んでください —</option>
+        {% for motion in default_motions %}
+        <option value="{{ motion }}">{{ motion }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="script-motion" class="block text-xs font-semibold text-slate-600 mb-1">論題</label>
+      <textarea id="script-motion" rows="2" maxlength="500"
+        class="w-full text-sm rounded-lg border border-teal-100 bg-white/80 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand"
+        placeholder="Homework should be abolished"></textarea>
+    </div>
+    <div class="flex flex-wrap gap-3">
+      <label class="text-xs font-semibold text-slate-600">
+        レベル
+        <select id="script-level" class="mt-1 block text-sm rounded-lg border border-teal-100 bg-white/80 px-3 py-1.5">
+          <option value="easy">easy（やさしい）</option>
+          <option value="normal" selected>normal（ふつう）</option>
+          <option value="hard">hard（むずかしい）</option>
+        </select>
+      </label>
+      <label class="text-xs font-semibold text-slate-600">
+        優勢側
+        <select id="script-winner" class="mt-1 block text-sm rounded-lg border border-teal-100 bg-white/80 px-3 py-1.5">
+          <option value="auto">おまかせ</option>
+          <option value="Gov">Gov</option>
+          <option value="Opp">Opp</option>
+        </select>
+      </label>
+    </div>
+    <div>
+      <p class="text-xs font-semibold text-slate-600 mb-1">生成モデル（この回だけ）</p>
+      <div id="script-model-picker" class="debate-mode-options debate-mode-options--ai"></div>
+    </div>
+    <button id="script-create-btn" type="submit"
+      class="text-xs px-3 py-1.5 rounded-full bg-brand text-white font-semibold hover:bg-brand-dark transition-colors">
+      生成する
+    </button>
+    <p id="script-create-status" class="text-xs text-slate-500"></p>
+  </form>
+  <div id="scripts-list" class="space-y-2">
+    <p class="text-sm text-slate-400">読み込み中...</p>
+  </div>
+</section>
+
 <section class="glass-card rounded-xl px-3 py-2.5 mb-4">
   <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5">
     <span class="text-[0.65rem] font-semibold text-slate-400 shrink-0">背景</span>
@@ -167,6 +231,35 @@
     </div>
 
     <div>
+      <h3 class="text-sm font-bold text-slate-800 mb-2">観戦スクリプトの生成モデル</h3>
+      <div id="script-model-default-picker" class="debate-mode-options debate-mode-options--ai"></div>
+      <p class="text-[0.65rem] text-slate-500 mt-1.5">
+        現在: <strong id="script-model-current" class="text-brand font-semibold">—</strong>
+        <span class="text-slate-400">（既定は gpt-5.6-terra。生成フォームの初期値になります）</span>
+      </p>
+    </div>
+
+    <div>
+      <h3 class="text-sm font-bold text-slate-800 mb-2">観戦の読み上げ</h3>
+      <div class="flex flex-col sm:flex-row gap-3" id="speech-mode-picker">
+        <label class="panel-soft flex items-start gap-3 rounded-xl px-4 py-3 cursor-pointer flex-1">
+          <input type="radio" name="speech_mode" value="openai" class="mt-1 accent-teal-600" checked>
+          <span>
+            <span class="block text-sm font-semibold text-slate-800">サーバー音声</span>
+            <span class="block text-xs text-slate-500 mt-0.5">公開時に音声ファイルを作って再生します（次の段階で有効）</span>
+          </span>
+        </label>
+        <label class="panel-soft flex items-start gap-3 rounded-xl px-4 py-3 cursor-pointer flex-1">
+          <input type="radio" name="speech_mode" value="browser" class="mt-1 accent-teal-600">
+          <span>
+            <span class="block text-sm font-semibold text-slate-800">ブラウザ読み上げ</span>
+            <span class="block text-xs text-slate-500 mt-0.5">端末の読み上げを使い、音声APIは呼びません</span>
+          </span>
+        </label>
+      </div>
+    </div>
+
+    <div>
       <h3 class="font-bold text-slate-800 mb-1">文字起こし方式</h3>
       <p class="text-xs text-slate-500 mb-3">
         生徒画面の録音時に使う文字起こし方式を切り替えます。セッションごとに使用モードが記録されます。
@@ -194,5 +287,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='debate/js/admin.js', v='20261006a') }}"></script>
+<script src="{{ url_for('static', filename='debate/js/admin.js', v='20261011b') }}"></script>
 {% endblock %}

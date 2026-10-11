@@ -98,7 +98,17 @@ Whisper: `debate/transcription.py`（短タイムアウト）。ジョブ: `tran
 
 ## 管理
 
-`/debate/admin` はリンク開放。パスワード必須は `transcription_mode`・`judge_model_mode`・`opponent_model_mode`・所属の変更/削除・セッション削除（`DEBATE_ADMIN_PASSWORD` 既定2479）。背景・透過・POI保護時間・所属の追加はパスワード不要。セッション一覧・コピー・備考は閲覧・編集可。一覧は所属を表示し、所属フィルターと更新日時／所属ソートがある。コピー時ジャッジはリセット、音声（AI音声含む）は複製。所属もコピー先へ引き継ぐ。
+`/debate/admin` はリンク開放。パスワード必須は `transcription_mode`・`judge_model_mode`・`opponent_model_mode`・`script_model_mode`・`speech_mode`・所属の変更/削除・セッション削除・観戦スクリプトの生成/編集/公開/削除（`DEBATE_ADMIN_PASSWORD` 既定2479）。背景・透過・POI保護時間・所属の追加はパスワード不要。セッション一覧・コピー・備考は閲覧・編集可。一覧は所属を表示し、所属フィルターと更新日時／所属ソートがある。コピー時ジャッジはリセット、音声（AI音声含む）は複製。所属もコピー先へ引き継ぐ。
+
+## 観戦（お手本）
+
+AI同士の6パートを保存して生徒は再生するだけ。生成APIは管理パスワード必須。ソロの `opponent.py` / `tts.py` は触らない。
+
+- 一覧 `/debate/watch` は `published` のみ。観戦 `/debate/watch/<script_id>`。下書きは `?preview=1&token=` のときだけ。
+- JSON: `data/debate/scripts/<id>.json`。音声ディレクトリは `data/debate/script_audio/`（音声生成は未実装）。
+- 生成: `debate/ai_script.py`（プロンプトは `PART_ROLES` / `PART_GUIDES`）。ジョブ: `debate/script_jobs.py`。保存: `debate/script_storage.py`。
+- 管理画面「観戦用スクリプト」。モデル既定 `5.6-terra`。`speech_mode` 既定 `openai`（読み上げ本体は次段階）。
+- 生徒画面にコスト・モデル名は出さない。
 
 ## ファイル案内（必要なときだけ開け）
 
@@ -115,6 +125,7 @@ Whisper: `debate/transcription.py`（短タイムアウト）。ジョブ: `tran
 | 管理 | `debate/admin.py` `templates/debate/admin.html` `static/debate/js/admin.js` |
 | 見た目 | `templates/debate/base.html` `static/debate/css/style.css` |
 | ソロ生成 | `debate/solo.py` `opponent.py` `solo_jobs.py` `tts.py` |
+| 観戦スクリプト | `debate/ai_script.py` `script_jobs.py` `script_storage.py` `templates/debate/watch.html` `watch_list.html` |
 
 ## 直近の確定仕様（これと違う実装は回帰）
 

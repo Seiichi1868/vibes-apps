@@ -5,9 +5,9 @@
 {% block body %}
 <section class="glass-card rounded-2xl p-8 text-center">
   <p class="text-3xl mb-3">🔍</p>
-  <h2 class="text-lg font-bold text-slate-800 mb-1">セッションが見つかりません</h2>
+  <h2 class="text-lg font-bold text-slate-800 mb-1">{{ heading or "セッションが見つかりません" }}</h2>
   <p class="text-sm text-slate-500 mb-6">
-    {% if session_id %}session_id: {{ session_id }}{% endif %}
+    {% if message %}{{ message }}{% elif session_id %}session_id: {{ session_id }}{% endif %}
   </p>
   <a href="{{ url_for('debate.index') }}"
     class="inline-block px-5 py-2.5 rounded-xl bg-brand text-white text-sm font-bold shadow hover:bg-brand-dark transition-colors">
