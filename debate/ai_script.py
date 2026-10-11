@@ -162,7 +162,8 @@ Begin each speech with, and use throughout, the signpost templates below (verbat
 {_guides_block()}
 
 # Rules
-- Rebuttals must respond to what the previous speaker ACTUALLY said: "They said ... However ... Therefore ...". Reconstruct before rebutting where the role requires it.
+- Rebuttals must respond to what the previous speaker ACTUALLY said: "They said ... Therefore ...". Reconstruct before rebutting where the role requires it.
+- Never write "however" right after "They said" (no "They said, however"). "However" comes only after stating the opponent's claim.
 - LOR and PMR introduce NO new arguments.
 - Do NOT invent statistics, study names, institutions, quotations, or named experts. Do not write "studies show" or "research shows". Argue with logic and concrete everyday school-life examples instead.
 - Plan the argument_map so the intended winner's total weight is {SCRIPT_WINNER_MARGIN_MIN} to {SCRIPT_WINNER_MARGIN_MAX} higher than the other side. Avoid a gap of 1.5 or more. Both sides should still argue well.
@@ -443,6 +444,8 @@ def _save_failed_response(record: dict) -> None:
 def _clean_speech_text(text: str) -> str:
     cleaned = (text or "").replace("\r\n", "\n").strip()
     cleaned = cleaned.replace("*", "")
+    # 「They said, however,」の however は不要（相手の主張の後に置くもの）
+    cleaned = re.sub(r"\b(They said),?\s+however,?\s+", r"\1, ", cleaned, flags=re.I)
     return cleaned.strip()
 
 

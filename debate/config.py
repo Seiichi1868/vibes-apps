@@ -127,18 +127,18 @@ PART_GUIDES = {
     "We have two points. The first point is... The second point is... "
     "I will explain the 1st point...",
     "LO": "We believe that ___ should not... Let me rebut what the Government team said... "
-    "They said, however, Therefore... We have two points. The first point is... "
+    "They said ... Therefore... We have two points. The first point is... "
     "The second point is... I will explain the 1st point...",
     "MG": "We believe that ___ should... First, let me rebut Opposition's 1st point... "
-    "They said, however, Therefore... Next, let me reconstruct Government's 1st point... "
+    "They said ... Therefore... Next, let me reconstruct Government's 1st point... "
     "Then let me explain our 2nd point...",
     "MO": "We believe that ___ should not... First, let me rebut the reconstruction of Government's 1st point... "
-    "They said, however, Therefore... Next, let me rebut Government's 2nd point... "
-    "They said, however, Therefore... Then, let me reconstruct Opposition's 1st point... "
+    "They said ... Therefore... Next, let me rebut Government's 2nd point... "
+    "They said ... Therefore... Then, let me reconstruct Opposition's 1st point... "
     "Finally, let me explain our 2nd point...",
     "LOR": "Let me summarize today's debate. The most important point is... "
     "On this point, their idea is... However, our argument is superior because...",
-    "PMR": "First, I will rebut Opposition's 2nd point... They said, however, Therefore... "
+    "PMR": "First, I will rebut Opposition's 2nd point... They said ... Therefore... "
     "Then I will summarize today's debate. The most important point is... "
     "On this point, their idea is... However, our argument is superior because...",
 }
