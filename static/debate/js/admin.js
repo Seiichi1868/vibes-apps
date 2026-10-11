@@ -1014,15 +1014,26 @@ function adminAuthHeaders() {
   };
 }
 
+function audioBusy(item) {
+  return (item.parts || []).some((part) => part.audio_status === "generating");
+}
+
+function audioLabel(part) {
+  if (part.audio_stale) return "古い";
+  const labels = { none: "なし", generating: "生成中", ready: "準備完了", error: "失敗" };
+  return labels[part.audio_status] || part.audio_status || "なし";
+}
+
 function scriptStatusLabel(item) {
   if (item.generation_status === "generating") return "生成中";
   if (item.generation_status === "error") return "error";
+  if (audioBusy(item)) return "音声生成中";
   if (item.status === "published") return "published";
   return "draft";
 }
 
 function scheduleScriptPoll() {
-  const generating = allScripts.some((item) => item.generation_status === "generating");
+  const generating = allScripts.some((item) => item.generation_status === "generating" || audioBusy(item));
   if (!generating) {
     clearInterval(scriptPollTimer);
     scriptPollTimer = null;
@@ -1072,6 +1083,18 @@ function renderScripts() {
       const checkable = item.generation_status !== "generating" && item.generation_status !== "error" && (item.parts || []).length;
       const checkCost = Number(item.check_cost_usd || 0);
       const checkCostLine = checkCost > 0 ? ` · 照合 $${checkCost.toFixed(4)}` : "";
+      const speechCost = Number(item.speech_cost_usd || 0);
+      const speechCostLine = speechCost > 0 ? ` · 音声 $${speechCost.toFixed(4)}` : "";
+      const audioLine = (item.parts || [])
+        .map((part) => `${escapeHtml(part.part)} ${audioLabel(part)}`)
+        .join(" / ");
+      const audioErrors = (item.parts || [])
+        .filter((part) => part.audio_error)
+        .map((part) => `${escapeHtml(part.part)}: ${escapeHtml(part.audio_error)}`)
+        .join(" ");
+      const needsAudio = (item.parts || []).some(
+        (part) => part.audio_stale || part.audio_status !== "ready"
+      );
       const error = item.generation_error
         ? `<p class="text-xs text-rose-600 mt-1">${escapeHtml(item.generation_error)}</p>`
         : "";
@@ -1084,10 +1107,12 @@ function renderScripts() {
             <p class="text-sm font-semibold text-slate-800">${escapeHtml(item.motion)}</p>
             <p class="text-[0.65rem] text-slate-500 mt-0.5">
               ${escapeHtml(item.level)} · ${escapeHtml(item.intended_winner || "—")} · ${scriptStatusLabel(item)}
-              · $${cost}${attempts}${attemptLine}${seconds}${score}<span data-row-check-cost>${checkCostLine}</span>
+              · $${cost}${attempts}${attemptLine}${seconds}${score}${speechCostLine}<span data-row-check-cost>${checkCostLine}</span>
             </p>
             ${tokenLine}
             ${warnings ? `<ul class="text-[0.65rem] text-amber-800 mt-1 space-y-0.5">${warnings}</ul>` : ""}
+            ${audioLine ? `<p class="text-[0.65rem] text-slate-500 mt-1">音声 ${audioLine}</p>` : ""}
+            ${audioErrors ? `<p class="text-[0.65rem] text-rose-600 mt-1">${audioErrors}</p>` : ""}
             ${error}
             ${previewNote}
           </div>
@@ -1095,6 +1120,7 @@ function renderScripts() {
             <button type="button" data-script-action="preview" class="text-[0.65rem] px-2 py-1 rounded-full border border-slate-200 disabled:opacity-40" ${failed ? "disabled" : ""}>プレビュー</button>
             <button type="button" data-script-action="check" class="text-[0.65rem] px-2 py-1 rounded-full border border-slate-200 disabled:opacity-40" ${checkable ? "" : "disabled"}>ジャッジ照合</button>
             <button type="button" data-script-action="edit" class="text-[0.65rem] px-2 py-1 rounded-full border border-slate-200">編集</button>
+            <button type="button" data-script-action="audio" class="text-[0.65rem] px-2 py-1 rounded-full border border-slate-200" ${needsAudio && !failed ? "" : "disabled"}>音声を生成</button>
             <button type="button" data-script-action="publish" class="text-[0.65rem] px-2 py-1 rounded-full border border-slate-200">公開</button>
             <button type="button" data-script-action="unpublish" class="text-[0.65rem] px-2 py-1 rounded-full border border-slate-200">非公開</button>
             <button type="button" data-script-action="delete" class="text-[0.65rem] px-2 py-1 rounded-full border border-rose-200 text-rose-700">削除</button>
@@ -1156,12 +1182,19 @@ async function openScriptEditor(card) {
   }
   const script = data.script || {};
   const parts = (script.parts || [])
-    .map(
-      (part) => `<label class="block text-[0.65rem] font-semibold text-slate-600">${escapeHtml(part.part)}
+    .map((part) => {
+      const audio = part.audio || {};
+      const stale = audio.status === "ready" && audio.text_hash && audio.text_hash !== part.text_hash;
+      const label = stale ? "古い" : audioLabel({ audio_status: audio.status || "none", audio_stale: stale });
+      return `<label class="block text-[0.65rem] font-semibold text-slate-600">${escapeHtml(part.part)}
+        <span class="font-normal text-slate-500">音声: ${label}</span>
         <textarea data-part="${escapeHtml(part.part)}" rows="6" class="mt-1 w-full text-sm font-normal rounded-lg border border-teal-100 bg-white/80 px-2 py-1.5">${escapeHtml(part.text || "")}</textarea>
-        <button type="button" data-save-part="${escapeHtml(part.part)}" class="mt-1 text-[0.65rem] px-2 py-1 rounded-full bg-brand text-white">このパートを保存</button>
-      </label>`
-    )
+        <span class="inline-flex gap-1 mt-1">
+          <button type="button" data-save-part="${escapeHtml(part.part)}" class="text-[0.65rem] px-2 py-1 rounded-full bg-brand text-white">このパートを保存</button>
+          <button type="button" data-regen-part="${escapeHtml(part.part)}" class="text-[0.65rem] px-2 py-1 rounded-full border border-slate-200">このパートの音声を作り直す</button>
+        </span>
+      </label>`;
+    })
     .join("");
   editor.innerHTML = `
     <label class="block text-[0.65rem] font-semibold text-slate-600">先生メモ
@@ -1375,7 +1408,7 @@ async function refreshScriptCheck(card) {
 }
 
 scriptsList?.addEventListener("click", async (event) => {
-  const button = event.target.closest("[data-script-action], [data-save-part], [data-save-note], [data-check-estimate], [data-check-run]");
+  const button = event.target.closest("[data-script-action], [data-save-part], [data-save-note], [data-regen-part], [data-check-estimate], [data-check-run]");
   if (!button) return;
   if (!requireUnlocked("この操作")) return;
   const card = button.closest("[data-script-id]");
@@ -1427,6 +1460,11 @@ scriptsList?.addEventListener("click", async (event) => {
       window.open(`/debate/watch/${scriptId}?preview=1&token=${encodeURIComponent(data.token)}`, "_blank");
       return;
     }
+    if (button.dataset.scriptAction === "audio") {
+      await scriptAction("audio", scriptId);
+      await loadScripts();
+      return;
+    }
     if (button.dataset.scriptAction === "publish") {
       await scriptAction("status", scriptId, { status: "published" });
       await loadScripts();
@@ -1460,7 +1498,13 @@ scriptsList?.addEventListener("click", async (event) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "保存に失敗しました");
       });
-      if (status) status.textContent = `${part} を保存しました。音声は次の段階で古く扱います。`;
+      if (status) status.textContent = `${part} を保存しました。このパートの音声は古くなりました。作り直してください。`;
+      await loadScripts();
+      return;
+    }
+    if (button.dataset.regenPart) {
+      await scriptAction("audio", scriptId, { part: button.dataset.regenPart });
+      if (status) status.textContent = `${button.dataset.regenPart} の音声を生成しています。`;
       await loadScripts();
     }
   } catch (err) {

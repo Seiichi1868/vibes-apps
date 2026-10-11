@@ -3,9 +3,21 @@
 }
 .watch-part--gov {
   border-left-color: #0d9488;
+  margin-right: 0.75rem;
 }
 .watch-part--opp {
   border-left-color: #e11d48;
+  margin-left: 0.75rem;
+}
+.watch-part.is-active {
+  box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.4);
+}
+@media (max-width: 640px) {
+  .watch-part--gov,
+  .watch-part--opp {
+    margin-left: 0;
+    margin-right: 0;
+  }
 }
 .watch-part.is-hidden-text .watch-text {
   display: none;
@@ -18,6 +30,72 @@
 }
 .watch-text {
   white-space: pre-wrap;
+}
+.watch-sentence {
+  cursor: pointer;
+  border-radius: 0.2rem;
+}
+.watch-sentence.is-current {
+  background: rgba(13, 148, 136, 0.18);
+}
+.watch-player {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.65rem 0.85rem calc(0.65rem + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.92);
+  border-top: 1px solid rgba(13, 148, 136, 0.18);
+  backdrop-filter: blur(10px);
+}
+body:has(.watch-player) main {
+  padding-bottom: 8.5rem;
+}
+.watch-player-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: 56rem;
+  margin: 0 auto;
+  width: 100%;
+}
+.watch-player-btn,
+.watch-rates button {
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid rgba(13, 148, 136, 0.25);
+  padding: 0.3rem 0.7rem;
+  background: #fff;
+  color: #134e4a;
+}
+.watch-player-btn--main,
+.watch-rates button.is-active,
+#watch-continuous[aria-pressed="true"] {
+  background: #0d9488;
+  color: #fff;
+  border-color: #0d9488;
+}
+#watch-seek {
+  flex: 1 1 8rem;
+  min-width: 6rem;
+  accent-color: #0d9488;
+}
+.watch-player-now,
+.watch-player-clock {
+  font-size: 0.72rem;
+  color: #64748b;
+  white-space: nowrap;
+}
+.watch-rates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
 }
 .watch-filter-btn.is-active {
   background: #0d9488;

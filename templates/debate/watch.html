@@ -5,7 +5,7 @@
 {% block title %}お手本 | Parliamentary Debate Practice{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='debate/css/watch.css', v='20261011b') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='debate/css/watch.css', v='20261011g') }}">
 {% endblock %}
 
 {% block header_actions %}
@@ -50,13 +50,20 @@
   <button id="watch-show-ja" type="button" class="text-xs px-3 py-1.5 rounded-full border border-teal-200 font-semibold" aria-pressed="true">日本語ポイント</button>
 </div>
 
-<div class="space-y-3 mb-4">
+<div class="space-y-3 mb-4" id="watch-parts">
   {% for part in script.parts %}
-  <article class="glass-card watch-part watch-part--{{ part.side|lower }} rounded-2xl p-4 md:p-5">
+  <article class="glass-card watch-part watch-part--{{ part.side|lower }} rounded-2xl p-4 md:p-5"
+    data-part="{{ part.part }}"
+    data-side="{{ part.side }}"
+    data-words="{{ part.word_count }}"
+    data-audio-ready="{{ '1' if part.audio_ready else '0' }}"
+    data-audio-url="{{ part.audio_url }}">
     <div class="flex flex-wrap items-center gap-2 mb-2">
       <h3 class="text-sm font-bold text-slate-800">{{ part.part }}</h3>
       <span class="status-pill side-badge-{{ part.side }}">{{ part.side }}</span>
       <span class="text-xs text-slate-400">{{ part.word_count }}語</span>
+      <span class="watch-eta text-xs text-slate-400" data-words="{{ part.word_count }}"></span>
+      <button type="button" data-part-play class="ml-auto text-xs px-3 py-1 rounded-full bg-brand text-white font-semibold">再生</button>
     </div>
     {% if part.key_point_ja %}
     <p class="watch-key-point text-sm text-slate-600 mb-2">{{ part.key_point_ja }}</p>
@@ -64,6 +71,28 @@
     <p class="watch-text text-sm leading-relaxed text-slate-800" data-phrases='{{ part.signpost_phrases|tojson }}'>{{ part.text }}</p>
   </article>
   {% endfor %}
+</div>
+
+<div id="watch-player" class="watch-player" data-level="{{ script.level }}" data-speech-mode="{{ script.speech_mode }}">
+  <audio id="watch-audio" preload="metadata" playsinline></audio>
+  <div class="watch-player-row">
+    <button type="button" id="watch-prev" class="watch-player-btn">前へ</button>
+    <button type="button" id="watch-toggle" class="watch-player-btn watch-player-btn--main">再生</button>
+    <button type="button" id="watch-next" class="watch-player-btn">次へ</button>
+    <span id="watch-now" class="watch-player-now">—</span>
+    <input id="watch-seek" type="range" min="0" max="1000" value="0" aria-label="再生位置">
+    <span id="watch-clock" class="watch-player-clock">0:00 / 0:00</span>
+  </div>
+  <div class="watch-player-row">
+    <div id="watch-rates" class="watch-rates" role="group" aria-label="再生速度">
+      <button type="button" data-rate="0.5">0.5×</button>
+      <button type="button" data-rate="0.75">0.75×</button>
+      <button type="button" data-rate="1">1.0×</button>
+      <button type="button" data-rate="1.25">1.25×</button>
+      <button type="button" data-rate="1.5">1.5×</button>
+    </div>
+    <button type="button" id="watch-continuous" class="watch-player-btn" aria-pressed="true">通し再生</button>
+  </div>
 </div>
 
 <section class="glass-card rounded-2xl p-5 md:p-6 mb-4">
@@ -84,5 +113,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='debate/js/watch.js', v='20261011b') }}"></script>
+<script src="{{ url_for('static', filename='debate/js/watch.js', v='20261011g') }}"></script>
 {% endblock %}

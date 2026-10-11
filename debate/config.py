@@ -52,6 +52,19 @@ TTS_TIMEOUT_SEC = float(os.environ.get("DEBATE_TTS_TIMEOUT_SEC", "90"))
 TTS_MAX_RETRIES = int(os.environ.get("DEBATE_TTS_MAX_RETRIES", "1"))
 TTS_STUCK_SEC = int(os.environ.get("DEBATE_TTS_STUCK_SEC", "60"))
 
+# 観戦モードの読み上げ。ソロの TTS_VOICE / tts.py とは別経路。
+WATCH_SPEECH_MODEL = "gpt-4o-mini-tts"
+WATCH_GOV_VOICE = "sage"
+WATCH_OPP_VOICE = "ash"
+WATCH_SPEECH_INSTRUCTIONS = (
+    "Speak as a clear, calm debate speaker at a steady, natural pace. "
+    "Neutral accent. Do not add dramatic emotion."
+)
+WATCH_SPEECH_MAX_INPUT_CHARS = 6000
+WATCH_SPEECH_TIMEOUT_SEC = float(os.environ.get("DEBATE_WATCH_SPEECH_TIMEOUT_SEC", "90"))
+WATCH_SPEECH_MAX_RETRIES = int(os.environ.get("DEBATE_WATCH_SPEECH_MAX_RETRIES", "1"))
+WATCH_SPEECH_STUCK_SEC = int(os.environ.get("DEBATE_WATCH_SPEECH_STUCK_SEC", "240"))
+
 # AIスピーチ本文の表示既定（運用で切り替えられるよう1箇所に置く）
 AI_TEXT_VISIBLE_DEFAULT = True
 

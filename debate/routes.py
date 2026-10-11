@@ -378,6 +378,7 @@ def watch_screen(script_id):
         if admin_preview:
             return _watch_not_found("データの形式が古く表示できません", "管理画面でスクリプトを確認してください。", admin=True, status=500)
         return _watch_not_found("読み込めませんでした", "もう一度お試しください。", status=500)
+    _attach_watch_audio(view, script, token if admin_preview else "")
     return render_template(
         "debate/watch.html",
         script=view,
@@ -385,6 +386,68 @@ def watch_screen(script_id):
         failed=False,
         **_background_context(),
     )
+
+
+def _attach_watch_audio(view: dict, script: dict, preview_token: str) -> None:
+    from urllib.parse import urlencode
+
+    from debate.script_storage import part_audio_ready
+    from debate.settings import resolve_speech_mode
+
+    speech_mode = resolve_speech_mode()
+    sources = {
+        item.get("part"): item
+        for item in (script.get("parts") or [])
+        if isinstance(item, dict)
+    }
+    script_id = str(script.get("script_id") or "")
+    for part in view.get("parts") or []:
+        source = sources.get(part.get("part")) or {}
+        ready = speech_mode == "openai" and part_audio_ready(script_id, source)
+        part["audio_ready"] = ready
+        if not ready:
+            part["audio_url"] = ""
+            continue
+        url = url_for("debate.watch_part_audio", script_id=script_id, part=part.get("part"))
+        if preview_token:
+            url = f"{url}?{urlencode({'preview': '1', 'token': preview_token})}"
+        part["audio_url"] = url
+    view["speech_mode"] = speech_mode
+
+
+@debate_bp.route("/watch/<script_id>/audio/<part>")
+def watch_part_audio(script_id, part):
+    from debate.config import PART_ORDER
+    from debate.script_storage import load_script, part_audio_path, part_audio_ready, preview_token_valid
+
+    if part not in PART_ORDER:
+        return jsonify({"error": "読み込めませんでした。"}), 404
+    script = load_script(script_id)
+    if not script:
+        return jsonify({"error": "読み込めませんでした。"}), 404
+    preview = request.args.get("preview") == "1"
+    token = str(request.args.get("token") or "")
+    published = script.get("status") == "published" and script.get("generation_status") == "draft"
+    admin_preview = preview and preview_token_valid(script_id, token)
+    if not published and not admin_preview:
+        return jsonify({"error": "読み込めませんでした。"}), 404
+    source = next(
+        (item for item in (script.get("parts") or []) if isinstance(item, dict) and item.get("part") == part),
+        None,
+    )
+    path = part_audio_path(script_id, part)
+    if not source or not path or not part_audio_ready(script_id, source):
+        return jsonify({"error": "読み込めませんでした。"}), 404
+    response = send_file(
+        path,
+        mimetype="audio/mpeg",
+        as_attachment=False,
+        download_name=path.name,
+        conditional=True,
+    )
+    response.headers["Accept-Ranges"] = "bytes"
+    response.headers["Cache-Control"] = "private, no-cache"
+    return response
 
 
 def _admin_password_matches(password) -> bool:

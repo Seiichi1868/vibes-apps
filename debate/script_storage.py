@@ -162,6 +162,31 @@ def part_audio_path(script_id: str, part: str) -> Path | None:
     return script_audio_dir(script_id) / f"{part}.mp3"
 
 
+def write_part_audio(script_id: str, part: str, audio_bytes: bytes) -> Path:
+    path = part_audio_path(script_id, part)
+    if path is None:
+        raise ValueError("不明なパートです。")
+    ensure_dirs()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(".mp3.tmp")
+    tmp_path.write_bytes(audio_bytes)
+    tmp_path.replace(path)
+    return path
+
+
+def part_audio_ready(script_id: str, part: dict) -> bool:
+    if not isinstance(part, dict):
+        return False
+    name = str(part.get("part") or "")
+    audio = part.get("audio") if isinstance(part.get("audio"), dict) else {}
+    if str(audio.get("status") or "") != "ready":
+        return False
+    if str(audio.get("text_hash") or "") != str(part.get("text_hash") or ""):
+        return False
+    path = part_audio_path(script_id, name)
+    return bool(path and path.is_file() and path.stat().st_size > 0)
+
+
 def _preview_secret() -> bytes:
     return os.environ.get("DEBATE_ADMIN_PASSWORD", "2479").encode("utf-8")
 
@@ -247,6 +272,7 @@ def script_admin_summary(script: dict) -> dict:
                 "key_point_ja": part.get("key_point_ja") or "",
                 "audio_status": audio.get("status") or "none",
                 "audio_stale": audio_is_stale(part),
+                "audio_error": audio.get("error") or "",
             }
         )
     from debate.ai_script import normalize_warning
@@ -267,6 +293,7 @@ def script_admin_summary(script: dict) -> dict:
         "score_line": score_line,
         "created_at": script.get("created_at") or "",
         "gen_cost_usd": script.get("gen_cost_usd") or 0,
+        "speech_cost_usd": script.get("speech_cost_usd") or 0,
         "generation_attempts": script.get("generation_attempts") or 0,
         "generation_attempt_seconds": script.get("generation_attempt_seconds") or [],
         "generation_calls": script.get("generation_calls") or [],

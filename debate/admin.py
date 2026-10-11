@@ -267,7 +267,10 @@ def admin_list_scripts():
     from debate.script_jobs import recover_stuck_scripts
     from debate.script_storage import list_scripts, script_admin_summary
 
+    from debate.speech_jobs import recover_stuck_speech
+
     recover_stuck_scripts()
+    recover_stuck_speech()
     return jsonify({"ok": True, "scripts": [script_admin_summary(item) for item in list_scripts()]})
 
 
@@ -380,6 +383,13 @@ def admin_update_script_status(script_id):
             return jsonify({"ok": False, "error": "本文がないため公開できません。"}), 400
         script["status"] = status
         save_script(script)
+    if status == "published" and resolve_speech_mode() == "openai":
+        from debate.speech_jobs import queue_script_speech
+
+        try:
+            queue_script_speech(script_id)
+        except ValueError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
     return jsonify({"ok": True, "status": status})
 
 
@@ -410,6 +420,25 @@ def admin_script_preview_token(script_id):
     if script.get("generation_status") != "draft":
         return jsonify({"ok": False, "error": "まだ生成が終わっていません。"}), 409
     return jsonify({"ok": True, "token": issue_preview_token(script_id)})
+
+
+@debate_admin_bp.route("/api/scripts/<script_id>/audio", methods=["POST"])
+def admin_queue_script_audio(script_id):
+    payload, denied = _protected_payload()
+    if denied:
+        return denied
+    if resolve_speech_mode() != "openai":
+        return jsonify({"ok": False, "error": "読み上げ方式がブラウザのため、サーバー音声は作りません。"}), 400
+    part = str(payload.get("part") or "").strip()
+    only = [part] if part else None
+    from debate.speech_jobs import queue_script_speech
+    from debate.script_storage import script_admin_summary
+
+    try:
+        script = queue_script_speech(script_id, only, force=bool(part))
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, "script": script_admin_summary(script)})
 
 
 @debate_admin_bp.route("/api/scripts/<script_id>/checks/estimate", methods=["POST"])
