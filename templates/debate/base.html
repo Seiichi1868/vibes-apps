@@ -17,7 +17,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='debate/css/style.css', v='20261011a') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='debate/css/style.css', v='20261011c') }}">
   <style>
     .debate-page-bg {
       background-image: url("{{ url_for('static', filename=background.background_image) }}");
@@ -69,6 +69,10 @@
   </main>
 
   {% block scripts %}{% endblock %}
+  <script>
+    window.DEBATE_ARGUMENT_STATUS = {{ argument_status_client | tojson }};
+  </script>
+  <script src="{{ url_for('static', filename='debate/js/argument-status.js', v='20261011c') }}"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", function () {

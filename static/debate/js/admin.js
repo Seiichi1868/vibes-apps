@@ -61,6 +61,7 @@ let currentOpponentModelMode = "5.6-luna";
 let currentScriptModelMode = "5.6-terra";
 let currentSpeechMode = "openai";
 let allScripts = [];
+let watchedScriptId = null;
 let scriptPollTimer = null;
 let allSessions = [];
 let allAffiliations = [];
@@ -1043,8 +1044,19 @@ function renderScripts() {
   }
   scriptsList.innerHTML = allScripts
     .map((item) => {
-      const warnings = (item.warnings || []).map((warning) => `<li>${escapeHtml(warning)}</li>`).join("");
+      const warnings = (item.warnings || [])
+        .map((warning) => {
+          const message = typeof warning === "string" ? warning : warning.message || "";
+          const strong = typeof warning === "object" && warning && warning.severity === "strong";
+          return `<li><span class="font-semibold">${strong ? "強" : "弱"}</span> ${escapeHtml(message)}</li>`;
+        })
+        .join("");
       const cost = Number(item.gen_cost_usd || 0).toFixed(4);
+      const seconds =
+        item.generation_seconds === null || item.generation_seconds === undefined || item.generation_seconds === ""
+          ? ""
+          : ` · ${Number(item.generation_seconds)}秒`;
+      const score = item.score_line ? ` · ${escapeHtml(item.score_line)}` : "";
       const error = item.generation_error
         ? `<p class="text-xs text-rose-600 mt-1">${escapeHtml(item.generation_error)}</p>`
         : "";
@@ -1054,7 +1066,7 @@ function renderScripts() {
             <p class="text-sm font-semibold text-slate-800">${escapeHtml(item.motion)}</p>
             <p class="text-[0.65rem] text-slate-500 mt-0.5">
               ${escapeHtml(item.level)} · ${escapeHtml(item.intended_winner || "—")} · ${scriptStatusLabel(item)}
-              · $${cost}
+              · $${cost}${seconds}${score}
             </p>
             ${warnings ? `<ul class="text-[0.65rem] text-amber-800 mt-1 space-y-0.5">${warnings}</ul>` : ""}
             ${error}
@@ -1073,6 +1085,18 @@ function renderScripts() {
     .join("");
 }
 
+function syncCreateStatus() {
+  if (!watchedScriptId || !scriptCreateStatus) return;
+  const item = allScripts.find((row) => row.script_id === watchedScriptId);
+  if (!item || item.generation_status === "generating") return;
+  if (item.generation_status === "error") {
+    scriptCreateStatus.textContent = item.generation_error || "生成に失敗しました。";
+  } else {
+    scriptCreateStatus.textContent = "生成が完了しました（下書き）";
+  }
+  watchedScriptId = null;
+}
+
 async function loadScripts() {
   if (!scriptsList) return;
   if (!unlocked) {
@@ -1085,6 +1109,7 @@ async function loadScripts() {
     if (!res.ok) throw new Error(data.error || "一覧を取得できませんでした");
     allScripts = data.scripts || [];
     renderScripts();
+    syncCreateStatus();
     scheduleScriptPoll();
   } catch (err) {
     scriptsList.innerHTML = `<p class="text-sm text-rose-600">${escapeHtml(err.message)}</p>`;
@@ -1163,6 +1188,7 @@ scriptCreateForm?.addEventListener("submit", async (event) => {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "生成を開始できませんでした");
+    watchedScriptId = data.script && data.script.script_id;
     if (scriptCreateStatus) scriptCreateStatus.textContent = "生成中です。一覧に状態が出ます。";
     await loadScripts();
   } catch (err) {

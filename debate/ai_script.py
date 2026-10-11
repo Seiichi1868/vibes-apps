@@ -12,7 +12,21 @@ import os
 import re
 import time
 
-from debate.config import PART_DEFS, PART_GUIDES, PART_ORDER, PART_ROLES
+from debate.config import (
+    ARGUMENT_STATUS,
+    HISTORY_ACTION,
+    PART_DEFS,
+    PART_GUIDES,
+    PART_ORDER,
+    PART_ROLES,
+    SCRIPT_LEVEL_WORD_RANGES,
+    SCRIPT_WINNER_MARGIN_MAX,
+    SCRIPT_WINNER_MARGIN_MIN,
+    SCRIPT_WORDS_PER_MINUTE,
+    argument_status_rules_text,
+    format_score_total,
+    side_score_totals,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,28 +39,32 @@ POINT_IDS = {
     "Gov": ("gov_1", "gov_2"),
     "Opp": ("opp_1", "opp_2"),
 }
-ARGUMENT_STATUSES = {"standing", "knocked_down", "extended"}
-
-LEVEL_SPECS = {
+_LEVEL_STYLE = {
     "easy": {
-        "constructive": (220, 280),
-        "reply": (150, 190),
         "sentence_rule": "Keep most sentences to 15 words or fewer.",
         "level_rules": "CEFR A2–B1. Short sentences. Everyday school words. Default playback 0.75x.",
     },
     "normal": {
-        "constructive": (330, 400),
-        "reply": (220, 270),
         "sentence_rule": "Keep most sentences to 22 words or fewer.",
         "level_rules": "CEFR B1–B2. Clear classroom English. Default playback 1.0x.",
     },
     "hard": {
-        "constructive": (430, 480),
-        "reply": (300, 340),
         "sentence_rule": "Use natural sentence length for a fluent debate speech.",
         "level_rules": "CEFR B2 or above. Natural debate English. Default playback 1.0x.",
     },
 }
+LEVEL_SPECS = {
+    level: {**style, **SCRIPT_LEVEL_WORD_RANGES[level]} for level, style in _LEVEL_STYLE.items()
+}
+
+_FABRICATION_PATTERNS = (
+    (re.compile(r"\d+(?:\.\d+)?\s*%"), "%"),
+    (re.compile(r"\bstudies\b", re.I), "studies"),
+    (re.compile(r"\bresearch\b", re.I), "research"),
+    (re.compile(r"\bsurvey\b", re.I), "survey"),
+    (re.compile(r"\baccording to\b", re.I), "according to"),
+    (re.compile(r"\bexperts\b", re.I), "experts"),
+)
 
 CONSTRUCTIVE_PARTS = {"PM", "LO", "MG", "MO"}
 REPLY_PARTS = {"LOR", "PMR"}
@@ -54,6 +72,25 @@ REPLY_PARTS = {"LOR", "PMR"}
 
 def word_count(text: str) -> int:
     return len(re.findall(r"[A-Za-z0-9']+", text or ""))
+
+
+def make_warning(message: str, severity: str) -> dict:
+    return {"severity": "strong" if severity == "strong" else "weak", "message": message}
+
+
+def warning_message(item) -> str:
+    if isinstance(item, dict):
+        return str(item.get("message") or "")
+    return str(item)
+
+
+def normalize_warning(item) -> dict:
+    if isinstance(item, dict):
+        severity = "strong" if item.get("severity") == "strong" else "weak"
+        return {"severity": severity, "message": str(item.get("message") or "")}
+    text = str(item)
+    strong = any(token in text for token in ("制限", "優勢差", "架空"))
+    return {"severity": "strong" if strong else "weak", "message": text}
 
 
 def text_hash(text: str) -> str:
@@ -109,7 +146,10 @@ Begin each speech with, and use throughout, the signpost templates below (verbat
 - Rebuttals must respond to what the previous speaker ACTUALLY said: "They said ... However ... Therefore ...". Reconstruct before rebutting where the role requires it.
 - LOR and PMR introduce NO new arguments.
 - Do NOT invent statistics, study names, institutions, quotations, or named experts. Do not write "studies show" or "research shows". Argue with logic and concrete everyday school-life examples instead.
-- The intended winner's points should remain standing at the end. The other side should lose at least one point through a rebuttal that goes unanswered. Keep the debate plausible and fair: both sides argue well; the result is clear but not a blowout.
+- Plan the argument_map so the intended winner's total weight is {SCRIPT_WINNER_MARGIN_MIN} to {SCRIPT_WINNER_MARGIN_MAX} higher than the other side. Avoid a gap of 1.5 or more. Both sides should still argue well.
+- A point may be weakened or collapsed only when a speech in this script actually reaches that point's reason and the owning side does not fully answer it. Do not exaggerate the rebuttal. The speeches and the statuses must describe the same debate.
+- Follow this judgment procedure exactly:
+{argument_status_rules_text()}
 - Write for the ear: plain text only, no markdown, bullets, parentheses, emoji, or abbreviations.
 - Word counts per speech: {_word_ranges_text(level)}. Sentence length: {spec["sentence_rule"]}.
 - Before you output JSON, count the words in each speech and rewrite any speech that is outside its range.
@@ -118,8 +158,8 @@ Begin each speech with, and use throughout, the signpost templates below (verbat
 JSON only, no preface. Keys in this order (plan first, then write):
 motion, intended_winner, points, argument_map, parts, summary_ja
 - points: Gov and Opp, each a list of two objects {{id, summary_ja, summary_en}}. ids must be gov_1, gov_2, opp_1, opp_2.
-- argument_map: one object per point id, with id, side, raised_in, status (standing, knocked_down, or extended), history (list of {{part, action}}).
-  Actions should be raised, rebutted, defended, or extended. summary is a short Japanese label for the point.
+- argument_map: one object per point id, with id, side, raised_in, status (intact, weakened, or collapsed only), reason_ja (Japanese, one sentence, 60 characters or fewer), history (list of {{part, action}}).
+  Actions are raised, rebutted, defended, or extended. extended is an action, never a status.
 - parts: 6 items in order PM, LO, MG, MO, LOR, PMR, each {{part, side, text, signpost_phrases, key_point_ja}}
   - signpost_phrases: exact substrings of text that are signpost expressions
   - key_point_ja: Japanese, 40 characters or fewer, what this speech does
@@ -192,27 +232,31 @@ def _clean_speech_text(text: str) -> str:
     return cleaned.strip()
 
 
-def validate_generated(data: dict, level: str) -> tuple[dict, list[str], list[str]]:
-    """生成JSONを検証し、(正規化済み中身, 致命的エラー, 警告) を返す。"""
+def validate_generated(data: dict, level: str) -> tuple[dict, list[str], list[dict], str]:
+    """生成JSONを検証し、(正規化済み, 致命的エラー, 警告, 優勢差の問題) を返す。
+
+    優勢差が外れていても致命的にはしない。呼び出し側が1回再生成し、だめなら警告付きで残す。
+    """
     fatal: list[str] = []
-    warnings: list[str] = []
+    warnings: list[dict] = []
     if level not in LEVEL_SPECS:
         fatal.append("レベルが不正です。")
-        return {}, fatal, warnings
+        return {}, fatal, warnings, ""
 
     winner = str(data.get("intended_winner") or "").strip()
     if winner not in WINNERS:
         fatal.append("優勢側（intended_winner）が Gov / Opp になっていません。")
 
     points = _normalize_points(data.get("points"), fatal)
-    argument_map = _normalize_argument_map(data.get("argument_map"), points, fatal)
+    argument_map = _normalize_argument_map(data.get("argument_map"), points, fatal, warnings)
+    balance = ""
     if winner in WINNERS and not fatal:
-        _check_winner_balance(argument_map, winner, fatal)
+        balance = _margin_problem(argument_map, winner)
 
     parts = _normalize_parts(data.get("parts"), level, warnings, fatal)
     summary = str(data.get("summary_ja") or "").strip()
     if len(summary) > 200:
-        warnings.append(f"全体解説が200字を超えています（{len(summary)}字）。")
+        warnings.append(make_warning(f"全体解説が200字を超えています（{len(summary)}字）。", "weak"))
 
     normalized = {
         "intended_winner": winner if winner in WINNERS else "",
@@ -221,7 +265,7 @@ def validate_generated(data: dict, level: str) -> tuple[dict, list[str], list[st
         "parts": parts,
         "summary_ja": summary,
     }
-    return normalized, fatal, warnings
+    return normalized, fatal, warnings, balance
 
 
 def _normalize_points(raw, fatal: list[str]) -> dict:
@@ -263,7 +307,7 @@ def _point_lookup(points: dict) -> dict[str, dict]:
     return found
 
 
-def _normalize_argument_map(raw, points: dict, fatal: list[str]) -> list:
+def _normalize_argument_map(raw, points: dict, fatal: list[str], warnings: list[dict]) -> list:
     lookup = _point_lookup(points)
     if not isinstance(raw, list):
         fatal.append("argument_map がありません。")
@@ -282,9 +326,11 @@ def _normalize_argument_map(raw, points: dict, fatal: list[str]) -> list:
         seen.add(point_id)
         side = lookup[point_id]["side"]
         status = str(item.get("status") or "").strip()
-        if status not in ARGUMENT_STATUSES:
-            fatal.append(f"{point_id} の status が不正です。")
-            status = "standing"
+        if status not in ARGUMENT_STATUS:
+            fatal.append(
+                f"{point_id} の status「{status or '空'}」は不正です。"
+                "intact / weakened / collapsed のみ使ってください。"
+            )
         raised = str(item.get("raised_in") or item.get("raised_in_part") or "").strip()
         if raised not in PART_ORDER:
             fatal.append(f"{point_id} の提示パートが不正です。")
@@ -295,9 +341,23 @@ def _normalize_argument_map(raw, points: dict, fatal: list[str]) -> list:
                 continue
             part = str(entry.get("part") or "").strip()
             action = str(entry.get("action") or "").strip()
-            if part in PART_ORDER and action:
-                history.append({"part": part, "action": action})
-        summary = str(item.get("summary") or lookup[point_id].get("summary_ja") or "").strip()
+            if action == "reinforced":
+                action = "extended"
+            if part not in PART_ORDER or action not in HISTORY_ACTION:
+                if action or part:
+                    warnings.append(
+                        make_warning(f"{point_id}: history の {part or '?'} / {action or '?'} を除きました。", "weak")
+                    )
+                continue
+            history.append({"part": part, "action": action})
+        reason = str(item.get("reason_ja") or "").strip()
+        if not reason:
+            warnings.append(make_warning(f"{point_id}: reason_ja がありません。", "weak"))
+        elif len(reason) > 60:
+            warnings.append(
+                make_warning(f"{point_id}: reason_ja が60字を超えています（{len(reason)}字）。", "weak")
+            )
+        point = lookup[point_id]
         normalized.append(
             {
                 "id": point_id,
@@ -305,8 +365,11 @@ def _normalize_argument_map(raw, points: dict, fatal: list[str]) -> list:
                 "side": side,
                 "raised_in": raised,
                 "raised_in_part": raised,
-                "status": status,
-                "summary": summary,
+                "status": status if status in ARGUMENT_STATUS else "",
+                "summary": str(item.get("summary") or point.get("summary_ja") or "").strip(),
+                "summary_ja": str(point.get("summary_ja") or "").strip(),
+                "summary_en": str(point.get("summary_en") or "").strip(),
+                "reason_ja": reason,
                 "history": history,
             }
         )
@@ -316,21 +379,55 @@ def _normalize_argument_map(raw, points: dict, fatal: list[str]) -> list:
     return normalized
 
 
-def _check_winner_balance(argument_map: list, winner: str, fatal: list[str]) -> None:
-    counts = {"Gov": 0, "Opp": 0}
-    for item in argument_map:
-        if item.get("status") in ("standing", "extended"):
-            side = item.get("side")
-            if side in counts:
-                counts[side] += 1
-    loser = "Opp" if winner == "Gov" else "Gov"
-    if counts[winner] <= counts[loser]:
-        fatal.append(
-            f"優勢側 {winner} の残っている論点（{counts[winner]}）が相手（{counts[loser]}）より多くありません。"
+def _margin_problem(argument_map: list, winner: str) -> str:
+    totals = side_score_totals(argument_map)
+    gov = float(totals["gov"])
+    opp = float(totals["opp"])
+    leader = "Gov" if gov > opp else "Opp" if opp > gov else ""
+    gap = round(abs(gov - opp) + 1e-9, 1)
+    if leader == winner and SCRIPT_WINNER_MARGIN_MIN - 1e-9 <= gap <= SCRIPT_WINNER_MARGIN_MAX + 1e-9:
+        return ""
+    line = format_score_total(totals)
+    return (
+        f"優勢差が範囲外です（{line}、差 {gap:.1f}。"
+        f"目安 {SCRIPT_WINNER_MARGIN_MIN:.1f}–{SCRIPT_WINNER_MARGIN_MAX:.1f}、指定 {winner}）。"
+    )
+
+
+def _part_quality_warnings(part: str, text: str, level: str) -> list[dict]:
+    """語数・制限時間・架空の統計。下書きは落とさない。"""
+    warnings = []
+    count = word_count(text)
+    if not text or not count:
+        return warnings
+    hits = [label for pattern, label in _FABRICATION_PATTERNS if pattern.search(text)]
+    if hits:
+        warnings.append(
+            make_warning(f"{part}: 架空の統計・引用の可能性（{'、'.join(hits)}）", "strong")
         )
+    low, high = word_range_for(part, level if level in LEVEL_SPECS else "normal")
+    limit = int(PART_DEFS[part]["time_limit_sec"])
+    est = round(count / SCRIPT_WORDS_PER_MINUTE * 60)
+    if est > limit:
+        warnings.append(
+            make_warning(
+                f"{part}: 読み時間の目安が制限を超えています"
+                f"（約{est}秒 / 制限{limit}秒、{count}語・約{SCRIPT_WORDS_PER_MINUTE}語/分）。",
+                "strong",
+            )
+        )
+    elif count < low or count > high:
+        warnings.append(
+            make_warning(
+                f"{part}: 語数が目安の外です（{count}語。目安 {low}–{high}）。"
+                f"読み時間の目安は約{est}秒（制限{limit}秒、約{SCRIPT_WORDS_PER_MINUTE}語/分）。",
+                "weak",
+            )
+        )
+    return warnings
 
 
-def _normalize_parts(raw, level: str, warnings: list[str], fatal: list[str]) -> list:
+def _normalize_parts(raw, level: str, warnings: list[dict], fatal: list[str]) -> list:
     if not isinstance(raw, list) or len(raw) != 6:
         fatal.append("parts が6つありません。")
         raw_items = raw if isinstance(raw, list) else []
@@ -361,11 +458,10 @@ def _normalize_parts(raw, level: str, warnings: list[str], fatal: list[str]) -> 
                 phrases.append(snippet)
         key_point = str(item.get("key_point_ja") or "").strip()
         if len(key_point) > 40:
-            warnings.append(f"{part}: 日本語ポイントが40字を超えています（{len(key_point)}字）。")
+            warnings.append(make_warning(f"{part}: 日本語ポイントが40字を超えています（{len(key_point)}字）。", "weak"))
         count = word_count(text)
-        low, high = word_range_for(part, level)
-        if text and (count < low or count > high):
-            warnings.append(f"{part}: 語数が範囲外です（{count}語。目安 {low}–{high}）。")
+        if text:
+            warnings.extend(_part_quality_warnings(part, text, level))
         digest = text_hash(text)
         parts.append(
             {
@@ -398,6 +494,7 @@ def generate_model_script(motion: str, level: str, intended_winner: str, model_m
     messages = [{"role": "user", "content": prompt}]
     total_cost = 0.0
     last_fatal: list[str] = []
+    fallback: tuple[dict, list[dict], str] | None = None
 
     for attempt in range(2):
         kwargs: dict = {
@@ -435,19 +532,41 @@ def generate_model_script(motion: str, level: str, intended_winner: str, model_m
             data = _parse_json_object(raw)
         except (json.JSONDecodeError, ValueError) as exc:
             last_fatal = [f"JSONとして読めませんでした（{exc}）。"]
-            messages = _retry_messages(prompt, last_fatal)
-            continue
-        normalized, fatal, warnings = validate_generated(data, level)
+            if attempt == 0:
+                messages = _retry_messages(prompt, last_fatal)
+                continue
+            break
+        normalized, fatal, warnings, balance = validate_generated(data, level)
+        if not fatal and not balance:
+            return _pack_script(normalized, warnings, model, total_cost)
+        reasons = list(fatal)
+        if balance:
+            reasons.append(balance)
+        last_fatal = reasons
+        logger.info("Script validation failed (attempt=%s): %s", attempt + 1, "; ".join(reasons))
         if not fatal:
-            normalized["script_model"] = model
-            normalized["gen_cost_usd"] = round(total_cost, 6)
-            normalized["warnings"] = warnings
-            return normalized
-        last_fatal = fatal
-        logger.info("Script validation failed (attempt=%s): %s", attempt + 1, "; ".join(fatal))
-        messages = _retry_messages(prompt, fatal)
+            fallback = (normalized, warnings, balance)
+        if attempt == 0:
+            messages = _retry_messages(prompt, reasons)
+            continue
+        break
+
+    if fallback:
+        normalized, warnings, balance = fallback
+        kept = list(warnings)
+        if balance:
+            kept.append(make_warning(balance, "strong"))
+        return _pack_script(normalized, kept, model, total_cost)
 
     raise ValueError(" / ".join(last_fatal) or "スクリプトを生成できませんでした。")
+
+
+def _pack_script(normalized: dict, warnings: list, model: str, total_cost: float) -> dict:
+    packed = dict(normalized)
+    packed["script_model"] = model
+    packed["gen_cost_usd"] = round(total_cost, 6)
+    packed["warnings"] = [normalize_warning(item) for item in warnings]
+    return packed
 
 
 def _retry_messages(prompt: str, fatal: list[str]) -> list[dict]:
@@ -464,8 +583,8 @@ def _retry_messages(prompt: str, fatal: list[str]) -> list[dict]:
     ]
 
 
-def apply_part_text(part: dict, text: str, level: str) -> tuple[dict, str | None]:
-    """本文編集後のパート。語数警告があれば返す。音声ハッシュは残し、古さは呼び出し側で見る。"""
+def apply_part_text(part: dict, text: str, level: str) -> tuple[dict, list[dict]]:
+    """本文編集後のパート。語数・時間・引用の警告を返す。音声ハッシュは残す。"""
     cleaned = _clean_speech_text(text)
     phrases = [phrase for phrase in (part.get("signpost_phrases") or []) if phrase and phrase in cleaned]
     updated = dict(part)
@@ -477,9 +596,5 @@ def apply_part_text(part: dict, text: str, level: str) -> tuple[dict, str | None
     audio.setdefault("status", "none")
     audio.setdefault("text_hash", "")
     updated["audio"] = audio
-    low, high = word_range_for(updated.get("part") or "PM", level if level in LEVEL_SPECS else "normal")
-    warning = None
-    count = updated["word_count"]
-    if cleaned and (count < low or count > high):
-        warning = f"{updated.get('part')}: 語数が範囲外です（{count}語。目安 {low}–{high}）。"
-    return updated, warning
+    part_name = str(updated.get("part") or "PM")
+    return updated, _part_quality_warnings(part_name, cleaned, level if level in LEVEL_SPECS else "normal")

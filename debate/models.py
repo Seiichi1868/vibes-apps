@@ -65,7 +65,7 @@ def new_judge_result() -> dict:
         "judged_at": None,
         "argument_flow": [],
         "winner": None,
-        "standing_point_count": {"gov": 0, "opp": 0},
+        "score_total": {"gov": 0.0, "opp": 0.0},
         "scores": {
             "content": {"reasoning": None, "examples": None, "relevance": None},
             "method": {

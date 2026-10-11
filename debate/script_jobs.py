@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 import uuid
 from datetime import datetime
 
@@ -106,6 +107,7 @@ def run_script_job(script_id: str) -> None:
         script = load_script(script_id)
     if not script or script.get("generation_status") != "generating":
         return
+    started = time.monotonic()
     try:
         generated = generate_model_script(
             script.get("motion") or "",
@@ -115,8 +117,14 @@ def run_script_job(script_id: str) -> None:
         )
     except Exception as exc:  # noqa: BLE001
         logger.warning("Script job failed (%s): %s", script_id, exc)
-        _save_error(script_id, str(exc) or "スクリプトを生成できませんでした。")
+        _save_error(
+            script_id,
+            str(exc) or "スクリプトを生成できませんでした。",
+            seconds=round(time.monotonic() - started, 1),
+        )
         return
+    generated = dict(generated)
+    generated["generation_seconds"] = round(time.monotonic() - started, 1)
     _save_success(script_id, generated)
 
 
@@ -135,6 +143,7 @@ def _save_success(script_id: str, generated: dict) -> None:
                 "warnings": generated.get("warnings") or [],
                 "script_model": generated.get("script_model") or "",
                 "gen_cost_usd": generated.get("gen_cost_usd") or 0,
+                "generation_seconds": generated.get("generation_seconds"),
                 "generation_status": "draft",
                 "generation_error": "",
                 "status": "draft",
@@ -143,7 +152,7 @@ def _save_success(script_id: str, generated: dict) -> None:
         save_script(script)
 
 
-def _save_error(script_id: str, message: str) -> None:
+def _save_error(script_id: str, message: str, seconds: float | None = None) -> None:
     with get_script_lock(script_id):
         script = load_script(script_id)
         if not script:
@@ -151,6 +160,8 @@ def _save_error(script_id: str, message: str) -> None:
         script["generation_status"] = "error"
         script["generation_error"] = message[:500]
         script["status"] = "draft"
+        if seconds is not None:
+            script["generation_seconds"] = seconds
         save_script(script)
 
 

@@ -161,6 +161,190 @@ STATUS_LABELS = {
     "confirmed": "確定済み",
 }
 
+# 論点の状態。画面ラベル・色・勝敗の重みはここだけを見る。
+# extended は状態ではなく history の action。
+ARGUMENT_STATUS = {
+    "intact": {"label_en": "Intact", "gloss_ja": "維持", "weight": 1.0, "color": "green"},
+    "weakened": {"label_en": "Weakened", "gloss_ja": "弱体化", "weight": 0.5, "color": "amber"},
+    "collapsed": {"label_en": "Collapsed", "gloss_ja": "崩れた", "weight": 0.0, "color": "gray"},
+}
+HISTORY_ACTION = {
+    "raised": {"label_en": "Raised"},
+    "rebutted": {"label_en": "Rebutted"},
+    "defended": {"label_en": "Defended"},
+    "extended": {"label_en": "Extended"},
+}
+SHOW_STATUS_GLOSS_JA = True
+
+# 表示時だけ使う。保存済みJSONは書き換えない。
+LEGACY_ARGUMENT_STATUS = {
+    "standing": "intact",
+    "knocked_down": "collapsed",
+    "extended": "intact",
+}
+
+# 観戦スクリプトの語数目安（音声を聞いてから調整する。今回は値を変えない）。
+SCRIPT_WORDS_PER_MINUTE = 140
+SCRIPT_WINNER_MARGIN_MIN = 0.5
+SCRIPT_WINNER_MARGIN_MAX = 1.0
+SCRIPT_LEVEL_WORD_RANGES = {
+    "easy": {"constructive": (220, 280), "reply": (150, 190)},
+    "normal": {"constructive": (330, 400), "reply": (220, 270)},
+    "hard": {"constructive": (430, 480), "reply": (300, 340)},
+}
+
+# 生成プロンプトとジャッジプロンプトが同じ文面を埋め込む。
+ARGUMENT_JUDGMENT_PROCEDURE = """各論点について、次の2つを順に判断する。
+- Q1 相手の反論は、その論点の核心（なぜそうなるかの理由）に届いたか: reached（届いた）/ partial（範囲・程度への指摘のみ）/ none（届かない・反論なし）
+- Q2 その後の再反論・防御で回復したか: full（十分）/ partial（部分的）/ none（なし）
+
+Q1 と Q2 から最終状態を決める。
+- Q1 が none → intact
+- Q1 が partial かつ Q2 が full → intact
+- Q1 が partial かつ Q2 が partial または none → weakened
+- Q1 が reached かつ Q2 が full → intact
+- Q1 が reached かつ Q2 が partial → weakened
+- Q1 が reached かつ Q2 が none → collapsed
+
+- collapsed は「核心に届いた反論に答えがなかった」場合に限る。迷ったら weakened。
+- LOR / PMR で新規に出された論点は、判定対象に含めない。
+- 各論点に reason_ja（判定理由、日本語1文、60字以内）を付ける。Q1・Q2 の結果が分かる書き方にする。
+- 各陣営の合計は、その陣営の論点（最大2つ）の weight の和。合計が多い側を勝者とする。同点は内容ルーブリック（Content）で決める。"""
+
+
+def argument_status_rules_text() -> str:
+    """生成とジャッジが共有する状態定義と判定手順。"""
+    lines = ["# 論点の状態（保存する内部値は次の3つのみ）"]
+    for key, meta in ARGUMENT_STATUS.items():
+        lines.append(f'- "{key}": weight {meta["weight"]}')
+    lines.append("- extended は状態ではない。補強は history の action として記録する。")
+    lines.append("- history の action は raised / rebutted / defended / extended の4種。")
+    lines.append("")
+    lines.append(ARGUMENT_JUDGMENT_PROCEDURE)
+    return "\n".join(lines)
+
+
+def canonical_argument_status(status: str) -> str:
+    """内部値へ揃える。未知の値は intact（迷ったら崩さない）。"""
+    raw = str(status or "").strip()
+    if raw in ARGUMENT_STATUS:
+        return raw
+    mapped = LEGACY_ARGUMENT_STATUS.get(raw)
+    if mapped:
+        return mapped
+    return "intact"
+
+
+def argument_weight(status: str) -> float:
+    key = canonical_argument_status(status)
+    return float(ARGUMENT_STATUS[key]["weight"])
+
+
+def side_score_totals(items) -> dict:
+    """陣営ごとに最大2論点の weight を足す。"""
+    buckets = {"Gov": [], "Opp": []}
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        side = str(item.get("side") or "").strip()
+        if side not in buckets:
+            continue
+        buckets[side].append(argument_weight(item.get("status")))
+    return {
+        "gov": round(sum(buckets["Gov"][:2]) + 1e-9, 1),
+        "opp": round(sum(buckets["Opp"][:2]) + 1e-9, 1),
+    }
+
+
+def format_score_total(totals: dict | None) -> str:
+    if not isinstance(totals, dict):
+        return ""
+    try:
+        gov = float(totals.get("gov") or 0)
+        opp = float(totals.get("opp") or 0)
+    except (TypeError, ValueError):
+        return ""
+    return f"Gov {gov:.1f} / Opp {opp:.1f}"
+
+
+def argument_rows_for_display(items) -> list:
+    """保存値は変えず、画面用の行だけ作る。旧状態名はここで変換する。"""
+    rows = []
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        raw_status = str(item.get("status") or "").strip()
+        status = canonical_argument_status(raw_status)
+        meta = ARGUMENT_STATUS[status]
+        history = []
+        saw_extended = False
+        for entry in item.get("history") or []:
+            if not isinstance(entry, dict):
+                continue
+            part = str(entry.get("part") or "").strip()
+            action = str(entry.get("action") or "").strip()
+            if action == "reinforced":
+                action = "extended"
+            if action not in HISTORY_ACTION or not part:
+                continue
+            if action == "extended":
+                saw_extended = True
+            history.append(
+                {
+                    "part": part,
+                    "action": action,
+                    "label_en": HISTORY_ACTION[action]["label_en"],
+                }
+            )
+        if raw_status == "extended" and not saw_extended:
+            part = str(item.get("raised_in") or item.get("raised_in_part") or "").strip()
+            if part:
+                history.append(
+                    {
+                        "part": part,
+                        "action": "extended",
+                        "label_en": HISTORY_ACTION["extended"]["label_en"],
+                    }
+                )
+        summary_en = str(item.get("summary_en") or "").strip()
+        summary_ja = str(item.get("summary_ja") or "").strip()
+        summary = str(item.get("summary") or "").strip()
+        if not summary_en:
+            summary_en = summary or summary_ja
+        if summary_ja and summary_ja == summary_en:
+            summary_ja = ""
+        elif not summary_ja and summary and summary != summary_en:
+            summary_ja = summary
+        rows.append(
+            {
+                "id": str(item.get("argument_id") or item.get("id") or ""),
+                "side": str(item.get("side") or ""),
+                "raised_in": str(item.get("raised_in") or item.get("raised_in_part") or ""),
+                "summary_en": summary_en,
+                "summary_ja": summary_ja,
+                "status": status,
+                "label_en": meta["label_en"],
+                "gloss_ja": meta["gloss_ja"],
+                "color": meta["color"],
+                "reason_ja": str(item.get("reason_ja") or "").strip(),
+                "history": history,
+            }
+        )
+    return rows
+
+
+def argument_template_context() -> dict:
+    return {
+        "argument_status": ARGUMENT_STATUS,
+        "history_action": HISTORY_ACTION,
+        "show_status_gloss_ja": SHOW_STATUS_GLOSS_JA,
+        "argument_status_client": {
+            "statuses": ARGUMENT_STATUS,
+            "actions": HISTORY_ACTION,
+            "showGlossJa": SHOW_STATUS_GLOSS_JA,
+        },
+    }
+
 
 def ensure_dirs() -> None:
     SESSIONS_DIR.mkdir(parents=True, exist_ok=True)

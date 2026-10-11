@@ -327,15 +327,18 @@ def admin_update_script_part(script_id, part):
         target = next((item for item in parts if item.get("part") == part), None)
         if not target:
             return jsonify({"ok": False, "error": "このパートはまだありません。"}), 400
-        updated, warning = apply_part_text(target, str(payload.get("text") or ""), script.get("level") or "normal")
+        updated, part_warnings = apply_part_text(
+            target, str(payload.get("text") or ""), script.get("level") or "normal"
+        )
         script["parts"] = [updated if item.get("part") == part else item for item in parts]
+        from debate.ai_script import warning_message
+
         warnings = [
             item
             for item in (script.get("warnings") or [])
-            if not str(item).startswith(f"{part}: 語数が範囲外")
+            if not warning_message(item).startswith(f"{part}:")
         ]
-        if warning:
-            warnings.append(warning)
+        warnings.extend(part_warnings)
         script["warnings"] = warnings
         save_script(script)
     return jsonify({"ok": True, "script": script})

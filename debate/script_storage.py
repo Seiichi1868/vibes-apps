@@ -12,7 +12,7 @@ import time
 import uuid
 from pathlib import Path
 
-from debate.config import PART_ORDER, SCRIPT_AUDIO_DIR, SCRIPTS_DIR, ensure_dirs
+from debate.config import PART_ORDER, SCRIPT_AUDIO_DIR, SCRIPTS_DIR, ensure_dirs, format_score_total, side_score_totals
 
 _lock = threading.Lock()
 _script_locks: dict[str, threading.Lock] = {}
@@ -171,6 +171,11 @@ def script_admin_summary(script: dict) -> dict:
                 "audio_stale": audio_is_stale(part),
             }
         )
+    from debate.ai_script import normalize_warning
+
+    warnings = [normalize_warning(item) for item in (script.get("warnings") or [])]
+    argument_map = script.get("argument_map") or []
+    score_line = format_score_total(side_score_totals(argument_map)) if argument_map else ""
     return {
         "script_id": script.get("script_id"),
         "motion": script.get("motion") or "",
@@ -179,7 +184,9 @@ def script_admin_summary(script: dict) -> dict:
         "status": script.get("status") or "draft",
         "generation_status": script.get("generation_status") or "idle",
         "generation_error": script.get("generation_error") or "",
-        "warnings": list(script.get("warnings") or []),
+        "generation_seconds": script.get("generation_seconds"),
+        "warnings": warnings,
+        "score_line": score_line,
         "created_at": script.get("created_at") or "",
         "gen_cost_usd": script.get("gen_cost_usd") or 0,
         "script_model": script.get("script_model") or "",

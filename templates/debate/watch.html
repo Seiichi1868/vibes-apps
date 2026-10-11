@@ -1,8 +1,6 @@
 {% extends "debate/base.html" %}
 
 {% set level_labels = {"easy": "やさしい", "normal": "ふつう", "hard": "むずかしい"} %}
-{% set action_labels = {"raised": "提示", "rebutted": "反論", "defended": "再反論・防御", "extended": "補強", "reinforced": "補強"} %}
-{% set status_labels = {"standing": "残っている", "knocked_down": "倒れた", "extended": "広がった"} %}
 
 {% block title %}お手本 | Parliamentary Debate Practice{% endblock %}
 
@@ -35,7 +33,7 @@
   {% if show_admin and script.warnings %}
   <ul class="mt-3 text-xs text-amber-800 space-y-1">
     {% for warning in script.warnings %}
-    <li>{{ warning }}</li>
+    <li>{% if warning.severity == 'strong' %}強{% else %}弱{% endif %} {{ warning.message }}</li>
     {% endfor %}
   </ul>
   {% endif %}
@@ -69,42 +67,12 @@
 </div>
 
 <section class="glass-card rounded-2xl p-5 md:p-6 mb-4">
-  <h3 class="font-bold text-slate-800 mb-1">論点の流れ図</h3>
+  <h3 class="font-bold text-slate-800 mb-1">Argument flow<span class="arg-col-gloss">論点の流れ</span></h3>
   <p class="text-xs text-slate-500 mb-3">これはお手本の流れの解説です。実際のAIジャッジの判定とは別のものです。</p>
-  {% if script.argument_map %}
-  <div class="overflow-x-auto -mx-1">
-    <table class="w-full text-sm min-w-[560px]">
-      <thead>
-        <tr class="text-left text-xs text-slate-400 border-b border-slate-200">
-          <th class="py-2 px-1 font-semibold">論点</th>
-          <th class="py-2 px-1 font-semibold">提示した陣営とパート</th>
-          <th class="py-2 px-1 font-semibold">反論・防御の推移</th>
-          <th class="py-2 px-1 font-semibold">最終ステータス</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for arg in script.argument_map %}
-        <tr class="border-b border-slate-100 align-top">
-          <td class="py-2.5 px-1 text-slate-700 max-w-[220px]">{{ arg.summary }}</td>
-          <td class="py-2.5 px-1">
-            <span class="status-pill side-badge-{{ arg.side }}">{{ arg.side }}</span>
-            <span class="text-slate-500 ml-1">{{ arg.raised_in_part or arg.raised_in }}</span>
-          </td>
-          <td class="py-2.5 px-1">
-            <div class="flex flex-wrap gap-1">
-              {% for h in arg.history %}
-              <span class="history-chip history-action-{{ h.action }}">{{ h.part }}: {{ action_labels.get(h.action, h.action) }}</span>
-              {% endfor %}
-            </div>
-          </td>
-          <td class="py-2.5 px-1">
-            <span class="status-pill arg-status-{{ arg.status }}">{{ status_labels.get(arg.status, arg.status) }}</span>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  {% if script.argument_rows %}
+  {% with argument_rows=script.argument_rows, score_line=script.score_line %}
+  {% include "debate/_argument_flow.html" %}
+  {% endwith %}
   {% endif %}
   {% if script.summary_ja %}
   <p class="text-sm text-slate-700 mt-4 leading-relaxed">{{ script.summary_ja }}</p>

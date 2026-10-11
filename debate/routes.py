@@ -260,6 +260,9 @@ def index():
 
 def _public_watch_script(script: dict, *, show_admin: bool) -> dict:
     """生徒向けにコスト・モデル名・内部エラーを落とす。"""
+    from debate.ai_script import normalize_warning
+    from debate.config import argument_rows_for_display, format_score_total, side_score_totals
+
     parts = []
     for part in script.get("parts") or []:
         if not isinstance(part, dict):
@@ -281,11 +284,13 @@ def _public_watch_script(script: dict, *, show_admin: bool) -> dict:
         "intended_winner": script.get("intended_winner") or "",
         "summary_ja": script.get("summary_ja") or "",
         "argument_map": script.get("argument_map") or [],
+        "argument_rows": argument_rows_for_display(script.get("argument_map") or []),
+        "score_line": format_score_total(side_score_totals(script.get("argument_map") or [])),
         "parts": parts,
         "status": script.get("status") or "draft",
     }
     if show_admin:
-        view["warnings"] = list(script.get("warnings") or [])
+        view["warnings"] = [normalize_warning(item) for item in (script.get("warnings") or [])]
         view["teacher_note"] = script.get("teacher_note") or ""
         view["generation_status"] = script.get("generation_status") or ""
         view["generation_error"] = script.get("generation_error") or ""
@@ -927,6 +932,13 @@ def judge_screen(session_id):
             "debate/not_found.html", session_id=session_id, **_background_context()
         ), 404
 
+    from debate.config import argument_rows_for_display, format_score_total, side_score_totals
+
+    judge = session.get("judge_result") or {}
+    flow = judge.get("argument_flow") or []
+    totals = judge.get("score_total") if isinstance(judge.get("score_total"), dict) else None
+    if not totals:
+        totals = side_score_totals(flow)
     return render_template(
         "debate/judge.html",
         session=session,
@@ -934,6 +946,8 @@ def judge_screen(session_id):
         part_order=included_part_names(session),
         unconfirmed_parts=_unconfirmed_parts(session),
         practice_label=practice_scope_label(session) if is_practice(session) else "",
+        argument_rows=argument_rows_for_display(flow),
+        score_line=format_score_total(totals) if flow else "",
         **_background_context(),
     )
 

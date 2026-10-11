@@ -1,7 +1,7 @@
 """LLMによるPDA形式ディベートのジャッジ機能。
 
 6パート（PM/LO/MG/MO/LOR/PMR）のtranscript_editedを1つのJSONにまとめてLLMに渡し、
-論点フロー分析（Standing Points）に基づく勝敗判定・スコア・講評を取得する。
+論点の状態（intact / weakened / collapsed）に基づく勝敗判定・スコア・講評を取得する。
 """
 import json
 import logging
@@ -9,7 +9,15 @@ import os
 import re
 import time
 
-from debate.config import PART_ORDER, PART_ROLES, POI_ALLOWED_PARTS
+from debate.config import (
+    HISTORY_ACTION,
+    PART_ORDER,
+    PART_ROLES,
+    POI_ALLOWED_PARTS,
+    argument_status_rules_text,
+    canonical_argument_status,
+    side_score_totals,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -49,31 +57,17 @@ JUDGE_SYSTEM_PROMPT = """あなたはPDA形式の即興ディベートを審査�
 - 論点フローでは Gov Point 2 を PM で raised、MG で extended、MO で rebutted と記録してよい。
   Opp Point 2 は LO で raised、MO で extended、PMR で rebutted と記録してよい。
 
-# 勝敗判定の中心ロジック：論点のフロー分析（Standing Points）
-6パートを発言順に読み、Gov側・Opp側それぞれが提示した論点を抽出してください。
-各論点について、以下のプロセスで追跡してください。
+# 勝敗判定の中心ロジック：論点の状態
+6パートを発言順に読み、Gov側・Opp側それぞれが提示した正規論点（各陣営 Point 1 と Point 2）を追跡してください。
+補強（Gov Point 2 を MG が展開、Opp Point 2 を MO が展開）は status にせず、history の action "extended" に記録してください。
 
-1. どのパートで、どちらの側が、どの論点を最初に提示したか
-2. その論点に対し、相手側が後続パートで有効な反論をしたか
-3. 反論された場合、論点を出した側が、さらに後続パートでその反論に対して
-   再反論・防御をしたか
-
-各論点の最終ステータスを以下のいずれかに分類してください。
-- "standing"：反論を受けなかった、または反論に対して有効に再反論・防御された
-- "knocked_down"：有効な反論を受けたが、再反論・防御が一切なされなかった
-- "extended"：反論の有無に関わらず、元の側が後続パートで自ら補強・具体化した
-  （Gov Point 2 をMGが展開した場合、Opp Point 2 をMOが展開した場合も含む）
+{argument_status_rules_text()}
 
 新規論点の扱い：
 - 各陣営の正規論点は Point 1 と Point 2 のみ。
-- MG / MO で Point 3 以降を新たに出しても standing 加点対象にしない。part_feedbackで軽く指摘する。
-- LOR / PMR の新規論点は無効（反則気味）。standing/knocked_downの判定対象に含めず、
+- MG / MO で Point 3 以降を新たに出しても合計点に入れない。part_feedbackで軽く指摘する。
+- LOR / PMR の新規論点は無効（反則気味）。状態判定の対象に含めず、
   part_feedbackの当該パートで軽く指摘する。
-
-# 勝敗の決定
-- 最終的にstanding（またはextended）となった論点の数と、論題への関連性の高さを踏まえ、
-  どちらの側がより多くの、より重要な論点を守り切ったかで勝敗（winner）を決定してください。
-- 論点の数が拮抗している場合は、内容（Content）ルーブリックの質を判断材料にしてください。
 
 # 評価ルーブリック（論点フロー分析の補助情報として使用）
 
@@ -99,13 +93,13 @@ PM / LO / MG / MO では、保護時間を除き相手がPOIを出せます。
 保護時間は payload の poi_protected_start_sec（最初）と poi_protected_end_sec（最後）。0 ならその側は保護なしです。
 LOR / PMR（Reply）ではPOIは不可です。POI中もスピーカーの持ち時間は止まりません。1回あたり最長15秒です。
 payload の各パートに poi（allowed / offered / accepted / events）が付きます。
-- 勝敗判定と standing points の根拠に、POIの回数は使わないでください。
+- 勝敗判定と論点の合計点の根拠に、POIの回数は使わないでください。
 - POIを出さなかった／取らなかったことを減点しないでください（授業練習のため任意です）。
 - 文字起こしからPOIの質問と応答が読み取れる場合のみ、part_feedbackで短く触れてよいです。
 
 # 話者について
 一部のパートは練習用AIが担当しています。payload の各パートに speaker ("human" または "ai") が付きます。
-argument_flow の standing / knocked_down / extended と勝敗判定は、話者によって基準を変えないでください。
+argument_flow の intact / weakened / collapsed と勝敗判定は、話者によって基準を変えないでください。
 part_feedback では human パートに生徒への改善提案を書き、ai パートは相手の発話として簡潔に触れるに留めてください。
 生徒側へのフィードバックが「相手の発話の改善案」にならないようにしてください。
 AIが使ったモデル名には触れないでください。
@@ -119,7 +113,8 @@ AIが使ったモデル名には触れないでください。
       "side": "Gov",
       "raised_in_part": "PM",
       "summary": "論点の要約（日本語、30字程度）",
-      "status": "standing",
+      "status": "intact",
+      "reason_ja": "LOの反論は核心に届いたが、MGが十分に防御して回復した。",
       "history": [
         { "part": "PM", "action": "raised" },
         { "part": "LO", "action": "rebutted" },
@@ -131,7 +126,8 @@ AIが使ったモデル名には触れないでください。
       "side": "Gov",
       "raised_in_part": "PM",
       "summary": "Gov Point 2 の要約",
-      "status": "extended",
+      "status": "weakened",
+      "reason_ja": "MOの反論は範囲への指摘にとどまり、その後の防御も部分的だった。",
       "history": [
         { "part": "PM", "action": "raised" },
         { "part": "MG", "action": "extended" },
@@ -143,7 +139,8 @@ AIが使ったモデル名には触れないでください。
       "side": "Opp",
       "raised_in_part": "LO",
       "summary": "Opp Point 2 の要約",
-      "status": "standing",
+      "status": "collapsed",
+      "reason_ja": "PMRの反論は核心に届き、その後に防御がなかった。",
       "history": [
         { "part": "LO", "action": "raised" },
         { "part": "MO", "action": "extended" },
@@ -152,7 +149,7 @@ AIが使ったモデル名には触れないでください。
     }
   ],
   "winner": "Gov または Opp",
-  "standing_point_count": { "gov": 0, "opp": 0 },
+  "score_total": { "gov": 0.0, "opp": 0.0 },
   "scores": {
     "content": { "reasoning": 1-5, "examples": 1-5, "relevance": 1-5 },
     "method": { "rebuttal_accuracy": 1-5, "flow_consistency": 1-5, "role_fulfillment": 1-5 }
@@ -168,6 +165,11 @@ AIが使ったモデル名には触れないでください。
   ]
 }"""
 
+JUDGE_SYSTEM_PROMPT = JUDGE_SYSTEM_PROMPT.replace(
+    "{argument_status_rules_text()}",
+    argument_status_rules_text(),
+)
+
 # パート練習で範囲が6パート未満のときだけ足す。通常対戦・ソロの全文ジャッジには付けない。
 PARTIAL_PRACTICE_ADDENDUM = """
 
@@ -176,14 +178,13 @@ payload.parts に含まれるパートだけが実施されています。それ
 - 未実施パートの役割を誰かが果たしていないことを減点しないでください。
 - Gov Point 2 の詳細は、MG が今回の範囲に無いなら PM の概要のままでよく、減点しません。
 - Opp Point 2 の詳細は、MO が範囲に無いなら LO の概要のままでよく、減点しません。
-- 後続パートが範囲外であるだけを理由に knocked_down にしないでください。実施済みの中で有効な反論があり、実施済みの範囲で防御がないときだけ knocked_down にしてください。
+- 後続パートが範囲外であるだけを理由に collapsed や weakened にしないでください。実施済みの中で核心に届く反論があり、実施済みの範囲で防御がないときだけ collapsed にしてください。届き方が partial なら weakened にしてください。
 - 片方の陣営しか発言していない場合、winner は null にしてください。
 - part_feedback は payload.parts にあるパートだけ書いてください。human は生徒への改善提案、ai は相手の発話の短い要約に留めてください。
 - overall_feedback は、生徒（speaker が human）のパートをどう良くするかを中心にしてください。
 - scores は実施された human の発話に対する評価です。
 """
 
-_ARGUMENT_STATUSES = {"standing", "knocked_down", "extended"}
 _SIDES = {"Gov", "Opp"}
 
 
@@ -312,22 +313,28 @@ def _normalize_argument_flow(raw_flow) -> list:
         side = str(item.get("side") or "").strip()
         if side not in _SIDES:
             continue
-        status = str(item.get("status") or "").strip()
-        if status not in _ARGUMENT_STATUSES:
-            status = "standing"
+        raw_status = str(item.get("status") or "").strip()
+        status = canonical_argument_status(raw_status)
         raised_in_part = str(item.get("raised_in_part") or "").strip()
         if raised_in_part not in PART_ORDER:
             raised_in_part = ""
 
         history = []
+        saw_extended = False
         for entry in item.get("history") or []:
             if not isinstance(entry, dict):
                 continue
             part = str(entry.get("part") or "").strip()
             action = str(entry.get("action") or "").strip()
-            if not part or not action:
+            if action == "reinforced":
+                action = "extended"
+            if not part or action not in HISTORY_ACTION:
                 continue
+            if action == "extended":
+                saw_extended = True
             history.append({"part": part, "action": action})
+        if raw_status == "extended" and not saw_extended and raised_in_part:
+            history.append({"part": raised_in_part, "action": "extended"})
 
         normalized.append(
             {
@@ -336,6 +343,7 @@ def _normalize_argument_flow(raw_flow) -> list:
                 "raised_in_part": raised_in_part,
                 "summary": str(item.get("summary") or "").strip(),
                 "status": status,
+                "reason_ja": str(item.get("reason_ja") or "").strip(),
                 "history": history,
             }
         )
@@ -347,15 +355,15 @@ def _normalize_result(data: dict) -> dict:
     if winner not in _SIDES:
         winner = None
 
-    raw_count = data.get("standing_point_count") or {}
-    try:
-        gov_count = int(raw_count.get("gov", 0))
-    except (TypeError, ValueError):
-        gov_count = 0
-    try:
-        opp_count = int(raw_count.get("opp", 0))
-    except (TypeError, ValueError):
-        opp_count = 0
+    flow = _normalize_argument_flow(data.get("argument_flow"))
+    totals = side_score_totals(flow)
+    gov_n = sum(1 for item in flow if item.get("side") == "Gov")
+    opp_n = sum(1 for item in flow if item.get("side") == "Opp")
+    if gov_n and opp_n:
+        if totals["gov"] > totals["opp"]:
+            winner = "Gov"
+        elif totals["opp"] > totals["gov"]:
+            winner = "Opp"
 
     raw_scores = data.get("scores") or {}
     raw_content = raw_scores.get("content") or {}
@@ -370,9 +378,9 @@ def _normalize_result(data: dict) -> dict:
             part_feedback_by_part[part] = str(item.get("comment") or "").strip()
 
     return {
-        "argument_flow": _normalize_argument_flow(data.get("argument_flow")),
+        "argument_flow": flow,
         "winner": winner,
-        "standing_point_count": {"gov": max(0, gov_count), "opp": max(0, opp_count)},
+        "score_total": totals,
         "scores": {
             "content": {
                 "reasoning": _clamp_score(raw_content.get("reasoning")),
@@ -396,7 +404,7 @@ def run_judge(session: dict) -> dict:
     """LLMを呼び出し、正規化済みのジャッジ結果（新しい判定内容の各フィールド）を返す。
 
     戻り値はnew_judge_result()のうちstatus/error/started_at/judged_at/transcription_mode
-    以外のフィールド（argument_flow, winner, standing_point_count, scores,
+    以外のフィールド（argument_flow, winner, score_total, scores,
     overall_feedback, part_feedback, model）を含む。
     """
     client = _get_client()

@@ -94,6 +94,7 @@ Whisper: `debate/transcription.py`（短タイムアウト）。ジョブ: `tran
 ## ジャッジ
 
 プロンプト正本は `debate/judge.py`（授業フロー準拠）。**PM/LOのP2概要は減点しない。LOがPMのGov P2説明不足を攻撃してもGovの欠点にしない。Gov P2の深さはMG、本格反論はMOの2番目（LORの冒頭ではない）。Opp P2の深さはMO。Opp P2本格反論はPMR。**
+論点の状態は `config.py` の `ARGUMENT_STATUS`（intact / weakened / collapsed）と `argument_status_rules_text()`。生成プロンプトも同じ文面。extended は history の action。画面は英語ラベル。旧状態名は表示時だけ変換し、保存JSONは書き換えない。勝敗は weight の合計で、同点は Content。
 モデル選択肢: `judge_model_pricing.py`（既定 `5.6-luna`）。結果画面にコストは出さない。ジャッジ中は擬似進捗ログ。
 
 ## 管理

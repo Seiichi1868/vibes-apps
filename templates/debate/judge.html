@@ -2,7 +2,6 @@
 
 {% set judge = session.judge_result %}
 {% set mode_labels = {"batch": "モードA: 録音＋Whisper文字起こし", "realtime": "モードB: リアルタイム文字起こし", "mixed": "モード混在"} %}
-{% set action_labels = {"raised": "提示", "rebutted": "反論", "defended": "再反論・防御", "extended": "補強", "reinforced": "補強"} %}
 {% set score_labels = {
   "reasoning": "主張の理由", "examples": "具体例", "relevance": "論題との関連性",
   "rebuttal_accuracy": "反駁の的確さ", "flow_consistency": "フローの一貫性・応答性", "role_fulfillment": "役割遂行"
@@ -76,8 +75,9 @@
   </p>
   {% endif %}
   <div class="flex flex-wrap gap-3 mb-4 text-xs font-semibold">
-    <span class="status-pill side-badge-Gov">Gov standing: {{ judge.standing_point_count.gov }}</span>
-    <span class="status-pill side-badge-Opp">Opp standing: {{ judge.standing_point_count.opp }}</span>
+    {% if score_line %}
+    <span class="status-pill">{{ score_line }}</span>
+    {% endif %}
   </div>
   <p class="text-sm md:text-base text-slate-700 leading-relaxed">{{ judge.overall_feedback }}</p>
   <div class="flex flex-wrap gap-x-4 gap-y-1 mt-4 text-[0.68rem] text-slate-400">
@@ -88,42 +88,9 @@
 </section>
 
 <section class="glass-card rounded-2xl p-5 md:p-6 mb-5">
-  <h3 class="font-bold text-slate-800 mb-3">論点フロー（Standing Points）</h3>
-  {% if judge.argument_flow %}
-  <div class="overflow-x-auto -mx-1">
-    <table class="w-full text-sm min-w-[560px]">
-      <thead>
-        <tr class="text-left text-xs text-slate-400 border-b border-slate-200">
-          <th class="py-2 px-1 font-semibold">論点</th>
-          <th class="py-2 px-1 font-semibold">Side</th>
-          <th class="py-2 px-1 font-semibold">提示パート</th>
-          <th class="py-2 px-1 font-semibold">ステータス</th>
-          <th class="py-2 px-1 font-semibold">推移</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for arg in judge.argument_flow %}
-        <tr class="border-b border-slate-100 align-top">
-          <td class="py-2.5 px-1 text-slate-700 max-w-[220px]">{{ arg.summary }}</td>
-          <td class="py-2.5 px-1"><span class="status-pill side-badge-{{ arg.side }}">{{ arg.side }}</span></td>
-          <td class="py-2.5 px-1 text-slate-500">{{ arg.raised_in_part }}</td>
-          <td class="py-2.5 px-1">
-            <span class="status-pill arg-status-{{ arg.status }}">
-              {{ {"standing": "Standing", "knocked_down": "Knocked Down", "extended": "Extended"}.get(arg.status, arg.status) }}
-            </span>
-          </td>
-          <td class="py-2.5 px-1">
-            <div class="flex flex-wrap gap-1">
-              {% for h in arg.history %}
-              <span class="history-chip history-action-{{ h.action }}">{{ h.part }}: {{ action_labels.get(h.action, h.action) }}</span>
-              {% endfor %}
-            </div>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  <h3 class="font-bold text-slate-800 mb-3">Argument flow<span class="arg-col-gloss">論点の流れ</span></h3>
+  {% if argument_rows %}
+  {% include "debate/_argument_flow.html" %}
   {% else %}
   <p class="text-sm text-slate-400">論点フローのデータがありません。</p>
   {% endif %}
@@ -230,5 +197,5 @@
   window.DEBATE_SESSION_ID = {{ session.session_id | tojson }};
   window.DEBATE_JUDGE_STATUS = {{ judge.status | tojson }};
 </script>
-<script src="{{ url_for('static', filename='debate/js/judge.js', v='20260731e') }}"></script>
+<script src="{{ url_for('static', filename='debate/js/judge.js', v='20261011c') }}"></script>
 {% endblock %}

@@ -1,0 +1,45 @@
+<div class="overflow-x-auto -mx-1">
+  <table class="w-full text-sm min-w-[560px]">
+    <thead>
+      <tr class="text-left text-xs text-slate-400 border-b border-slate-200">
+        <th class="py-2 px-1 font-semibold">Argument<span class="arg-col-gloss">論点</span></th>
+        <th class="py-2 px-1 font-semibold">Raised in<span class="arg-col-gloss">提示</span></th>
+        <th class="py-2 px-1 font-semibold">Flow<span class="arg-col-gloss">流れ</span></th>
+        <th class="py-2 px-1 font-semibold">Status<span class="arg-col-gloss">状態</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for arg in argument_rows %}
+      <tr class="border-b border-slate-100 align-top">
+        <td class="py-2.5 px-1 text-slate-800 max-w-[220px]">
+          {{ arg.summary_en }}
+          {% if arg.summary_ja %}<span class="arg-col-gloss">{{ arg.summary_ja }}</span>{% endif %}
+        </td>
+        <td class="py-2.5 px-1">
+          <span class="status-pill side-badge-{{ arg.side }}">{{ arg.side }}</span>
+          <span class="text-slate-500 ml-1">{{ arg.raised_in }}</span>
+        </td>
+        <td class="py-2.5 px-1">
+          <div class="flex flex-wrap items-center gap-1">
+            {% for step in arg.history %}
+            <span class="history-chip history-action-{{ step.action }}">{{ step.part }} {{ step.label_en }}</span>
+            {% if not loop.last %}<span class="text-slate-300">→</span>{% endif %}
+            {% endfor %}
+          </div>
+        </td>
+        <td class="py-2.5 px-1">
+          <span class="status-pill arg-status-{{ arg.color }}">{{ arg.label_en }}{% if show_status_gloss_ja and arg.gloss_ja %}<span class="arg-status-gloss">（{{ arg.gloss_ja }}）</span>{% endif %}</span>
+        </td>
+      </tr>
+      {% if arg.reason_ja %}
+      <tr class="border-b border-slate-100">
+        <td colspan="4" class="arg-reason px-1 pb-2">{{ arg.reason_ja }}</td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if score_line %}
+<p class="text-sm font-semibold text-slate-700 mt-3">{{ score_line }}</p>
+{% endif %}
