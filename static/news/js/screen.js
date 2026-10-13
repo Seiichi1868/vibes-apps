@@ -316,14 +316,19 @@
     return "min(28vh, 18rem)";
   }
 
-  function questionRevealPieces(questions) {
+  function questionRevealPieces(questions, kind) {
     const pieces = [];
-    if ((questions || []).some(function (q) { return q && q.text; })) pieces.push({ kind: "all" });
     (questions || []).forEach(function (q, index) {
       if (!q || !q.text) return;
-      pieces.push({ kind: "question", index: index });
-      if (q.answer) pieces.push({ kind: "answer", index: index });
+      pieces.push({ kind: "question", index: index, preview: true });
     });
+    if (kind === "postview") {
+      (questions || []).forEach(function (q, index) {
+        if (!q || !q.text) return;
+        pieces.push({ kind: "question", index: index, preview: false });
+        if (q.answer) pieces.push({ kind: "answer", index: index, preview: false });
+      });
+    }
     return pieces;
   }
 
@@ -339,7 +344,7 @@
     return Boolean(
       target &&
         target.closest &&
-        target.closest(".screen-qa-all-scroll, .screen-script-scroll")
+        target.closest(".screen-script-scroll")
     );
   }
 
@@ -359,7 +364,7 @@
     const viewEl = questionRevealViewEl(kind);
     const contentEl = questionRevealContentEl(kind);
     if (!state || !viewEl || !contentEl) return;
-    const pieces = questionRevealPieces(state.questions);
+    const pieces = questionRevealPieces(state.questions, kind);
     const pending = pieces.length > 0 && state.step < pieces.length;
     viewEl.classList.toggle("is-reveal-pending", pending);
     const hint = contentEl.querySelector(".screen-postview-hint");
@@ -393,10 +398,10 @@
     contentEl.style.setProperty("--warmup-q-size", singleQuestionFontSize(hasImage));
     contentEl.style.setProperty("--warmup-img-max-h", warmupImageMaxHeight());
 
-    const pieces = questionRevealPieces(list);
+    const pieces = questionRevealPieces(list, kind);
     const activePiece =
       pieces.length && state.step > 0 ? pieces[Math.min(state.step, pieces.length) - 1] : null;
-    contentEl.classList.toggle("screen-warmup-inner--scroll", Boolean(activePiece && activePiece.kind === "all"));
+    contentEl.classList.remove("screen-warmup-inner--scroll");
     let html = "";
     if (imageUrl) {
       html +=
@@ -409,32 +414,20 @@
     if (pieces.length && state.step > 0) {
       const piece = activePiece;
       const q = list[piece.index];
-      if (piece.kind === "all") {
-        html += '<div class="screen-qa-all-scroll"><ul class="screen-warmup-list screen-warmup-list--all-questions">';
-        list.forEach(function (item, i) {
-          if (!item || !item.text) return;
-          html +=
-            '<li class="screen-warmup-q flex items-start gap-[0.35em]">' +
-            '<span class="screen-warmup-num">Q' + (i + 1) + ".</span>" +
-            '<span class="screen-warmup-text">' + escHtml(item.text) + "</span></li>";
-        });
-        html += "</ul></div>";
-      } else {
-        html += '<div class="screen-qa-current">';
+      html += '<div class="screen-qa-current">';
+      html +=
+        '<div class="screen-warmup-q flex items-start gap-[0.35em]">' +
+        '<span class="screen-warmup-num">Q' + (piece.index + 1) + ".</span>" +
+        '<span class="screen-warmup-text">' + escHtml(q.text) + "</span>" +
+        "</div>";
+      if (piece.kind === "answer") {
         html +=
-          '<div class="screen-warmup-q flex items-start gap-[0.35em]">' +
-          '<span class="screen-warmup-num">Q' + (piece.index + 1) + ".</span>" +
-          '<span class="screen-warmup-text">' + escHtml(q.text) + "</span>" +
-          "</div>";
-        if (piece.kind === "answer") {
-          html +=
-            '<p class="screen-postview-answer is-shown" aria-hidden="false"><span>' +
-            '<span class="screen-postview-answer-label">A.</span>' +
-            escHtml(q.answer) +
-            "</span></p>";
-        }
-        html += "</div>";
+          '<p class="screen-postview-answer is-shown" aria-hidden="false"><span>' +
+          '<span class="screen-postview-answer-label">A.</span>' +
+          escHtml(q.answer) +
+          "</span></p>";
       }
+      html += "</div>";
     } else if (list.length) {
       html +=
         '<p class="screen-qa-waiting">' +
@@ -453,7 +446,7 @@
     if (currentView !== kind) return;
     const state = questionReveal[kind];
     if (!state) return;
-    const pieces = questionRevealPieces(state.questions);
+    const pieces = questionRevealPieces(state.questions, kind);
     if (state.step >= pieces.length) return;
     state.step += 1;
     renderQuestionReveal(kind);
@@ -791,7 +784,7 @@
     swipeStartX = touch.clientX;
     swipeStartY = touch.clientY;
     swipeScrollEl = event.target && event.target.closest
-      ? event.target.closest(".screen-qa-all-scroll, .screen-script-scroll")
+      ? event.target.closest(".screen-script-scroll")
       : null;
     swipeScrollTop0 = swipeScrollEl ? swipeScrollEl.scrollTop : 0;
     swipeTracking = true;
