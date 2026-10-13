@@ -328,11 +328,19 @@
   }
 
   function questionRevealViewEl(kind) {
-    return kind === "warmup" ? viewWarmup : kind === "script" ? viewScript : viewPostview;
+    return kind === "warmup" ? viewWarmup : viewPostview;
   }
 
   function questionRevealContentEl(kind) {
-    return kind === "warmup" ? warmupContent : kind === "script" ? scriptContent : postviewContent;
+    return kind === "warmup" ? warmupContent : postviewContent;
+  }
+
+  function isScrollableScreenTarget(target) {
+    return Boolean(
+      target &&
+        target.closest &&
+        target.closest(".screen-qa-all-scroll, .screen-script-scroll")
+    );
   }
 
   function isStepRevealView(view) {
@@ -373,7 +381,6 @@
     const imageUrl = state.imageUrl || "";
     const emptyKey = kind === "warmup" ? "screenNoWarmup" : "screenNoPostview";
     const headingKey = kind === "warmup" ? "screenWarmupHeading" : "screenPostviewHeading";
-    const isScript = kind === "script";
 
     if (!imageUrl && !list.length) {
       contentEl.innerHTML = '<p class="text-center text-lg text-slate-500">' + t(emptyKey) + "</p>";
@@ -383,13 +390,13 @@
     }
 
     const hasImage = Boolean(imageUrl);
-    contentEl.style.setProperty(
-      "--warmup-q-size",
-      isScript ? "clamp(1.4rem, 4.2vmin, 3rem)" : singleQuestionFontSize(hasImage)
-    );
+    contentEl.style.setProperty("--warmup-q-size", singleQuestionFontSize(hasImage));
     contentEl.style.setProperty("--warmup-img-max-h", warmupImageMaxHeight());
 
     const pieces = questionRevealPieces(list);
+    const activePiece =
+      pieces.length && state.step > 0 ? pieces[Math.min(state.step, pieces.length) - 1] : null;
+    contentEl.classList.toggle("screen-warmup-inner--scroll", Boolean(activePiece && activePiece.kind === "all"));
     let html = "";
     if (imageUrl) {
       html +=
@@ -397,15 +404,15 @@
         '<img src="' + escHtml(imageUrl) + '" alt="Warmup illustration">' +
         "</div>";
     }
-    html += '<p class="screen-warmup-heading">' + (isScript ? "原文と和訳" : t(headingKey)) + "</p>";
+    html += '<p class="screen-warmup-heading">' + t(headingKey) + "</p>";
 
     if (pieces.length && state.step > 0) {
-      const piece = pieces[Math.min(state.step, pieces.length) - 1];
+      const piece = activePiece;
       const q = list[piece.index];
       if (piece.kind === "all") {
-        contentEl.style.setProperty("--warmup-q-size", "clamp(1.3rem, 3.8vmin, 2.8rem)");
-        html += '<div class="screen-qa-current"><ul class="screen-warmup-list" style="justify-content:center">';
+        html += '<div class="screen-qa-all-scroll"><ul class="screen-warmup-list screen-warmup-list--all-questions">';
         list.forEach(function (item, i) {
+          if (!item || !item.text) return;
           html +=
             '<li class="screen-warmup-q flex items-start gap-[0.35em]">' +
             '<span class="screen-warmup-num">Q' + (i + 1) + ".</span>" +
@@ -413,20 +420,20 @@
         });
         html += "</ul></div>";
       } else {
-      html += '<div class="screen-qa-current">';
-      html +=
-        '<div class="screen-warmup-q flex items-start gap-[0.35em]">' +
-        '<span class="screen-warmup-num">' + (isScript ? "" : "Q") + (piece.index + 1) + ".</span>" +
-        '<span class="screen-warmup-text">' + escHtml(q.text) + "</span>" +
-        "</div>";
-      if (piece.kind === "answer") {
+        html += '<div class="screen-qa-current">';
         html +=
-          '<p class="screen-postview-answer is-shown" aria-hidden="false"><span>' +
-          '<span class="screen-postview-answer-label">' + (isScript ? "和訳" : "A.") + '</span>' +
-          escHtml(q.answer) +
-          "</span></p>";
-      }
-      html += "</div>";
+          '<div class="screen-warmup-q flex items-start gap-[0.35em]">' +
+          '<span class="screen-warmup-num">Q' + (piece.index + 1) + ".</span>" +
+          '<span class="screen-warmup-text">' + escHtml(q.text) + "</span>" +
+          "</div>";
+        if (piece.kind === "answer") {
+          html +=
+            '<p class="screen-postview-answer is-shown" aria-hidden="false"><span>' +
+            '<span class="screen-postview-answer-label">A.</span>' +
+            escHtml(q.answer) +
+            "</span></p>";
+        }
+        html += "</div>";
       }
     } else if (list.length) {
       html +=
@@ -473,9 +480,11 @@
     if (!scriptContent) return;
     const list = (pairs || []).filter(function (p) { return p && p.en; });
     if (!list.length) {
+      scriptContent.classList.remove("screen-warmup-inner--scroll");
       scriptContent.innerHTML = '<p class="text-center text-lg text-slate-500">原文と和訳がありません</p>';
       return;
     }
+    scriptContent.classList.add("screen-warmup-inner--scroll");
     scriptContent.style.setProperty("--warmup-q-size", "clamp(1.4rem, 4.2vmin, 3rem)");
     let html = '<p class="screen-warmup-heading">原文と和訳</p><div class="screen-script-scroll">';
     list.forEach(function (p, i) {
@@ -484,8 +493,10 @@
         '<div class="screen-warmup-q flex items-start gap-[0.35em]">' +
         '<span class="screen-warmup-num">' + (i + 1) + ".</span>" +
         '<span class="screen-warmup-text">' + escHtml(p.en) + "</span></div>" +
-        '<p class="screen-postview-answer is-shown" style="min-height:0"><span>' +
-        escHtml(p.ja) + "</span></p></div>";
+        '<p class="screen-postview-answer is-shown"><span>' +
+        '<span class="screen-postview-answer-label">和訳</span>' +
+        escHtml(p.ja) +
+        "</span></p></div>";
     });
     scriptContent.innerHTML = html + "</div>";
   }
@@ -756,6 +767,8 @@
   let swipeStartX = 0;
   let swipeStartY = 0;
   let swipeTracking = false;
+  let swipeScrollEl = null;
+  let swipeScrollTop0 = 0;
   let ignoreQuestionClick = false;
 
   function suppressQuestionClick() {
@@ -777,6 +790,10 @@
     const touch = event.touches[0];
     swipeStartX = touch.clientX;
     swipeStartY = touch.clientY;
+    swipeScrollEl = event.target && event.target.closest
+      ? event.target.closest(".screen-qa-all-scroll, .screen-script-scroll")
+      : null;
+    swipeScrollTop0 = swipeScrollEl ? swipeScrollEl.scrollTop : 0;
     swipeTracking = true;
   }
 
@@ -793,7 +810,7 @@
       return;
     }
     if (isStepView && absY > 16 && absY > absX * 1.15) {
-      event.preventDefault();
+      if (!isScrollableScreenTarget(event.target)) event.preventDefault();
     }
   }
 
@@ -813,6 +830,7 @@
     }
     if (!isStepRevealView(currentView)) return;
     if (absY < 48 || absY <= absX * 1.2) return;
+    if (swipeScrollEl && Math.abs(swipeScrollEl.scrollTop - swipeScrollTop0) > 10) return;
     suppressQuestionClick();
     if (currentView === "writing") {
       if (dy < 0) revealNextWritingStep();

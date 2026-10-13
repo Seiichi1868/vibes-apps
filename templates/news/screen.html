@@ -188,6 +188,33 @@
     touch-action: none;
     overscroll-behavior: none;
   }
+  #view-script {
+    touch-action: pan-y;
+    overscroll-behavior: contain;
+  }
+  .screen-warmup-inner--scroll {
+    justify-content: flex-start;
+    overflow: hidden;
+  }
+  .screen-qa-all-scroll,
+  .screen-script-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2.5rem;
+  }
+  .screen-warmup-list--all-questions {
+    justify-content: flex-start;
+    gap: clamp(0.75rem, 2.5vh, 1.75rem);
+  }
+  .screen-script-item {
+    margin-bottom: clamp(0.75rem, 2vh, 1.75rem);
+  }
+  .screen-script-item .screen-postview-answer {
+    margin-top: 0.25em;
+    min-height: 0;
+  }
   .screen-qa-current {
     flex: 1;
     display: flex;
@@ -254,10 +281,6 @@
       opacity: 1;
     }
   }
-  #view-script { overflow: hidden; }
-  .screen-script-scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-right: 0.5rem; }
-  .screen-script-item { margin-bottom: 1.1em; }
-  .screen-script-item .screen-postview-answer { margin-top: 0.2em; }
   .screen-writing-item {
     display: flex;
     flex-direction: column;
@@ -395,5 +418,5 @@
   window.SCREEN_CLASSES = {{ classes|tojson }};
 </script>
 <script src="{{ url_for('static', filename='news/js/i18n.js', v='20260930b') }}"></script>
-<script src="{{ url_for('static', filename='news/js/screen.js', v='20261013b') }}"></script>
+<script src="{{ url_for('static', filename='news/js/screen.js', v='20261013c') }}"></script>
 {% endblock %}
