@@ -37,7 +37,6 @@
   const questionReveal = {
     warmup: { questions: [], step: 0, imageUrl: "" },
     postview: { questions: [], step: 0, imageUrl: "" },
-    script: { questions: [], step: 0, imageUrl: "" },
   };
   const writingReveal = { topics: [], step: 0 };
   let youtubeApiPlayer = null;
@@ -319,6 +318,7 @@
 
   function questionRevealPieces(questions) {
     const pieces = [];
+    if ((questions || []).some(function (q) { return q && q.text; })) pieces.push({ kind: "all" });
     (questions || []).forEach(function (q, index) {
       if (!q || !q.text) return;
       pieces.push({ kind: "question", index: index });
@@ -336,7 +336,7 @@
   }
 
   function isStepRevealView(view) {
-    return view === "warmup" || view === "postview" || view === "script" || view === "writing";
+    return view === "warmup" || view === "postview" || view === "writing";
   }
 
   function prefersTouchNav() {
@@ -402,6 +402,17 @@
     if (pieces.length && state.step > 0) {
       const piece = pieces[Math.min(state.step, pieces.length) - 1];
       const q = list[piece.index];
+      if (piece.kind === "all") {
+        contentEl.style.setProperty("--warmup-q-size", "clamp(1.3rem, 3.8vmin, 2.8rem)");
+        html += '<div class="screen-qa-current"><ul class="screen-warmup-list" style="justify-content:center">';
+        list.forEach(function (item, i) {
+          html +=
+            '<li class="screen-warmup-q flex items-start gap-[0.35em]">' +
+            '<span class="screen-warmup-num">Q' + (i + 1) + ".</span>" +
+            '<span class="screen-warmup-text">' + escHtml(item.text) + "</span></li>";
+        });
+        html += "</ul></div>";
+      } else {
       html += '<div class="screen-qa-current">';
       html +=
         '<div class="screen-warmup-q flex items-start gap-[0.35em]">' +
@@ -416,6 +427,7 @@
           "</span></p>";
       }
       html += "</div>";
+      }
     } else if (list.length) {
       html +=
         '<p class="screen-qa-waiting">' +
@@ -458,16 +470,24 @@
   }
 
   function renderScript(pairs) {
-    questionReveal.script.imageUrl = "";
-    questionReveal.script.questions = (pairs || [])
-      .filter(function (p) {
-        return p && p.en;
-      })
-      .map(function (p) {
-        return { text: p.en, answer: p.ja };
-      });
-    questionReveal.script.step = 0;
-    renderQuestionReveal("script");
+    if (!scriptContent) return;
+    const list = (pairs || []).filter(function (p) { return p && p.en; });
+    if (!list.length) {
+      scriptContent.innerHTML = '<p class="text-center text-lg text-slate-500">原文と和訳がありません</p>';
+      return;
+    }
+    scriptContent.style.setProperty("--warmup-q-size", "clamp(1.4rem, 4.2vmin, 3rem)");
+    let html = '<p class="screen-warmup-heading">原文と和訳</p><div class="screen-script-scroll">';
+    list.forEach(function (p, i) {
+      html +=
+        '<div class="screen-script-item">' +
+        '<div class="screen-warmup-q flex items-start gap-[0.35em]">' +
+        '<span class="screen-warmup-num">' + (i + 1) + ".</span>" +
+        '<span class="screen-warmup-text">' + escHtml(p.en) + "</span></div>" +
+        '<p class="screen-postview-answer is-shown" style="min-height:0"><span>' +
+        escHtml(p.ja) + "</span></p></div>";
+    });
+    scriptContent.innerHTML = html + "</div>";
   }
 
   function renderPostview(questions) {
@@ -720,7 +740,6 @@
 
   bindQuestionRevealClick(viewWarmup, "warmup");
   bindQuestionRevealClick(viewPostview, "postview");
-  bindQuestionRevealClick(viewScript, "script");
   if (viewWriting) {
     viewWriting.addEventListener("click", function (event) {
       if (ignoreQuestionClick) {
@@ -831,7 +850,7 @@
       else revealNextWritingStep();
       return;
     }
-    if (currentView !== "postview" && currentView !== "warmup" && currentView !== "script") return;
+    if (currentView !== "postview" && currentView !== "warmup") return;
     const showNext = key === " " || key === "Spacebar" || key === "ArrowDown" || key === "PageDown" || key === "Enter";
     const hidePrev = key === "ArrowUp" || key === "PageUp";
     if (!showNext && !hidePrev) return;

@@ -179,13 +179,11 @@
   }
   #view-warmup.is-reveal-pending,
   #view-postview.is-reveal-pending,
-  #view-script.is-reveal-pending,
   #view-writing.is-reveal-pending {
     cursor: pointer;
   }
   #view-warmup,
   #view-postview,
-  #view-script,
   #view-writing {
     touch-action: none;
     overscroll-behavior: none;
@@ -256,6 +254,10 @@
       opacity: 1;
     }
   }
+  #view-script { overflow: hidden; }
+  .screen-script-scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-right: 0.5rem; }
+  .screen-script-item { margin-bottom: 1.1em; }
+  .screen-script-item .screen-postview-answer { margin-top: 0.2em; }
   .screen-writing-item {
     display: flex;
     flex-direction: column;
@@ -393,5 +395,5 @@
   window.SCREEN_CLASSES = {{ classes|tojson }};
 </script>
 <script src="{{ url_for('static', filename='news/js/i18n.js', v='20260930b') }}"></script>
-<script src="{{ url_for('static', filename='news/js/screen.js', v='20261013a') }}"></script>
+<script src="{{ url_for('static', filename='news/js/screen.js', v='20261013b') }}"></script>
 {% endblock %}
