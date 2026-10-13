@@ -179,11 +179,13 @@
   }
   #view-warmup.is-reveal-pending,
   #view-postview.is-reveal-pending,
+  #view-script.is-reveal-pending,
   #view-writing.is-reveal-pending {
     cursor: pointer;
   }
   #view-warmup,
   #view-postview,
+  #view-script,
   #view-writing {
     touch-action: none;
     overscroll-behavior: none;
@@ -360,6 +362,10 @@
     <div id="postview-content-screen" class="screen-warmup-inner"></div>
   </div>
 
+  <div id="view-script" class="screen-view screen-view--warmup">
+    <div id="script-content-screen" class="screen-warmup-inner"></div>
+  </div>
+
   <div id="view-writing" class="screen-view screen-view--warmup">
     <div id="writing-content-screen" class="screen-warmup-inner"></div>
   </div>
@@ -372,6 +378,7 @@
     <button type="button" class="screen-ctrl-btn" data-view="vocab" title="単語" data-i18n="screenVocab" data-i18n-title="screenVocab" data-assistive-lang>単語</button>
     <button type="button" class="screen-ctrl-btn" data-view="warmup" title="ウォームアップ" data-i18n="screenWarmup" data-i18n-title="screenWarmup">ウォームアップ</button>
     <button type="button" class="screen-ctrl-btn" data-view="postview" title="ディスカッション" data-i18n="screenPostview" data-i18n-title="screenPostview">ディスカッション</button>
+    <button type="button" class="screen-ctrl-btn" data-view="script" title="原文と和訳" data-assistive-lang>原文と和訳</button>
     <button type="button" class="screen-ctrl-btn" data-view="writing" title="ライティング" data-i18n="screenWriting" data-i18n-title="screenWriting">書く</button>
     <button type="button" id="screen-fullscreen-btn" class="screen-ctrl-btn" title="全画面" data-i18n-title="fullscreen">⛶</button>
   </div>
@@ -386,5 +393,5 @@
   window.SCREEN_CLASSES = {{ classes|tojson }};
 </script>
 <script src="{{ url_for('static', filename='news/js/i18n.js', v='20260930b') }}"></script>
-<script src="{{ url_for('static', filename='news/js/screen.js', v='20260930b') }}"></script>
+<script src="{{ url_for('static', filename='news/js/screen.js', v='20261013a') }}"></script>
 {% endblock %}

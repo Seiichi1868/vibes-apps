@@ -25,16 +25,19 @@
   const vocabContent = document.getElementById("vocab-content-screen");
   const warmupContent = document.getElementById("warmup-content-screen");
   const postviewContent = document.getElementById("postview-content-screen");
+  const viewScript = document.getElementById("view-script");
+  const scriptContent = document.getElementById("script-content-screen");
   const viewWriting = document.getElementById("view-writing");
   const writingContent = document.getElementById("writing-content-screen");
 
-  const viewMap = { video: viewVideo, vocab: viewVocab, warmup: viewWarmup, postview: viewPostview, writing: viewWriting };
+  const viewMap = { video: viewVideo, vocab: viewVocab, warmup: viewWarmup, postview: viewPostview, script: viewScript, writing: viewWriting };
   const viewButtons = controlsEl ? controlsEl.querySelectorAll("[data-view]") : [];
 
   let currentView = "video";
   const questionReveal = {
     warmup: { questions: [], step: 0, imageUrl: "" },
     postview: { questions: [], step: 0, imageUrl: "" },
+    script: { questions: [], step: 0, imageUrl: "" },
   };
   const writingReveal = { topics: [], step: 0 };
   let youtubeApiPlayer = null;
@@ -325,15 +328,15 @@
   }
 
   function questionRevealViewEl(kind) {
-    return kind === "warmup" ? viewWarmup : viewPostview;
+    return kind === "warmup" ? viewWarmup : kind === "script" ? viewScript : viewPostview;
   }
 
   function questionRevealContentEl(kind) {
-    return kind === "warmup" ? warmupContent : postviewContent;
+    return kind === "warmup" ? warmupContent : kind === "script" ? scriptContent : postviewContent;
   }
 
   function isStepRevealView(view) {
-    return view === "warmup" || view === "postview" || view === "writing";
+    return view === "warmup" || view === "postview" || view === "script" || view === "writing";
   }
 
   function prefersTouchNav() {
@@ -370,6 +373,7 @@
     const imageUrl = state.imageUrl || "";
     const emptyKey = kind === "warmup" ? "screenNoWarmup" : "screenNoPostview";
     const headingKey = kind === "warmup" ? "screenWarmupHeading" : "screenPostviewHeading";
+    const isScript = kind === "script";
 
     if (!imageUrl && !list.length) {
       contentEl.innerHTML = '<p class="text-center text-lg text-slate-500">' + t(emptyKey) + "</p>";
@@ -379,7 +383,10 @@
     }
 
     const hasImage = Boolean(imageUrl);
-    contentEl.style.setProperty("--warmup-q-size", singleQuestionFontSize(hasImage));
+    contentEl.style.setProperty(
+      "--warmup-q-size",
+      isScript ? "clamp(1.4rem, 4.2vmin, 3rem)" : singleQuestionFontSize(hasImage)
+    );
     contentEl.style.setProperty("--warmup-img-max-h", warmupImageMaxHeight());
 
     const pieces = questionRevealPieces(list);
@@ -390,7 +397,7 @@
         '<img src="' + escHtml(imageUrl) + '" alt="Warmup illustration">' +
         "</div>";
     }
-    html += '<p class="screen-warmup-heading">' + t(headingKey) + "</p>";
+    html += '<p class="screen-warmup-heading">' + (isScript ? "原文と和訳" : t(headingKey)) + "</p>";
 
     if (pieces.length && state.step > 0) {
       const piece = pieces[Math.min(state.step, pieces.length) - 1];
@@ -398,13 +405,13 @@
       html += '<div class="screen-qa-current">';
       html +=
         '<div class="screen-warmup-q flex items-start gap-[0.35em]">' +
-        '<span class="screen-warmup-num">Q' + (piece.index + 1) + ".</span>" +
+        '<span class="screen-warmup-num">' + (isScript ? "" : "Q") + (piece.index + 1) + ".</span>" +
         '<span class="screen-warmup-text">' + escHtml(q.text) + "</span>" +
         "</div>";
       if (piece.kind === "answer") {
         html +=
           '<p class="screen-postview-answer is-shown" aria-hidden="false"><span>' +
-          '<span class="screen-postview-answer-label">A.</span>' +
+          '<span class="screen-postview-answer-label">' + (isScript ? "和訳" : "A.") + '</span>' +
           escHtml(q.answer) +
           "</span></p>";
       }
@@ -448,6 +455,19 @@
     });
     questionReveal.warmup.step = 0;
     renderQuestionReveal("warmup");
+  }
+
+  function renderScript(pairs) {
+    questionReveal.script.imageUrl = "";
+    questionReveal.script.questions = (pairs || [])
+      .filter(function (p) {
+        return p && p.en;
+      })
+      .map(function (p) {
+        return { text: p.en, answer: p.ja };
+      });
+    questionReveal.script.step = 0;
+    renderQuestionReveal("script");
   }
 
   function renderPostview(questions) {
@@ -611,6 +631,7 @@
       vocab: payload.has_vocab && showAssistive(),
       warmup: payload.has_warmup,
       postview: payload.has_postview,
+      script: payload.has_script && showAssistive(),
       writing: payload.has_writing,
     };
 
@@ -667,6 +688,7 @@
       renderVocab(cls.vocabulary_data || []);
       renderWarmup(cls.warmup_image_url || "", cls.warmup_questions || []);
       renderPostview(cls.postview_questions || []);
+      renderScript(cls.script_pairs || []);
       renderWriting(cls.writing_topics || []);
       configureControls(cls);
       showLoading(false);
@@ -698,6 +720,7 @@
 
   bindQuestionRevealClick(viewWarmup, "warmup");
   bindQuestionRevealClick(viewPostview, "postview");
+  bindQuestionRevealClick(viewScript, "script");
   if (viewWriting) {
     viewWriting.addEventListener("click", function (event) {
       if (ignoreQuestionClick) {
@@ -808,7 +831,7 @@
       else revealNextWritingStep();
       return;
     }
-    if (currentView !== "postview" && currentView !== "warmup") return;
+    if (currentView !== "postview" && currentView !== "warmup" && currentView !== "script") return;
     const showNext = key === " " || key === "Spacebar" || key === "ArrowDown" || key === "PageDown" || key === "Enter";
     const hidePrev = key === "ArrowUp" || key === "PageUp";
     if (!showNext && !hidePrev) return;

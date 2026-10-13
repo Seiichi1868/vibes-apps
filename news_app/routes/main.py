@@ -277,6 +277,11 @@ def _screen_lesson_view(lesson: dict, origin: str, display_language: str) -> dic
     warmup_questions = selected_display_questions(lesson.get("warmup_questions"))
     postview_questions = selected_display_questions(lesson.get("postview_questions"))
     writing_topics = selected_writing_topics(lesson.get("writing_topics"), include_japanese=lang == "ja")
+    script_pairs = (
+        [p for p in script_translation_for_lang(lesson, lang).get("pairs") or [] if p.get("en") and p.get("ja")]
+        if show_assistive
+        else []
+    )
     embed_url = (
         build_youtube_embed_url(
             video_id,
@@ -289,6 +294,8 @@ def _screen_lesson_view(lesson: dict, origin: str, display_language: str) -> dic
         else ""
     )
     return {
+        "script_pairs": script_pairs,
+        "has_script": bool(script_pairs),
         "video": {
             "video_id": video_id,
             "start_seconds": start_sec,
