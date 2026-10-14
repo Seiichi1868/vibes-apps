@@ -352,6 +352,32 @@
     return view === "warmup" || view === "postview" || view === "writing";
   }
 
+  function scrollablePanelForView(view) {
+    if (view === "vocab") return viewVocab;
+    if (view === "script") {
+      if (scriptContent) {
+        const inner = scriptContent.querySelector(".screen-script-scroll");
+        if (inner) return inner;
+      }
+      return viewScript;
+    }
+    return null;
+  }
+
+  function scrollPanelByKeyboard(key) {
+    const panel = scrollablePanelForView(currentView);
+    if (!panel) return false;
+    let delta = 0;
+    if (key === "ArrowDown") delta = 56;
+    else if (key === "ArrowUp") delta = -56;
+    else if (key === "PageDown") delta = Math.max(120, Math.floor(panel.clientHeight * 0.9));
+    else if (key === "PageUp") delta = -Math.max(120, Math.floor(panel.clientHeight * 0.9));
+    else return false;
+    if (panel.scrollHeight <= panel.clientHeight + 1) return false;
+    panel.scrollBy({ top: delta, behavior: "smooth" });
+    return true;
+  }
+
   function prefersTouchNav() {
     return Boolean(
       window.matchMedia &&
@@ -850,6 +876,10 @@
     if (key === "ArrowLeft" || key === "ArrowRight") {
       event.preventDefault();
       goAdjacentView(key === "ArrowRight" ? 1 : -1);
+      return;
+    }
+    if (currentView === "vocab" || currentView === "script") {
+      if (scrollPanelByKeyboard(key)) event.preventDefault();
       return;
     }
     if (currentView === "writing") {
