@@ -16,9 +16,9 @@
   {% if scripts %}
   <div id="watch-level-filter" class="flex flex-wrap gap-2 mb-4">
     <button type="button" data-level="" class="watch-filter-btn is-active text-xs px-3 py-1.5 rounded-full border border-teal-200 font-semibold">すべて</button>
-    <button type="button" data-level="easy" class="watch-filter-btn text-xs px-3 py-1.5 rounded-full border border-teal-200 font-semibold">やさしい</button>
-    <button type="button" data-level="normal" class="watch-filter-btn text-xs px-3 py-1.5 rounded-full border border-teal-200 font-semibold">ふつう</button>
-    <button type="button" data-level="hard" class="watch-filter-btn text-xs px-3 py-1.5 rounded-full border border-teal-200 font-semibold">むずかしい</button>
+    <button type="button" data-level="easy" class="watch-filter-btn text-xs px-3 py-1.5 rounded-full border border-teal-200 font-semibold">easy</button>
+    <button type="button" data-level="normal" class="watch-filter-btn text-xs px-3 py-1.5 rounded-full border border-teal-200 font-semibold">normal</button>
+    <button type="button" data-level="hard" class="watch-filter-btn text-xs px-3 py-1.5 rounded-full border border-teal-200 font-semibold">hard</button>
   </div>
   <div class="space-y-3">
     {% for item in scripts %}
@@ -27,7 +27,7 @@
       class="block panel-soft rounded-xl px-4 py-3 hover:border-teal-200 transition-colors">
       <p class="text-sm font-semibold text-slate-800">{{ item.motion }}</p>
       <p class="text-xs text-slate-500 mt-1">
-        {{ {"easy": "やさしい", "normal": "ふつう", "hard": "むずかしい"}.get(item.level, item.level) }}
+        {{ item.level }}
         · {{ item.part_count }}パート
         {% if item.minutes %}· 目安 {{ item.minutes }}分{% endif %}
       </p>
