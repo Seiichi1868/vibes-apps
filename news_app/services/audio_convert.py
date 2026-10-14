@@ -58,7 +58,12 @@ def prepare_for_whisper(src_path: Path, max_seconds: int) -> Path:
         audio = AudioSegment.from_file(src_path)
         duration_sec = len(audio) / 1000.0
         if duration_sec > max_seconds:
-            raise ValueError(f"音声が長すぎます（{max_seconds}秒以内にしてください）。")
+            logger.info(
+                "trimming upload audio from %.1fs to %ds for whisper",
+                duration_sec,
+                max_seconds,
+            )
+            audio = audio[: max_seconds * 1000]
         audio = audio.set_channels(1).set_frame_rate(16000)
         out_path = src_path.with_suffix(".whisper.mp3")
         audio.export(out_path, format="mp3", bitrate="64k")
