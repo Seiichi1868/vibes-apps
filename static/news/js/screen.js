@@ -513,7 +513,6 @@
         '<span class="screen-warmup-num">' + (i + 1) + ".</span>" +
         '<span class="screen-warmup-text">' + escHtml(p.en) + "</span></div>" +
         '<p class="screen-postview-answer is-shown"><span>' +
-        '<span class="screen-postview-answer-label">和訳</span>' +
         escHtml(p.ja) +
         "</span></p></div>";
     });
