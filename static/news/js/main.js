@@ -125,7 +125,7 @@
     return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
   }
 
-  const MAX_UPLOAD_BYTES = 60 * 1024 * 1024;
+  const MAX_UPLOAD_BYTES = 150 * 1024 * 1024;
   const MAX_SPEECH_SECONDS = 180;
 
   function updateSubmitState() {

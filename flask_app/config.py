@@ -15,7 +15,7 @@ class Config:
     UPLOAD_FOLDER = str(BASE_DIR / "uploads")
     AUDIO_CACHE_DIR = BASE_DIR / "static" / "audio"
     ALLOWED_EXTENSIONS = {"webm", "wav", "mp3", "ogg", "m4a"}
-    MAX_CONTENT_LENGTH = 60 * 1024 * 1024
+    MAX_CONTENT_LENGTH = 150 * 1024 * 1024
 
     ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
     OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
