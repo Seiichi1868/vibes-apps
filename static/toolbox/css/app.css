@@ -250,7 +250,6 @@ html.tb-skip-opening .tb-opening { display: none !important; }
 .tb-opening-orb {
   position: absolute;
   border-radius: 50%;
-  filter: blur(28px);
 }
 .tb-opening-orb-l {
   width: 220px;
@@ -266,7 +265,7 @@ html.tb-skip-opening .tb-opening { display: none !important; }
   bottom: 40px;
   background: rgba(124, 179, 66, 0.35);
 }
-.tb-opening-card { position: relative; text-align: center; animation: tbOpeningIn 1.6s ease both; }
+.tb-opening-card { position: relative; text-align: center; }
 .tb-opening-label {
   margin: 0 0 8px;
   font-size: 11px;

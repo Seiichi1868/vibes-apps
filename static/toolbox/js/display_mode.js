@@ -17,7 +17,6 @@
       <button type="button" data-act="prev" aria-label="前へ">←</button>
       <button type="button" data-act="next" aria-label="次へ">→</button>
       <button type="button" data-act="blank" aria-label="Blank">B</button>
-      <button type="button" data-act="full" aria-label="全画面">F</button>
       <button type="button" data-act="exit" aria-label="終了">Esc</button>
     `;
     bar.addEventListener("click", (ev) => {
@@ -25,7 +24,6 @@
       if (act === "prev") display.onPrev && display.onPrev();
       if (act === "next") display.onNext && display.onNext();
       if (act === "blank") toggleBlank();
-      if (act === "full") toggleFullscreen();
       if (act === "exit") exit();
       poke();
     });
@@ -47,28 +45,14 @@
     const bar = ensureBar();
     bar.hidden = false;
     poke();
-    if (document.documentElement.requestFullscreen) {
-      document.documentElement.requestFullscreen().catch(() => {});
-    }
   }
 
   function exit() {
     display.on = false;
     document.body.classList.remove("tb-display-on");
     if (display.bar) display.bar.hidden = true;
-    if (document.fullscreenElement && document.exitFullscreen) {
-      document.exitFullscreen().catch(() => {});
-    }
     window.toolboxSetBlank && window.toolboxSetBlank(false);
     display.blank = false;
-  }
-
-  function toggleFullscreen() {
-    if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => {});
-    } else if (document.documentElement.requestFullscreen) {
-      document.documentElement.requestFullscreen().catch(() => {});
-    }
   }
 
   function syncBlank(on) {
@@ -109,9 +93,9 @@
       if (ev.target && /INPUT|TEXTAREA|SELECT/.test(ev.target.tagName)) return;
       if (window.toolboxIsBlank && window.toolboxIsBlank()) return;
       if (ev.key === "f" || ev.key === "F") {
+        if (display.on) return;
         ev.preventDefault();
-        if (display.on) toggleFullscreen();
-        else enter();
+        enter();
       }
       if (ev.key === "Escape") {
         if (display.on) exit();

@@ -63,15 +63,15 @@ body.tb-display-on .tb-listening {
 }
 
 body.tb-display-on .tb-stage-tool {
-  position: fixed;
-  inset: 0;
-  z-index: 10;
+  position: relative;
+  z-index: 1;
   margin: 0;
   padding: 8px 12px 36px;
   background: var(--tb-bg, #e9efdf);
   border-radius: 0;
   box-shadow: none;
-  min-height: 100vh;
+  min-height: calc(100vh - 44px);
+  filter: none;
 }
 
 body.tb-display-on .tb-stage-chrome .tb-btn,
@@ -84,16 +84,17 @@ body.tb-display-on .tb-stage-chrome .tb-inline-form select {
 }
 
 body.tb-display-on [data-view="play"]:not([hidden]) {
-  position: fixed;
-  inset: 0;
-  z-index: 10;
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   margin: 0;
   padding: 0;
+  min-height: calc(100vh - 44px);
   background: var(--tb-bg, #e9efdf);
   border-radius: 0;
   box-shadow: none;
+  filter: none;
 }
 
 body.tb-display-on [data-view="play"]:not([hidden]) .tb-progress {
@@ -299,9 +300,11 @@ body.tb-display-on .tb-stage-tool:has(.tb-seat-stage) .tb-seat-board {
 
 .tb-display-bar {
   position: fixed;
-  left: 50%;
+  left: 0;
+  right: 0;
   bottom: 10px;
-  transform: translateX(-50%);
+  width: max-content;
+  margin: 0 auto;
   display: flex;
   gap: 6px;
   padding: 6px;
