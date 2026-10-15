@@ -999,25 +999,41 @@
 
   function syncSelectChecks() {
     if (state.view !== "select") return;
-    document.querySelectorAll("#tb-select-list input[data-i]").forEach((input) => {
-      const q = state.questions[Number(input.dataset.i)];
-      if (q) q.included = input.checked;
+    document.querySelectorAll("#tb-select-list li[data-i]").forEach((li) => {
+      const q = state.questions[Number(li.dataset.i)];
+      if (!q) return;
+      const box = li.querySelector("input[type=checkbox]");
+      if (box) q.included = box.checked;
+      li.querySelectorAll("textarea[data-f]").forEach((el) => {
+        q[el.dataset.f] = el.value;
+      });
     });
   }
 
   function renderSelect() {
     const list = document.getElementById("tb-select-list");
     list.innerHTML = state.questions.map((q, i) => `
-      <li>
-        <label class="tb-check"><input type="checkbox" data-i="${i}" ${isIncluded(q) ? "checked" : ""}> 問題 ${i + 1}${q.section ? ` <small class="tb-muted">(${esc(q.section)})</small>` : ""}</label>
-        <p>${esc(q.question)}</p>
-        ${q.model_answer ? `<p class="tb-answer-line">模範解答: ${esc(q.model_answer)}</p>` : ""}
+      <li data-i="${i}">
+        <label class="tb-check"><input type="checkbox" ${isIncluded(q) ? "checked" : ""}> 問題 ${i + 1}${q.section ? ` <small class="tb-muted">(${esc(q.section)})</small>` : ""}</label>
+        <label class="tb-field-label">問題文
+          <textarea data-f="question" rows="2">${esc(q.question || "")}</textarea>
+        </label>
+        <label class="tb-field-label">模範解答
+          <textarea data-f="model_answer" rows="2">${esc(q.model_answer || "")}</textarea>
+        </label>
       </li>
     `).join("");
-    list.querySelectorAll("input[data-i]").forEach((input) => {
+    list.querySelectorAll("input[type=checkbox]").forEach((input) => {
       input.addEventListener("change", () => {
-        const q = state.questions[Number(input.dataset.i)];
-        if (q) q.included = input.checked;
+        syncSelectChecks();
+        persistSelection();
+      });
+    });
+    list.querySelectorAll("textarea[data-f]").forEach((el) => {
+      el.addEventListener("input", () => {
+        syncSelectChecks();
+        clearTimeout(renderSelect._save);
+        renderSelect._save = setTimeout(persistSelection, 400);
       });
     });
   }
@@ -1370,7 +1386,8 @@
     state.queue = null;
     state.transcript = detail.transcript || "";
     state.source = detail.source || "paste";
-    startPlay();
+    renderSelect();
+    show("select");
   }
 
   document.getElementById("tb-history-list").addEventListener("click", async (ev) => {
@@ -1409,8 +1426,8 @@
     ar.list.innerHTML = ar.questions.map((q, i) => `
       <li data-i="${i}">
         <label class="tb-check"><input type="checkbox" data-f="included" ${q.included === false ? "" : "checked"}> 出題する（問題 ${i + 1}${q.section ? ` / ${esc(q.section)}` : ""}）</label>
-        <input data-f="question" value="${esc(q.question)}" placeholder="問題文">
-        <input data-f="model_answer" value="${esc(q.model_answer)}" placeholder="模範解答（英文）">
+        <textarea data-f="question" rows="2" placeholder="問題文">${esc(q.question || "")}</textarea>
+        <textarea data-f="model_answer" rows="2" placeholder="模範解答（英文）">${esc(q.model_answer || "")}</textarea>
         <input data-f="evidence" value="${esc(q.evidence)}" placeholder="根拠（スピーチからの引用）">
         <button class="tb-btn" type="button" data-act="del">この問題を削除</button>
       </li>
@@ -1575,7 +1592,8 @@
       state.queue = null;
       state.transcript = saved.transcript || "";
       state.source = saved.source || "paste";
-      startPlay();
+      renderSelect();
+      show("select");
     }).catch((e) => alert(e.message));
   });
 

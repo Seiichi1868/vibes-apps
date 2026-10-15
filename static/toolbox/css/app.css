@@ -821,8 +821,18 @@ body.tb-display-on .tb-refresh-row:hover { opacity: 0.8; }
 .tb-hist-meta { font-size: 0.8rem; margin: 1px 0 3px; }
 #tb-ar-questions li { display: grid; gap: 6px; }
 #tb-ar-questions input[data-f]:not([type="checkbox"]),
+#tb-ar-questions textarea[data-f],
+#tb-select-list textarea[data-f],
 [data-view="archive"] textarea,
 [data-view="archive"] #tb-ar-title { width: 100%; box-sizing: border-box; }
+#tb-select-list .tb-field-label {
+  display: grid;
+  gap: 2px;
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: var(--tb-muted);
+}
+#tb-select-list textarea[data-f] { font-size: 1rem; color: inherit; }
 #tb-ar-audio { width: 100%; margin: 8px 0; }
 .tb-dir-box {
   padding: 10px 12px;
