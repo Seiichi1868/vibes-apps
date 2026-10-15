@@ -20,7 +20,11 @@ def transcribe_audio(file_path: Path, language: str = "en") -> str:
         )
 
     client = OpenAI(api_key=api_key, timeout=WHISPER_TIMEOUT_SEC, max_retries=WHISPER_MAX_RETRIES)
-    kwargs: dict = {"model": WHISPER_MODEL, "language": language}
+    kwargs: dict = {
+        "model": WHISPER_MODEL,
+        "language": language,
+        "prompt": "High school student speaking an English summary of a news story.",
+    }
     if WHISPER_MODEL == "whisper-1":
         kwargs["temperature"] = 0
 
