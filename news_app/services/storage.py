@@ -316,6 +316,7 @@ def _normalize_writing_topics(raw) -> list[dict]:
             "kind": kind,
             "text": text,
             "text_ja": str(entry.get("text_ja") or "").strip()[:400],
+            "answer": str(entry.get("answer") or "").strip()[:400],
             "options": options if kind == "opinion" else [],
             "selected": selected,
         }

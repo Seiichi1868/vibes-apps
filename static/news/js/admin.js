@@ -4056,7 +4056,6 @@
   const writingGenerateStatus = document.getElementById("writing-generate-status");
   const writingPreview = document.getElementById("writing-preview");
   const writingManualRows = document.getElementById("writing-manual-rows");
-  const writingAddOpinionBtn = document.getElementById("writing-add-opinion-btn");
   const writingAddQuestionBtn = document.getElementById("writing-add-question-btn");
   let adminWritingTopics = [];
   let writingSaveTimer = null;
@@ -4071,6 +4070,7 @@
       kind,
       text: String((raw && raw.text) || ""),
       text_ja: String((raw && raw.text_ja) || ""),
+      answer: String((raw && raw.answer) || ""),
       options: kind === "opinion" ? [options[0] || "Agree", options[1] || "Disagree"] : [],
       selected: raw && raw.selected === true,
       manual: raw && raw.manual === true,
@@ -4098,6 +4098,7 @@
         kind: "question",
         text: "",
         text_ja: "",
+        answer: "",
         options: [],
         selected: true,
         manual: true,
@@ -4185,37 +4186,74 @@
     let html = "";
     manualTopics.forEach((topic) => {
       const index = adminWritingTopics.indexOf(topic);
-      const dimClass = topic.selected ? "" : " opacity-60";
-      html += `<div class="rounded px-1 py-0.5 bg-white/70${dimClass}">${writingTopicFieldsHtml(topic, index)}</div>`;
+      const dimClass = topic.selected ? "" : " opacity-50";
+      html += `<div class="rounded px-1 py-0.5 bg-white/70${dimClass}">
+        <div class="flex items-center gap-1">
+          <input type="checkbox" class="writing-select-cb shrink-0 h-3.5 w-3.5 rounded border-rose-200 text-rose-600"
+            data-index="${index}" ${topic.selected ? "checked" : ""}>
+          ${questionOrderControlsHtml(index, topic, "rose")}
+          <span class="shrink-0 text-[9px] font-bold text-rose-700">Q${topic.id}</span>
+          <input type="text" class="writing-manual-input compact-input min-w-0 flex-1 text-[10px] py-0.5"
+            data-index="${index}" value="${escAttr(topic.text)}" placeholder="質問（英語）">
+        </div>
+        <label class="mt-0.5 flex items-center gap-1 pl-5">
+          <span class="shrink-0 text-[9px] font-semibold text-rose-800">${t("modelAnswer")}</span>
+          <input type="text" class="writing-answer-input compact-input min-w-0 flex-1 text-[10px] py-0.5"
+            data-index="${index}" value="${escAttr(topic.answer || "")}" placeholder="${escAttr(t("modelAnswerPlaceholder"))}">
+        </label>
+      </div>`;
     });
     writingManualRows.innerHTML = html;
-    bindWritingTopicFields(writingManualRows);
+    writingManualRows.querySelectorAll(".writing-select-cb").forEach((cb) => {
+      cb.addEventListener("change", onWritingSelectionChange);
+    });
+    writingManualRows.querySelectorAll(".writing-manual-input").forEach((input) => {
+      input.addEventListener("input", (event) => {
+        const topic = adminWritingTopics[Number(event.target.dataset.index)];
+        if (!topic) return;
+        topic.text = event.target.value;
+        scheduleWritingSave();
+      });
+      input.addEventListener("blur", () => saveWritingTopics({ silent: true }));
+    });
+    writingManualRows.querySelectorAll(".writing-answer-input").forEach((input) => {
+      input.addEventListener("input", (event) => {
+        const topic = adminWritingTopics[Number(event.target.dataset.index)];
+        if (!topic) return;
+        topic.answer = event.target.value;
+        scheduleWritingSave();
+      });
+      input.addEventListener("blur", () => saveWritingTopics({ silent: true }));
+      input.addEventListener("click", (event) => event.stopPropagation());
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") event.preventDefault();
+      });
+    });
+    bindQuestionOrderControls(writingManualRows, adminWritingTopics, onWritingOrderChanged);
   }
 
-  function addManualWritingRow(kind) {
-    const opinion = kind === "opinion";
+  function addManualWritingRow() {
     adminWritingTopics.push({
       id: nextWritingTopicId(),
-      kind: opinion ? "opinion" : "question",
+      kind: "question",
       text: "",
       text_ja: "",
-      options: opinion ? ["Agree", "Disagree"] : [],
+      answer: "",
+      options: [],
       selected: true,
       manual: true,
       display_order: 0,
     });
     renderWritingManualRows();
-    const inputs = writingManualRows?.querySelectorAll(".writing-text-input") || [];
+    const inputs = writingManualRows?.querySelectorAll(".writing-manual-input") || [];
     const lastInput = inputs[inputs.length - 1];
     if (lastInput) lastInput.focus();
   }
 
-  if (writingAddOpinionBtn) {
-    writingAddOpinionBtn.addEventListener("click", () => addManualWritingRow("opinion"));
-  }
   if (writingAddQuestionBtn) {
-    writingAddQuestionBtn.addEventListener("click", () => addManualWritingRow("question"));
+    writingAddQuestionBtn.addEventListener("click", addManualWritingRow);
   }
+  renderWritingManualRows();
 
   function renderAdminWritingPreview(topics) {
     const incoming = (topics || []).map(writingTopicFromRaw);
