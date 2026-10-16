@@ -563,6 +563,7 @@ def _normalize_class(class_id: str, raw: dict) -> dict:
                 "postview_answers_visible": bool(item.get("postview_answers_visible", False)),
                 "writing_topics": _normalize_writing_topics(item.get("writing_topics")),
                 "archive_id": str(item.get("archive_id") or "").strip(),
+                "in_use": item.get("in_use") is True,
             }
         )
     _assign_archive_ids(normalized_archive)
@@ -819,6 +820,7 @@ def archive_class_current(class_id: str, title: str = "", lesson_name: str = "")
         "lesson_name": saved_lesson_name,
         "archived_at": _now_iso(),
         "archive_id": _new_archive_id(),
+        "in_use": False,
     }
     cls.setdefault("archive", []).insert(0, archive_item)
     update_submission_lesson_title(
@@ -861,6 +863,7 @@ def restore_class_archive(class_id: str, archive_index: int) -> dict:
     restored_lesson_name = str(restored.get("lesson_name") or "").strip()
     restored.pop("archived_at", None)
     restored.pop("archive_id", None)
+    restored.pop("in_use", None)
     cls["current"] = _normalize_current(
         {**restored, "title": restored_title, "lesson_name": restored_lesson_name}
     )
@@ -878,10 +881,31 @@ def delete_class_archive(class_id: str, archive_index: int) -> dict:
     if archive_index < 0 or archive_index >= len(archive):
         raise ValueError("指定されたアーカイブが見つかりません。")
 
+    if archive[archive_index].get("in_use") is True:
+        raise ValueError(
+            "このアーカイブは QR / スクリーンリンクを配布中（使用中）のため削除できません。"
+            "不要になったら「使用中」を解除してから削除してください。"
+        )
+
     archive.pop(archive_index)
     cls["archive"] = archive
     save_state(state)
     return cls
+
+
+def set_archive_in_use(class_id: str, archive_id: str, in_use: bool) -> dict:
+    """アーカイブの「使用中」（配布した QR / リンクを残したい）印を付け外しする。"""
+    archive_id = str(archive_id or "").strip()
+    state = load_state()
+    if class_id not in state.get("classes", {}):
+        raise ValueError("指定されたクラスが見つかりません。")
+    cls = state["classes"][class_id]
+    for item in cls.get("archive") or []:
+        if str(item.get("archive_id") or "") == archive_id and archive_id:
+            item["in_use"] = bool(in_use)
+            save_state(state)
+            return cls
+    raise ValueError("指定されたアーカイブが見つかりません。")
 
 
 def copy_class_archive(class_id: str, archive_index: int, target_class_id: str) -> tuple[dict, dict]:
@@ -902,6 +926,7 @@ def copy_class_archive(class_id: str, archive_index: int, target_class_id: str) 
     archive_item = deepcopy(source_archive[archive_index])
     archive_item["archived_at"] = _now_iso()
     archive_item["archive_id"] = _new_archive_id()
+    archive_item["in_use"] = False
     classes[target_class_id].setdefault("archive", []).insert(0, archive_item)
     save_state(state)
     return classes[class_id], classes[target_class_id]

@@ -42,6 +42,17 @@
   const shareLinkOutput = document.getElementById("share-link-output");
   const openScreenBtn = document.getElementById("open-screen-btn");
   const copyScreenLinkBtn = document.getElementById("copy-screen-link-btn");
+  const screenQrBtn = document.getElementById("screen-qr-btn");
+  const screenQrModal = document.getElementById("screen-qr-modal");
+  const screenQrTitle = document.getElementById("screen-qr-title");
+  const screenQrNote = document.getElementById("screen-qr-note");
+  const screenQrImage = document.getElementById("screen-qr-image");
+  const screenQrLink = document.getElementById("screen-qr-link");
+  const screenQrInUseWrap = document.getElementById("screen-qr-inuse-wrap");
+  const screenQrInUse = document.getElementById("screen-qr-inuse");
+  const screenQrCopy = document.getElementById("screen-qr-copy");
+  const screenQrDownload = document.getElementById("screen-qr-download");
+  const screenQrClose = document.getElementById("screen-qr-close");
   const cnn10OpenBtn = document.getElementById("cnn10-open-btn");
   const cnn10Panel = document.getElementById("cnn10-panel");
   const cnn10CloseBtn = document.getElementById("cnn10-close-btn");
@@ -1398,6 +1409,119 @@
     const enabled = Boolean(classId);
     if (openScreenBtn) openScreenBtn.disabled = !enabled;
     if (copyScreenLinkBtn) copyScreenLinkBtn.disabled = !enabled;
+    if (screenQrBtn) screenQrBtn.disabled = !enabled;
+  }
+
+  // ── 教室スクリーン QR（授業設定中／アーカイブ） ─────────────────────
+
+  let screenQrState = { classId: "", archiveId: "" };
+
+  async function fetchScreenQr(classId, archiveId) {
+    let url = `/news/admin/api/screen-qr?class_id=${encodeURIComponent(classId)}`;
+    if (archiveId) url += `&archive_id=${encodeURIComponent(archiveId)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "QRの取得に失敗しました");
+    return data;
+  }
+
+  async function postArchiveInUse(classId, archiveId, inUse) {
+    const res = await fetch("/news/admin/api/class/archive/in-use", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ class_id: classId, archive_id: archiveId, in_use: inUse }),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "使用中の設定に失敗しました");
+    if (data.class) renderArchiveList(data.class);
+    return data;
+  }
+
+  function closeScreenQrModal() {
+    if (!screenQrModal) return;
+    screenQrModal.classList.add("hidden");
+    screenQrModal.classList.remove("flex");
+  }
+
+  async function openScreenQrModal(classId, archiveId, titleText) {
+    if (!screenQrModal) return;
+    const qr = await fetchScreenQr(classId, archiveId);
+    let inUse = qr.in_use === true;
+    if (archiveId && !inUse) {
+      // 配布する前提で、削除してしまわないよう自動で「使用中」にする
+      await postArchiveInUse(classId, archiveId, true);
+      inUse = true;
+    }
+    screenQrState = { classId, archiveId };
+    if (screenQrTitle) screenQrTitle.textContent = titleText || t("qrCurrentTitle");
+    if (screenQrNote) screenQrNote.textContent = archiveId ? t("qrArchiveNote") : t("qrCurrentNote");
+    if (screenQrImage) screenQrImage.src = qr.qr;
+    if (screenQrLink) screenQrLink.value = qr.link;
+    if (screenQrDownload) screenQrDownload.href = qr.qr;
+    if (screenQrInUseWrap) {
+      screenQrInUseWrap.classList.toggle("hidden", !archiveId);
+      screenQrInUseWrap.classList.toggle("flex", Boolean(archiveId));
+    }
+    if (screenQrInUse) screenQrInUse.checked = inUse;
+    screenQrModal.classList.remove("hidden");
+    screenQrModal.classList.add("flex");
+  }
+
+  if (screenQrBtn) {
+    screenQrBtn.addEventListener("click", async () => {
+      const classId = getSelectedClassId();
+      if (!classId) {
+        alert("クラスを選択してください。");
+        return;
+      }
+      try {
+        await openScreenQrModal(classId, "", t("qrCurrentTitle"));
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+  }
+  if (screenQrClose) screenQrClose.addEventListener("click", closeScreenQrModal);
+  if (screenQrModal) {
+    screenQrModal.addEventListener("click", (event) => {
+      if (event.target === screenQrModal) closeScreenQrModal();
+    });
+  }
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeScreenQrModal();
+  });
+  if (screenQrCopy) {
+    screenQrCopy.addEventListener("click", async () => {
+      const link = screenQrLink ? screenQrLink.value : "";
+      if (!link) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(link);
+        const prev = screenQrCopy.textContent;
+        screenQrCopy.textContent = t("archiveScreenCopied");
+        setTimeout(() => {
+          screenQrCopy.textContent = prev;
+        }, 1200);
+      } else {
+        prompt("教室スクリーン URL:", link);
+      }
+    });
+  }
+  if (screenQrInUse) {
+    screenQrInUse.addEventListener("change", async () => {
+      const wantInUse = screenQrInUse.checked;
+      const { classId, archiveId } = screenQrState;
+      if (!classId || !archiveId) return;
+      if (!wantInUse && !confirm("使用中を解除すると、このアーカイブを削除できるようになります。配布したQRやリンクが不要になった場合のみ解除してください。解除しますか？")) {
+        screenQrInUse.checked = true;
+        return;
+      }
+      try {
+        await postArchiveInUse(classId, archiveId, wantInUse);
+      } catch (err) {
+        screenQrInUse.checked = !wantInUse;
+        alert(err.message);
+      }
+    });
   }
 
   async function fetchScreenLink(classId, archiveId) {
@@ -1475,8 +1599,12 @@
 
     archive.forEach((item, index) => {
       const li = document.createElement("li");
-      li.className = "rounded border border-teal-100/80 bg-white/50 px-1.5 py-1";
+      const inUse = item.in_use === true;
+      li.className = inUse
+        ? "rounded border border-amber-300 bg-amber-50/90 px-1.5 py-1 ring-1 ring-amber-200"
+        : "rounded border border-teal-100/80 bg-white/50 px-1.5 py-1";
       li.dataset.archiveIndex = String(index);
+      li.dataset.inUse = inUse ? "1" : "0";
       li.dataset.archiveId = item.archive_id || "";
 
       const row = document.createElement("div");
@@ -1512,7 +1640,14 @@
         createAssistFlag("W", archiveHasIntro(item), t("archiveAssistIntro")),
         createAssistFlag("D", archiveHasPostview(item), t("archiveAssistPostview")),
       );
-      titleRow.append(title, flags);
+      if (inUse) {
+        const inUseBadge = document.createElement("span");
+        inUseBadge.className = "shrink-0 rounded bg-amber-400 px-1 py-0.5 text-[9px] font-bold leading-none text-white";
+        inUseBadge.textContent = "🔒 " + t("archiveInUse");
+        titleRow.append(title, inUseBadge, flags);
+      } else {
+        titleRow.append(title, flags);
+      }
 
       const meta = document.createElement("p");
       meta.className = "truncate leading-tight";
@@ -1537,9 +1672,25 @@
       copyScreenBtnItem.className = "copy-archive-screen-btn rounded border border-violet-100 bg-white/80 px-1.5 py-0.5 text-[9px] font-semibold leading-none text-violet-700 hover:bg-violet-50";
       copyScreenBtnItem.textContent = t("archiveCopyScreenUrl");
       copyScreenBtnItem.title = t("archiveCopyScreenUrlTitle");
+      const qrBtnItem = document.createElement("button");
+      qrBtnItem.type = "button";
+      qrBtnItem.className = "archive-qr-btn rounded border border-violet-100 bg-white/80 px-1.5 py-0.5 text-[9px] font-semibold leading-none text-violet-700 hover:bg-violet-50";
+      qrBtnItem.textContent = t("archiveQr");
+      qrBtnItem.title = t("archiveQrTitle");
+
+      const inUseBtn = document.createElement("button");
+      inUseBtn.type = "button";
+      inUseBtn.className = inUse
+        ? "toggle-archive-inuse-btn rounded border border-amber-400 bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold leading-none text-amber-800 hover:bg-amber-200"
+        : "toggle-archive-inuse-btn rounded border border-slate-200 bg-white/80 px-1.5 py-0.5 text-[9px] font-semibold leading-none text-slate-500 hover:bg-slate-50";
+      inUseBtn.textContent = (inUse ? "✔ " : "○ ") + t("archiveInUse");
+      inUseBtn.title = inUse ? t("archiveInUseOn") : t("archiveInUseOff");
+
       if (!item.archive_id) {
         openScreenBtnItem.disabled = true;
         copyScreenBtnItem.disabled = true;
+        qrBtnItem.disabled = true;
+        inUseBtn.disabled = true;
       }
 
       const restoreBtn = document.createElement("button");
@@ -1551,8 +1702,12 @@
       deleteBtn.type = "button";
       deleteBtn.className = "delete-archive-btn rounded border border-red-100 bg-white/80 px-1.5 py-0.5 text-[9px] font-semibold leading-none text-red-600 hover:bg-red-50";
       deleteBtn.textContent = "削除";
+      if (inUse) {
+        deleteBtn.classList.add("opacity-40", "cursor-not-allowed");
+        deleteBtn.title = t("archiveDeleteBlocked");
+      }
 
-      actions.append(openScreenBtnItem, copyScreenBtnItem, restoreBtn, deleteBtn);
+      actions.append(openScreenBtnItem, copyScreenBtnItem, qrBtnItem, inUseBtn, restoreBtn, deleteBtn);
 
       const copyTargets = adminClasses.filter((c) => c.id !== currentClassId);
       if (copyTargets.length) {
@@ -1909,6 +2064,24 @@
           return;
         }
 
+        if (btn.classList.contains("archive-qr-btn")) {
+          if (!archiveId) throw new Error("このアーカイブのスクリーンリンクを発行できません。");
+          const titleEl = itemEl.querySelector("p");
+          await openScreenQrModal(classId, archiveId, titleEl ? titleEl.textContent : "");
+          return;
+        }
+
+        if (btn.classList.contains("toggle-archive-inuse-btn")) {
+          if (!archiveId) throw new Error("このアーカイブは使用中にできません。");
+          const currentlyInUse = itemEl.dataset.inUse === "1";
+          if (currentlyInUse && !confirm("使用中を解除すると、このアーカイブを削除できるようになります。配布したQRやリンクが不要になった場合のみ解除してください。解除しますか？")) {
+            return;
+          }
+          const data = await postArchiveInUse(classId, archiveId, !currentlyInUse);
+          showMessage(lessonMessage, data.message || "", false);
+          return;
+        }
+
         if (btn.classList.contains("restore-archive-btn")) {
           if (!confirm("現在設定されている動画やスクリプトなどは上書きされます。アーカイブの内容を設定画面に戻しますか？")) {
             return;
@@ -1926,6 +2099,9 @@
         }
 
         if (btn.classList.contains("delete-archive-btn")) {
+          if (itemEl.dataset.inUse === "1") {
+            throw new Error(t("archiveDeleteBlocked"));
+          }
           if (!confirm("このアーカイブを削除します。元に戻せません。よろしいですか？")) {
             return;
           }

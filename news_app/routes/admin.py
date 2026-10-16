@@ -56,6 +56,7 @@ from news_app.services.storage import (
     load_state,
     reset_class_current,
     restore_class_archive,
+    set_archive_in_use,
     extract_score_breakdown,
     lesson_key,
     lesson_title_display,
@@ -1267,6 +1268,69 @@ def screen_link():
     else:
         link = f"{base}/news/screen/?class={class_id}"
     return jsonify({"ok": True, "link": link, "class_id": class_id, "archive_id": archive_id})
+
+
+@admin_bp.route("/api/screen-qr", methods=["GET"])
+def screen_qr():
+    """教室スクリーンのリンクを QR（PNG data URI）で返す。archive_id なしは授業設定中のリンク。"""
+    class_id = (request.args.get("class_id") or get_active_class_id()).strip()
+    if not class_id:
+        return jsonify({"ok": False, "error": "クラスを選択してください。"}), 400
+
+    archive_id = (request.args.get("archive_id") or "").strip()
+    base = get_public_base_url(request)
+    in_use = False
+    if archive_id:
+        item = get_archive_item(class_id, archive_id)
+        if not item:
+            return jsonify({"ok": False, "error": "指定されたアーカイブが見つかりません。"}), 404
+        link = f"{base}/news/screen/?class={class_id}&archive={archive_id}"
+        in_use = item.get("in_use") is True
+    else:
+        link = f"{base}/news/screen/?class={class_id}"
+    try:
+        import segno
+
+        qr_image = segno.make(link, error="m").png_data_uri(scale=10, border=3)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"QRの生成に失敗しました: {exc}"}), 500
+    return jsonify(
+        {
+            "ok": True,
+            "link": link,
+            "qr": qr_image,
+            "class_id": class_id,
+            "archive_id": archive_id,
+            "in_use": in_use,
+        }
+    )
+
+
+@admin_bp.route("/api/class/archive/in-use", methods=["POST"])
+def api_set_archive_in_use():
+    """QR / リンクを配布中のアーカイブに「使用中」印を付け外しする（使用中は削除不可）。"""
+    data = request.get_json(silent=True) or {}
+    class_id = str(data.get("class_id") or get_active_class_id()).strip()
+    archive_id = str(data.get("archive_id") or "").strip()
+    in_use = data.get("in_use") is True
+    try:
+        cls = set_archive_in_use(class_id, archive_id, in_use)
+        return jsonify(
+            {
+                "ok": True,
+                "class": cls,
+                "in_use": in_use,
+                "message": (
+                    "使用中にしました。解除するまでこのアーカイブは削除できません。"
+                    if in_use
+                    else "使用中を解除しました。削除できるようになりました。"
+                ),
+            }
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"保存に失敗しました: {exc}"}), 500
 
 
 # ── 名簿アップロード ──────────────────────────────────────────
