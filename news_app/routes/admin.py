@@ -998,7 +998,13 @@ def api_generate_writing_topics():
     model = resolve_ai_model(state.get("ai_model"))
     try:
         result = extract_writing_topics_from_script(script, api_key=api_key, model=model)
-        cls = update_class_current(class_id, {"writing_topics": result["topics"]})
+        existing_manual = [
+            topic
+            for topic in _normalize_writing_topics(current.get("writing_topics"))
+            if topic.get("manual")
+        ]
+        topics = result["topics"] + existing_manual
+        cls = update_class_current(class_id, {"writing_topics": topics})
         return jsonify(
             {
                 "ok": True,

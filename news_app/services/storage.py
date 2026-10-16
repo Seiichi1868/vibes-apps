@@ -306,6 +306,11 @@ def _normalize_writing_topics(raw) -> list[dict]:
             selected = selected_raw.strip().lower() in {"true", "1", "yes", "on"}
         else:
             selected = bool(selected_raw)
+        manual_raw = entry.get("manual", False)
+        if isinstance(manual_raw, str):
+            manual = manual_raw.strip().lower() in {"true", "1", "yes", "on"}
+        else:
+            manual = bool(manual_raw)
         item = {
             "id": topic_id,
             "kind": kind,
@@ -314,6 +319,8 @@ def _normalize_writing_topics(raw) -> list[dict]:
             "options": options if kind == "opinion" else [],
             "selected": selected,
         }
+        if manual:
+            item["manual"] = True
         raw_order = entry.get("display_order")
         try:
             display_order = int(raw_order) if raw_order not in (None, "") else None

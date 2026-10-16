@@ -4055,6 +4055,9 @@
   const writingGenerateBtn = document.getElementById("writing-generate-btn");
   const writingGenerateStatus = document.getElementById("writing-generate-status");
   const writingPreview = document.getElementById("writing-preview");
+  const writingManualRows = document.getElementById("writing-manual-rows");
+  const writingAddOpinionBtn = document.getElementById("writing-add-opinion-btn");
+  const writingAddQuestionBtn = document.getElementById("writing-add-question-btn");
   let adminWritingTopics = [];
   let writingSaveTimer = null;
   let writingSaving = false;
@@ -4070,8 +4073,37 @@
       text_ja: String((raw && raw.text_ja) || ""),
       options: kind === "opinion" ? [options[0] || "Agree", options[1] || "Disagree"] : [],
       selected: raw && raw.selected === true,
+      manual: raw && raw.manual === true,
       display_order: Number.isFinite(order) && order > 0 ? order : 0,
     };
+  }
+
+  function nextWritingTopicId() {
+    const ids = adminWritingTopics.map((topic) => Number(topic.id)).filter((id) => Number.isFinite(id));
+    return ids.length ? Math.max(...ids) + 1 : 1;
+  }
+
+  function getManualWritingTopics() {
+    return adminWritingTopics.filter((topic) => topic.manual);
+  }
+
+  function getAiWritingTopics() {
+    return adminWritingTopics.filter((topic) => !topic.manual);
+  }
+
+  function ensureManualWritingRow() {
+    if (!getManualWritingTopics().length) {
+      adminWritingTopics.push({
+        id: nextWritingTopicId(),
+        kind: "question",
+        text: "",
+        text_ja: "",
+        options: [],
+        selected: true,
+        manual: true,
+        display_order: 0,
+      });
+    }
   }
 
   function onWritingOrderChanged() {
@@ -4079,57 +4111,45 @@
     saveWritingTopics({ silent: true });
   }
 
-  function renderAdminWritingPreview(topics) {
-    adminWritingTopics = (topics || []).map(writingTopicFromRaw);
-    syncSelectedDisplayOrders(adminWritingTopics);
-    if (!writingPreview) return;
-    if (!adminWritingTopics.length) {
-      writingPreview.classList.add("hidden");
-      writingPreview.innerHTML = "";
-      return;
-    }
-    const selectedCount = adminWritingTopics.filter((topic) => topic.selected && topic.text.trim()).length;
-    const totalCount = adminWritingTopics.filter((topic) => topic.text.trim()).length;
-    let html = `<p class="mb-1 font-semibold text-slate-600">${t("writingPreview", { selected: selectedCount, total: totalCount })}</p>`;
-    html += `<p class="mb-1 text-[9px] text-slate-500">${t("writingOrderHint")}</p>`;
-    html += `<div class="space-y-1">`;
-    adminWritingTopics.forEach((topic, index) => {
-      const badge = topic.kind === "opinion"
-        ? '<span class="shrink-0 rounded bg-rose-100 px-1 text-[9px] font-bold text-rose-700">2択</span>'
-        : '<span class="shrink-0 rounded bg-amber-100 px-1 text-[9px] font-bold text-amber-700">問い</span>';
-      const dimClass = topic.selected ? "" : " opacity-60";
-      html += `<div class="rounded px-1.5 py-1 ${index % 2 === 0 ? "bg-white/70" : ""}${dimClass}">
-        <div class="flex items-start gap-1.5">
+  function writingTopicFieldsHtml(topic, index) {
+    const badge = topic.kind === "opinion"
+      ? '<span class="shrink-0 rounded bg-rose-100 px-1 text-[9px] font-bold text-rose-700">2択</span>'
+      : '<span class="shrink-0 rounded bg-amber-100 px-1 text-[9px] font-bold text-amber-700">問い</span>';
+    let html = `<div class="flex items-start gap-1.5">
           <input type="checkbox" class="writing-select-cb shrink-0 mt-1 h-3.5 w-3.5 rounded border-rose-200 text-rose-600"
             data-index="${index}" ${topic.selected ? "checked" : ""} title="スクリーンに表示">
           ${questionOrderControlsHtml(index, topic, "rose")}
           <span class="shrink-0 mt-0.5 font-bold text-rose-700">T${index + 1}.</span>
           ${badge}
           <textarea rows="2" class="writing-text-input compact-input min-w-0 flex-1 resize-y text-[10px] py-0.5 leading-snug"
-            data-index="${index}">${esc(topic.text)}</textarea>
+            data-index="${index}" placeholder="トピック（英語）">${esc(topic.text)}</textarea>
         </div>`;
-      if (topic.kind === "opinion") {
-        html += `<div class="mt-0.5 ml-12 flex items-center gap-1 text-[9px] text-rose-800">
+    if (topic.kind === "opinion") {
+      html += `<div class="mt-0.5 ml-12 flex items-center gap-1 text-[9px] text-rose-800">
           <span class="shrink-0 font-semibold">選択肢</span>
-          <input type="text" class="writing-option-input compact-input w-28 text-[10px] py-0.5" data-index="${index}" data-option="0" value="${escAttr(topic.options[0])}">
+          <input type="text" class="writing-option-input compact-input w-28 text-[10px] py-0.5" data-index="${index}" data-option="0" value="${escAttr(topic.options[0] || "")}">
           <span>/</span>
-          <input type="text" class="writing-option-input compact-input w-28 text-[10px] py-0.5" data-index="${index}" data-option="1" value="${escAttr(topic.options[1])}">
+          <input type="text" class="writing-option-input compact-input w-28 text-[10px] py-0.5" data-index="${index}" data-option="1" value="${escAttr(topic.options[1] || "")}">
         </div>`;
-      }
-      if (topic.text_ja) {
-        html += `<p class="mt-0.5 ml-12 text-[9px] text-slate-500">${esc(topic.text_ja)}</p>`;
-      }
-      html += `</div>`;
-    });
-    html += `</div>`;
-    writingPreview.innerHTML = html;
-    writingPreview.classList.remove("hidden");
+    }
+    if (topic.manual) {
+      html += `<label class="mt-0.5 ml-12 flex items-center gap-1 text-[9px] text-slate-500">
+          <span class="shrink-0 font-semibold">日本語</span>
+          <input type="text" class="writing-ja-input compact-input min-w-0 flex-1 text-[10px] py-0.5" data-index="${index}" value="${escAttr(topic.text_ja || "")}" placeholder="任意">
+        </label>`;
+    } else if (topic.text_ja) {
+      html += `<p class="mt-0.5 ml-12 text-[9px] text-slate-500">${esc(topic.text_ja)}</p>`;
+    }
+    return html;
+  }
 
-    writingPreview.querySelectorAll(".writing-select-cb").forEach((cb) => {
+  function bindWritingTopicFields(root) {
+    if (!root) return;
+    root.querySelectorAll(".writing-select-cb").forEach((cb) => {
       cb.addEventListener("change", onWritingSelectionChange);
     });
-    bindQuestionOrderControls(writingPreview, adminWritingTopics, onWritingOrderChanged);
-    writingPreview.querySelectorAll(".writing-text-input").forEach((input) => {
+    bindQuestionOrderControls(root, adminWritingTopics, onWritingOrderChanged);
+    root.querySelectorAll(".writing-text-input").forEach((input) => {
       input.addEventListener("input", (event) => {
         const topic = adminWritingTopics[Number(event.target.dataset.index)];
         if (!topic) return;
@@ -4138,7 +4158,7 @@
       });
       input.addEventListener("blur", () => saveWritingTopics({ silent: true }));
     });
-    writingPreview.querySelectorAll(".writing-option-input").forEach((input) => {
+    root.querySelectorAll(".writing-option-input").forEach((input) => {
       input.addEventListener("input", (event) => {
         const topic = adminWritingTopics[Number(event.target.dataset.index)];
         if (!topic) return;
@@ -4147,6 +4167,90 @@
       });
       input.addEventListener("blur", () => saveWritingTopics({ silent: true }));
     });
+    root.querySelectorAll(".writing-ja-input").forEach((input) => {
+      input.addEventListener("input", (event) => {
+        const topic = adminWritingTopics[Number(event.target.dataset.index)];
+        if (!topic) return;
+        topic.text_ja = event.target.value;
+        scheduleWritingSave();
+      });
+      input.addEventListener("blur", () => saveWritingTopics({ silent: true }));
+    });
+  }
+
+  function renderWritingManualRows() {
+    if (!writingManualRows) return;
+    ensureManualWritingRow();
+    const manualTopics = getManualWritingTopics();
+    let html = "";
+    manualTopics.forEach((topic) => {
+      const index = adminWritingTopics.indexOf(topic);
+      const dimClass = topic.selected ? "" : " opacity-60";
+      html += `<div class="rounded px-1 py-0.5 bg-white/70${dimClass}">${writingTopicFieldsHtml(topic, index)}</div>`;
+    });
+    writingManualRows.innerHTML = html;
+    bindWritingTopicFields(writingManualRows);
+  }
+
+  function addManualWritingRow(kind) {
+    const opinion = kind === "opinion";
+    adminWritingTopics.push({
+      id: nextWritingTopicId(),
+      kind: opinion ? "opinion" : "question",
+      text: "",
+      text_ja: "",
+      options: opinion ? ["Agree", "Disagree"] : [],
+      selected: true,
+      manual: true,
+      display_order: 0,
+    });
+    renderWritingManualRows();
+    const inputs = writingManualRows?.querySelectorAll(".writing-text-input") || [];
+    const lastInput = inputs[inputs.length - 1];
+    if (lastInput) lastInput.focus();
+  }
+
+  if (writingAddOpinionBtn) {
+    writingAddOpinionBtn.addEventListener("click", () => addManualWritingRow("opinion"));
+  }
+  if (writingAddQuestionBtn) {
+    writingAddQuestionBtn.addEventListener("click", () => addManualWritingRow("question"));
+  }
+
+  function renderAdminWritingPreview(topics) {
+    const incoming = (topics || []).map(writingTopicFromRaw);
+    const manualFromState = incoming.length
+      ? incoming.filter((topic) => topic.manual)
+      : getManualWritingTopics();
+    const aiFromState = incoming.filter((topic) => !topic.manual);
+    adminWritingTopics = [...aiFromState, ...manualFromState];
+    syncSelectedDisplayOrders(adminWritingTopics);
+    const aiTopics = getAiWritingTopics();
+    if (!writingPreview) {
+      renderWritingManualRows();
+      return;
+    }
+    if (!aiTopics.length) {
+      writingPreview.classList.add("hidden");
+      writingPreview.innerHTML = "";
+      renderWritingManualRows();
+      return;
+    }
+    const selectedCount = adminWritingTopics.filter((topic) => topic.selected && topic.text.trim()).length;
+    const totalCount = adminWritingTopics.filter((topic) => topic.text.trim()).length;
+    let html = `<p class="mb-1 font-semibold text-slate-600">${t("writingPreview", { selected: selectedCount, total: totalCount })}</p>`;
+    html += `<p class="mb-1 text-[9px] text-slate-500">${t("writingOrderHint")}</p>`;
+    html += `<div class="space-y-1">`;
+    aiTopics.forEach((topic) => {
+      const index = adminWritingTopics.indexOf(topic);
+      const dimClass = topic.selected ? "" : " opacity-60";
+      html += `<div class="rounded px-1.5 py-1 ${index % 2 === 0 ? "bg-white/70" : ""}${dimClass}">${writingTopicFieldsHtml(topic, index)}</div>`;
+    });
+    html += `</div>`;
+    writingPreview.innerHTML = html;
+    writingPreview.classList.remove("hidden");
+    bindWritingTopicFields(writingPreview);
+    renderWritingManualRows();
   }
 
   function scheduleWritingSave() {
@@ -4220,9 +4324,10 @@
         showMessage(lessonMessage, "スクリプトを入力してから生成してください。", true);
         return;
       }
+      const hasGenerated = getAiWritingTopics().some((topic) => topic.text.trim());
       if (
-        adminWritingTopics.length &&
-        !window.confirm("今のトピックは新しく生成した5つに置き換わります。よろしいですか？")
+        hasGenerated &&
+        !window.confirm("生成済みのトピックは新しく生成した5つに置き換わります。手書きのトピックはそのまま残ります。よろしいですか？")
       ) {
         return;
       }
