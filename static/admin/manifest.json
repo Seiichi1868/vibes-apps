@@ -1,7 +1,7 @@
 {
   "id": "/admin",
-  "name": "音読判定 管理",
-  "short_name": "音読管理",
+  "name": "Speaking Lab Pronounce 管理",
+  "short_name": "Pronounce 管理",
   "start_url": "/admin",
   "scope": "/admin",
   "display": "standalone",

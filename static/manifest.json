@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "音読判定アプリ",
-  "short_name": "音読判定",
+  "name": "Speaking Lab Pronounce",
+  "short_name": "Pronounce",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

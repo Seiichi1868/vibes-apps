@@ -128,7 +128,7 @@ def admin_unlock():
 
 
 OTHER_APPS = (
-    {"name": "音読判定", "user": "/", "admin": "/admin"},
+    {"name": "Speaking Lab Pronounce", "user": "/", "admin": "/admin"},
     {"name": "Speaking Lab News", "user": "/news/", "admin": "/news/admin/"},
     {"name": "Parliamentary Debate Practice", "user": "/debate/", "admin": "/debate/admin/"},
     {"name": "GTEC Speaking", "user": "/gtec", "admin": "/gtec/admin"},
