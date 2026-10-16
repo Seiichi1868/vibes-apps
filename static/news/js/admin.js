@@ -4512,6 +4512,7 @@
   } else {
     renderAdminWarmupPreview("", []);
     renderAdminPostviewPreview([]);
+    renderAdminWritingPreview([]);
   }
   if (!window.ADMIN_ACTIVE_CLASS && (window.ADMIN_WARMUP_IMAGE_URL || (window.ADMIN_WARMUP_QUESTIONS && window.ADMIN_WARMUP_QUESTIONS.length))) {
     renderAdminWarmupPreview(window.ADMIN_WARMUP_IMAGE_URL || "", window.ADMIN_WARMUP_QUESTIONS || []);
