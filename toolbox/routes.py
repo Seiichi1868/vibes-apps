@@ -310,8 +310,15 @@ def change_password():
         current = request.form.get("current_password") or ""
         new_password = request.form.get("new_password") or ""
         confirm = request.form.get("confirm_password") or ""
-        if not verify_password(user, current):
+        from toolbox.totp import verify_code
+
+        totp_secret = str(user.get("totp_secret") or "")
+        if not totp_secret:
+            error = "認証アプリを管理画面で登録してから変更できます。"
+        elif not verify_password(user, current):
             error = "いまのパスワードが違います。"
+        elif not verify_code(totp_secret, request.form.get("totp_code") or ""):
+            error = "認証アプリの番号が違います。"
         elif new_password != confirm:
             error = "新しいパスワードが一致しません。"
         else:
@@ -322,7 +329,12 @@ def change_password():
                 user["password_hash"] = hash_password(new_password)
                 save_user(user)
                 ok_message = "パスワードを変更しました。"
-    return render_template("toolbox/password.html", error=error, ok_message=ok_message)
+    return render_template(
+        "toolbox/password.html",
+        error=error,
+        ok_message=ok_message,
+        totp_enabled=bool(user.get("totp_secret")),
+    )
 
 
 @main_bp.route("/api/favorites/<tool_id>", methods=["POST"])

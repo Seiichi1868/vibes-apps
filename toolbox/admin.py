@@ -24,6 +24,7 @@ from toolbox.model_catalog import resolved_catalog
 from toolbox.pricing import estimate_embed_usd, estimate_generate_usd, estimate_transcribe_usd
 from toolbox.registry import all_tools, get_tool
 from toolbox.routes import main_bp
+from toolbox.totp import new_secret, provisioning_uri, qr_data_uri, verify_code
 from toolbox.storage import (
     count_active_admins,
     delete_user,
@@ -168,7 +169,72 @@ def admin_page():
             only=CNN10_HIGHLIGHT_MODELS,
             radio_name="cnn10_highlight",
         ),
+        **_totp_context(current_user()),
+        totp_error=request.args.get("totp_error") or "",
+        totp_ok=request.args.get("totp_ok") or "",
     )
+
+
+def _totp_context(user: dict | None) -> dict:
+    if not user or user.get("is_guest"):
+        return {"totp_enabled": False, "totp_pending_secret": "", "totp_qr": "", "totp_account": ""}
+    pending = str(user.get("totp_pending_secret") or "")
+    username = str(user.get("username") or "")
+    return {
+        "totp_enabled": bool(user.get("totp_secret")),
+        "totp_pending_secret": pending,
+        "totp_qr": qr_data_uri(provisioning_uri(username, pending)) if pending else "",
+        "totp_account": username,
+    }
+
+
+def _totp_redirect(error: str = "", ok: str = ""):
+    return redirect(url_for("toolbox.admin_page", totp_error=error, totp_ok=ok))
+
+
+@main_bp.route("/admin/totp/start", methods=["POST"])
+def admin_totp_start():
+    if not admin_panel_ok():
+        return render_template("toolbox/admin_gate.html", error=None)
+    user = current_user()
+    if not user or user.get("is_guest"):
+        return _totp_redirect("教員アカウントでログインしてから登録してください。")
+    if user.get("totp_secret"):
+        return _totp_redirect("すでに登録済みです。入れ直すときは、いまの認証アプリの番号が必要です。")
+    user["totp_pending_secret"] = new_secret()
+    save_user(user)
+    return _totp_redirect(ok="認証アプリでQRコードを読み取り、表示された6桁を入力してください。")
+
+
+@main_bp.route("/admin/totp/confirm", methods=["POST"])
+def admin_totp_confirm():
+    if not admin_panel_ok():
+        return render_template("toolbox/admin_gate.html", error=None)
+    user = current_user()
+    pending = str((user or {}).get("totp_pending_secret") or "")
+    if not user or not pending:
+        return _totp_redirect("先にQRコードを発行してください。")
+    if not verify_code(pending, request.form.get("code") or ""):
+        return _totp_redirect("番号が違います。アプリの表示を確認してもう一度入力してください。")
+    user["totp_secret"] = pending
+    user["totp_pending_secret"] = ""
+    save_user(user)
+    return _totp_redirect(ok="認証アプリを登録しました。パスワード変更にはこの6桁が必要です。")
+
+
+@main_bp.route("/admin/totp/replace", methods=["POST"])
+def admin_totp_replace():
+    if not admin_panel_ok():
+        return render_template("toolbox/admin_gate.html", error=None)
+    user = current_user()
+    secret = str((user or {}).get("totp_secret") or "")
+    if not user or not secret:
+        return _totp_redirect("先に認証アプリを登録してください。")
+    if not verify_code(secret, request.form.get("code") or ""):
+        return _totp_redirect("いまの認証アプリの番号が違います。")
+    user["totp_pending_secret"] = new_secret()
+    save_user(user)
+    return _totp_redirect(ok="新しいQRコードを読み取り、新しいアプリの6桁で確定してください。")
 
 
 @main_bp.route("/admin/api/talk/sessions")

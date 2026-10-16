@@ -19,6 +19,35 @@
   </ul>
   <p class="tb-note" id="tb-login-required-note">{% if settings.login_required_enabled %}オンのあいだは、ランチャーと各ツールで教員ログインが必要です。{% else %}オフのあいだは、ランチャーと各ツールにログインなしで入れます。{% endif %}</p>
 
+  <h2>認証アプリ</h2>
+  <p class="tb-note">ログイン中の教員アカウント（{{ totp_account or "未ログイン" }}）に紐づきます。パスワード変更には、登録したアプリの6桁が必要です。</p>
+  {% if totp_error %}<p class="tb-error" role="alert">{{ totp_error }}</p>{% endif %}
+  {% if totp_ok %}<p class="tb-ok" role="status">{{ totp_ok }}</p>{% endif %}
+  {% if not totp_account %}
+  <p class="tb-note">教員アカウントでログインしてから登録してください。</p>
+  {% elif totp_qr %}
+  <p>このQRコードを認証アプリで読み取ってください。</p>
+  <img src="{{ totp_qr }}" alt="認証アプリ用のQRコード" width="180" height="180">
+  <p class="tb-note">読み取れないときは、このキーを手入力します: <code>{{ totp_pending_secret }}</code></p>
+  <form method="post" action="{{ url_for('toolbox.admin_totp_confirm') }}" class="tb-inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="6桁" required>
+    <button class="tb-btn tb-btn-primary" type="submit">この番号で登録する</button>
+  </form>
+  {% elif totp_enabled %}
+  <p>登録済みです。アプリを入れ直すときだけ、いまの6桁を入力してください。</p>
+  <form method="post" action="{{ url_for('toolbox.admin_totp_replace') }}" class="tb-inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="いまの6桁" required>
+    <button class="tb-btn" type="submit">入れ直す</button>
+  </form>
+  {% else %}
+  <form method="post" action="{{ url_for('toolbox.admin_totp_start') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button class="tb-btn tb-btn-primary" type="submit">QRコードを発行する</button>
+  </form>
+  {% endif %}
+
   <h2>ユーザー管理</h2>
   <form id="tb-user-form" class="tb-inline-form">
     <input name="username" placeholder="ユーザー名" required>
