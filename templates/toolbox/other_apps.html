@@ -1,0 +1,19 @@
+{% extends "toolbox/base.html" %}
+{% block title %}他のアプリへのリンク一覧 · Toolbox{% endblock %}
+{% block body %}
+<section class="tb-card">
+  <h1>他のアプリへのリンク一覧</h1>
+  <p class="tb-note">同じサーバーで動いているアプリです。利用画面と管理画面を別タブで開けます。</p>
+  <ul class="tb-app-links">
+    {% for app in apps %}
+    <li>
+      <span class="tb-app-links-name">{{ app.name }}</span>
+      <span class="tb-app-links-actions">
+        <a class="tb-btn tb-btn-primary" href="{{ app.user }}" target="_blank" rel="noopener">利用画面</a>
+        <a class="tb-btn" href="{{ app.admin }}" target="_blank" rel="noopener">管理画面</a>
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}

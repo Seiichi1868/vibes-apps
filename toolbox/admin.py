@@ -126,6 +126,24 @@ def admin_unlock():
     return redirect(url_for("toolbox.admin_page"))
 
 
+OTHER_APPS = (
+    {"name": "音読判定", "user": "/", "admin": "/admin"},
+    {"name": "Speaking Lab News", "user": "/news/", "admin": "/news/admin/"},
+    {"name": "Parliamentary Debate Practice", "user": "/debate/", "admin": "/debate/admin/"},
+    {"name": "GTEC Speaking", "user": "/gtec", "admin": "/gtec/admin"},
+    {"name": "Speaking Level Check", "user": "/level_check/", "admin": "/level_check/admin/"},
+    {"name": "Spanish Lab Conjugate", "user": "/conjugate/", "admin": "/conjugate/admin/"},
+    {"name": "Speaking Lab Trigger", "user": "/trigger/", "admin": "/trigger/admin/"},
+)
+
+
+@main_bp.route("/admin/apps")
+def other_apps_page():
+    if not admin_panel_ok():
+        return render_template("toolbox/admin_gate.html", error=None)
+    return render_template("toolbox/other_apps.html", apps=OTHER_APPS)
+
+
 @main_bp.route("/admin/")
 def admin_page():
     if not admin_panel_ok():

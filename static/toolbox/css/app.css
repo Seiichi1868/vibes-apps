@@ -295,6 +295,26 @@ html.tb-skip-opening .tb-opening { display: none !important; }
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: none; }
 }
+.tb-app-links {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tb-app-links li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+.tb-app-links-name { font-weight: 700; }
+.tb-app-links-actions { display: flex; gap: 8px; }
+
 .tb-user-menu a, .tb-user-menu button {
   display: block;
   width: 100%;
