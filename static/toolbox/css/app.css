@@ -74,6 +74,21 @@ h1, h2, h3 { margin: 0 0 12px; }
   font-weight: 600;
 }
 
+.tb-secret {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.tb-secret input { flex: 1; min-width: 0; }
+.tb-eye {
+  flex: 0 0 auto;
+  min-width: var(--tb-tap);
+  padding: 0;
+}
+.tb-eye .tb-eye-off { display: none; }
+.tb-eye[aria-pressed="true"] .tb-eye-on { display: none; }
+.tb-eye[aria-pressed="true"] .tb-eye-off { display: block; }
+
 .tb-form input, .tb-form select, .tb-form textarea,
 .tb-inline-form input, .tb-inline-form select {
   min-height: var(--tb-tap);
