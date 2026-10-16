@@ -532,21 +532,6 @@
     return "clamp(2rem, 6.4vmin, 5.25rem)";
   }
 
-  function writingOreoHtml() {
-    return (
-      '<div class="screen-writing-oreo">' +
-      '<span class="screen-writing-oreo-step"><b>O</b>Opinion</span>' +
-      '<span class="screen-writing-oreo-arrow">→</span>' +
-      '<span class="screen-writing-oreo-step"><b>R</b>Reason</span>' +
-      '<span class="screen-writing-oreo-arrow">→</span>' +
-      '<span class="screen-writing-oreo-step"><b>E</b>Example</span>' +
-      '<span class="screen-writing-oreo-arrow">→</span>' +
-      '<span class="screen-writing-oreo-step"><b>O</b>Opinion</span>' +
-      '<span class="screen-writing-oreo-words">about 100 words</span>' +
-      "</div>"
-    );
-  }
-
   function writingTopicBodyHtml(topic, index) {
     let html = '<div class="screen-writing-item">';
     html +=
@@ -560,11 +545,6 @@
         '<span class="screen-writing-choice">' + escHtml(topic.options[0]) + "</span>" +
         '<span class="screen-writing-or">or</span>' +
         '<span class="screen-writing-choice">' + escHtml(topic.options[1]) + "</span>" +
-        "</div>";
-    } else {
-      html +=
-        '<div class="screen-writing-choices">' +
-        '<span class="screen-writing-answer-cue">Your answer + Why?</span>' +
         "</div>";
     }
     if (topic.text_ja) {
@@ -612,7 +592,6 @@
         t(prefersTouchNav() ? "screenFlickWritingToStart" : "screenWritingToStart") +
         "</p>";
     }
-    html += writingOreoHtml();
     html += '<p class="screen-postview-hint"></p>';
     writingContent.innerHTML = html;
     updateWritingRevealUi();

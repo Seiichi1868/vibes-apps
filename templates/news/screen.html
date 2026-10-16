@@ -301,43 +301,11 @@
     color: rgba(148, 163, 184, 0.9);
     font-weight: 600;
   }
-  .screen-writing-answer-cue {
-    color: #fcd34d;
-    font-weight: 600;
-  }
   .screen-writing-ja {
     margin-left: 3.6em;
     font-size: 0.55em;
     color: rgba(203, 213, 225, 0.85);
     line-height: 1.4;
-  }
-  .screen-writing-oreo {
-    flex-shrink: 0;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    align-items: center;
-    gap: clamp(0.3rem, 1vmin, 0.75rem);
-    margin-top: clamp(0.5rem, 2vh, 1.25rem);
-    font-size: clamp(0.9rem, 2.4vmin, 1.6rem);
-  }
-  .screen-writing-oreo-step {
-    border: 1px solid rgba(125, 211, 252, 0.45);
-    border-radius: 0.6rem;
-    padding: 0.2em 0.7em;
-    color: #e0f2fe;
-  }
-  .screen-writing-oreo-step b {
-    color: #38bdf8;
-    margin-right: 0.3em;
-  }
-  .screen-writing-oreo-arrow {
-    color: rgba(148, 163, 184, 0.8);
-  }
-  .screen-writing-oreo-words {
-    color: #fda4af;
-    font-weight: 700;
-    margin-left: 0.5em;
   }
   .screen-view--warmup {
     flex-direction: column;
@@ -413,5 +381,5 @@
   window.SCREEN_CLASSES = {{ classes|tojson }};
 </script>
 <script src="{{ url_for('static', filename='news/js/i18n.js', v='20261016a') }}"></script>
-<script src="{{ url_for('static', filename='news/js/screen.js', v='20261014b') }}"></script>
+<script src="{{ url_for('static', filename='news/js/screen.js', v='20261016a') }}"></script>
 {% endblock %}
