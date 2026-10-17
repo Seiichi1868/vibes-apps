@@ -4,15 +4,18 @@
 const SoundFX = (() => {
   const MUTE_KEY = "sfx_muted";
   const SFX_BASE = "/static/audio/conjugate/";
-  const SFX_VERSION = "20261017c";
+  const SFX_VERSION = "20261017d";
   const VOLUME = 0.5;
   const TAP_SELECTOR = [
     ".vsc-btn-primary",
     ".vsc-btn-secondary",
     ".vsc-btn-record",
+    ".vsc-btn-stop",
     ".vsc-promo-btn",
     ".vsc-vocab-btn",
     ".vsc-vocab-master",
+    ".vsc-filter-chip",
+    ".vsc-category-card",
     ".celebrate-button",
   ].join(",");
   const NAV_SELECTOR = [
@@ -32,7 +35,7 @@ const SoundFX = (() => {
   const FILES = {
     correct: "sfx-correct.mp3",
     incorrect: "sfx-incorrect.mp3",
-    tap: "sfx-tap.mp3",
+    tap: "sfx-nav.mp3",
     coin: "sfx-coin.mp3",
     streak: "sfx-streak.mp3",
     guardian: "sfx-guardian.mp3",
@@ -42,12 +45,12 @@ const SoundFX = (() => {
 
   // ファイル末尾の余韻が次の場面に食い込まないよう、再生長を場面に合わせる
   const CUES = {
-    tap: { duration: 0.14, fade: 0.03, volume: 0.35 },
+    tap: { duration: 0.44, fade: 0.03, volume: 0.5 },
     incorrect: { duration: 0.36, fade: 0.05, volume: 0.45 },
     coin: { duration: 0.5, fade: 0.06, volume: 0.5 },
-    correct: { duration: 0.42, fade: 0.06, volume: 0.5 },
-    opening: { duration: 0.85, fade: 0.12, volume: 0.45 },
-    nav: { duration: 0.18, fade: 0.04, volume: 0.55 },
+    correct: { duration: 0.58, fade: 0.06, volume: 0.5 },
+    opening: { duration: 0.86, fade: 0, volume: 0.45 },
+    nav: { duration: 0.44, fade: 0.03, volume: 0.5 },
     guardian: { duration: 0.85, fade: 0.1, volume: 0.5 },
     streak: { duration: 1.35, fade: 0.12, volume: 0.5 },
   };
@@ -185,7 +188,7 @@ const SoundFX = (() => {
     source.buffer = buffer;
     const volume = cue.volume != null ? cue.volume : VOLUME;
     const duration = Math.min(cue.duration || buffer.duration, buffer.duration);
-    const fade = Math.min(cue.fade || 0.04, duration / 2);
+    const fade = Math.min(cue.fade != null ? cue.fade : 0.04, duration / 2);
     const when = audioCtx.currentTime + delay;
     gain.gain.setValueAtTime(volume, when);
     if (fade > 0) {
