@@ -10,7 +10,7 @@
 
 URL: `/toolbox/admin/`
 
-**Toolbox の教員ログインは不要**です。管理パスワードを入力すると入れます。ユーザー作成などの重要操作では、同じ管理パスワードの再入力を求めます。パスワードの値は画面に出しません。変更は環境変数 `TOOLBOX_ADMIN_PASSWORD` です。
+**Toolbox の教員ログインは不要**です。管理パスワードを入力すると入れます。ユーザー作成などの重要操作では、同じ管理パスワードの再入力を求めます。パスワードの値は画面に出しません。共通の `ADMIN_PASSWORD` を使い、`TOOLBOX_ADMIN_PASSWORD` があればそちらを優先します。どちらも未設定なら管理操作は拒否します。
 
 教員ログインは管理画面の「教員ログインを必須にする」で切り替えます。オフ（既定）のときはランチャーと各ツールに自動で入れます。
 
@@ -37,9 +37,10 @@ FLASK_APP=wsgi:application flask toolbox create-user --role admin
 | `TOOLBOX_DATA_DIR` | 省略時は `data/toolbox`。本番の Render ディスクを使うなら `/opt/render/project/src/data/toolbox` |
 | `TOOLBOX_WHISPER_TIMEOUT_SEC` | 既定 90 |
 | `TOOLBOX_GENERATE_TIMEOUT_SEC` | 既定 90 |
-| `TOOLBOX_ADMIN_PASSWORD` | 管理画面の入口パスワード。省略時は他アプリと同じ既定 |
+| `ADMIN_PASSWORD` | 管理画面の入口（全アプリ共通）。未設定かつ下の上書きも無いと拒否 |
+| `TOOLBOX_ADMIN_PASSWORD` | Toolbox だけの上書き。設定時は `ADMIN_PASSWORD` より優先 |
 
-新規に必須なのは `TOOLBOX_DATA_DIR` だけです（省略可）。API キーと SECRET は既存のものを共有します。
+`TOOLBOX_DATA_DIR` は省略可。管理画面を使うには `ADMIN_PASSWORD` か `TOOLBOX_ADMIN_PASSWORD` が必要です。API キーと SECRET は既存のものを共有します。
 
 ## 運用メモ
 

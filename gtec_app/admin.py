@@ -1,5 +1,6 @@
 """GTEC 管理画面 Blueprint。"""
 
+import hmac
 import os
 from pathlib import Path
 
@@ -18,7 +19,16 @@ from gtec_app.settings import (
 
 gtec_admin_bp = Blueprint("gtec_admin", __name__)
 
-ADMIN_PASSWORD = os.environ.get("GTEC_ADMIN_PASSWORD", "2479")
+_PASSWORD_UNSET = "管理パスワードが設定されていません。"
+_PASSWORD_WRONG = "管理パスワードが違います。"
+
+
+def get_admin_password() -> str:
+    per_app = (os.environ.get("GTEC_ADMIN_PASSWORD") or "").strip()
+    if per_app:
+        return per_app
+    return (os.environ.get("ADMIN_PASSWORD") or "").strip()
+
 
 PART_LABELS = {
     "a": "Part A：音読 (Reading Aloud)",
@@ -29,7 +39,18 @@ PART_LABELS = {
 
 
 def _password_ok(payload: dict) -> bool:
-    return str(payload.get("admin_password") or "") == ADMIN_PASSWORD
+    expected = get_admin_password()
+    if not expected:
+        return False
+    return hmac.compare_digest(str(payload.get("admin_password") or ""), expected)
+
+
+def _require_admin_password(payload: dict):
+    if not get_admin_password():
+        return jsonify({"ok": False, "error": _PASSWORD_UNSET}), 503
+    if not _password_ok(payload):
+        return jsonify({"ok": False, "error": _PASSWORD_WRONG}), 403
+    return None
 
 
 @gtec_admin_bp.route("/gtec/admin/manifest.json")
@@ -65,8 +86,9 @@ def admin_settings():
         return jsonify({"ok": True, **settings, **resolve_background(settings.get("background_id"))})
 
     payload = request.get_json(silent=True) or {}
-    if not _password_ok(payload):
-        return jsonify({"ok": False, "error": "管理パスワードが違います。"}), 403
+    denied = _require_admin_password(payload)
+    if denied:
+        return denied
 
     updates = {}
     for part in PART_DEFAULTS:
@@ -105,8 +127,9 @@ def admin_problems():
         return jsonify({"ok": True, **load_problems()})
 
     payload = request.get_json(silent=True) or {}
-    if not _password_ok(payload):
-        return jsonify({"ok": False, "error": "管理パスワードが違います。"}), 403
+    denied = _require_admin_password(payload)
+    if denied:
+        return denied
 
     incoming = {}
     if isinstance(payload.get("active"), dict):

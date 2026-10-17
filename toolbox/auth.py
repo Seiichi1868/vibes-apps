@@ -11,12 +11,12 @@ from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from toolbox.config import (
-    ADMIN_PANEL_PASSWORD,
     ADMIN_REAUTH_SEC,
     COOKIE_MAX_AGE,
     COOKIE_NAME,
     MIN_PASSWORD_LEN,
     SESSION_SALT,
+    get_admin_panel_password,
 )
 from toolbox.storage import (
     add_login_attempt,
@@ -168,7 +168,10 @@ def verify_password(user: dict, password: str) -> bool:
 
 
 def verify_admin_panel_password(password: str) -> bool:
-    return str(password or "") == str(ADMIN_PANEL_PASSWORD)
+    expected = get_admin_panel_password()
+    if not expected:
+        return False
+    return hmac.compare_digest(str(password or ""), expected)
 
 
 def admin_panel_ok() -> bool:

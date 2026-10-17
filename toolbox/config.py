@@ -56,8 +56,12 @@ DEFAULT_EMBED_MODEL = "text-embedding-3-small"
 DEFAULT_PARALLEL_BROWSER_STT = True
 DEFAULT_LOGIN_REQUIRED = False
 
-# 管理画面の入口（他アプリの 2479 と同じ運用）。環境変数で上書き可。
-ADMIN_PANEL_PASSWORD = os.environ.get("TOOLBOX_ADMIN_PASSWORD", "2479")
+def get_admin_panel_password() -> str:
+    """TOOLBOX_ADMIN_PASSWORD があればそれを使い、なければ ADMIN_PASSWORD。未設定は空文字。"""
+    per_app = (os.environ.get("TOOLBOX_ADMIN_PASSWORD") or "").strip()
+    if per_app:
+        return per_app
+    return (os.environ.get("ADMIN_PASSWORD") or "").strip()
 
 
 def get_openai_api_key() -> str:

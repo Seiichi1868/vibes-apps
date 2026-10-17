@@ -13,6 +13,7 @@ from toolbox.auth import (
     require_admin_reauth,
     verify_admin_panel_password,
 )
+from toolbox.config import get_admin_panel_password
 from toolbox.routes import tool_required
 from toolbox.storage import get_setting, get_user_pref, set_user_pref, update_app_settings
 from toolbox.tools.minute_speech import classify, embed
@@ -134,6 +135,8 @@ def register(bp):
         if _delete_locked(ip):
             return jsonify({"ok": False, "error": "試行が多すぎます。しばらくしてからもう一度試してください。"}), 429
         payload = request.get_json(silent=True) or {}
+        if not get_admin_panel_password():
+            return jsonify({"ok": False, "error": "管理パスワードが設定されていません。"}), 503
         if not verify_admin_panel_password(payload.get("password") or ""):
             _delete_fails.setdefault(ip, []).append(time.time())
             return jsonify({"ok": False, "error": "パスワードが違います。"}), 403

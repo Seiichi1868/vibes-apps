@@ -16,7 +16,8 @@ from level_check.config import (
     CATEGORY_LABELS,
     INFO_LEVEL_LABELS,
     INFO_LEVELS,
-    ADMIN_PASSWORD,
+    admin_password_matches,
+    get_admin_password,
     get_openai_api_key,
     resolve_ai_model_id,
 )
@@ -59,7 +60,9 @@ admin_bp = Blueprint(
 
 def _require_model_change_password(payload: dict):
     """AIモデル選択（管理設定）の変更時のみパスワードを要求する。"""
-    if str(payload.get("admin_password") or "") != ADMIN_PASSWORD:
+    if not get_admin_password():
+        return jsonify({"ok": False, "error": "管理パスワードが設定されていません。"}), 503
+    if not admin_password_matches(payload.get("admin_password")):
         return jsonify({"ok": False, "error": "管理設定のパスワードが違います。"}), 403
     return None
 

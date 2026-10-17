@@ -10,7 +10,8 @@ from flask import Blueprint, jsonify, render_template, request, send_from_direct
 
 from conjugate.appearance import appearance_context
 from conjugate.config import (
-    ADMIN_PASSWORD,
+    admin_password_matches,
+    get_admin_password,
     ASR_ENGINES,
     STRICTNESS_MODES,
     WHISPER_MODELS,
@@ -48,7 +49,9 @@ def web_app_manifest():
 
 
 def _require_admin_password(payload: dict):
-    if str(payload.get("admin_password") or "") != ADMIN_PASSWORD:
+    if not get_admin_password():
+        return jsonify({"ok": False, "error": "管理パスワードが設定されていません。"}), 503
+    if not admin_password_matches(payload.get("admin_password")):
         return jsonify({"ok": False, "error": "管理パスワードが違います。"}), 403
     return None
 

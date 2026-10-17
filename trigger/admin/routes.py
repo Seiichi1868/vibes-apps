@@ -10,7 +10,8 @@ import openpyxl
 from flask import Blueprint, current_app, jsonify, render_template, request, send_file, send_from_directory
 
 from trigger.config import (
-    ADMIN_PASSWORD,
+    admin_password_matches,
+    get_admin_password,
     QA_QUESTION_COUNT_RANGE,
     SPEECH_TOPIC_COUNT_RANGE,
     TASK_KEYS,
@@ -44,7 +45,9 @@ admin_bp = Blueprint(
 
 
 def _require_password(payload: dict):
-    if str(payload.get("admin_password") or "") != ADMIN_PASSWORD:
+    if not get_admin_password():
+        return jsonify({"ok": False, "error": "管理パスワードが設定されていません。"}), 503
+    if not admin_password_matches(payload.get("admin_password")):
         return jsonify({"ok": False, "error": "管理者パスワードが違います。"}), 403
     return None
 

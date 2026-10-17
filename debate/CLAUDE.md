@@ -99,7 +99,7 @@ Whisper: `debate/transcription.py`（短タイムアウト）。ジョブ: `tran
 
 ## 管理
 
-`/debate/admin` はリンク開放。パスワード必須は `transcription_mode`・`judge_model_mode`・`opponent_model_mode`・`script_model_mode`・`speech_mode`・所属の変更/削除・セッション削除・観戦スクリプトの生成/編集/公開/削除（`DEBATE_ADMIN_PASSWORD` 既定2479）。背景・透過・POI保護時間・所属の追加はパスワード不要。セッション一覧・コピー・備考は閲覧・編集可。一覧は所属を表示し、所属フィルターと更新日時／所属ソートがある。コピー時ジャッジはリセット、音声（AI音声含む）は複製。所属もコピー先へ引き継ぐ。
+`/debate/admin` はリンク開放。パスワード必須は `transcription_mode`・`judge_model_mode`・`opponent_model_mode`・`script_model_mode`・`speech_mode`・所属の変更/削除・セッション削除・観戦スクリプトの生成/編集/公開/削除（`DEBATE_ADMIN_PASSWORD` があればそれを使い、なければ `ADMIN_PASSWORD`。未設定なら拒否）。観戦プレビュートークンの署名は `DEBATE_PREVIEW_SECRET`（未設定なら発行不可）。背景・透過・POI保護時間・所属の追加はパスワード不要。セッション一覧・コピー・備考は閲覧・編集可。一覧は所属を表示し、所属フィルターと更新日時／所属ソートがある。コピー時ジャッジはリセット、音声（AI音声含む）は複製。所属もコピー先へ引き継ぐ。
 
 ## 観戦（お手本）
 

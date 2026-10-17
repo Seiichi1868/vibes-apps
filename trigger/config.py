@@ -5,6 +5,7 @@ news_app / flask_app / level_check / conjugate とは完全に独立させ、
 data/trigger/ 配下に JSON ファイル・音声ファイルとして永続化する
 （Render のディスクマウントを想定）。
 """
+import hmac
 import os
 from pathlib import Path
 
@@ -19,7 +20,18 @@ THEMES_FILE = DATA_DIR / "trigger_themes.json"
 STUDENTS_FILE = DATA_DIR / "trigger_students.json"
 SUBMISSIONS_FILE = DATA_DIR / "trigger_submissions.json"
 
-ADMIN_PASSWORD = os.environ.get("TRIGGER_ADMIN_PASSWORD", "2479")
+def get_admin_password() -> str:
+    per_app = (os.environ.get("TRIGGER_ADMIN_PASSWORD") or "").strip()
+    if per_app:
+        return per_app
+    return (os.environ.get("ADMIN_PASSWORD") or "").strip()
+
+
+def admin_password_matches(provided) -> bool:
+    expected = get_admin_password()
+    if not expected:
+        return False
+    return hmac.compare_digest(str(provided or ""), expected)
 
 # ── 処理単位ごとの AI（GPT）モデル選択キー ─────────────────────
 # 管理画面でこの単位ごとに個別にプルダウン選択できる（コスト管理目的）。

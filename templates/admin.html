@@ -276,15 +276,32 @@
         if (adminSettingsGated) adminSettingsGated.classList.remove("hidden");
       }
 
-      function unlockAdminSettings() {
+      async function unlockAdminSettings() {
         if (adminSettingsPasswordValue) {
           openAdminSettingsPanel();
           return;
         }
 
         const password = adminSettingsPassword ? adminSettingsPassword.value.trim() : "";
-        if (password !== "2479") {
-          showAdminSettingsLockMessage("パスワードが違います。");
+        if (!password) {
+          showAdminSettingsLockMessage("パスワードを入力してください。");
+          return;
+        }
+
+        try {
+          const response = await fetch("/api/admin/password-check", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ admin_password: password }),
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            showAdminSettingsLockMessage(data.error || "パスワードが違います。");
+            return;
+          }
+        } catch (error) {
+          console.error(error);
+          showAdminSettingsLockMessage("パスワードの確認に失敗しました。");
           return;
         }
 

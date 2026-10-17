@@ -12,6 +12,8 @@ from news_app.config import (
     CEFR_LEVELS,
     DISPLAY_LANGUAGES,
     VOCAB_MIN_CEFR_LEVELS,
+    admin_password_matches,
+    get_admin_password,
     get_openai_api_key,
     mask_api_key,
     resolve_ai_model,
@@ -247,12 +249,26 @@ def admin_index():
     )
 
 
+def _admin_password_denied():
+    if not get_admin_password():
+        return jsonify({"ok": False, "error": "管理パスワードが設定されていません。"}), 503
+    return jsonify({"ok": False, "error": "管理設定のパスワードが違います。"}), 403
+
+
+@admin_bp.route("/api/password-check", methods=["POST"])
+def password_check():
+    data = request.get_json(silent=True) or {}
+    if not admin_password_matches(data.get("admin_password")):
+        return _admin_password_denied()
+    return jsonify({"ok": True})
+
+
 @admin_bp.route("/api/settings", methods=["POST"])
 def save_settings():
     data = request.get_json(silent=True) or {}
     try:
-        if str(data.get("admin_password") or "") != "2479":
-            return jsonify({"ok": False, "error": "管理設定のパスワードが違います。"}), 403
+        if not admin_password_matches(data.get("admin_password")):
+            return _admin_password_denied()
 
         openai_api_key = str(data.get("openai_api_key", "")).strip()
         if not openai_api_key:
