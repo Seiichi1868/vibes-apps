@@ -4,6 +4,7 @@ news_app / debate とは完全に独立させ、他モジュールを import し
 データ（名簿・問題バンク・提出結果・音声）は data/level_check/ 配下に
 JSON ファイル・音声ファイルとして永続化する（Render のディスクマウントを想定）。
 """
+import hmac
 import os
 from pathlib import Path
 
@@ -20,7 +21,18 @@ SUBMISSIONS_FILE = DATA_DIR / "level_check_submissions.json"
 QUESTIONS_FILE = DATA_DIR / "level_check_questions.json"
 SETTINGS_FILE = DATA_DIR / "level_check_settings.json"
 
-ADMIN_PASSWORD = os.environ.get("LEVEL_CHECK_ADMIN_PASSWORD", "2479")
+def get_admin_password() -> str:
+    per_app = (os.environ.get("LEVEL_CHECK_ADMIN_PASSWORD") or "").strip()
+    if per_app:
+        return per_app
+    return (os.environ.get("ADMIN_PASSWORD") or "").strip()
+
+
+def admin_password_matches(provided) -> bool:
+    expected = get_admin_password()
+    if not expected:
+        return False
+    return hmac.compare_digest(str(provided or ""), expected)
 
 TRANSCRIBE_MODEL = os.environ.get("LEVEL_CHECK_WHISPER_MODEL", "whisper-1")
 WHISPER_TIMEOUT_SEC = float(os.environ.get("LEVEL_CHECK_WHISPER_TIMEOUT_SEC", "45"))

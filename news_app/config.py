@@ -1,3 +1,4 @@
+import hmac
 import os
 from pathlib import Path
 
@@ -22,6 +23,18 @@ def load_environment() -> None:
 
 
 load_environment()
+
+
+def get_admin_password() -> str:
+    return (os.environ.get("ADMIN_PASSWORD") or "").strip()
+
+
+def admin_password_matches(provided) -> bool:
+    expected = get_admin_password()
+    if not expected:
+        return False
+    return hmac.compare_digest(str(provided or ""), expected)
+
 
 DEFAULT_AI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-5.6-luna")
 DEFAULT_TRANSCRIPT_AI_MODEL = os.environ.get("NEWS_TRANSCRIPT_AI_MODEL", "gpt-5.6-sol")

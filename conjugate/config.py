@@ -4,6 +4,7 @@ news_app / level_check / debate とは完全に独立させ、他モジュール
 データ（設定・セッション履歴・弱点動詞集計）は data/conjugate/ 配下に
 JSONファイルとして永続化する（Render のディスクマウントを想定）。
 """
+import hmac
 import os
 from pathlib import Path
 
@@ -19,7 +20,18 @@ SUBMISSIONS_FILE = DATA_DIR / "conjugate_submissions.json"
 WEAK_VERBS_FILE = DATA_DIR / "conjugate_weak_verbs.json"
 PROGRESS_FILE = DATA_DIR / "conjugate_progress.json"
 
-ADMIN_PASSWORD = os.environ.get("CONJUGATE_ADMIN_PASSWORD", "2479")
+def get_admin_password() -> str:
+    per_app = (os.environ.get("CONJUGATE_ADMIN_PASSWORD") or "").strip()
+    if per_app:
+        return per_app
+    return (os.environ.get("ADMIN_PASSWORD") or "").strip()
+
+
+def admin_password_matches(provided) -> bool:
+    expected = get_admin_password()
+    if not expected:
+        return False
+    return hmac.compare_digest(str(provided or ""), expected)
 
 # ── ASRエンジン ──────────────────────────────────────────────
 ASR_ENGINES = ("whisper", "web_speech")

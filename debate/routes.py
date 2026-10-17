@@ -451,9 +451,17 @@ def watch_part_audio(script_id, part):
 
 
 def _admin_password_matches(password) -> bool:
-    from debate.admin import ADMIN_PASSWORD
+    from debate.admin import admin_password_matches
 
-    return str(password or "") == ADMIN_PASSWORD
+    return admin_password_matches(password)
+
+
+def _admin_password_denied():
+    from debate.admin import get_admin_password
+
+    if not get_admin_password():
+        return jsonify({"ok": False, "error": "管理パスワードが設定されていません。"}), 503
+    return jsonify({"ok": False, "error": "管理パスワードが違います。"}), 403
 
 
 @debate_bp.route("/api/admin-password-check", methods=["POST"])
@@ -461,7 +469,7 @@ def admin_password_check():
     """アップデート確認用の所属を選んだときだけ、管理パスワードが合うか返す。"""
     payload = request.get_json(silent=True) or {}
     if not _admin_password_matches(payload.get("admin_password")):
-        return jsonify({"ok": False, "error": "管理パスワードが違います。"}), 403
+        return _admin_password_denied()
     return jsonify({"ok": True})
 
 
@@ -486,7 +494,7 @@ def create_session():
     if affiliation_requires_admin(affiliation.get("name")) and not _admin_password_matches(
         payload.get("admin_password")
     ):
-        return jsonify({"error": "管理パスワードが違います。"}), 403
+        return _admin_password_denied()
 
     user_side = None
     ai_difficulty = None

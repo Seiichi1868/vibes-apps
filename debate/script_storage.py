@@ -187,22 +187,29 @@ def part_audio_ready(script_id: str, part: dict) -> bool:
     return bool(path and path.is_file() and path.stat().st_size > 0)
 
 
-def _preview_secret() -> bytes:
-    return os.environ.get("DEBATE_ADMIN_PASSWORD", "2479").encode("utf-8")
+def _preview_secret() -> bytes | None:
+    secret = (os.environ.get("DEBATE_PREVIEW_SECRET") or "").strip()
+    if not secret:
+        return None
+    return secret.encode("utf-8")
 
 
 def issue_preview_token(script_id: str) -> str:
     """ワーカーが複数でも同じトークンを検証できるよう署名する。"""
+    secret = _preview_secret()
+    if not secret:
+        raise RuntimeError("DEBATE_PREVIEW_SECRET is not set")
     expires = int(time.time()) + PREVIEW_TOKEN_TTL_SEC
     body = f"{_safe_id(script_id)}.{expires}"
-    sig = hmac.new(_preview_secret(), body.encode("utf-8"), hashlib.sha256).hexdigest()
+    sig = hmac.new(secret, body.encode("utf-8"), hashlib.sha256).hexdigest()
     return f"{body}.{sig}"
 
 
 def preview_token_valid(script_id: str, token: str) -> bool:
     wanted = _safe_id(script_id)
     raw = str(token or "").strip()
-    if not wanted or not raw:
+    secret = _preview_secret()
+    if not wanted or not raw or not secret:
         return False
     parts = raw.split(".")
     if len(parts) != 3:
@@ -217,7 +224,7 @@ def preview_token_valid(script_id: str, token: str) -> bool:
     if expires < time.time():
         return False
     body = f"{stored_id}.{expires_text}"
-    expected = hmac.new(_preview_secret(), body.encode("utf-8"), hashlib.sha256).hexdigest()
+    expected = hmac.new(secret, body.encode("utf-8"), hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, sig)
 
 

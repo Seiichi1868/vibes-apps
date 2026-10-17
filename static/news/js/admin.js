@@ -120,8 +120,7 @@
   let adminPostviewQuestions = [];
   let postviewSelectionSaving = false;
   let postviewManualSaveTimer = null;
-  const ADMIN_SETTINGS_PASSWORD = "2479";
-  const ADMIN_SETTINGS_UNLOCK_KEY = "news-admin-settings-unlocked";
+  const ADMIN_SETTINGS_UNLOCK_KEY = "news-admin-settings-password";
   let adminClasses = window.ADMIN_CLASSES || [];
   let adminSettingsPasswordValue = "";
   let latestSubmissions = [];
@@ -1824,17 +1823,25 @@
 
   function readAdminSettingsUnlock() {
     try {
-      return sessionStorage.getItem(ADMIN_SETTINGS_UNLOCK_KEY) === "1";
+      return sessionStorage.getItem(ADMIN_SETTINGS_UNLOCK_KEY) || "";
     } catch (err) {
-      return false;
+      return "";
     }
   }
 
-  function persistAdminSettingsUnlock() {
+  function persistAdminSettingsUnlock(password) {
     try {
-      sessionStorage.setItem(ADMIN_SETTINGS_UNLOCK_KEY, "1");
+      sessionStorage.setItem(ADMIN_SETTINGS_UNLOCK_KEY, password);
     } catch (err) {
       // Ignore storage failures; in-memory unlock still works for this page.
+    }
+  }
+
+  function clearAdminSettingsUnlock() {
+    try {
+      sessionStorage.removeItem(ADMIN_SETTINGS_UNLOCK_KEY);
+    } catch (err) {
+      // Ignore storage failures.
     }
   }
 
@@ -1850,13 +1857,44 @@
 
   function rememberAdminSettingsUnlock(password) {
     adminSettingsPasswordValue = password;
-    persistAdminSettingsUnlock();
+    persistAdminSettingsUnlock(password);
     syncAdminSettingsLockUi();
   }
 
-  function restoreAdminSettingsUnlock() {
-    if (readAdminSettingsUnlock()) {
-      adminSettingsPasswordValue = ADMIN_SETTINGS_PASSWORD;
+  async function verifyAdminSettingsPassword(password) {
+    const res = await fetch("/news/admin/api/password-check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ admin_password: password }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const error = new Error(data.error || "パスワードが違います。");
+      error.status = res.status;
+      throw error;
+    }
+    return data;
+  }
+
+  function showAdminSettingsLockError(message) {
+    if (adminSettingsLockMessage) {
+      adminSettingsLockMessage.textContent = message;
+      adminSettingsLockMessage.classList.remove("hidden");
+    }
+  }
+
+  async function restoreAdminSettingsUnlock() {
+    const stored = readAdminSettingsUnlock();
+    if (!stored) {
+      syncAdminSettingsLockUi();
+      return;
+    }
+    try {
+      await verifyAdminSettingsPassword(stored);
+      adminSettingsPasswordValue = stored;
+    } catch (_) {
+      clearAdminSettingsUnlock();
+      adminSettingsPasswordValue = "";
     }
     syncAdminSettingsLockUi();
   }
@@ -1874,18 +1912,22 @@
     syncAdminSettingsLockUi();
   }
 
-  function unlockAdminSettings() {
+  async function unlockAdminSettings() {
     if (adminSettingsPasswordValue) {
       openAdminSettingsPanel();
       return;
     }
 
     const password = adminSettingsPassword ? adminSettingsPassword.value.trim() : "";
-    if (password !== ADMIN_SETTINGS_PASSWORD) {
-      if (adminSettingsLockMessage) {
-        adminSettingsLockMessage.textContent = "パスワードが違います。";
-        adminSettingsLockMessage.classList.remove("hidden");
-      }
+    if (!password) {
+      showAdminSettingsLockError("パスワードを入力してください。");
+      return;
+    }
+
+    try {
+      await verifyAdminSettingsPassword(password);
+    } catch (err) {
+      showAdminSettingsLockError(err.message || "パスワードが違います。");
       return;
     }
 

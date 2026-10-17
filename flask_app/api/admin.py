@@ -1,3 +1,6 @@
+import hmac
+import os
+
 from flask import Blueprint, jsonify, request
 
 from flask_app.config import Config
@@ -20,11 +23,25 @@ from flask_app.utils.section_utils import sections_response, set_visible_section
 
 admin_bp = Blueprint("admin", __name__)
 
-ADMIN_SETTINGS_PASSWORD = "2479"
+_PASSWORD_UNSET = "管理パスワードが設定されていません。"
+_PASSWORD_WRONG = "管理設定のパスワードが違います。"
+
+
+def _get_admin_password() -> str:
+    return (os.environ.get("ADMIN_PASSWORD") or "").strip()
 
 
 def _admin_password_ok(payload: dict) -> bool:
-    return str(payload.get("admin_password") or "") == ADMIN_SETTINGS_PASSWORD
+    expected = _get_admin_password()
+    if not expected:
+        return False
+    return hmac.compare_digest(str(payload.get("admin_password") or ""), expected)
+
+
+def _admin_password_denied():
+    if not _get_admin_password():
+        return jsonify({"error": _PASSWORD_UNSET}), 503
+    return jsonify({"error": _PASSWORD_WRONG}), 403
 
 
 @admin_bp.route("/admin/gate-lock", methods=["GET", "POST"])
@@ -57,7 +74,7 @@ def admin_ai_mode():
 
     payload = request.get_json(silent=True) or {}
     if not _admin_password_ok(payload):
-        return jsonify({"error": "管理設定のパスワードが違います。"}), 403
+        return _admin_password_denied()
 
     raw_mode = payload.get("ai_mode")
     if raw_mode is None and payload.get("use_gpt5_mode") is not None:
@@ -102,7 +119,7 @@ def admin_tts():
 
     payload = request.get_json(silent=True) or {}
     if not _admin_password_ok(payload):
-        return jsonify({"error": "管理設定のパスワードが違います。"}), 403
+        return _admin_password_denied()
 
     raw = payload.get("tts_enabled")
     if raw is None:
@@ -128,7 +145,7 @@ def admin_languages():
 
     payload = request.get_json(silent=True) or {}
     if not _admin_password_ok(payload):
-        return jsonify({"error": "管理設定のパスワードが違います。"}), 403
+        return _admin_password_denied()
 
     raw = payload.get("enabled_languages")
     if raw is None:
@@ -152,7 +169,7 @@ def admin_public_status():
 def admin_toggle_public():
     payload = request.get_json(silent=True) or {}
     if not _admin_password_ok(payload):
-        return jsonify({"error": "管理設定のパスワードが違います。"}), 403
+        return _admin_password_denied()
 
     raw = payload.get("public_enabled")
     if isinstance(raw, bool):
@@ -168,6 +185,14 @@ def admin_toggle_public():
 
     status = set_public_status(enabled, admin_user="admin")
     return jsonify({"ok": True, **status})
+
+
+@admin_bp.route("/admin/password-check", methods=["POST"])
+def admin_password_check():
+    payload = request.get_json(silent=True) or {}
+    if not _admin_password_ok(payload):
+        return _admin_password_denied()
+    return jsonify({"ok": True})
 
 
 @admin_bp.route("/admin/sections", methods=["GET", "POST"])

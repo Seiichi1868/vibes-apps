@@ -19,7 +19,7 @@ from toolbox.auth import (
     wants_json,
 )
 from toolbox.cli import USERNAME_RE
-from toolbox.config import MIN_PASSWORD_LEN
+from toolbox.config import MIN_PASSWORD_LEN, get_admin_panel_password
 from toolbox.model_catalog import resolved_catalog
 from toolbox.pricing import estimate_embed_usd, estimate_generate_usd, estimate_transcribe_usd
 from toolbox.registry import all_tools, get_tool
@@ -113,6 +113,11 @@ def admin_unlock():
     if request.is_json:
         payload = request.get_json(silent=True) or {}
         password = payload.get("password") or password
+    if not get_admin_panel_password():
+        unset_error = "管理パスワードが設定されていません。"
+        if wants_json():
+            return jsonify({"ok": False, "error": unset_error}), 503
+        return render_template("toolbox/admin_gate.html", error=unset_error), 503
     if not verify_admin_panel_password(password):
         if wants_json():
             return jsonify({"ok": False, "error": "管理パスワードが違います。"}), 403
@@ -276,6 +281,8 @@ def admin_talk_sessions():
 def admin_reauth():
     payload = request.get_json(silent=True) or {}
     password = payload.get("password") or ""
+    if not get_admin_panel_password():
+        return jsonify({"ok": False, "error": "管理パスワードが設定されていません。"}), 503
     if not verify_admin_panel_password(password):
         return jsonify({"ok": False, "error": "管理パスワードが違います。"}), 403
     g.toolbox_session = set_admin_reauth(g.toolbox_session)

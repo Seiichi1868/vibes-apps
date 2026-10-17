@@ -1,4 +1,5 @@
 """Debate app 管理画面 Blueprint（背景・透過率の設定、保存済みセッションの一覧・削除）。"""
+import hmac
 import os
 from pathlib import Path
 
@@ -36,7 +37,22 @@ from debate.storage import copy_session, delete_session, list_sessions, update_s
 
 debate_admin_bp = Blueprint("debate_admin", __name__, url_prefix="/debate/admin")
 
-ADMIN_PASSWORD = os.environ.get("DEBATE_ADMIN_PASSWORD", "2479")
+_PASSWORD_UNSET = "管理パスワードが設定されていません。"
+_PASSWORD_WRONG = "管理パスワードが違います。"
+
+
+def get_admin_password() -> str:
+    per_app = (os.environ.get("DEBATE_ADMIN_PASSWORD") or "").strip()
+    if per_app:
+        return per_app
+    return (os.environ.get("ADMIN_PASSWORD") or "").strip()
+
+
+def admin_password_matches(provided) -> bool:
+    expected = get_admin_password()
+    if not expected:
+        return False
+    return hmac.compare_digest(str(provided or ""), expected)
 
 # パスワードが必要な設定キー（AIモデル・文字起こし方式・観戦スクリプト設定）
 _SENSITIVE_SETTING_KEYS = (
@@ -49,13 +65,19 @@ _SENSITIVE_SETTING_KEYS = (
 
 
 def _password_ok(payload: dict) -> bool:
-    return str(payload.get("admin_password") or "") == ADMIN_PASSWORD
+    return admin_password_matches((payload or {}).get("admin_password"))
+
+
+def _admin_denied_response():
+    if not get_admin_password():
+        return jsonify({"ok": False, "error": _PASSWORD_UNSET}), 503
+    return jsonify({"ok": False, "error": _PASSWORD_WRONG}), 403
 
 
 def _protected_payload():
     payload = request.get_json(silent=True) or {}
     if not _password_ok(payload):
-        return None, (jsonify({"ok": False, "error": "管理パスワードが違います。"}), 403)
+        return None, _admin_denied_response()
     return payload, None
 
 
@@ -131,7 +153,7 @@ def admin_settings():
     payload = request.get_json(silent=True) or {}
     has_sensitive = any(key in payload for key in _SENSITIVE_SETTING_KEYS)
     if has_sensitive and not _password_ok(payload):
-        return jsonify({"ok": False, "error": "管理パスワードが違います。"}), 403
+        return _admin_denied_response()
 
     updates = {}
     if "background_id" in payload:
@@ -169,7 +191,7 @@ def admin_settings():
         # パスワード確認のみ（管理設定の解除）
         if has_sensitive or _password_ok(payload):
             return jsonify(_settings_response(load_settings()))
-        return jsonify({"ok": False, "error": "管理パスワードが違います。"}), 403
+        return _admin_denied_response()
 
     return jsonify(_settings_response(update_settings(**updates)))
 
@@ -256,14 +278,14 @@ def admin_delete_session(session_id):
 def _admin_password_from_request(payload: dict | None = None) -> bool:
     body = payload if isinstance(payload, dict) else {}
     header = request.headers.get("X-Debate-Admin-Password") or ""
-    return _password_ok(body) or str(header) == ADMIN_PASSWORD
+    return _password_ok(body) or admin_password_matches(header)
 
 
 # ── 観戦用スクリプト（生成・編集・公開。生徒画面の生成APIにはしない） ──
 @debate_admin_bp.route("/api/scripts", methods=["GET"])
 def admin_list_scripts():
     if not _admin_password_from_request():
-        return jsonify({"ok": False, "error": "管理パスワードが違います。"}), 403
+        return _admin_denied_response()
     from debate.script_jobs import recover_stuck_scripts
     from debate.script_storage import list_scripts, script_admin_summary
 
@@ -303,7 +325,7 @@ def admin_create_script():
 @debate_admin_bp.route("/api/scripts/<script_id>", methods=["GET"])
 def admin_get_script(script_id):
     if not _admin_password_from_request():
-        return jsonify({"ok": False, "error": "管理パスワードが違います。"}), 403
+        return _admin_denied_response()
     from debate.script_storage import load_script
 
     script = load_script(script_id)
@@ -419,7 +441,11 @@ def admin_script_preview_token(script_id):
         return jsonify({"ok": False, "error": "生成に失敗したためプレビューできません。"}), 409
     if script.get("generation_status") != "draft":
         return jsonify({"ok": False, "error": "まだ生成が終わっていません。"}), 409
-    return jsonify({"ok": True, "token": issue_preview_token(script_id)})
+    try:
+        token = issue_preview_token(script_id)
+    except RuntimeError:
+        return jsonify({"ok": False, "error": "DEBATE_PREVIEW_SECRET が設定されていません。"}), 503
+    return jsonify({"ok": True, "token": token})
 
 
 @debate_admin_bp.route("/api/scripts/<script_id>/audio", methods=["POST"])
@@ -464,7 +490,7 @@ def admin_estimate_script_check(script_id):
 @debate_admin_bp.route("/api/scripts/<script_id>/checks", methods=["GET"])
 def admin_get_script_checks(script_id):
     if not _admin_password_from_request():
-        return jsonify({"ok": False, "error": "管理パスワードが違います。"}), 403
+        return _admin_denied_response()
     from debate.script_check_jobs import checks_view
     from debate.script_storage import load_script
 
