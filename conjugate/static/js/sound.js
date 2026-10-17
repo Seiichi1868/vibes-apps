@@ -4,7 +4,7 @@
 const SoundFX = (() => {
   const MUTE_KEY = "sfx_muted";
   const SFX_BASE = "/static/audio/conjugate/";
-  const SFX_VERSION = "20261017b";
+  const SFX_VERSION = "20261017c";
   const VOLUME = 0.5;
   const TAP_SELECTOR = [
     ".vsc-btn-primary",
@@ -15,7 +15,19 @@ const SoundFX = (() => {
     ".vsc-vocab-master",
     ".celebrate-button",
   ].join(",");
-  const TAP_SKIP_SELECTOR = "#type-submit-btn, .vsc-choice-btn";
+  const NAV_SELECTOR = [
+    "#start-btn",
+    "[data-start]",
+    ".vsc-nav-item",
+    "a.vsc-btn-primary",
+    "a.vsc-btn-secondary",
+    "a.vsc-filter-chip",
+    "a.vsc-menu-item",
+    "a.vsc-guide-index-card",
+    "a.vsc-coin-row",
+    "#next-btn",
+  ].join(",");
+  const TAP_SKIP_SELECTOR = `#type-submit-btn, .vsc-choice-btn, ${NAV_SELECTOR}`;
 
   const FILES = {
     correct: "sfx-correct.mp3",
@@ -25,6 +37,7 @@ const SoundFX = (() => {
     streak: "sfx-streak.mp3",
     guardian: "sfx-guardian.mp3",
     opening: "sfx-opening.mp3",
+    nav: "sfx-nav.mp3",
   };
 
   // ファイル末尾の余韻が次の場面に食い込まないよう、再生長を場面に合わせる
@@ -34,6 +47,7 @@ const SoundFX = (() => {
     coin: { duration: 0.5, fade: 0.06, volume: 0.5 },
     correct: { duration: 0.42, fade: 0.06, volume: 0.5 },
     opening: { duration: 0.85, fade: 0.12, volume: 0.45 },
+    nav: { duration: 0.18, fade: 0.04, volume: 0.55 },
     guardian: { duration: 0.85, fade: 0.1, volume: 0.5 },
     streak: { duration: 1.35, fade: 0.12, volume: 0.5 },
   };
@@ -239,6 +253,35 @@ const SoundFX = (() => {
     document.addEventListener("click", unlock, once);
   }
 
+  let lastNavAt = 0;
+
+  function playNav() {
+    const now = performance.now();
+    if (now - lastNavAt < 400) return;
+    lastNavAt = now;
+    play("nav", { channel: "nav", stops: ["tap"] });
+  }
+
+  function bindNavSounds() {
+    document.addEventListener(
+      "pointerdown",
+      (event) => {
+        if (event.button != null && event.button !== 0) return;
+        const target = event.target && event.target.closest ? event.target.closest(NAV_SELECTOR) : null;
+        if (!target || target.disabled || target.getAttribute("aria-disabled") === "true") return;
+        playNav();
+      },
+      { capture: true, passive: true }
+    );
+    document.addEventListener(
+      "submit",
+      (event) => {
+        if (event.target && event.target.id === "start-form") playNav();
+      },
+      true
+    );
+  }
+
   function bindTapSounds() {
     document.addEventListener(
       "pointerdown",
@@ -289,6 +332,7 @@ const SoundFX = (() => {
     coin: () => play("coin", { channel: "coin", delay: 0.08, stops: ["tap"] }),
     streakUpdate: () => play("streak", { channel: "streak", stops: ["tap", "result", "coin"] }),
     guardian: () => play("guardian", { channel: "guardian", stops: ["tap"] }),
+    navigate: () => playNav(),
     opening() {
       const start = () => play("opening", { channel: "opening" });
       unlock();
@@ -318,6 +362,7 @@ const SoundFX = (() => {
   preload();
   bindUnlock();
   bindTapSounds();
+  bindNavSounds();
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", bindMuteToggle);
   } else {
