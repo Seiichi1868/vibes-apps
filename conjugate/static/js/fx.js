@@ -3,7 +3,7 @@
   const PARTICLE_COUNT = 28;
   const CONFETTI_MS = 1800;
   const COUNT_MS = 600;
-  const LEAVE_MS = 480;
+  const LEAVE_MS = 360;
   const GUARDIAN_TOAST_MS = 2600;
   const GUARDIAN_TOAST_FADE_MS = 450;
 
