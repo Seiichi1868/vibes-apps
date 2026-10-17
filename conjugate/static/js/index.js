@@ -6,10 +6,8 @@
     } else {
       const openingMs = Math.max(400, Number(window.CONJUGATE_OPENING_MS || 2000));
       openingOverlay.style.setProperty("--splash-ms", `${openingMs}ms`);
-      setTimeout(() => {
-        openingOverlay.remove();
-        if (window.SoundFX && window.SoundFX.opening) window.SoundFX.opening();
-      }, openingMs + 40);
+      if (window.SoundFX && window.SoundFX.opening) window.SoundFX.opening();
+      setTimeout(() => openingOverlay.remove(), openingMs + 40);
     }
   }
 
