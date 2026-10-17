@@ -83,6 +83,13 @@ class AdminPasswordConfigTests(_EnvIsolation):
         self.assertFalse(debate_matches(""))
         self.assertFalse(verify_admin_panel_password(""))
 
+    def test_blank_env_value_is_treated_as_unset(self):
+        os.environ["ADMIN_PASSWORD"] = "   "
+        from conjugate.config import admin_password_matches, get_admin_password
+
+        self.assertEqual(get_admin_password(), "")
+        self.assertFalse(admin_password_matches("   "))
+
     def test_preview_secret_fail_closed(self):
         from debate.script_storage import issue_preview_token, preview_token_valid
 
