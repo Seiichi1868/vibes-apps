@@ -17,7 +17,7 @@
 | `/debate/session/<id>` | 6パート進行（録音・一時停止・保存・確認） |
 | `/debate/session/<id>/parts/<part>/review` | 文字起こし確認・確定 |
 | `/debate/session/<id>/judge` | AIジャッジ結果 |
-| `/debate/admin` | 背景は公開。文字起こし方式・ジャッジモデル変更だけパスワード |
+| `/debate/admin` | 管理ログイン後に所属・セッション・スクリプト・設定を操作 |
 
 タイトル: Parliamentary Debate Practice。PDA表記は出さない。
 
@@ -99,7 +99,7 @@ Whisper: `debate/transcription.py`（短タイムアウト）。ジョブ: `tran
 
 ## 管理
 
-`/debate/admin` はリンク開放。パスワード必須は `transcription_mode`・`judge_model_mode`・`opponent_model_mode`・`script_model_mode`・`speech_mode`・所属の変更/削除・セッション削除・観戦スクリプトの生成/編集/公開/削除（`DEBATE_ADMIN_PASSWORD` があればそれを使い、なければ `ADMIN_PASSWORD`。未設定なら拒否）。観戦プレビュートークンの署名は `DEBATE_PREVIEW_SECRET`（未設定なら発行不可）。背景・透過・POI保護時間・所属の追加はパスワード不要。セッション一覧・コピー・備考は閲覧・編集可。一覧は所属を表示し、所属フィルターと更新日時／所属ソートがある。コピー時ジャッジはリセット、音声（AI音声含む）は複製。所属もコピー先へ引き継ぐ。
+`/debate/admin` はサーバー側ログイン必須。`POST /debate/admin/api/login` が `DEBATE_ADMIN_PASSWORD`（なければ `ADMIN_PASSWORD`）を `hmac.compare_digest` で照合し、署名付き Flask セッションを発行する。未設定なら 503。失敗は IP あたり 15 分で 5 回、全体で 30 回まで（JSON + flock、gunicorn 2 ワーカー共有）。以降の管理 API はセッション Cookie を見る（パスワードをリクエストに載せない）。ログアウトは `POST /debate/admin/api/logout`。観戦プレビュートークンの署名は `DEBATE_PREVIEW_SECRET`（未設定なら発行不可）。生徒画面と公開観戦はログイン不要。所属「アップデート確認用」だけ、選択時とセッション作成時に同じ管理パスワード（試行制限あり）。一覧は所属を表示し、所属フィルターと更新日時／所属ソートがある。コピー時ジャッジはリセット、音声（AI音声含む）は複製。所属もコピー先へ引き継ぐ。
 
 ## 観戦（お手本）
 
@@ -127,7 +127,7 @@ AI同士の6パートを保存して生徒は再生するだけ。生成APIは�
 | 再開一覧 | `static/debate/js/local-sessions.js` |
 | 論題 | `templates/debate/index.html` `static/debate/js/index.js` |
 | ジャッジUI | `templates/debate/judge.html` `static/debate/js/judge.js` |
-| 管理 | `debate/admin.py` `templates/debate/admin.html` `static/debate/js/admin.js` |
+| 管理 | `debate/admin.py` `debate/admin_auth.py` `templates/debate/admin.html` `static/debate/js/admin.js` |
 | 見た目 | `templates/debate/base.html` `static/debate/css/style.css` |
 | ソロ生成 | `debate/solo.py` `opponent.py` `solo_jobs.py` `tts.py` |
 | 観戦スクリプト | `debate/ai_script.py` `script_jobs.py` `script_storage.py` `speech.py` `speech_jobs.py` `templates/debate/watch.html` `watch_list.html` |

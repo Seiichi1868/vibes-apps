@@ -3,7 +3,7 @@ import hmac
 import os
 from pathlib import Path
 
-from flask import Blueprint, current_app, jsonify, render_template, request, send_from_directory
+from flask import Blueprint, current_app, jsonify, redirect, render_template, request, send_from_directory, url_for
 
 from debate.judge_models import public_judge_model_modes, resolve_judge_model_mode
 from debate.config import (
@@ -33,12 +33,28 @@ from debate.settings import (
     resolve_speech_mode,
     update_settings,
 )
+from debate.admin_auth import (
+    check_admin_password_attempt,
+    clear_admin_session,
+    configure_debate_session_cookie,
+    establish_admin_session,
+    is_admin_session,
+)
 from debate.storage import copy_session, delete_session, list_sessions, update_session_notes
 
 debate_admin_bp = Blueprint("debate_admin", __name__, url_prefix="/debate/admin")
 
 _PASSWORD_UNSET = "管理パスワードが設定されていません。"
-_PASSWORD_WRONG = "管理パスワードが違います。"
+_LOGIN_REQUIRED = "ログインが必要です。"
+_OPEN_ENDPOINTS = frozenset(
+    {
+        "debate_admin.admin_login",
+        "debate_admin.admin_logout",
+        "debate_admin.admin_status",
+        "debate_admin.web_app_manifest",
+        "debate_admin.admin_page",
+    }
+)
 
 
 def get_admin_password() -> str:
@@ -54,31 +70,61 @@ def admin_password_matches(provided) -> bool:
         return False
     return hmac.compare_digest(str(provided or ""), expected)
 
-# パスワードが必要な設定キー（AIモデル・文字起こし方式・観戦スクリプト設定）
-_SENSITIVE_SETTING_KEYS = (
-    "transcription_mode",
-    "judge_model_mode",
-    "opponent_model_mode",
-    "script_model_mode",
-    "speech_mode",
-)
+
+@debate_admin_bp.record_once
+def _configure_debate_admin_session(state):
+    configure_debate_session_cookie(state.app)
 
 
-def _password_ok(payload: dict) -> bool:
-    return admin_password_matches((payload or {}).get("admin_password"))
+def _wants_admin_json() -> bool:
+    path = request.path or ""
+    if path.startswith("/debate/admin/api/"):
+        return True
+    json_ok = request.accept_mimetypes["application/json"]
+    html_ok = request.accept_mimetypes["text/html"]
+    return json_ok > 0 and json_ok >= html_ok
 
 
-def _admin_denied_response():
+def _unauthenticated_admin_response():
     if not get_admin_password():
-        return jsonify({"ok": False, "error": _PASSWORD_UNSET}), 503
-    return jsonify({"ok": False, "error": _PASSWORD_WRONG}), 403
+        body = {"ok": False, "error": _PASSWORD_UNSET}
+        if _wants_admin_json():
+            return jsonify(body), 503
+        return render_template("debate/admin.html", **_admin_page_context()), 503
+    if _wants_admin_json():
+        return jsonify({"ok": False, "error": _LOGIN_REQUIRED}), 401
+    return redirect(url_for("debate_admin.admin_page"))
 
 
-def _protected_payload():
-    payload = request.get_json(silent=True) or {}
-    if not _password_ok(payload):
-        return None, _admin_denied_response()
-    return payload, None
+@debate_admin_bp.before_request
+def require_admin_session():
+    if request.method == "OPTIONS":
+        return None
+    if request.endpoint in _OPEN_ENDPOINTS:
+        return None
+    if is_admin_session() and get_admin_password():
+        return None
+    return _unauthenticated_admin_response()
+
+
+def _admin_page_context() -> dict:
+    settings = load_settings()
+    bg = resolve_background(settings.get("background_id"))
+    start_sec = clamp_poi_protected_sec(settings.get("poi_protected_start_sec"))
+    end_sec = clamp_poi_protected_sec(settings.get("poi_protected_end_sec"))
+    return {
+        "backgrounds": BACKGROUND_PRESETS,
+        "background": bg,
+        "background_opacity": settings.get("background_opacity", DEFAULT_BACKGROUND_OPACITY),
+        "default_motions": DEFAULT_MOTIONS,
+        "poi_protected_start_sec": start_sec,
+        "poi_protected_end_sec": end_sec,
+        "poi_protected_start_label": format_poi_protected_label(start_sec),
+        "poi_protected_end_label": format_poi_protected_label(end_sec),
+        "poi_protected_min": POI_PROTECTED_SEC_MIN,
+        "poi_protected_max": POI_PROTECTED_SEC_MAX,
+        "poi_protected_step": POI_PROTECTED_SEC_STEP,
+    }
 
 
 def _settings_response(settings: dict) -> dict:
@@ -125,24 +171,33 @@ def web_app_manifest():
 
 @debate_admin_bp.route("/", strict_slashes=False)
 def admin_page():
-    settings = load_settings()
-    bg = resolve_background(settings.get("background_id"))
-    start_sec = clamp_poi_protected_sec(settings.get("poi_protected_start_sec"))
-    end_sec = clamp_poi_protected_sec(settings.get("poi_protected_end_sec"))
-    return render_template(
-        "debate/admin.html",
-        backgrounds=BACKGROUND_PRESETS,
-        background=bg,
-        background_opacity=settings.get("background_opacity", DEFAULT_BACKGROUND_OPACITY),
-        default_motions=DEFAULT_MOTIONS,
-        poi_protected_start_sec=start_sec,
-        poi_protected_end_sec=end_sec,
-        poi_protected_start_label=format_poi_protected_label(start_sec),
-        poi_protected_end_label=format_poi_protected_label(end_sec),
-        poi_protected_min=POI_PROTECTED_SEC_MIN,
-        poi_protected_max=POI_PROTECTED_SEC_MAX,
-        poi_protected_step=POI_PROTECTED_SEC_STEP,
-    )
+    return render_template("debate/admin.html", **_admin_page_context())
+
+
+@debate_admin_bp.route("/api/login", methods=["POST"])
+def admin_login():
+    payload = request.get_json(silent=True) or {}
+    provided = payload.get("password")
+    if provided is None:
+        provided = payload.get("admin_password")
+    denied = check_admin_password_attempt(provided)
+    if denied:
+        return denied
+    establish_admin_session()
+    return jsonify({"ok": True, "logged_in": True})
+
+
+@debate_admin_bp.route("/api/logout", methods=["POST"])
+def admin_logout():
+    clear_admin_session()
+    return jsonify({"ok": True, "logged_in": False})
+
+
+@debate_admin_bp.route("/api/status", methods=["GET"])
+def admin_status():
+    if not get_admin_password():
+        return jsonify({"ok": False, "logged_in": False, "error": _PASSWORD_UNSET}), 503
+    return jsonify({"ok": True, "logged_in": is_admin_session()})
 
 
 @debate_admin_bp.route("/api/settings", methods=["GET", "POST"])
@@ -151,9 +206,6 @@ def admin_settings():
         return jsonify(_settings_response(load_settings()))
 
     payload = request.get_json(silent=True) or {}
-    has_sensitive = any(key in payload for key in _SENSITIVE_SETTING_KEYS)
-    if has_sensitive and not _password_ok(payload):
-        return _admin_denied_response()
 
     updates = {}
     if "background_id" in payload:
@@ -188,10 +240,7 @@ def admin_settings():
             updates["speech_mode"] = speech_mode
 
     if not updates:
-        # パスワード確認のみ（管理設定の解除）
-        if has_sensitive or _password_ok(payload):
-            return jsonify(_settings_response(load_settings()))
-        return _admin_denied_response()
+        return jsonify(_settings_response(load_settings()))
 
     return jsonify(_settings_response(update_settings(**updates)))
 
@@ -213,9 +262,7 @@ def admin_add_affiliation():
 
 @debate_admin_bp.route("/api/affiliations/<affiliation_id>", methods=["POST"])
 def admin_rename_affiliation(affiliation_id):
-    payload, denied = _protected_payload()
-    if denied:
-        return denied
+    payload = request.get_json(silent=True) or {}
     items, error = rename_affiliation(affiliation_id, str(payload.get("name") or ""))
     if error:
         status = 404 if error == "所属が見つかりません。" else 400
@@ -225,9 +272,6 @@ def admin_rename_affiliation(affiliation_id):
 
 @debate_admin_bp.route("/api/affiliations/<affiliation_id>/delete", methods=["POST"])
 def admin_delete_affiliation(affiliation_id):
-    _payload, denied = _protected_payload()
-    if denied:
-        return denied
     items, error = delete_affiliation(affiliation_id)
     if error:
         return jsonify({"ok": False, "error": error}), 404
@@ -266,26 +310,15 @@ def admin_update_session_notes(session_id):
 
 @debate_admin_bp.route("/api/sessions/<session_id>/delete", methods=["POST"])
 def admin_delete_session(session_id):
-    _payload, denied = _protected_payload()
-    if denied:
-        return denied
     deleted = delete_session(session_id)
     if not deleted:
         return jsonify({"ok": False, "error": "セッションが見つかりません。"}), 404
     return jsonify({"ok": True})
 
 
-def _admin_password_from_request(payload: dict | None = None) -> bool:
-    body = payload if isinstance(payload, dict) else {}
-    header = request.headers.get("X-Debate-Admin-Password") or ""
-    return _password_ok(body) or admin_password_matches(header)
-
-
 # ── 観戦用スクリプト（生成・編集・公開。生徒画面の生成APIにはしない） ──
 @debate_admin_bp.route("/api/scripts", methods=["GET"])
 def admin_list_scripts():
-    if not _admin_password_from_request():
-        return _admin_denied_response()
     from debate.script_jobs import recover_stuck_scripts
     from debate.script_storage import list_scripts, script_admin_summary
 
@@ -298,9 +331,7 @@ def admin_list_scripts():
 
 @debate_admin_bp.route("/api/scripts", methods=["POST"])
 def admin_create_script():
-    payload, denied = _protected_payload()
-    if denied:
-        return denied
+    payload = request.get_json(silent=True) or {}
     motion = str(payload.get("motion") or "").strip()
     if not motion:
         return jsonify({"ok": False, "error": "論題を入力してください。"}), 400
@@ -324,8 +355,6 @@ def admin_create_script():
 
 @debate_admin_bp.route("/api/scripts/<script_id>", methods=["GET"])
 def admin_get_script(script_id):
-    if not _admin_password_from_request():
-        return _admin_denied_response()
     from debate.script_storage import load_script
 
     script = load_script(script_id)
@@ -336,9 +365,7 @@ def admin_get_script(script_id):
 
 @debate_admin_bp.route("/api/scripts/<script_id>/parts/<part>", methods=["POST"])
 def admin_update_script_part(script_id, part):
-    payload, denied = _protected_payload()
-    if denied:
-        return denied
+    payload = request.get_json(silent=True) or {}
     if part not in PART_ORDER:
         return jsonify({"ok": False, "error": "パートが不正です。"}), 400
     from debate.ai_script import apply_part_text
@@ -371,9 +398,7 @@ def admin_update_script_part(script_id, part):
 
 @debate_admin_bp.route("/api/scripts/<script_id>/note", methods=["POST"])
 def admin_update_script_note(script_id):
-    payload, denied = _protected_payload()
-    if denied:
-        return denied
+    payload = request.get_json(silent=True) or {}
     from debate.script_storage import get_script_lock, load_script, normalize_teacher_note, save_script
 
     with get_script_lock(script_id):
@@ -387,9 +412,7 @@ def admin_update_script_note(script_id):
 
 @debate_admin_bp.route("/api/scripts/<script_id>/status", methods=["POST"])
 def admin_update_script_status(script_id):
-    payload, denied = _protected_payload()
-    if denied:
-        return denied
+    payload = request.get_json(silent=True) or {}
     status = str(payload.get("status") or "").strip()
     if status not in ("draft", "published"):
         return jsonify({"ok": False, "error": "状態は draft か published です。"}), 400
@@ -417,9 +440,6 @@ def admin_update_script_status(script_id):
 
 @debate_admin_bp.route("/api/scripts/<script_id>/delete", methods=["POST"])
 def admin_delete_script(script_id):
-    _payload, denied = _protected_payload()
-    if denied:
-        return denied
     from debate.script_storage import delete_script
 
     if not delete_script(script_id):
@@ -429,9 +449,6 @@ def admin_delete_script(script_id):
 
 @debate_admin_bp.route("/api/scripts/<script_id>/preview-token", methods=["POST"])
 def admin_script_preview_token(script_id):
-    _payload, denied = _protected_payload()
-    if denied:
-        return denied
     from debate.script_storage import issue_preview_token, load_script
 
     script = load_script(script_id)
@@ -450,9 +467,7 @@ def admin_script_preview_token(script_id):
 
 @debate_admin_bp.route("/api/scripts/<script_id>/audio", methods=["POST"])
 def admin_queue_script_audio(script_id):
-    payload, denied = _protected_payload()
-    if denied:
-        return denied
+    payload = request.get_json(silent=True) or {}
     if resolve_speech_mode() != "openai":
         return jsonify({"ok": False, "error": "読み上げ方式がブラウザのため、サーバー音声は作りません。"}), 400
     part = str(payload.get("part") or "").strip()
@@ -469,9 +484,7 @@ def admin_queue_script_audio(script_id):
 
 @debate_admin_bp.route("/api/scripts/<script_id>/checks/estimate", methods=["POST"])
 def admin_estimate_script_check(script_id):
-    payload, denied = _protected_payload()
-    if denied:
-        return denied
+    payload = request.get_json(silent=True) or {}
     from debate.script_checks import estimate_check_cost, parse_check_request
     from debate.script_storage import load_script
 
@@ -489,8 +502,6 @@ def admin_estimate_script_check(script_id):
 
 @debate_admin_bp.route("/api/scripts/<script_id>/checks", methods=["GET"])
 def admin_get_script_checks(script_id):
-    if not _admin_password_from_request():
-        return _admin_denied_response()
     from debate.script_check_jobs import checks_view
     from debate.script_storage import load_script
 
@@ -501,9 +512,7 @@ def admin_get_script_checks(script_id):
 
 @debate_admin_bp.route("/api/scripts/<script_id>/checks", methods=["POST"])
 def admin_start_script_check(script_id):
-    payload, denied = _protected_payload()
-    if denied:
-        return denied
+    payload = request.get_json(silent=True) or {}
     from debate.script_check_jobs import start_check_job
 
     if not payload.get("confirmed"):

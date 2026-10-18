@@ -109,11 +109,9 @@ class AdminPasswordConfigTests(_EnvIsolation):
 class AdminPasswordHttpTests(_EnvIsolation):
     @classmethod
     def setUpClass(cls):
-        os.environ.setdefault("FLASK_SECRET_KEY", "test-secret")
-        from flask_app import create_app
+        from tests.flask_test_app import get_test_app
 
-        cls.app = create_app()
-        cls.app.testing = True
+        cls.app = get_test_app()
 
     def setUp(self):
         super().setUp()
