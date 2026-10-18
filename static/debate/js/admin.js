@@ -1,9 +1,11 @@
 "use strict";
 
-const UNLOCK_STORAGE_KEY = "debate_admin_unlocked";
-
 const passwordInput = document.getElementById("admin-password");
 const unlockBtn = document.getElementById("unlock-btn");
+const loginForm = document.getElementById("admin-login-form");
+const loginCard = document.getElementById("admin-login-card");
+const adminWorkspace = document.getElementById("admin-workspace");
+const logoutBtn = document.getElementById("admin-logout-btn");
 const lockMessage = document.getElementById("lock-message");
 const adminSettingsLock = document.getElementById("admin-settings-lock");
 const adminSettingsPanel = document.getElementById("admin-settings-panel");
@@ -69,30 +71,14 @@ let allAffiliations = [];
 let currentSessionsSort = "updated";
 let currentAffiliationFilter = FILTER_UNSET;
 
-function getStoredPassword() {
-  try {
-    return sessionStorage.getItem(UNLOCK_STORAGE_KEY) || "";
-  } catch (_) {
-    return "";
-  }
-}
-
-function saveUnlockState(password) {
-  try {
-    sessionStorage.setItem(UNLOCK_STORAGE_KEY, password);
-  } catch (_) {}
-}
-
-function clearUnlockState() {
-  try {
-    sessionStorage.removeItem(UNLOCK_STORAGE_KEY);
-  } catch (_) {}
-}
-
 function applyUnlockUI() {
   unlocked = true;
+  loginCard?.classList.add("hidden");
+  adminWorkspace?.classList.remove("hidden");
+  logoutBtn?.classList.remove("hidden");
   adminSettingsLock?.classList.add("hidden");
   adminSettingsPanel?.classList.remove("hidden");
+  if (passwordInput) passwordInput.value = "";
   if (sensitiveSettings) {
     sensitiveSettings.classList.remove("opacity-50", "pointer-events-none");
     sensitiveSettings.removeAttribute("aria-disabled");
@@ -100,7 +86,19 @@ function applyUnlockUI() {
   syncProtectedControls();
   renderAffiliations(allAffiliations);
   renderVisibleSessions();
-  loadScripts();
+}
+
+function lockAdminUi(message) {
+  unlocked = false;
+  adminWorkspace?.classList.add("hidden");
+  loginCard?.classList.remove("hidden");
+  logoutBtn?.classList.add("hidden");
+  if (sensitiveSettings) {
+    sensitiveSettings.classList.add("opacity-50", "pointer-events-none");
+    sensitiveSettings.setAttribute("aria-disabled", "true");
+  }
+  syncProtectedControls();
+  if (message) showLockMessage(message);
 }
 
 function syncProtectedControls() {
@@ -110,7 +108,7 @@ function syncProtectedControls() {
 
 function requireUnlocked(actionLabel) {
   if (unlocked) return true;
-  showLockMessage(`${actionLabel}には管理パスワードが必要です。下の管理設定で解除してください。`);
+  showLockMessage(`${actionLabel}にはログインが必要です。`);
   passwordInput?.focus();
   return false;
 }
@@ -305,19 +303,34 @@ function getSelectedSpeechMode() {
   return checked?.value === "browser" ? "browser" : "openai";
 }
 
+async function adminFetch(url, options = {}) {
+  const headers = { ...(options.headers || {}) };
+  if (options.body && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
+  }
+  const res = await fetch(url, {
+    credentials: "same-origin",
+    ...options,
+    headers,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    lockAdminUi(data.error || "ログインの有効期限が切れました。もう一度ログインしてください。");
+  }
+  return { res, data };
+}
+
 async function fetchSettings() {
-  const res = await fetch("/debate/admin/api/settings");
-  if (!res.ok) throw new Error("設定の取得に失敗しました");
-  return res.json();
+  const { res, data } = await adminFetch("/debate/admin/api/settings");
+  if (!res.ok) throw new Error(data.error || "設定の取得に失敗しました");
+  return data;
 }
 
 async function saveSettings(payload) {
-  const res = await fetch("/debate/admin/api/settings", {
+  const { res, data } = await adminFetch("/debate/admin/api/settings", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  const data = await res.json();
   if (!res.ok) throw new Error(data.error || "保存に失敗しました");
   return data;
 }
@@ -332,10 +345,6 @@ function applyTranscriptionMode(mode) {
   transcriptionModePicker?.querySelectorAll('input[name="transcription_mode"]').forEach((input) => {
     input.checked = input.value === value;
   });
-}
-
-function getAdminPassword() {
-  return getStoredPassword() || passwordInput?.value.trim() || "";
 }
 
 async function loadSettingsIntoUI() {
@@ -355,6 +364,7 @@ async function loadSettingsIntoUI() {
 }
 
 function schedulePoiProtectedSave() {
+  if (!unlocked) return;
   applyPoiProtectedTimes({
     poi_protected_start_sec: getPoiProtectedSecFromSlider(poiProtectedStartSlider, 60),
     poi_protected_end_sec: getPoiProtectedSecFromSlider(poiProtectedEndSlider, 60),
@@ -377,6 +387,7 @@ function schedulePoiProtectedSave() {
 }
 
 function scheduleBackgroundSave() {
+  if (!unlocked) return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
     try {
@@ -402,7 +413,6 @@ function scheduleSensitiveSave() {
   saveTimer = setTimeout(async () => {
     try {
       const saved = await saveSettings({
-        admin_password: getAdminPassword(),
         transcription_mode: getSelectedTranscriptionMode(),
         judge_model_mode: getSelectedJudgeModelMode(),
         opponent_model_mode: getSelectedOpponentModelMode(),
@@ -711,6 +721,7 @@ sessionsFilter?.addEventListener("change", () => applyAffiliationFilter(sessions
 
 affiliationAddForm?.addEventListener("submit", async (e) => {
   e.preventDefault();
+  if (!requireUnlocked("所属の追加")) return;
   const name = affiliationNameInput?.value.trim() || "";
   if (!name) {
     showLockMessage("所属名を入力してください");
@@ -756,7 +767,7 @@ affiliationsList?.addEventListener("click", async (e) => {
       const res = await fetch(`/debate/admin/api/affiliations/${encodeURIComponent(affiliationId)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, admin_password: getAdminPassword() }),
+        body: JSON.stringify({ name }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || "所属の変更に失敗しました");
@@ -781,7 +792,7 @@ affiliationsList?.addEventListener("click", async (e) => {
     const res = await fetch(`/debate/admin/api/affiliations/${encodeURIComponent(affiliationId)}/delete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ admin_password: getAdminPassword() }),
+      body: JSON.stringify({}),
     });
     const data = await res.json();
     if (!res.ok || !data.ok) throw new Error(data.error || "所属の削除に失敗しました");
@@ -871,7 +882,7 @@ sessionsList?.addEventListener("click", async (e) => {
     const res = await fetch(`/debate/admin/api/sessions/${encodeURIComponent(sessionId)}/delete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ admin_password: getAdminPassword() }),
+      body: JSON.stringify({}),
     });
     const data = await res.json();
     if (!res.ok || !data.ok) throw new Error(data.error || "削除に失敗しました");
@@ -886,6 +897,13 @@ sessionsList?.addEventListener("click", async (e) => {
   }
 });
 
+async function afterLogin() {
+  applyUnlockUI();
+  hideLockMessage();
+  await loadAdminWorkspace();
+  if (statusMessage) statusMessage.textContent = "ログインしました";
+}
+
 async function tryUnlock() {
   hideLockMessage();
   const password = passwordInput?.value.trim() || "";
@@ -893,75 +911,76 @@ async function tryUnlock() {
     showLockMessage("パスワードを入力してください");
     return;
   }
-
+  if (unlockBtn) unlockBtn.disabled = true;
   try {
-    const res = await fetch("/debate/admin/api/settings", {
+    const res = await fetch("/debate/admin/api/login", {
       method: "POST",
+      credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ admin_password: password }),
+      body: JSON.stringify({ password }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (res.status === 403) {
-      showLockMessage("パスワードが違います");
+      showLockMessage(data.error || "パスワードが違います");
       return;
     }
-    if (!res.ok) throw new Error(data.error || "解除に失敗しました");
+    if (!res.ok) throw new Error(data.error || "ログインに失敗しました");
+    await afterLogin();
+  } catch (err) {
+    showLockMessage(err.message);
+  } finally {
+    if (unlockBtn) unlockBtn.disabled = false;
+  }
+}
 
-    saveUnlockState(password);
+async function restoreAdminSession() {
+  try {
+    const res = await fetch("/debate/admin/api/status", { credentials: "same-origin" });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 503) {
+      showLockMessage(data.error || "管理パスワードが設定されていません。");
+      return;
+    }
+    if (!res.ok || !data.logged_in) return;
     applyUnlockUI();
-    applyTranscriptionMode(data.transcription_mode ?? "batch");
-    renderJudgeModelOptions(data.judge_model_modes || [], data.judge_model_mode || "5.6-luna");
-    applyJudgeModelMode(data.judge_model_mode || "5.6-luna", data.judge_model);
-    renderOpponentModelOptions(data.judge_model_modes || [], data.opponent_model_mode || "5.6-luna");
-    applyOpponentModelMode(data.opponent_model_mode || "5.6-luna", data.opponent_model);
-    renderScriptModelOptions(data.judge_model_modes || [], data.script_model_mode || "5.6-terra");
-    applyScriptModelMode(data.script_model_mode || "5.6-terra", data.script_model);
-    applySpeechMode(data.speech_mode || "openai");
-    if (statusMessage) statusMessage.textContent = "管理設定を解除しました";
+    hideLockMessage();
+    await loadAdminWorkspace();
+  } catch (_) {
+    // セッション復元に失敗した場合はログイン画面のまま
+  }
+}
+
+async function loadAdminWorkspace() {
+  try {
+    await loadSettingsIntoUI();
   } catch (err) {
     showLockMessage(err.message);
   }
+  await Promise.all([loadAffiliations(), loadSessions()]);
+  await loadScripts();
 }
 
-async function restoreUnlockFromStorage() {
-  const password = getStoredPassword();
-  if (!password) return;
-
-  if (passwordInput) passwordInput.value = password;
-  hideLockMessage();
-
+async function logoutAdmin() {
   try {
-    const res = await fetch("/debate/admin/api/settings", {
+    await fetch("/debate/admin/api/logout", {
       method: "POST",
+      credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ admin_password: password }),
+      body: JSON.stringify({}),
     });
-    const data = await res.json();
-    if (res.status === 403) {
-      clearUnlockState();
-      if (passwordInput) passwordInput.value = "";
-      return;
-    }
-    if (!res.ok) return;
-
-    applyUnlockUI();
-    applyTranscriptionMode(data.transcription_mode ?? "batch");
-    renderJudgeModelOptions(data.judge_model_modes || [], data.judge_model_mode || "5.6-luna");
-    applyJudgeModelMode(data.judge_model_mode || "5.6-luna", data.judge_model);
-    renderOpponentModelOptions(data.judge_model_modes || [], data.opponent_model_mode || "5.6-luna");
-    applyOpponentModelMode(data.opponent_model_mode || "5.6-luna", data.opponent_model);
-    renderScriptModelOptions(data.judge_model_modes || [], data.script_model_mode || "5.6-terra");
-    applyScriptModelMode(data.script_model_mode || "5.6-terra", data.script_model);
-    applySpeechMode(data.speech_mode || "openai");
   } catch (_) {
-    // 保存済み解除の復元に失敗した場合はロックのまま
+    // 画面側はログインへ戻す
   }
+  lockAdminUi();
+  hideLockMessage();
+  if (statusMessage) statusMessage.textContent = "ログアウトしました";
 }
 
-unlockBtn?.addEventListener("click", tryUnlock);
-passwordInput?.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") tryUnlock();
+loginForm?.addEventListener("submit", (e) => {
+  e.preventDefault();
+  tryUnlock();
 });
+logoutBtn?.addEventListener("click", logoutAdmin);
 
 bgPicker?.addEventListener("click", (e) => {
   const btn = e.target.closest(".bg-pick-btn");
@@ -1010,7 +1029,6 @@ transcriptionModePicker?.addEventListener("change", () => {
 function adminAuthHeaders() {
   return {
     "Content-Type": "application/json",
-    "X-Debate-Admin-Password": getAdminPassword(),
   };
 }
 
@@ -1209,7 +1227,7 @@ async function scriptAction(action, scriptId, extra) {
   const res = await fetch(`/debate/admin/api/scripts/${scriptId}/${action}`, {
     method: "POST",
     headers: adminAuthHeaders(),
-    body: JSON.stringify({ admin_password: getAdminPassword(), ...(extra || {}) }),
+    body: JSON.stringify({ ...(extra || {}) }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "操作に失敗しました");
@@ -1234,7 +1252,6 @@ scriptCreateForm?.addEventListener("submit", async (event) => {
       method: "POST",
       headers: adminAuthHeaders(),
       body: JSON.stringify({
-        admin_password: getAdminPassword(),
         motion,
         level: scriptLevel?.value || "normal",
         intended_winner: scriptWinner?.value || "auto",
@@ -1278,7 +1295,6 @@ function selectedCheckModels(panel) {
 
 function checkRequestBody(panel, extra) {
   return {
-    admin_password: getAdminPassword(),
     models: selectedCheckModels(panel),
     runs: Number(panel.querySelector("[data-check-runs]")?.value || 1),
     ...(extra || {}),
@@ -1493,7 +1509,7 @@ scriptsList?.addEventListener("click", async (event) => {
       await fetch(`/debate/admin/api/scripts/${scriptId}/parts/${part}`, {
         method: "POST",
         headers: adminAuthHeaders(),
-        body: JSON.stringify({ admin_password: getAdminPassword(), text }),
+        body: JSON.stringify({ text }),
       }).then(async (res) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "保存に失敗しました");
@@ -1529,14 +1545,8 @@ scriptsList?.addEventListener("click", async (event) => {
     currentAffiliationFilter = FILTER_UNSET;
   }
 
-  try {
-    await loadSettingsIntoUI();
-  } catch (err) {
-    showLockMessage(err.message);
-  }
-  await Promise.all([loadAffiliations(), loadSessions()]);
-  await restoreUnlockFromStorage();
+  await restoreAdminSession();
   if (!unlocked && scriptsList) {
-    scriptsList.innerHTML = '<p class="text-sm text-slate-400">パスワードを解除すると一覧を表示します。</p>';
+    scriptsList.innerHTML = '<p class="text-sm text-slate-400">ログインすると一覧を表示します。</p>';
   }
 })();

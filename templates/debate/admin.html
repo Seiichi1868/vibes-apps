@@ -5,6 +5,10 @@
 {% block pwa_short_name %}Debate 管理{% endblock %}
 
 {% block header_actions %}
+<button id="admin-logout-btn" type="button"
+  class="hidden text-xs px-3 py-1.5 rounded-full bg-white/60 text-slate-600 hover:bg-rose-50 hover:text-rose-700 font-medium transition-colors border border-white/80">
+  ログアウト
+</button>
 <a href="{{ url_for('debate.index') }}"
   class="text-xs px-3 py-1.5 rounded-full bg-white/60 text-slate-600 hover:bg-emerald-50 hover:text-teal-700 font-medium transition-colors border border-white/80">
   ← 生徒画面
@@ -15,6 +19,23 @@
 <p id="lock-message" class="hidden text-sm text-rose-600 font-medium mb-3" role="alert"></p>
 <p id="status-message" class="text-sm text-emerald-700 font-medium min-h-[1.25rem] mb-3" aria-live="polite"></p>
 
+<section id="admin-login-card" class="glass-card rounded-2xl p-5 md:p-6 mb-4">
+  <h2 class="font-bold text-slate-800 mb-1">管理ログイン</h2>
+  <p class="text-xs text-slate-500 mb-3 leading-snug">
+    所属・セッション・観戦スクリプト・設定を触るには、先にログインしてください。パスワードはブラウザに保存しません。
+  </p>
+  <form id="admin-login-form" class="flex flex-wrap items-center gap-2">
+    <input id="admin-password" type="password" name="password" autocomplete="current-password"
+      placeholder="管理パスワード"
+      class="flex-1 min-w-[12rem] text-sm rounded-lg border border-teal-100 bg-white/80 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand">
+    <button id="unlock-btn" type="submit"
+      class="text-xs px-3 py-1.5 rounded-full bg-brand text-white font-semibold hover:bg-brand-dark transition-colors">
+      ログイン
+    </button>
+  </form>
+</section>
+
+<div id="admin-workspace" class="hidden">
 <section class="glass-card rounded-2xl p-5 md:p-6 mb-4">
   <div class="flex items-center justify-between gap-2 mb-2">
     <h2 class="font-bold text-slate-800">所属</h2>
@@ -23,8 +44,8 @@
   <p class="text-xs text-slate-500 mb-3 leading-snug">
     生徒は論題のあとで、ここで登録した所属から1つ選んでディベートを始めます。クラス名や学年などを追加してください。
   </p>
-  <p id="affiliation-lock-hint" class="text-xs text-amber-700 mb-3">
-    所属の変更・削除には、下の管理設定でパスワードを解除してください。
+  <p id="affiliation-lock-hint" class="hidden text-xs text-amber-700 mb-3">
+    ログインすると所属を追加・変更・削除できます。
   </p>
   <div id="affiliations-list" class="space-y-1.5 mb-3">
     <p class="text-sm text-slate-400">読み込み中...</p>
@@ -69,7 +90,7 @@
     </div>
   </div>
   <p class="text-xs text-slate-500 mb-2 leading-snug">
-    すべての保存済みセッションをここで管理できます。所属を選ぶとその所属だけ表示します。削除には管理パスワードが必要です。生徒画面の「続きから再開する」には、各端末で保存したセッションだけが表示されます。
+    すべての保存済みセッションをここで管理できます。所属を選ぶとその所属だけ表示します。削除は取り消せません。生徒画面の「続きから再開する」には、各端末で保存したセッションだけが表示されます。
   </p>
   <div id="sessions-list" class="space-y-1.5">
     <p class="text-sm text-slate-400">読み込み中...</p>
@@ -85,10 +106,10 @@
     </button>
   </div>
   <p class="text-xs text-slate-500 mb-3 leading-snug">
-    お手本はここで作って確認してから公開します。生成・編集・公開・削除・音声の作り直しには管理パスワードが必要です。サーバー音声は公開時に作り、生徒は保存済みの音声を再生します。
+    お手本はここで作って確認してから公開します。生成・編集・公開・削除・音声の作り直しはログイン後にできます。サーバー音声は公開時に作り、生徒は保存済みの音声を再生します。
   </p>
-  <p id="scripts-lock-hint" class="text-xs text-amber-700 mb-3">
-    下の管理設定でパスワードを解除してください。
+  <p id="scripts-lock-hint" class="hidden text-xs text-amber-700 mb-3">
+    ログインするとスクリプトを操作できます。
   </p>
   <form id="script-create-form" class="space-y-3 mb-4">
     <div>
@@ -193,23 +214,8 @@
 </section>
 
 <section id="admin-settings-section" class="glass-card rounded-2xl p-4 md:p-5">
-  <div id="admin-settings-lock">
-    <h2 class="text-sm font-bold text-slate-800 mb-1">管理設定</h2>
-    <p class="text-xs text-slate-500 mb-3">
-      AIモデルや文字起こし方式の変更にはパスワードが必要です。
-    </p>
-    <div id="admin-lock" class="flex items-center gap-1.5">
-      <input id="admin-password" type="password" inputmode="numeric" autocomplete="off"
-        placeholder="パスワード"
-        class="text-sm rounded-lg border border-teal-100 bg-white/80 px-3 py-1.5 w-28 focus:outline-none focus:ring-2 focus:ring-brand">
-      <button id="unlock-btn" type="button"
-        class="text-xs px-3 py-1.5 rounded-full bg-brand text-white font-semibold hover:bg-brand-dark transition-colors">
-        解除
-      </button>
-    </div>
-  </div>
-
-  <div id="admin-settings-panel" class="hidden">
+  <div id="admin-settings-lock" class="hidden"></div>
+  <div id="admin-settings-panel">
     <h2 class="text-sm font-bold text-slate-800 mb-3">管理設定</h2>
     <div id="sensitive-settings" class="space-y-4">
     <div>
@@ -284,8 +290,9 @@
   </div>
   </div>
 </section>
+</div>
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='debate/js/admin.js', v='20261011g') }}"></script>
+<script src="{{ url_for('static', filename='debate/js/admin.js', v='20261018a') }}"></script>
 {% endblock %}
