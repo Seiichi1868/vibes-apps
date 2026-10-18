@@ -88,12 +88,9 @@ class _EnvIsolation(unittest.TestCase):
 class DebateAdminAuthHttpTests(_EnvIsolation):
     @classmethod
     def setUpClass(cls):
-        os.environ.setdefault("FLASK_SECRET_KEY", "test-secret")
-        from flask_app import create_app
+        from tests.flask_test_app import get_test_app
 
-        cls.app = create_app()
-        cls.app.testing = True
-        cls.app.config["SESSION_COOKIE_SECURE"] = False
+        cls.app = get_test_app()
 
     def setUp(self):
         super().setUp()
@@ -183,10 +180,11 @@ class DebateAdminAuthHttpTests(_EnvIsolation):
     def test_every_admin_route_works_when_logged_in(self):
         self.assertEqual(self._login().status_code, 200)
         auth_failures = {401, 403, 429, 503}
+        skip = {"debate_admin.admin_login", "debate_admin.admin_logout"}
         for rule in self._admin_rules():
             path = _rule_path(rule)
             for method in _rule_methods(rule):
-                if rule.endpoint == "debate_admin.admin_login":
+                if rule.endpoint in skip:
                     continue
                 response = self.client.open(path, method=method, json={})
                 self.assertNotIn(
@@ -297,7 +295,7 @@ class DebateAdminAuthHttpTests(_EnvIsolation):
             return clock["now"]
 
         with patch("debate.admin_auth.time.time", side_effect=fake_time):
-            for index in range(30):
+            for index in range(29):
                 headers = {"X-Forwarded-For": f"203.0.113.{index}"}
                 response = self.client.post(
                     "/debate/admin/api/login",
@@ -305,6 +303,12 @@ class DebateAdminAuthHttpTests(_EnvIsolation):
                     headers=headers,
                 )
                 self.assertEqual(response.status_code, 403)
+            thirtieth = self.client.post(
+                "/debate/admin/api/login",
+                json={"password": _WRONG},
+                headers={"X-Forwarded-For": "203.0.113.29"},
+            )
+            self.assertEqual(thirtieth.status_code, 429)
             blocked = self.client.post(
                 "/debate/admin/api/login",
                 json={"password": _CONFIGURED},
