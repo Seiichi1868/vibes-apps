@@ -158,7 +158,7 @@ def other_apps_page():
     if closed:
         return closed
     if not admin_panel_ok():
-        return render_template("toolbox/admin_gate.html", error=None)
+        return redirect(url_for("toolbox.admin_page"))
     return render_template("toolbox/other_apps.html", apps=OTHER_APPS)
 
 
@@ -218,7 +218,7 @@ def admin_totp_start():
     if closed:
         return closed
     if not admin_panel_ok():
-        return render_template("toolbox/admin_gate.html", error=None)
+        return redirect(url_for("toolbox.admin_page"))
     user = current_user()
     if not user or user.get("is_guest"):
         return _totp_redirect("教員アカウントでログインしてから登録してください。")
@@ -235,7 +235,7 @@ def admin_totp_confirm():
     if closed:
         return closed
     if not admin_panel_ok():
-        return render_template("toolbox/admin_gate.html", error=None)
+        return redirect(url_for("toolbox.admin_page"))
     user = current_user()
     pending = str((user or {}).get("totp_pending_secret") or "")
     if not user or not pending:
@@ -254,7 +254,7 @@ def admin_totp_replace():
     if closed:
         return closed
     if not admin_panel_ok():
-        return render_template("toolbox/admin_gate.html", error=None)
+        return redirect(url_for("toolbox.admin_page"))
     user = current_user()
     secret = str((user or {}).get("totp_secret") or "")
     if not user or not secret:
