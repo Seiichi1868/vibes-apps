@@ -6,7 +6,7 @@
 """
 from pathlib import Path
 
-from flask import Blueprint, jsonify, render_template, request, send_from_directory
+from flask import Blueprint, jsonify, redirect, render_template, request, send_from_directory, url_for
 
 from conjugate.admin_auth import (
     check_admin_password_attempt,
@@ -41,6 +41,42 @@ admin_bp = Blueprint(
 @admin_bp.context_processor
 def _inject_appearance():
     return appearance_context()
+
+
+_OPEN_ADMIN_ENDPOINTS = frozenset(
+    {
+        "conjugate_admin.admin_login",
+        "conjugate_admin.admin_logout",
+        "conjugate_admin.admin_status",
+        "conjugate_admin.web_app_manifest",
+        "conjugate_admin.admin_page",
+    }
+)
+
+
+def _wants_admin_json() -> bool:
+    if "/admin/api/" in (request.path or ""):
+        return True
+    json_ok = request.accept_mimetypes["application/json"]
+    html_ok = request.accept_mimetypes["text/html"]
+    return json_ok > 0 and json_ok >= html_ok
+
+
+@admin_bp.before_request
+def require_admin_session():
+    if request.method == "OPTIONS":
+        return None
+    if request.endpoint in _OPEN_ADMIN_ENDPOINTS:
+        return None
+    if is_admin_session() and get_admin_password():
+        return None
+    if not get_admin_password():
+        if _wants_admin_json():
+            return jsonify({"ok": False, "error": "管理パスワードが設定されていません。"}), 503
+        return "管理パスワードが設定されていません。", 503
+    if _wants_admin_json():
+        return jsonify({"ok": False, "error": "ログインが必要です。"}), 401
+    return redirect(url_for("conjugate_admin.admin_page"))
 
 
 @admin_bp.route("/manifest.json")
@@ -155,9 +191,6 @@ def get_settings_api():
 @admin_bp.route("/api/settings", methods=["POST"])
 def save_settings_api():
     payload = request.get_json(silent=True) or {}
-    guard = _require_admin_password(payload)
-    if guard:
-        return guard
 
     current = load_settings()
     updates = dict(current)

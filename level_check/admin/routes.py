@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 
 import openpyxl
-from flask import Blueprint, jsonify, render_template, request, send_file, send_from_directory
+from flask import Blueprint, jsonify, redirect, render_template, request, send_file, send_from_directory, url_for
 
 from level_check.admin_auth import (
     check_admin_password_attempt,
@@ -136,6 +136,42 @@ def web_app_manifest():
     return response
 
 
+_OPEN_ADMIN_ENDPOINTS = frozenset(
+    {
+        "level_check_admin.admin_login",
+        "level_check_admin.admin_logout",
+        "level_check_admin.admin_status",
+        "level_check_admin.web_app_manifest",
+        "level_check_admin.admin_page",
+    }
+)
+
+
+def _wants_admin_json() -> bool:
+    if "/admin/api/" in (request.path or ""):
+        return True
+    json_ok = request.accept_mimetypes["application/json"]
+    html_ok = request.accept_mimetypes["text/html"]
+    return json_ok > 0 and json_ok >= html_ok
+
+
+@admin_bp.before_request
+def require_admin_session():
+    if request.method == "OPTIONS":
+        return None
+    if request.endpoint in _OPEN_ADMIN_ENDPOINTS:
+        return None
+    if is_admin_session() and get_admin_password():
+        return None
+    if not get_admin_password():
+        if _wants_admin_json():
+            return jsonify({"ok": False, "error": "管理パスワードが設定されていません。"}), 503
+        return "管理パスワードが設定されていません。", 503
+    if _wants_admin_json():
+        return jsonify({"ok": False, "error": "ログインが必要です。"}), 401
+    return redirect(url_for("level_check_admin.admin_page"))
+
+
 @admin_bp.route("/")
 def admin_page():
     bank = load_questions()
@@ -181,9 +217,6 @@ def save_settings_api():
     if "background_opacity" in payload:
         updates["background_opacity"] = payload.get("background_opacity")
     if "ai_model_mode" in payload:
-        err = _require_model_change_password(payload)
-        if err:
-            return err
         updates["ai_model_mode"] = payload.get("ai_model_mode")
     update_settings(**updates)
     return jsonify(_settings_payload())

@@ -86,6 +86,28 @@ def _admin_password_denied():
     return jsonify({"error": _PASSWORD_WRONG}), 403
 
 
+_OPEN_ADMIN_ENDPOINTS = frozenset(
+    {
+        "admin.admin_login",
+        "admin.admin_logout",
+        "admin.admin_status",
+    }
+)
+
+
+@admin_bp.before_request
+def require_admin_session():
+    if request.method == "OPTIONS":
+        return None
+    if request.endpoint in _OPEN_ADMIN_ENDPOINTS:
+        return None
+    if is_admin_session() and _get_admin_password():
+        return None
+    if not _get_admin_password():
+        return jsonify({"ok": False, "error": _PASSWORD_UNSET}), 503
+    return jsonify({"ok": False, "error": "ログインが必要です。"}), 401
+
+
 @admin_bp.route("/admin/gate-lock", methods=["GET", "POST"])
 def admin_gate_lock():
     from flask_app.services.gate_service import is_gate_lock_enabled
@@ -115,8 +137,6 @@ def admin_ai_mode():
         return jsonify(ai_mode_response())
 
     payload = request.get_json(silent=True) or {}
-    if not _admin_password_ok(payload):
-        return _admin_password_denied()
 
     raw_mode = payload.get("ai_mode")
     if raw_mode is None and payload.get("use_gpt5_mode") is not None:
@@ -160,8 +180,6 @@ def admin_tts():
         return jsonify({"ok": True, "tts_enabled": is_tts_enabled()})
 
     payload = request.get_json(silent=True) or {}
-    if not _admin_password_ok(payload):
-        return _admin_password_denied()
 
     raw = payload.get("tts_enabled")
     if raw is None:
@@ -186,8 +204,6 @@ def admin_languages():
         return jsonify(languages_response())
 
     payload = request.get_json(silent=True) or {}
-    if not _admin_password_ok(payload):
-        return _admin_password_denied()
 
     raw = payload.get("enabled_languages")
     if raw is None:
@@ -210,8 +226,6 @@ def admin_public_status():
 @admin_bp.route("/admin/toggle-public", methods=["POST"])
 def admin_toggle_public():
     payload = request.get_json(silent=True) or {}
-    if not _admin_password_ok(payload):
-        return _admin_password_denied()
 
     raw = payload.get("public_enabled")
     if isinstance(raw, bool):

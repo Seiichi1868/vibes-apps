@@ -4,7 +4,7 @@ import hmac
 import os
 from pathlib import Path
 
-from flask import Blueprint, current_app, jsonify, render_template, request, send_from_directory
+from flask import Blueprint, current_app, jsonify, redirect, render_template, request, send_from_directory, url_for
 
 from gtec_app.admin_auth import (
     check_admin_password_attempt,
@@ -95,6 +95,43 @@ def _require_admin_password(payload: dict):
     )
 
 
+_OPEN_ADMIN_ENDPOINTS = frozenset(
+    {
+        "gtec_admin.admin_login",
+        "gtec_admin.admin_logout",
+        "gtec_admin.admin_status",
+        "gtec_admin.web_app_manifest",
+        "gtec_admin.admin_page",
+    }
+)
+
+
+def _wants_admin_json() -> bool:
+    path = request.path or ""
+    if "/admin/api/" in path:
+        return True
+    json_ok = request.accept_mimetypes["application/json"]
+    html_ok = request.accept_mimetypes["text/html"]
+    return json_ok > 0 and json_ok >= html_ok
+
+
+@gtec_admin_bp.before_request
+def require_admin_session():
+    if request.method == "OPTIONS":
+        return None
+    if request.endpoint in _OPEN_ADMIN_ENDPOINTS:
+        return None
+    if is_admin_session() and get_admin_password():
+        return None
+    if not get_admin_password():
+        if _wants_admin_json():
+            return jsonify({"ok": False, "error": _PASSWORD_UNSET}), 503
+        return _PASSWORD_UNSET, 503
+    if _wants_admin_json():
+        return jsonify({"ok": False, "error": "ログインが必要です。"}), 401
+    return redirect(url_for("gtec_admin.admin_page"))
+
+
 @gtec_admin_bp.route("/gtec/admin/manifest.json")
 def web_app_manifest():
     """管理画面用 PWA manifest（start_url / scope: /gtec/admin/）。"""
@@ -128,9 +165,6 @@ def admin_settings():
         return jsonify({"ok": True, **settings, **resolve_background(settings.get("background_id"))})
 
     payload = request.get_json(silent=True) or {}
-    denied = _require_admin_password(payload)
-    if denied:
-        return denied
 
     updates = {}
     for part in PART_DEFAULTS:
@@ -169,9 +203,6 @@ def admin_problems():
         return jsonify({"ok": True, **load_problems()})
 
     payload = request.get_json(silent=True) or {}
-    denied = _require_admin_password(payload)
-    if denied:
-        return denied
 
     incoming = {}
     if isinstance(payload.get("active"), dict):

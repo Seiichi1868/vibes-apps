@@ -7,7 +7,7 @@ import io
 from pathlib import Path
 
 import openpyxl
-from flask import Blueprint, current_app, jsonify, render_template, request, send_file, send_from_directory
+from flask import Blueprint, current_app, jsonify, redirect, render_template, request, send_file, send_from_directory, url_for
 
 from trigger.admin_auth import (
     check_admin_password_attempt,
@@ -123,6 +123,42 @@ def web_app_manifest():
     return response
 
 
+_OPEN_ADMIN_ENDPOINTS = frozenset(
+    {
+        "trigger_admin.admin_login",
+        "trigger_admin.admin_logout",
+        "trigger_admin.admin_status",
+        "trigger_admin.web_app_manifest",
+        "trigger_admin.admin_page",
+    }
+)
+
+
+def _wants_admin_json() -> bool:
+    if "/admin/api/" in (request.path or ""):
+        return True
+    json_ok = request.accept_mimetypes["application/json"]
+    html_ok = request.accept_mimetypes["text/html"]
+    return json_ok > 0 and json_ok >= html_ok
+
+
+@admin_bp.before_request
+def require_admin_session():
+    if request.method == "OPTIONS":
+        return None
+    if request.endpoint in _OPEN_ADMIN_ENDPOINTS:
+        return None
+    if is_admin_session() and get_admin_password():
+        return None
+    if not get_admin_password():
+        if _wants_admin_json():
+            return jsonify({"ok": False, "error": "管理パスワードが設定されていません。"}), 503
+        return "管理パスワードが設定されていません。", 503
+    if _wants_admin_json():
+        return jsonify({"ok": False, "error": "ログインが必要です。"}), 401
+    return redirect(url_for("trigger_admin.admin_page"))
+
+
 @admin_bp.route("/")
 def admin_page():
     return render_template(
@@ -143,11 +179,6 @@ def get_settings_api():
 @admin_bp.route("/api/settings", methods=["POST"])
 def save_settings_api():
     payload = request.get_json(silent=True) or {}
-    changes_model = "task_model_modes" in payload
-    if changes_model:
-        err = _require_password(payload)
-        if err:
-            return err
 
     updates = {}
     if "task_model_modes" in payload:

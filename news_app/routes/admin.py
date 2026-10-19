@@ -122,6 +122,44 @@ def admin_status():
     return jsonify({"ok": True, "logged_in": is_admin_session()})
 
 
+_OPEN_ADMIN_ENDPOINTS = frozenset(
+    {
+        "news_admin.admin_login",
+        "news_admin.admin_logout",
+        "news_admin.admin_status",
+        "news_admin.web_app_manifest",
+        "news_admin.admin_index",
+    }
+)
+
+
+def _wants_admin_json() -> bool:
+    path = request.path or ""
+    if "/admin/api/" in path:
+        return True
+    json_ok = request.accept_mimetypes["application/json"]
+    html_ok = request.accept_mimetypes["text/html"]
+    return json_ok > 0 and json_ok >= html_ok
+
+
+@admin_bp.before_request
+def require_admin_session():
+    if request.method == "OPTIONS":
+        return None
+    if request.endpoint in _OPEN_ADMIN_ENDPOINTS:
+        return None
+    if is_admin_session() and get_admin_password():
+        return None
+    if not get_admin_password():
+        body = {"ok": False, "error": "管理パスワードが設定されていません。"}
+        if _wants_admin_json():
+            return jsonify(body), 503
+        return "管理パスワードが設定されていません。", 503
+    if _wants_admin_json():
+        return jsonify({"ok": False, "error": "ログインが必要です。"}), 401
+    return redirect(url_for("news_admin.admin_index"))
+
+
 @admin_bp.route("/manifest.json")
 def web_app_manifest():
     """管理画面用 PWA。start_url を /news/admin/ に固定する。"""
@@ -314,9 +352,6 @@ def password_check():
 def save_settings():
     data = request.get_json(silent=True) or {}
     try:
-        if not admin_password_matches(data.get("admin_password")):
-            return _admin_password_denied()
-
         openai_api_key = str(data.get("openai_api_key", "")).strip()
         if not openai_api_key:
             openai_api_key = (load_state().get("openai_api_key") or "").strip()
