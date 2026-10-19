@@ -1,5 +1,6 @@
 import io
 import logging
+from copy import deepcopy
 from pathlib import Path
 
 import openpyxl
@@ -73,6 +74,9 @@ from news_app.services.storage import (
     create_class,
     delete_class_archive,
     delete_submission,
+    SAMPLE_CLASS_DISPLAY_NAME,
+    SAMPLE_CLASS_NAME,
+    find_class_by_name,
     get_active_class_id,
     get_archive_item,
     get_class,
@@ -451,6 +455,7 @@ def admin_index():
         if submission_classes:
             class_id = submission_classes[0]["id"]
             cls = get_class(class_id)
+    sample_readonly = False
     if not role:
         state = {
             **state,
@@ -458,6 +463,23 @@ def admin_index():
         }
         cls = None
         class_id = ""
+        classes = []
+        submission_classes = []
+        if not require_teacher_login():
+            sample = find_class_by_name(SAMPLE_CLASS_NAME)
+            if sample:
+                preview = deepcopy(sample)
+                preview["name"] = SAMPLE_CLASS_DISPLAY_NAME
+                cls = preview
+                class_id = preview["id"]
+                listed = {
+                    "id": preview["id"],
+                    "name": SAMPLE_CLASS_DISPLAY_NAME,
+                    "can_manage": False,
+                }
+                classes = [listed]
+                submission_classes = [listed]
+                sample_readonly = True
     current = (cls or {}).get("current") or {}
     api_key_configured = bool(get_openai_api_key()) and role == "owner"
     is_owner = role == "owner"
@@ -484,6 +506,8 @@ def admin_index():
         submission_classes=submission_classes,
         require_teacher_login=require_teacher_login(),
         share_archives=share_archives_enabled() if role else False,
+        sample_readonly=sample_readonly,
+        sample_class_label=SAMPLE_CLASS_DISPLAY_NAME if sample_readonly else "",
         login_url=url_for("news_admin.admin_login_page"),
         **appearance_context(state),
     )
