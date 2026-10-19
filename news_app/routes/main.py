@@ -27,6 +27,7 @@ from news_app.services.storage import (
     get_archive_item,
     get_class,
     get_evaluation_rubric,
+    get_roster,
     list_classes,
     load_state,
     save_submission,
@@ -430,6 +431,12 @@ def screen_config():
             "class": payload,
         }
     )
+
+
+@main_bp.route("/api/roster/<class_id>", methods=["GET"])
+def public_roster(class_id):
+    """生徒画面の名前選択。管理画面の名簿 API とは別で、ログイン不要。"""
+    return jsonify({"ok": True, "students": get_roster(class_id)})
 
 
 @main_bp.route("/api/config")
