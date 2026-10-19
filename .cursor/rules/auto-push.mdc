@@ -1,20 +1,28 @@
 ---
-description: 修正完了後に自動で git push する
+description: 修正完了後は PR 経由で main に反映する
 alwaysApply: true
 ---
 
-# 修正後の自動 push
+# 修正後は PR 経由で反映する
 
-このプロジェクトでコードや設定を修正したら、ユーザーが別途依頼しなくても次を行う:
+このプロジェクトでコードや設定を修正したら、ユーザーが別途依頼しなくても次を行う。`main` に直接コミット・push しない。
 
-1. 変更内容をコミットする（コミットメッセージは変更の意図を簡潔に）
-2. `git push` でリモートへ反映する
+1. 作業前に `main` から新しいブランチを作る（例: `fix/…` `feat/…`）。
+2. 変更をコミットする（コミットメッセージは変更の意図を簡潔に）。
+3. そのブランチを `git push` する。
+4. `gh pr create` で `main` 向けの Pull Request を作る。タイトルと説明は日本語で、変更内容と確認したことを書く。
+5. マージ前の確認:
+   - 既存テスト（`python3 -m unittest discover -s tests` など、変更したアプリのテスト）が通ること。
+   - 差分に字幕取得関連ファイル（`news_app/services/youtube_transcript.py`、`toolbox/services/youtube_transcript.py`、`static/news/js/youtube-transcript.js`、`static/toolbox/js/youtube-transcript.js`、cnn10 関連のサービスファイル）が、ユーザーが明示的に頼んでいないのに含まれていないこと。
+   - シークレットや `.env` が含まれていないこと。
+   - JS/CSS を変えたらテンプレートのキャッシュ用クエリ（`?v=…`）を上げること。
+6. 確認が通れば `gh pr merge --merge --delete-branch` でマージし、Render の自動デプロイに任せる。PR の URL を報告する。
+7. 確認で問題が見つかった場合、または `gh` が使えない・失敗した場合は、マージせずに PR の URL（または状況）を報告してユーザーに確認する。
 
-本番は本リポジトリ（`vibes-apps`）→ https://vibes-app-auz1.onrender.com
+本番は本リポジトリ（`vibes-apps`）→ https://vibes-lab.com（旧: https://vibes-app-auz1.onrender.com）
 
 `vibe-speak-news` 単体リポジトリへの同期は行わない（本番は `news_app/` を使用）。
 
 例外:
-- ユーザーが「コミットしない」「push しない」と明示した場合
+- ユーザーが「コミットしない」「push しない」「マージしない」と明示した場合はそれに従う
 - シークレットや `.env` などコミットすべきでないファイルが含まれる場合
-- push が失敗した場合はエラーを報告し、ユーザーに確認する
