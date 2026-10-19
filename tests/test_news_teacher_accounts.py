@@ -270,6 +270,21 @@ class NewsTeacherAccountTests(unittest.TestCase):
         roster = self.client.get(f"/news/api/roster/{teacher_class_id}")
         self.assertEqual(roster.status_code, 200)
 
+    def test_owner_page_exposes_logout_issue_and_switches(self):
+        self._login_owner()
+        page = self.client.get("/news/admin/")
+        html = page.get_data(as_text=True)
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("news/js/admin.js?v=20261019b", html)
+        self.assertIn('id="admin-logout-btn"', html)
+        logout = html.split('id="admin-logout-btn"', 1)[1][:180]
+        self.assertNotIn("hidden", logout)
+        self.assertIn('id="teacher-issue-btn"', html)
+        self.assertIn('id="teacher-copy-btn"', html)
+        self.assertIn('role="switch"', html)
+        self.assertGreaterEqual(html.count('class="owner-switch"'), 2)
+        self.assertNotIn('id="require-teacher-login" class="h-3.5', html)
+
     def test_teacher_login_uses_shared_lockout(self):
         self._login_owner()
         self._issue()

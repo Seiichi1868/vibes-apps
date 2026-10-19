@@ -2023,7 +2023,9 @@
     adminLoginBtn.addEventListener("click", submitHeaderLogin);
   }
   if (adminLogoutBtn) {
-    adminLogoutBtn.addEventListener("click", async () => {
+    adminLogoutBtn.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
       await fetch("/news/admin/api/logout", { method: "POST", credentials: "same-origin" });
       location.reload();
     });
@@ -2152,7 +2154,9 @@
     });
   }
   if (teacherIssueBtn) {
-    teacherIssueBtn.addEventListener("click", async () => {
+    teacherIssueBtn.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
       const res = await fetch("/news/admin/api/teachers", {
         method: "POST",
         credentials: "same-origin",
@@ -2173,15 +2177,37 @@
       showTeacherAccountMessage("発行しました。コピーで渡せます。", false);
     });
   }
+  async function writeTeacherClipboard(text) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+    } catch (err) {
+      // 権限が無いブラウザでは下の選択コピーに落とす。
+    }
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.left = "-9999px";
+    document.body.appendChild(area);
+    area.select();
+    document.execCommand("copy");
+    area.remove();
+  }
+
   if (teacherCopyBtn) {
-    teacherCopyBtn.addEventListener("click", async () => {
+    teacherCopyBtn.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
       const id = teacherIssueId ? teacherIssueId.value.trim() : "";
       const password = teacherIssuePassword ? teacherIssuePassword.value : "";
       if (!id || !password) {
         showTeacherAccountMessage("IDとパスワードを入力してください。", true);
         return;
       }
-      await navigator.clipboard.writeText(teacherCopyText({ id, password }));
+      await writeTeacherClipboard(teacherCopyText({ id, password }));
       showTeacherAccountMessage("コピーしました。", false);
     });
   }
