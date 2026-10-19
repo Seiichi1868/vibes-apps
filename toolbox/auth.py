@@ -6,7 +6,7 @@ import logging
 import secrets
 from functools import wraps
 
-from flask import g, jsonify, redirect, request, url_for
+from flask import g, jsonify, redirect, render_template, request, url_for
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -259,6 +259,11 @@ def admin_panel_required(view):
     """管理画面・管理 API。Toolbox ログイン不要。管理パスワード解除済みなら通す。"""
     @wraps(view)
     def wrapped(*args, **kwargs):
+        if not get_admin_panel_password():
+            message = "管理パスワードが設定されていません。"
+            if wants_json():
+                return jsonify({"ok": False, "error": message}), 503
+            return render_template("toolbox/admin_gate.html", error=message), 503
         if admin_panel_ok():
             return view(*args, **kwargs)
         if wants_json():

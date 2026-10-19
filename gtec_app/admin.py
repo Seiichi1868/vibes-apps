@@ -6,6 +6,13 @@ from pathlib import Path
 
 from flask import Blueprint, current_app, jsonify, render_template, request, send_from_directory
 
+from gtec_app.admin_auth import (
+    check_admin_password_attempt,
+    clear_admin_session,
+    configure_session_cookie,
+    establish_admin_session,
+    is_admin_session,
+)
 from gtec_app.problems import load_problems, public_problems, save_problems
 from gtec_app.settings import (
     BACKGROUND_PRESETS,
@@ -18,6 +25,41 @@ from gtec_app.settings import (
 )
 
 gtec_admin_bp = Blueprint("gtec_admin", __name__)
+
+
+@gtec_admin_bp.record_once
+def _configure_admin_session(state):
+    configure_session_cookie(state.app)
+
+
+@gtec_admin_bp.route("/gtec/admin/api/login", methods=["POST"])
+def admin_login():
+    payload = request.get_json(silent=True) or {}
+    provided = payload.get("password")
+    if provided is None:
+        provided = payload.get("admin_password")
+    denied = check_admin_password_attempt(
+        provided,
+        matches=lambda value: _password_ok({"admin_password": value}),
+        configured=get_admin_password,
+    )
+    if denied:
+        return denied
+    establish_admin_session()
+    return jsonify({"ok": True, "logged_in": True})
+
+
+@gtec_admin_bp.route("/gtec/admin/api/logout", methods=["POST"])
+def admin_logout():
+    clear_admin_session()
+    return jsonify({"ok": True, "logged_in": False})
+
+
+@gtec_admin_bp.route("/gtec/admin/api/status", methods=["GET"])
+def admin_status():
+    if not get_admin_password():
+        return jsonify({"ok": False, "logged_in": False, "error": _PASSWORD_UNSET}), 503
+    return jsonify({"ok": True, "logged_in": is_admin_session()})
 
 _PASSWORD_UNSET = "管理パスワードが設定されていません。"
 _PASSWORD_WRONG = "管理パスワードが違います。"
@@ -46,11 +88,11 @@ def _password_ok(payload: dict) -> bool:
 
 
 def _require_admin_password(payload: dict):
-    if not get_admin_password():
-        return jsonify({"ok": False, "error": _PASSWORD_UNSET}), 503
-    if not _password_ok(payload):
-        return jsonify({"ok": False, "error": _PASSWORD_WRONG}), 403
-    return None
+    return check_admin_password_attempt(
+        payload.get("admin_password"),
+        matches=lambda value: _password_ok({"admin_password": value}),
+        configured=get_admin_password,
+    )
 
 
 @gtec_admin_bp.route("/gtec/admin/manifest.json")

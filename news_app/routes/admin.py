@@ -7,6 +7,13 @@ from flask import Blueprint, current_app, jsonify, render_template, request, sen
 
 logger = logging.getLogger(__name__)
 
+from news_app.admin_auth import (
+    check_admin_password_attempt,
+    clear_admin_session,
+    configure_session_cookie,
+    establish_admin_session,
+    is_admin_session,
+)
 from news_app.config import (
     AI_MODELS,
     CEFR_LEVELS,
@@ -78,6 +85,41 @@ from news_app.services.pdf_report import build_submissions_pdf
 from news_app.services.youtube import extract_video_id, fetch_youtube_title, parse_time_to_seconds, seconds_to_display
 
 admin_bp = Blueprint("news_admin", __name__)
+
+
+@admin_bp.record_once
+def _configure_admin_session(state):
+    configure_session_cookie(state.app)
+
+
+@admin_bp.route("/api/login", methods=["POST"])
+def admin_login():
+    payload = request.get_json(silent=True) or {}
+    provided = payload.get("password")
+    if provided is None:
+        provided = payload.get("admin_password")
+    denied = check_admin_password_attempt(
+        provided,
+        matches=admin_password_matches,
+        configured=get_admin_password,
+    )
+    if denied:
+        return denied
+    establish_admin_session()
+    return jsonify({"ok": True, "logged_in": True})
+
+
+@admin_bp.route("/api/logout", methods=["POST"])
+def admin_logout():
+    clear_admin_session()
+    return jsonify({"ok": True, "logged_in": False})
+
+
+@admin_bp.route("/api/status", methods=["GET"])
+def admin_status():
+    if not get_admin_password():
+        return jsonify({"ok": False, "logged_in": False, "error": "管理パスワードが設定されていません。"}), 503
+    return jsonify({"ok": True, "logged_in": is_admin_session()})
 
 
 @admin_bp.route("/manifest.json")
@@ -258,8 +300,13 @@ def _admin_password_denied():
 @admin_bp.route("/api/password-check", methods=["POST"])
 def password_check():
     data = request.get_json(silent=True) or {}
-    if not admin_password_matches(data.get("admin_password")):
-        return _admin_password_denied()
+    denied = check_admin_password_attempt(
+        data.get("admin_password"),
+        matches=admin_password_matches,
+        configured=get_admin_password,
+    )
+    if denied:
+        return denied
     return jsonify({"ok": True})
 
 

@@ -3,6 +3,13 @@ import os
 
 from flask import Blueprint, jsonify, request
 
+from flask_app.admin_auth import (
+    check_admin_password_attempt,
+    clear_admin_session,
+    configure_session_cookie,
+    establish_admin_session,
+    is_admin_session,
+)
 from flask_app.config import Config
 from flask_app.services.gate_service import set_gate_lock_enabled
 from flask_app.services.runtime_settings import appearance_response, update_runtime_settings
@@ -22,6 +29,41 @@ from flask_app.utils.language_utils import (
 from flask_app.utils.section_utils import sections_response, set_visible_sections
 
 admin_bp = Blueprint("admin", __name__)
+
+
+@admin_bp.record_once
+def _configure_admin_session(state):
+    configure_session_cookie(state.app)
+
+
+@admin_bp.route("/admin/login", methods=["POST"])
+def admin_login():
+    payload = request.get_json(silent=True) or {}
+    provided = payload.get("password")
+    if provided is None:
+        provided = payload.get("admin_password")
+    denied = check_admin_password_attempt(
+        provided,
+        matches=lambda value: _admin_password_ok({"admin_password": value}),
+        configured=_get_admin_password,
+    )
+    if denied:
+        return denied
+    establish_admin_session()
+    return jsonify({"ok": True, "logged_in": True})
+
+
+@admin_bp.route("/admin/logout", methods=["POST"])
+def admin_logout():
+    clear_admin_session()
+    return jsonify({"ok": True, "logged_in": False})
+
+
+@admin_bp.route("/admin/status", methods=["GET"])
+def admin_status():
+    if not _get_admin_password():
+        return jsonify({"ok": False, "logged_in": False, "error": _PASSWORD_UNSET}), 503
+    return jsonify({"ok": True, "logged_in": is_admin_session()})
 
 _PASSWORD_UNSET = "管理パスワードが設定されていません。"
 _PASSWORD_WRONG = "管理設定のパスワードが違います。"
@@ -190,8 +232,13 @@ def admin_toggle_public():
 @admin_bp.route("/admin/password-check", methods=["POST"])
 def admin_password_check():
     payload = request.get_json(silent=True) or {}
-    if not _admin_password_ok(payload):
-        return _admin_password_denied()
+    denied = check_admin_password_attempt(
+        payload.get("admin_password"),
+        matches=lambda value: _admin_password_ok({"admin_password": value}),
+        configured=_get_admin_password,
+    )
+    if denied:
+        return denied
     return jsonify({"ok": True})
 
 
