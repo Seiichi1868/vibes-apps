@@ -230,18 +230,53 @@
       <div class="relative flex items-center gap-2">
         <div id="admin-settings-panel" class="relative">
           <div id="admin-settings-lock" class="flex items-center gap-1">
-            <input type="password" id="admin-settings-password" inputmode="numeric" autocomplete="off"
-              class="compact-input w-20 py-1 text-xs" placeholder="">
+            <input type="text" id="teacher-login-id" autocomplete="off"
+              class="compact-input w-24 py-1 text-xs {% if is_logged_in %}hidden{% endif %}" placeholder="教員ID">
+            <input type="password" id="admin-settings-password" autocomplete="off"
+              class="compact-input w-24 py-1 text-xs {% if is_logged_in %}hidden{% endif %}" placeholder="パスワード">
             <button type="button" id="admin-settings-unlock"
-              class="rounded border border-teal-100 bg-white/80 px-2 py-1 text-[10px] font-semibold text-teal-700 shadow-sm hover:bg-teal-50"
-              data-i18n="adminSettings">
+              class="rounded border border-teal-100 bg-white/80 px-2 py-1 text-[10px] font-semibold text-teal-700 shadow-sm hover:bg-teal-50 {% if not is_owner %}hidden{% endif %}">
               管理設定
+            </button>
+            <button type="button" id="admin-login-btn"
+              class="rounded border border-teal-100 bg-white/80 px-2 py-1 text-[10px] font-semibold text-teal-700 shadow-sm hover:bg-teal-50 {% if is_logged_in %}hidden{% endif %}">
+              ログイン
+            </button>
+            <span id="admin-actor-label" class="text-[10px] text-slate-500 {% if not is_logged_in %}hidden{% endif %}">{{ actor_label }}</span>
+            <button type="button" id="admin-logout-btn"
+              class="rounded border border-slate-200 bg-white/80 px-2 py-1 text-[10px] font-semibold text-slate-600 hover:bg-slate-50 {% if not is_logged_in %}hidden{% endif %}">
+              ログアウト
             </button>
           </div>
           <p id="admin-settings-lock-message"
             class="absolute right-0 top-full z-50 mt-1 hidden whitespace-nowrap rounded bg-white/95 px-2 py-1 text-[10px] text-red-600 shadow"></p>
+          {% if is_owner %}
           <form id="settings-form"
-            class="absolute right-0 top-full z-[9999] mt-2 hidden max-h-[calc(100vh-4rem)] w-[min(32rem,calc(100vw-1rem))] space-y-2 overflow-y-auto rounded-xl border border-teal-100 bg-white p-3 shadow-xl">
+            class="absolute right-0 top-full z-[9999] mt-2 hidden max-h-[calc(100vh-4rem)] w-[min(32rem,calc(100vw-1rem))] space-y-2 overflow-y-auto rounded-xl border border-teal-100 bg-white p-3 shadow-xl {% if not is_owner %}hidden{% endif %}">
+            <div class="rounded-lg border border-teal-100 bg-teal-50/40 p-2">
+              <label class="flex items-center gap-1.5 text-[11px] font-medium text-slate-700">
+                <input type="checkbox" id="require-teacher-login" class="h-3.5 w-3.5" {% if require_teacher_login %}checked{% endif %}>
+                教員ログインを必須にする
+              </label>
+              <label class="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-slate-700">
+                <input type="checkbox" id="share-teacher-archives" class="h-3.5 w-3.5" {% if share_archives %}checked{% endif %}>
+                ログイン教員同士でアーカイブを共有する
+              </label>
+              <div class="mt-1.5 flex items-center gap-1">
+                <input type="text" id="teacher-issue-id" autocomplete="off" placeholder="アカウントID" class="compact-input min-w-0 flex-1 py-1 text-[11px]">
+                <input type="text" id="teacher-issue-password" autocomplete="off" placeholder="パスワード" class="compact-input min-w-0 flex-1 py-1 text-[11px]">
+                <button type="button" id="teacher-issue-btn" class="shrink-0 rounded bg-teal-600 px-2 py-1 text-[10px] font-semibold text-white">発行</button>
+                <button type="button" id="teacher-copy-btn" class="shrink-0 rounded border border-teal-200 bg-white px-2 py-1 text-[10px] font-semibold text-teal-700">コピー</button>
+              </div>
+              <p id="teacher-account-message" class="mt-1 hidden text-[10px]"></p>
+              <details id="teacher-account-details" class="mt-1">
+                <summary class="cursor-pointer text-[11px] font-medium text-teal-800">発行済みアカウント</summary>
+                <div class="mt-1">
+                  <button type="button" id="teacher-password-visibility" class="mb-1 rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-600">表示</button>
+                  <ul id="teacher-account-list" class="space-y-1 text-[10px] text-slate-700"></ul>
+                </div>
+              </details>
+            </div>
             <div class="flex items-center justify-between gap-2">
               <h2 class="text-sm font-semibold text-slate-800" data-i18n="adminSettings">管理設定</h2>
               <span class="text-[10px] text-slate-500" data-i18n="adminSettingsShared">教員共通</span>
@@ -343,6 +378,7 @@
             <button type="submit" class="compact-btn bg-teal-600 hover:bg-teal-500" data-i18n="saveAdminSettings">管理設定を保存</button>
             <p id="settings-message" class="text-[11px] text-emerald-600 hidden"></p>
           </form>
+          {% endif %}
         </div>
         <a href="/news/" class="compact-btn border border-teal-100 bg-white/70 text-teal-700 shadow-sm hover:bg-teal-50" data-i18n="studentPage">
           生徒画面
@@ -851,7 +887,7 @@
           <label class="mb-0.5 block text-[11px] font-medium text-slate-600" data-i18n="filterByClass">クラスで絞り込み</label>
           <select id="results-class-filter" class="compact-input w-full">
             <option value="" data-i18n="allClasses">すべてのクラス</option>
-            {% for c in classes %}
+            {% for c in submission_classes %}
             <option value="{{ c.id }}">{{ c.name }}</option>
             {% endfor %}
           </select>

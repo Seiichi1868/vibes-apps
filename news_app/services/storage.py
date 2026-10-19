@@ -564,6 +564,7 @@ def _normalize_class(class_id: str, raw: dict) -> dict:
                 "writing_topics": _normalize_writing_topics(item.get("writing_topics")),
                 "archive_id": str(item.get("archive_id") or "").strip(),
                 "in_use": item.get("in_use") is True,
+                "created_by": str(item.get("created_by") or raw.get("created_by") or "owner").strip() or "owner",
             }
         )
     _assign_archive_ids(normalized_archive)
@@ -571,6 +572,7 @@ def _normalize_class(class_id: str, raw: dict) -> dict:
         "id": class_id,
         "name": str(raw.get("name") or class_id).strip() or class_id,
         "created_at": str(raw.get("created_at") or _now_iso()),
+        "created_by": str(raw.get("created_by") or "owner").strip() or "owner",
         "require_student_info": bool(raw.get("require_student_info", False)),
         "current": _normalize_current(raw.get("current")),
         "archive": normalized_archive,
@@ -611,6 +613,7 @@ def _migrate_legacy_state(data: dict) -> dict:
         "id": class_id,
         "name": class_name,
         "created_at": _now_iso(),
+        "created_by": "owner",
         "current": current,
         "archive": [],
     }
@@ -724,7 +727,12 @@ def update_settings(**kwargs) -> dict:
 def list_classes() -> list[dict]:
     state = load_state()
     return [
-        {"id": c["id"], "name": c["name"], "created_at": c.get("created_at", "")}
+        {
+            "id": c["id"],
+            "name": c["name"],
+            "created_at": c.get("created_at", ""),
+            "created_by": c.get("created_by") or "owner",
+        }
         for c in state.get("classes", {}).values()
     ]
 
@@ -766,10 +774,11 @@ def set_active_class(class_id: str) -> dict:
     return save_state(state)
 
 
-def create_class(name: str) -> dict:
+def create_class(name: str, created_by: str = "owner") -> dict:
     name = (name or "").strip()
     if not name:
         raise ValueError("クラス名を入力してください。")
+    creator = (created_by or "owner").strip() or "owner"
     state = load_state()
     class_id = _slug_id(name)
     while class_id in state["classes"]:
@@ -778,6 +787,7 @@ def create_class(name: str) -> dict:
         "id": class_id,
         "name": name,
         "created_at": _now_iso(),
+        "created_by": creator,
         "current": deepcopy(DEFAULT_CLASS_CURRENT),
         "archive": [],
     }
@@ -799,7 +809,7 @@ def update_class_current(class_id: str, current_data: dict, *, require_student_i
     return state["classes"][class_id]
 
 
-def archive_class_current(class_id: str, title: str = "", lesson_name: str = "") -> dict:
+def archive_class_current(class_id: str, title: str = "", lesson_name: str = "", created_by: str = "") -> dict:
     state = load_state()
     if class_id not in state.get("classes", {}):
         raise ValueError("指定されたクラスが見つかりません。")
@@ -821,6 +831,7 @@ def archive_class_current(class_id: str, title: str = "", lesson_name: str = "")
         "archived_at": _now_iso(),
         "archive_id": _new_archive_id(),
         "in_use": False,
+        "created_by": (created_by or cls.get("created_by") or "owner").strip() or "owner",
     }
     cls.setdefault("archive", []).insert(0, archive_item)
     update_submission_lesson_title(
@@ -908,7 +919,9 @@ def set_archive_in_use(class_id: str, archive_id: str, in_use: bool) -> dict:
     raise ValueError("指定されたアーカイブが見つかりません。")
 
 
-def copy_class_archive(class_id: str, archive_index: int, target_class_id: str) -> tuple[dict, dict]:
+def copy_class_archive(
+    class_id: str, archive_index: int, target_class_id: str, created_by: str = ""
+) -> tuple[dict, dict]:
     state = load_state()
     classes = state.get("classes", {})
     if class_id not in classes:
@@ -927,6 +940,8 @@ def copy_class_archive(class_id: str, archive_index: int, target_class_id: str) 
     archive_item["archived_at"] = _now_iso()
     archive_item["archive_id"] = _new_archive_id()
     archive_item["in_use"] = False
+    target = classes[target_class_id]
+    archive_item["created_by"] = (created_by or target.get("created_by") or "owner").strip() or "owner"
     classes[target_class_id].setdefault("archive", []).insert(0, archive_item)
     save_state(state)
     return classes[class_id], classes[target_class_id]

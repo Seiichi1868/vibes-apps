@@ -34,6 +34,9 @@
   const settingsMessage = document.getElementById("settings-message");
   const adminSettingsLock = document.getElementById("admin-settings-lock");
   const adminSettingsPassword = document.getElementById("admin-settings-password");
+  const teacherLoginId = document.getElementById("teacher-login-id");
+  const adminLoginBtn = document.getElementById("admin-login-btn");
+  const adminLogoutBtn = document.getElementById("admin-logout-btn");
   const adminSettingsUnlock = document.getElementById("admin-settings-unlock");
   const adminSettingsLockMessage = document.getElementById("admin-settings-lock-message");
   const adminSettingsPanel = document.getElementById("admin-settings-panel");
@@ -1937,9 +1940,195 @@
 
   restoreAdminSettingsUnlock();
 
+  async function submitHeaderLogin() {
+    const password = adminSettingsPassword ? adminSettingsPassword.value : "";
+    const teacherId = teacherLoginId ? teacherLoginId.value.trim() : "";
+    if (!password) {
+      showAdminSettingsLockError("パスワードを入力してください。");
+      return;
+    }
+    try {
+      const res = await fetch("/news/admin/api/login", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teacher_id: teacherId, password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "ログインできませんでした。");
+      location.reload();
+    } catch (err) {
+      showAdminSettingsLockError(err.message || "ログインできませんでした。");
+    }
+  }
+
+  if (adminLoginBtn) {
+    adminLoginBtn.addEventListener("click", submitHeaderLogin);
+  }
+  if (adminLogoutBtn) {
+    adminLogoutBtn.addEventListener("click", async () => {
+      await fetch("/news/admin/api/logout", { method: "POST", credentials: "same-origin" });
+      location.reload();
+    });
+  }
+
   if (adminSettingsUnlock) {
     adminSettingsUnlock.addEventListener("click", unlockAdminSettings);
   }
+
+  const requireTeacherLoginEl = document.getElementById("require-teacher-login");
+  const shareTeacherArchivesEl = document.getElementById("share-teacher-archives");
+  const teacherIssueId = document.getElementById("teacher-issue-id");
+  const teacherIssuePassword = document.getElementById("teacher-issue-password");
+  const teacherIssueBtn = document.getElementById("teacher-issue-btn");
+  const teacherCopyBtn = document.getElementById("teacher-copy-btn");
+  const teacherAccountList = document.getElementById("teacher-account-list");
+  const teacherAccountMessage = document.getElementById("teacher-account-message");
+  const teacherPasswordVisibility = document.getElementById("teacher-password-visibility");
+  let teacherAccounts = [];
+  let teacherPasswordsVisible = false;
+  let teacherLoginUrl = `${location.origin}/news/admin/login`;
+
+  function teacherCopyText(account) {
+    return `ID: ${account.id}\nパスワード: ${account.password}\nログインURL: ${teacherLoginUrl}`;
+  }
+
+  function showTeacherAccountMessage(text, isError) {
+    if (!teacherAccountMessage) return;
+    teacherAccountMessage.textContent = text;
+    teacherAccountMessage.classList.remove("hidden", "text-red-600", "text-emerald-700");
+    teacherAccountMessage.classList.add(isError ? "text-red-600" : "text-emerald-700");
+  }
+
+  function renderTeacherAccounts() {
+    if (!teacherAccountList) return;
+    const summary = document.querySelector("#teacher-account-details summary");
+    if (summary) summary.textContent = `発行済みアカウント（${teacherAccounts.length}）`;
+    teacherAccountList.innerHTML = "";
+    teacherAccounts.forEach((account) => {
+      const row = document.createElement("li");
+      row.className = "flex items-center gap-1 whitespace-nowrap";
+      const password = teacherPasswordsVisible ? account.password : "••••";
+      const date = (account.created_at || "").slice(0, 10);
+      const idSpan = document.createElement("span");
+      idSpan.className = "w-16 truncate font-medium";
+      idSpan.textContent = account.id;
+      const passSpan = document.createElement("span");
+      passSpan.className = "w-16 truncate font-mono";
+      passSpan.textContent = password;
+      const dateSpan = document.createElement("span");
+      dateSpan.className = "w-16 text-slate-500";
+      dateSpan.textContent = date;
+      const copyBtn = document.createElement("button");
+      copyBtn.type = "button";
+      copyBtn.className = "rounded border border-teal-100 px-1.5 py-0.5";
+      copyBtn.textContent = "コピー";
+      copyBtn.addEventListener("click", () => navigator.clipboard.writeText(teacherCopyText(account)));
+      const stopBtn = document.createElement("button");
+      stopBtn.type = "button";
+      stopBtn.className = "rounded border border-amber-100 px-1.5 py-0.5";
+      stopBtn.textContent = account.disabled ? "再開" : "停止";
+      stopBtn.addEventListener("click", () => postTeacherAction(account.disabled ? "resume" : "stop", account.id));
+      const deleteBtn = document.createElement("button");
+      deleteBtn.type = "button";
+      deleteBtn.className = "rounded border border-red-100 px-1.5 py-0.5 text-red-700";
+      deleteBtn.textContent = "削除";
+      deleteBtn.addEventListener("click", () => {
+        if (!confirm(`「${account.id}」を削除しますか？この操作は元に戻せません。`)) return;
+        postTeacherAction("delete", account.id);
+      });
+      row.append(idSpan, passSpan, dateSpan, copyBtn, stopBtn, deleteBtn);
+      teacherAccountList.appendChild(row);
+    });
+  }
+
+  async function loadTeacherAccounts() {
+    if (!teacherAccountList) return;
+    const res = await fetch("/news/admin/api/access-settings", { credentials: "same-origin" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) return;
+    teacherAccounts = data.accounts || [];
+    if (data.login_url) teacherLoginUrl = data.login_url;
+    if (requireTeacherLoginEl) requireTeacherLoginEl.checked = !!data.require_teacher_login;
+    if (shareTeacherArchivesEl) shareTeacherArchivesEl.checked = !!data.share_archives;
+    renderTeacherAccounts();
+  }
+
+  async function saveTeacherAccessToggles() {
+    const res = await fetch("/news/admin/api/access-settings", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        require_teacher_login: !!(requireTeacherLoginEl && requireTeacherLoginEl.checked),
+        share_archives: !!(shareTeacherArchivesEl && shareTeacherArchivesEl.checked),
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) showTeacherAccountMessage(data.error || "設定を保存できませんでした。", true);
+    else showTeacherAccountMessage("設定を保存しました。", false);
+  }
+
+  async function postTeacherAction(action, id) {
+    const res = await fetch(`/news/admin/api/teachers/${action}`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      showTeacherAccountMessage(data.error || "操作に失敗しました。", true);
+      return;
+    }
+    teacherAccounts = data.accounts || [];
+    renderTeacherAccounts();
+  }
+
+  if (requireTeacherLoginEl) requireTeacherLoginEl.addEventListener("change", saveTeacherAccessToggles);
+  if (shareTeacherArchivesEl) shareTeacherArchivesEl.addEventListener("change", saveTeacherAccessToggles);
+  if (teacherPasswordVisibility) {
+    teacherPasswordVisibility.addEventListener("click", () => {
+      teacherPasswordsVisible = !teacherPasswordsVisible;
+      teacherPasswordVisibility.textContent = teacherPasswordsVisible ? "非表示" : "表示";
+      renderTeacherAccounts();
+    });
+  }
+  if (teacherIssueBtn) {
+    teacherIssueBtn.addEventListener("click", async () => {
+      const res = await fetch("/news/admin/api/teachers", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: teacherIssueId ? teacherIssueId.value.trim() : "",
+          password: teacherIssuePassword ? teacherIssuePassword.value : "",
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        showTeacherAccountMessage(data.error || "発行できませんでした。", true);
+        return;
+      }
+      teacherAccounts = data.accounts || [];
+      if (data.login_url) teacherLoginUrl = data.login_url;
+      renderTeacherAccounts();
+      showTeacherAccountMessage("発行しました。コピーで渡せます。", false);
+    });
+  }
+  if (teacherCopyBtn) {
+    teacherCopyBtn.addEventListener("click", async () => {
+      const id = teacherIssueId ? teacherIssueId.value.trim() : "";
+      const password = teacherIssuePassword ? teacherIssuePassword.value : "";
+      if (!id || !password) {
+        showTeacherAccountMessage("IDとパスワードを入力してください。", true);
+        return;
+      }
+      await navigator.clipboard.writeText(teacherCopyText({ id, password }));
+      showTeacherAccountMessage("コピーしました。", false);
+    });
+  }
+  if (teacherAccountList) loadTeacherAccounts();
 
   document.addEventListener("click", (e) => {
     if (!isAdminSettingsOpen()) return;
