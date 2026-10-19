@@ -61,7 +61,33 @@
   async function loadAll() {
     await Promise.all([loadSettings(), loadRoster(), loadQuestions(), loadSubmissions()]);
   }
-  loadAll();
+
+  async function loginAdmin(password) {
+    const res = await fetch("/level_check/admin/api/login", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "ログインに失敗しました。");
+    return data;
+  }
+
+  async function boot() {
+    try {
+      const res = await fetch("/level_check/admin/api/status", { credentials: "same-origin" });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.logged_in) {
+        await loadAll();
+        return;
+      }
+    } catch (_) {
+      /* ログイン前は一覧を読まない */
+    }
+    showStatus("管理ログインが必要です。下のパスワードを入れてAIモデルを変更してください。", true);
+  }
+  boot();
 
   document.querySelectorAll("#admin-tabs .admin-tab-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -225,9 +251,14 @@
     const password = pwInput?.value.trim() || "";
 
     try {
+      if (password) {
+        await loginAdmin(password);
+        if (pwInput) pwInput.value = "";
+        await loadAll();
+      }
       await apiFetch("/level_check/admin/api/settings", {
         method: "POST",
-        body: JSON.stringify({ ai_model_mode: modelMode, admin_password: password }),
+        body: JSON.stringify({ ai_model_mode: modelMode }),
       });
       if (statusEl) {
         statusEl.textContent = "AIモデルを変更しました。";

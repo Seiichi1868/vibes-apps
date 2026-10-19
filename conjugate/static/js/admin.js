@@ -112,7 +112,6 @@
       background_opacity: bgOpacityInput ? parseFloat(bgOpacityInput.value) : 0.38,
       opening_enabled: form.querySelector('input[name="opening_enabled"]').checked,
       opening_ms: parseInt(form.querySelector('input[name="opening_ms"]').value, 10),
-      admin_password: form.querySelector('input[name="admin_password"]').value,
     };
 
     btn.disabled = true;
@@ -120,6 +119,18 @@
     messageEl.classList.add("hidden");
 
     try {
+      const password = form.querySelector('input[name="admin_password"]').value;
+      if (password) {
+        const loginRes = await fetch("/conjugate/admin/api/login", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password }),
+        });
+        const loginData = await loginRes.json().catch(() => ({}));
+        if (!loginRes.ok) throw new Error(loginData.error || "ログインに失敗しました。");
+        form.querySelector('input[name="admin_password"]').value = "";
+      }
       const res = await fetch("/conjugate/admin/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
