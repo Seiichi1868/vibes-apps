@@ -257,7 +257,7 @@
       };
       let shareLinkEnabledLangs = [...ALL_SHARE_TARGET_LANGS];
       let shareLinkCopyToastTimer = null;
-      let adminSettingsPasswordValue = null;
+      let adminSettingsUnlocked = false;
       let appearanceSaveTimer = null;
       let currentBackgroundId = {{ background_id|tojson }};
 
@@ -277,7 +277,7 @@
       }
 
       async function unlockAdminSettings() {
-        if (adminSettingsPasswordValue) {
+        if (adminSettingsUnlocked) {
           openAdminSettingsPanel();
           return;
         }
@@ -289,10 +289,11 @@
         }
 
         try {
-          const response = await fetch("/api/admin/password-check", {
+          const response = await fetch("/api/admin/login", {
             method: "POST",
+            credentials: "same-origin",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ admin_password: password }),
+            body: JSON.stringify({ password }),
           });
           const data = await response.json().catch(() => ({}));
           if (!response.ok) {
@@ -301,11 +302,12 @@
           }
         } catch (error) {
           console.error(error);
-          showAdminSettingsLockMessage("パスワードの確認に失敗しました。");
+          showAdminSettingsLockMessage("ログインに失敗しました。");
           return;
         }
 
-        adminSettingsPasswordValue = password;
+        adminSettingsUnlocked = true;
+        if (adminSettingsPassword) adminSettingsPassword.value = "";
         openAdminSettingsPanel();
         loadAdvancedAdminState().catch((error) => {
           console.error(error);
@@ -314,7 +316,7 @@
       }
 
       async function loadAdvancedAdminState() {
-        if (!adminSettingsPasswordValue) return;
+        if (!adminSettingsUnlocked) return;
 
         statusText.textContent = "管理設定を取得中...";
         const [aiRes, ttsRes, publicRes] = await Promise.all([
@@ -615,18 +617,24 @@
 
       async function loadAdminState() {
         statusText.textContent = "状態を取得中...";
-        const [lockRes, langRes, uiLangRes, sectionsRes, codeRes] = await Promise.all([
+        const codeRes = await fetch("/api/gate/today");
+        const codeData = await codeRes.json();
+        todayCode.textContent = String(codeData.code || "----").padStart(4, "0");
+        updateShareLinkPreview();
+        if (!adminSettingsUnlocked) {
+          statusText.textContent = "管理ログインが必要です。";
+          return;
+        }
+        const [lockRes, langRes, uiLangRes, sectionsRes] = await Promise.all([
           fetch("/api/admin/gate-lock"),
           fetch("/api/admin/languages"),
           fetch("/api/admin/ui-language"),
           fetch("/api/admin/sections"),
-          fetch("/api/gate/today"),
         ]);
         const lockData = await lockRes.json();
         const langData = await langRes.json();
         const uiLangData = await uiLangRes.json();
         const sectionsData = await sectionsRes.json();
-        const codeData = await codeRes.json();
         if (!lockRes.ok) {
           throw new Error(lockData.error || "ロック状態の取得に失敗しました");
         }
@@ -647,13 +655,8 @@
           const uiDefault = uiLangData.default_ui_language === "en" ? "en" : "ja";
           if (!shareLinkUiSelect.value) shareLinkUiSelect.value = uiDefault;
         }
-        todayCode.textContent = String(codeData.code || "----").padStart(4, "0");
         updateShareLinkPreview();
-        if (adminSettingsPasswordValue) {
-          await loadAdvancedAdminState();
-        } else {
-          statusText.textContent = "準備完了";
-        }
+        await loadAdvancedAdminState();
       }
 
       async function saveGateLockState(lockEnabled) {
@@ -683,7 +686,7 @@
       }
 
       async function saveAiModeState(aiMode) {
-        if (!adminSettingsPasswordValue) {
+        if (!adminSettingsUnlocked) {
           statusText.textContent = "管理設定のパスワードが必要です。";
           return;
         }
@@ -695,7 +698,7 @@
           const response = await fetch("/api/admin/ai-mode", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ai_mode: aiMode, admin_password: adminSettingsPasswordValue }),
+            body: JSON.stringify({ ai_mode: aiMode }),
           });
           const data = await response.json();
           if (!response.ok) {
@@ -711,7 +714,7 @@
       }
 
       async function saveLanguageState() {
-        if (!adminSettingsPasswordValue) {
+        if (!adminSettingsUnlocked) {
           statusText.textContent = "管理設定のパスワードが必要です。";
           return;
         }
@@ -732,7 +735,6 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               enabled_languages: enabled,
-              admin_password: adminSettingsPasswordValue,
             }),
           });
           const data = await response.json();
@@ -813,7 +815,7 @@
       }
 
       async function saveTtsState(ttsEnabled) {
-        if (!adminSettingsPasswordValue) {
+        if (!adminSettingsUnlocked) {
           statusText.textContent = "管理設定のパスワードが必要です。";
           return;
         }
@@ -823,7 +825,7 @@
           const response = await fetch("/api/admin/tts", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ tts_enabled: ttsEnabled, admin_password: adminSettingsPasswordValue }),
+            body: JSON.stringify({ tts_enabled: ttsEnabled }),
           });
           const data = await response.json();
           if (!response.ok) {
@@ -843,7 +845,7 @@
       }
 
       async function savePublicStatusState(enabled) {
-        if (!adminSettingsPasswordValue) {
+        if (!adminSettingsUnlocked) {
           statusText.textContent = "管理設定のパスワードが必要です。";
           publicStatusToggle.checked = !enabled;
           return;
@@ -854,7 +856,7 @@
           const response = await fetch("/api/admin/toggle-public", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ public_enabled: enabled, admin_password: adminSettingsPasswordValue }),
+            body: JSON.stringify({ public_enabled: enabled }),
           });
           const data = await response.json();
           if (!response.ok) {
@@ -955,10 +957,21 @@
       renderShareLinkTargetOptions();
       updateShareLinkPreview();
 
-      loadAdminState().catch((error) => {
-        console.error(error);
-        statusText.textContent = "サーバーに接続できませんでした。";
-      });
+      fetch("/api/admin/status", { credentials: "same-origin" })
+        .then((res) => res.json().catch(() => ({})))
+        .then((data) => {
+          if (data && data.logged_in) {
+            adminSettingsUnlocked = true;
+            openAdminSettingsPanel();
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          loadAdminState().catch((error) => {
+            console.error(error);
+            statusText.textContent = "サーバーに接続できませんでした。";
+          });
+        });
     </script>
   </body>
 </html>

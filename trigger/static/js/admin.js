@@ -172,8 +172,17 @@
     messageEl.textContent = "";
     messageEl.className = "mt-2 text-xs";
     try {
+      const password = $("admin-password-input").value;
+      if (password) {
+        await fetchJson(`${API}/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password }),
+        });
+        $("admin-password-input").value = "";
+        if (!state.settings) await init();
+      }
       const payload = collectSettingsPayload();
-      payload.admin_password = $("admin-password-input").value;
       const data = await fetchJson(`${API}/settings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -378,6 +387,13 @@
   // ── 初期化 ────────────────────────────────────────────────
 
   async function init() {
+    const statusRes = await fetch(`${API}/status`, { credentials: "same-origin" });
+    const status = await statusRes.json().catch(() => ({}));
+    if (!statusRes.ok || !status.logged_in) {
+      const messageEl = $("settings-message");
+      if (messageEl) messageEl.textContent = "管理パスワードを入れて保存するとログインします。";
+      return;
+    }
     await loadSettings();
     state.themes = (await fetchJson(`${API}/themes`)).themes;
     renderThemeListAdmin();

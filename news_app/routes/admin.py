@@ -7,6 +7,13 @@ from flask import Blueprint, current_app, jsonify, render_template, request, sen
 
 logger = logging.getLogger(__name__)
 
+from news_app.admin_auth import (
+    check_admin_password_attempt,
+    clear_admin_session,
+    configure_session_cookie,
+    establish_admin_session,
+    is_admin_session,
+)
 from news_app.config import (
     AI_MODELS,
     CEFR_LEVELS,
@@ -78,6 +85,79 @@ from news_app.services.pdf_report import build_submissions_pdf
 from news_app.services.youtube import extract_video_id, fetch_youtube_title, parse_time_to_seconds, seconds_to_display
 
 admin_bp = Blueprint("news_admin", __name__)
+
+
+@admin_bp.record_once
+def _configure_admin_session(state):
+    configure_session_cookie(state.app)
+
+
+@admin_bp.route("/api/login", methods=["POST"])
+def admin_login():
+    payload = request.get_json(silent=True) or {}
+    provided = payload.get("password")
+    if provided is None:
+        provided = payload.get("admin_password")
+    denied = check_admin_password_attempt(
+        provided,
+        matches=admin_password_matches,
+        configured=get_admin_password,
+    )
+    if denied:
+        return denied
+    establish_admin_session()
+    return jsonify({"ok": True, "logged_in": True})
+
+
+@admin_bp.route("/api/logout", methods=["POST"])
+def admin_logout():
+    clear_admin_session()
+    return jsonify({"ok": True, "logged_in": False})
+
+
+@admin_bp.route("/api/status", methods=["GET"])
+def admin_status():
+    if not get_admin_password():
+        return jsonify({"ok": False, "logged_in": False, "error": "管理パスワードが設定されていません。"}), 503
+    return jsonify({"ok": True, "logged_in": is_admin_session()})
+
+
+_OPEN_ADMIN_ENDPOINTS = frozenset(
+    {
+        "news_admin.admin_login",
+        "news_admin.admin_logout",
+        "news_admin.admin_status",
+        "news_admin.web_app_manifest",
+        "news_admin.admin_index",
+    }
+)
+
+
+def _wants_admin_json() -> bool:
+    path = request.path or ""
+    if "/admin/api/" in path:
+        return True
+    json_ok = request.accept_mimetypes["application/json"]
+    html_ok = request.accept_mimetypes["text/html"]
+    return json_ok > 0 and json_ok >= html_ok
+
+
+@admin_bp.before_request
+def require_admin_session():
+    if request.method == "OPTIONS":
+        return None
+    if request.endpoint in _OPEN_ADMIN_ENDPOINTS:
+        return None
+    if is_admin_session() and get_admin_password():
+        return None
+    if not get_admin_password():
+        body = {"ok": False, "error": "管理パスワードが設定されていません。"}
+        if _wants_admin_json():
+            return jsonify(body), 503
+        return "管理パスワードが設定されていません。", 503
+    if _wants_admin_json():
+        return jsonify({"ok": False, "error": "ログインが必要です。"}), 401
+    return redirect(url_for("news_admin.admin_index"))
 
 
 @admin_bp.route("/manifest.json")
@@ -258,8 +338,13 @@ def _admin_password_denied():
 @admin_bp.route("/api/password-check", methods=["POST"])
 def password_check():
     data = request.get_json(silent=True) or {}
-    if not admin_password_matches(data.get("admin_password")):
-        return _admin_password_denied()
+    denied = check_admin_password_attempt(
+        data.get("admin_password"),
+        matches=admin_password_matches,
+        configured=get_admin_password,
+    )
+    if denied:
+        return denied
     return jsonify({"ok": True})
 
 
@@ -267,9 +352,6 @@ def password_check():
 def save_settings():
     data = request.get_json(silent=True) or {}
     try:
-        if not admin_password_matches(data.get("admin_password")):
-            return _admin_password_denied()
-
         openai_api_key = str(data.get("openai_api_key", "")).strip()
         if not openai_api_key:
             openai_api_key = (load_state().get("openai_api_key") or "").strip()

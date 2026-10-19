@@ -766,7 +766,7 @@
 
     let hasRoster = false;
     try {
-      const res = await fetch(`/news/admin/api/roster/${encodeURIComponent(classId)}`);
+      const res = await fetch(`/news/api/roster/${encodeURIComponent(classId)}`);
       const data = await res.json();
       const roster = data.students || [];
       hasRoster = roster.length > 0;

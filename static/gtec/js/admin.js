@@ -34,9 +34,9 @@ function getStoredPassword() {
   }
 }
 
-function saveUnlockState(password) {
+function saveUnlockState() {
   try {
-    sessionStorage.setItem(UNLOCK_STORAGE_KEY, password);
+    sessionStorage.removeItem(UNLOCK_STORAGE_KEY);
   } catch (_) {}
 }
 
@@ -473,7 +473,6 @@ function scheduleProblemSave() {
       }
       collectProblemFieldsFromUI();
       const saved = await saveProblems({
-        admin_password: passwordInput.value.trim(),
         active: problemsData.active,
         sets: problemsData.sets,
       });
@@ -504,7 +503,7 @@ async function saveSettings(payload) {
 }
 
 function collectPayload() {
-  const payload = { admin_password: passwordInput.value.trim() };
+  const payload = {};
   PARTS.forEach(part => {
     const toggle = document.querySelector(`.prep-toggle[data-part="${part}"]`);
     const secondsInput = document.querySelector(`.prep-seconds[data-part="${part}"]`);
@@ -530,19 +529,21 @@ async function tryUnlock() {
   }
 
   try {
-    const res = await fetch('/gtec/admin/api/settings', {
+    const res = await fetch('/gtec/admin/api/login', {
       method: 'POST',
+      credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ admin_password: password }),
+      body: JSON.stringify({ password }),
     });
     const data = await res.json();
-    if (res.status === 403) {
-      showLockMessage('パスワードが違います');
+    if (res.status === 403 || res.status === 429) {
+      showLockMessage(data.error || 'パスワードが違います');
       return;
     }
-    if (!res.ok) throw new Error(data.error || '解除に失敗しました');
+    if (!res.ok) throw new Error(data.error || 'ログインに失敗しました');
 
-    saveUnlockState(password);
+    passwordInput.value = '';
+    saveUnlockState();
     applyUnlockUI();
     await loadSettingsIntoUI();
     statusMessage.textContent = '管理設定を解除しました';
@@ -552,30 +553,16 @@ async function tryUnlock() {
 }
 
 async function restoreUnlockFromStorage() {
-  const password = getStoredPassword();
-  if (!password) return;
-
-  passwordInput.value = password;
+  clearUnlockState();
   hideLockMessage();
-
   try {
-    const res = await fetch('/gtec/admin/api/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ admin_password: password }),
-    });
-    const data = await res.json();
-    if (res.status === 403) {
-      clearUnlockState();
-      passwordInput.value = '';
-      return;
-    }
-    if (!res.ok) return;
-
+    const res = await fetch('/gtec/admin/api/status', { credentials: 'same-origin' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.logged_in) return;
     applyUnlockUI();
     await loadSettingsIntoUI();
   } catch (_) {
-    // 保存済み解除の復元に失敗した場合はロック画面のまま
+    // セッション復元に失敗した場合はログイン画面のまま
   }
 }
 

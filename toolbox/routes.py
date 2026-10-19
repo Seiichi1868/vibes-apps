@@ -23,6 +23,7 @@ from toolbox.auth import (
     set_admin_reauth,
     verify_admin_panel_password,
     verify_password,
+    wants_json,
     write_session_cookie,
 )
 from toolbox.config import PROJECT_ROOT
@@ -102,6 +103,19 @@ def _before():
     if request.endpoint == "toolbox.static":
         return None
     if _admin_path():
+        if request.endpoint not in {
+            "toolbox.admin_unlock",
+            "toolbox.admin_page",
+            "toolbox.admin_web_app_manifest",
+            "toolbox.other_apps_page",
+        }:
+            from toolbox.auth import admin_panel_ok
+            from toolbox.config import get_admin_panel_password
+
+            if not get_admin_panel_password() or not admin_panel_ok():
+                if wants_json():
+                    return jsonify({"ok": False, "error": "ログインが必要です。"}), 401
+                return redirect(url_for("toolbox.admin_page"))
         return check_csrf()
     if not login_is_required():
         if not current_user():

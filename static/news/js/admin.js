@@ -1829,11 +1829,11 @@
     }
   }
 
-  function persistAdminSettingsUnlock(password) {
+  function persistAdminSettingsUnlock() {
     try {
-      sessionStorage.setItem(ADMIN_SETTINGS_UNLOCK_KEY, password);
+      sessionStorage.removeItem(ADMIN_SETTINGS_UNLOCK_KEY);
     } catch (err) {
-      // Ignore storage failures; in-memory unlock still works for this page.
+      // パスワードはブラウザに残さない。
     }
   }
 
@@ -1855,17 +1855,18 @@
     }
   }
 
-  function rememberAdminSettingsUnlock(password) {
-    adminSettingsPasswordValue = password;
-    persistAdminSettingsUnlock(password);
+  function rememberAdminSettingsUnlock() {
+    adminSettingsPasswordValue = "session";
+    persistAdminSettingsUnlock();
     syncAdminSettingsLockUi();
   }
 
   async function verifyAdminSettingsPassword(password) {
-    const res = await fetch("/news/admin/api/password-check", {
+    const res = await fetch("/news/admin/api/login", {
       method: "POST",
+      credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ admin_password: password }),
+      body: JSON.stringify({ password }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -1884,16 +1885,15 @@
   }
 
   async function restoreAdminSettingsUnlock() {
-    const stored = readAdminSettingsUnlock();
-    if (!stored) {
-      syncAdminSettingsLockUi();
-      return;
-    }
+    clearAdminSettingsUnlock();
     try {
-      await verifyAdminSettingsPassword(stored);
-      adminSettingsPasswordValue = stored;
+      const res = await fetch("/news/admin/api/status", { credentials: "same-origin" });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.logged_in) {
+        adminSettingsPasswordValue = "session";
+        openAdminSettingsPanel();
+      }
     } catch (_) {
-      clearAdminSettingsUnlock();
       adminSettingsPasswordValue = "";
     }
     syncAdminSettingsLockUi();
@@ -1931,7 +1931,7 @@
       return;
     }
 
-    rememberAdminSettingsUnlock(password);
+    rememberAdminSettingsUnlock();
     openAdminSettingsPanel();
   }
 
@@ -2197,7 +2197,6 @@
         default_evaluation_criteria: collectDefaultCriteria(),
         background_id: currentBackgroundId,
         background_opacity: getBackgroundOpacityFromSlider(),
-        admin_password: adminSettingsPasswordValue,
       };
       try {
         const res = await fetch("/news/admin/api/settings", {

@@ -19,6 +19,7 @@ from toolbox.auth import (
     wants_json,
 )
 from toolbox.cli import USERNAME_RE
+from toolbox.admin_auth import check_admin_password_attempt
 from toolbox.config import MIN_PASSWORD_LEN, get_admin_panel_password
 from toolbox.model_catalog import resolved_catalog
 from toolbox.pricing import estimate_embed_usd, estimate_generate_usd, estimate_transcribe_usd
@@ -113,18 +114,17 @@ def admin_unlock():
     if request.is_json:
         payload = request.get_json(silent=True) or {}
         password = payload.get("password") or password
-    if not get_admin_panel_password():
-        unset_error = "管理パスワードが設定されていません。"
+    denied = check_admin_password_attempt(
+        password,
+        matches=verify_admin_panel_password,
+        configured=get_admin_panel_password,
+    )
+    if denied:
+        body, status = denied
         if wants_json():
-            return jsonify({"ok": False, "error": unset_error}), 503
-        return render_template("toolbox/admin_gate.html", error=unset_error), 503
-    if not verify_admin_panel_password(password):
-        if wants_json():
-            return jsonify({"ok": False, "error": "管理パスワードが違います。"}), 403
-        return render_template(
-            "toolbox/admin_gate.html",
-            error="管理パスワードが違います。",
-        ), 403
+            return body, status
+        message = (body.get_json() or {}).get("error") or "管理パスワードが違います。"
+        return render_template("toolbox/admin_gate.html", error=message), status
     g.toolbox_session = set_admin_panel_unlock(g.toolbox_session)
     g.toolbox_session = set_admin_reauth(g.toolbox_session)
     if wants_json():
@@ -143,15 +143,30 @@ OTHER_APPS = (
 )
 
 
+def _admin_panel_closed():
+    if get_admin_panel_password():
+        return None
+    message = "管理パスワードが設定されていません。"
+    if wants_json():
+        return jsonify({"ok": False, "error": message}), 503
+    return render_template("toolbox/admin_gate.html", error=message), 503
+
+
 @main_bp.route("/admin/apps")
 def other_apps_page():
+    closed = _admin_panel_closed()
+    if closed:
+        return closed
     if not admin_panel_ok():
-        return render_template("toolbox/admin_gate.html", error=None)
+        return redirect(url_for("toolbox.admin_page"))
     return render_template("toolbox/other_apps.html", apps=OTHER_APPS)
 
 
 @main_bp.route("/admin/")
 def admin_page():
+    closed = _admin_panel_closed()
+    if closed:
+        return closed
     if not admin_panel_ok():
         return render_template("toolbox/admin_gate.html", error=None)
     users = [public_user(user) for user in list_users()]
@@ -199,8 +214,11 @@ def _totp_redirect(error: str = "", ok: str = ""):
 
 @main_bp.route("/admin/totp/start", methods=["POST"])
 def admin_totp_start():
+    closed = _admin_panel_closed()
+    if closed:
+        return closed
     if not admin_panel_ok():
-        return render_template("toolbox/admin_gate.html", error=None)
+        return redirect(url_for("toolbox.admin_page"))
     user = current_user()
     if not user or user.get("is_guest"):
         return _totp_redirect("教員アカウントでログインしてから登録してください。")
@@ -213,8 +231,11 @@ def admin_totp_start():
 
 @main_bp.route("/admin/totp/confirm", methods=["POST"])
 def admin_totp_confirm():
+    closed = _admin_panel_closed()
+    if closed:
+        return closed
     if not admin_panel_ok():
-        return render_template("toolbox/admin_gate.html", error=None)
+        return redirect(url_for("toolbox.admin_page"))
     user = current_user()
     pending = str((user or {}).get("totp_pending_secret") or "")
     if not user or not pending:
@@ -229,8 +250,11 @@ def admin_totp_confirm():
 
 @main_bp.route("/admin/totp/replace", methods=["POST"])
 def admin_totp_replace():
+    closed = _admin_panel_closed()
+    if closed:
+        return closed
     if not admin_panel_ok():
-        return render_template("toolbox/admin_gate.html", error=None)
+        return redirect(url_for("toolbox.admin_page"))
     user = current_user()
     secret = str((user or {}).get("totp_secret") or "")
     if not user or not secret:
@@ -281,10 +305,13 @@ def admin_talk_sessions():
 def admin_reauth():
     payload = request.get_json(silent=True) or {}
     password = payload.get("password") or ""
-    if not get_admin_panel_password():
-        return jsonify({"ok": False, "error": "管理パスワードが設定されていません。"}), 503
-    if not verify_admin_panel_password(password):
-        return jsonify({"ok": False, "error": "管理パスワードが違います。"}), 403
+    denied = check_admin_password_attempt(
+        password,
+        matches=verify_admin_panel_password,
+        configured=get_admin_panel_password,
+    )
+    if denied:
+        return denied
     g.toolbox_session = set_admin_reauth(g.toolbox_session)
     return jsonify({"ok": True})
 

@@ -7,8 +7,15 @@ import logging
 from pathlib import Path
 
 import openpyxl
-from flask import Blueprint, jsonify, render_template, request, send_file, send_from_directory
+from flask import Blueprint, jsonify, redirect, render_template, request, send_file, send_from_directory, url_for
 
+from level_check.admin_auth import (
+    check_admin_password_attempt,
+    clear_admin_session,
+    configure_session_cookie,
+    establish_admin_session,
+    is_admin_session,
+)
 from level_check.config import (
     AI_MODEL_MODES,
     BACKGROUND_IMAGE_STATIC_PATH,
@@ -60,11 +67,46 @@ admin_bp = Blueprint(
 
 def _require_model_change_password(payload: dict):
     """AIモデル選択（管理設定）の変更時のみパスワードを要求する。"""
+    return check_admin_password_attempt(
+        payload.get("admin_password"),
+        matches=admin_password_matches,
+        configured=get_admin_password,
+    )
+
+
+@admin_bp.record_once
+def _configure_admin_session(state):
+    configure_session_cookie(state.app)
+
+
+@admin_bp.route("/api/login", methods=["POST"])
+def admin_login():
+    payload = request.get_json(silent=True) or {}
+    provided = payload.get("password")
+    if provided is None:
+        provided = payload.get("admin_password")
+    denied = check_admin_password_attempt(
+        provided,
+        matches=admin_password_matches,
+        configured=get_admin_password,
+    )
+    if denied:
+        return denied
+    establish_admin_session()
+    return jsonify({"ok": True, "logged_in": True})
+
+
+@admin_bp.route("/api/logout", methods=["POST"])
+def admin_logout():
+    clear_admin_session()
+    return jsonify({"ok": True, "logged_in": False})
+
+
+@admin_bp.route("/api/status", methods=["GET"])
+def admin_status():
     if not get_admin_password():
-        return jsonify({"ok": False, "error": "管理パスワードが設定されていません。"}), 503
-    if not admin_password_matches(payload.get("admin_password")):
-        return jsonify({"ok": False, "error": "管理設定のパスワードが違います。"}), 403
-    return None
+        return jsonify({"ok": False, "logged_in": False, "error": "管理パスワードが設定されていません。"}), 503
+    return jsonify({"ok": True, "logged_in": is_admin_session()})
 
 
 def _settings_payload() -> dict:
@@ -92,6 +134,42 @@ def web_app_manifest():
     )
     response.headers["Cache-Control"] = "no-cache, must-revalidate"
     return response
+
+
+_OPEN_ADMIN_ENDPOINTS = frozenset(
+    {
+        "level_check_admin.admin_login",
+        "level_check_admin.admin_logout",
+        "level_check_admin.admin_status",
+        "level_check_admin.web_app_manifest",
+        "level_check_admin.admin_page",
+    }
+)
+
+
+def _wants_admin_json() -> bool:
+    if "/admin/api/" in (request.path or ""):
+        return True
+    json_ok = request.accept_mimetypes["application/json"]
+    html_ok = request.accept_mimetypes["text/html"]
+    return json_ok > 0 and json_ok >= html_ok
+
+
+@admin_bp.before_request
+def require_admin_session():
+    if request.method == "OPTIONS":
+        return None
+    if request.endpoint in _OPEN_ADMIN_ENDPOINTS:
+        return None
+    if is_admin_session() and get_admin_password():
+        return None
+    if not get_admin_password():
+        if _wants_admin_json():
+            return jsonify({"ok": False, "error": "管理パスワードが設定されていません。"}), 503
+        return "管理パスワードが設定されていません。", 503
+    if _wants_admin_json():
+        return jsonify({"ok": False, "error": "ログインが必要です。"}), 401
+    return redirect(url_for("level_check_admin.admin_page"))
 
 
 @admin_bp.route("/")
@@ -139,9 +217,6 @@ def save_settings_api():
     if "background_opacity" in payload:
         updates["background_opacity"] = payload.get("background_opacity")
     if "ai_model_mode" in payload:
-        err = _require_model_change_password(payload)
-        if err:
-            return err
         updates["ai_model_mode"] = payload.get("ai_model_mode")
     update_settings(**updates)
     return jsonify(_settings_payload())
