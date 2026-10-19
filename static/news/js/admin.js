@@ -1,5 +1,48 @@
 (function () {
   const CEFR_LEVELS = window.CEFR_LEVELS || ["A2", "B1", "B2"];
+  const SAMPLE_LOGIN_MSG = "保存するにはログインしてください";
+
+  if (window.ADMIN_SAMPLE_READONLY) {
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = function (input, init) {
+      const method = String((init && init.method) || "GET").toUpperCase();
+      const url = typeof input === "string" ? input : (input && input.url) || "";
+      const isLogin = url.indexOf("/news/admin/api/login") !== -1 || url.indexOf("/news/admin/api/logout") !== -1;
+      if (!isLogin && method !== "GET" && method !== "HEAD" && url.indexOf("/news/admin/api/") !== -1) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ ok: false, error: SAMPLE_LOGIN_MSG }), {
+            status: 401,
+            headers: { "Content-Type": "application/json" },
+          })
+        );
+      }
+      return nativeFetch(input, init);
+    };
+  }
+
+  function rememberSupportPanels() {
+    document.querySelectorAll("details.js-support-panel").forEach((el) => {
+      const id = el.dataset.supportId || "";
+      if (!id) return;
+      const key = `newsAdminSupportOpen:${id}`;
+      let saved = null;
+      try {
+        saved = localStorage.getItem(key);
+      } catch (err) {
+        saved = null;
+      }
+      if (saved === "0") el.open = false;
+      else if (saved === "1") el.open = true;
+      el.addEventListener("toggle", () => {
+        try {
+          localStorage.setItem(key, el.open ? "1" : "0");
+        } catch (err) {
+          /* 保存できない環境では初期の開閉だけ使う */
+        }
+      });
+    });
+  }
+  rememberSupportPanels();
 
   function t(key, vars) {
     return window.NewsI18n ? window.NewsI18n.t(key, vars) : key;
@@ -1399,12 +1442,16 @@
       const el = document.getElementById(`class-criteria-${lv}`);
       if (el) el.value = (c.evaluation_criteria && c.evaluation_criteria[lv]) || "";
     });
-    if (archiveBtn) archiveBtn.disabled = false;
-    if (resetLessonBtn) resetLessonBtn.disabled = false;
+    const sampleView = window.ADMIN_SAMPLE_READONLY === true;
+    if (archiveBtn) archiveBtn.disabled = sampleView;
+    if (resetLessonBtn) resetLessonBtn.disabled = sampleView;
     const saveBtn = document.getElementById("save-lesson-btn");
-    if (saveBtn) saveBtn.disabled = false;
+    if (saveBtn) saveBtn.disabled = sampleView;
+    if (sampleView && lessonClassLabel && window.ADMIN_SAMPLE_CLASS_LABEL) {
+      lessonClassLabel.textContent = window.ADMIN_SAMPLE_CLASS_LABEL;
+    }
     updateScreenButtons(cls.id);
-    renderArchiveList(cls);
+    renderArchiveList(cls, sampleView ? { readOnly: true } : undefined);
   }
 
   function updateScreenButtons(classId) {
@@ -1832,7 +1879,7 @@
     return data;
   }
 
-  if (classSelect) {
+  if (classSelect && !window.ADMIN_SAMPLE_READONLY) {
     classSelect.addEventListener("change", async () => {
       const id = getSelectedClassId();
       if (!id) return;
@@ -2232,6 +2279,10 @@
   if (lessonForm) {
     lessonForm.addEventListener("submit", async (e) => {
       e.preventDefault();
+      if (window.ADMIN_SAMPLE_READONLY) {
+        showMessage(lessonMessage, SAMPLE_LOGIN_MSG, true);
+        return;
+      }
       const classId = getSelectedClassId() || (lessonClassId && lessonClassId.value);
       if (!classId) {
         showMessage(lessonMessage, "クラスを選択または作成してください。", true);

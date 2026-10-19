@@ -742,6 +742,21 @@ def get_class(class_id: str) -> dict | None:
     return state.get("classes", {}).get(class_id)
 
 
+SAMPLE_CLASS_NAME = "test1"
+SAMPLE_CLASS_DISPLAY_NAME = "クラス未設定"
+
+
+def find_class_by_name(name: str) -> dict | None:
+    """保存名が一致するクラス。表示名の書き換えは呼び出し側で行う。"""
+    wanted = (name or "").strip()
+    if not wanted:
+        return None
+    for cls in load_state().get("classes", {}).values():
+        if str(cls.get("name") or "").strip() == wanted:
+            return cls
+    return None
+
+
 def get_archive_item(class_id: str, archive_id: str) -> dict | None:
     archive_id = str(archive_id or "").strip()
     if not archive_id:
