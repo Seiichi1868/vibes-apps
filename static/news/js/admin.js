@@ -1590,14 +1590,23 @@
     return span;
   }
 
-  function renderArchiveList(cls) {
-    if (!archiveList || !archiveSummary || !archiveEmptyMessage) return;
+  function managedClasses() {
+    return adminClasses.filter((c) => c.can_manage !== false);
+  }
+
+  function renderArchiveList(cls, options) {
+    options = options || {};
+    const root = options.root || archiveList;
+    if (!root || !archiveSummary || !archiveEmptyMessage) return;
     const archive = cls && Array.isArray(cls.archive) ? cls.archive : [];
     const currentClassId = cls ? cls.id : getSelectedClassId();
+    const readOnly = !!options.readOnly;
 
-    archiveSummary.textContent = t("archiveSummary", { n: archive.length });
-    archiveList.innerHTML = "";
-    archiveEmptyMessage.classList.toggle("hidden", archive.length > 0);
+    if (!options.root) {
+      archiveSummary.textContent = t("archiveSummary", { n: archive.length });
+      archiveEmptyMessage.classList.toggle("hidden", archive.length > 0);
+    }
+    root.innerHTML = "";
 
     archive.forEach((item, index) => {
       const li = document.createElement("li");
@@ -1606,6 +1615,7 @@
         ? "rounded border border-amber-300 bg-amber-50/90 px-1.5 py-1 ring-1 ring-amber-200"
         : "rounded border border-teal-100/80 bg-white/50 px-1.5 py-1";
       li.dataset.archiveIndex = String(index);
+      li.dataset.classId = currentClassId || "";
       li.dataset.inUse = inUse ? "1" : "0";
       li.dataset.archiveId = item.archive_id || "";
 
@@ -1709,9 +1719,11 @@
         deleteBtn.title = t("archiveDeleteBlocked");
       }
 
-      actions.append(openScreenBtnItem, copyScreenBtnItem, qrBtnItem, inUseBtn, restoreBtn, deleteBtn);
+      if (!readOnly) {
+        actions.append(openScreenBtnItem, copyScreenBtnItem, qrBtnItem, inUseBtn, restoreBtn, deleteBtn);
+      }
 
-      const copyTargets = adminClasses.filter((c) => c.id !== currentClassId);
+      const copyTargets = options.copyTargets || managedClasses().filter((c) => c.id !== currentClassId);
       if (copyTargets.length) {
         const targetSelect = document.createElement("select");
         targetSelect.className = "archive-copy-target rounded border border-teal-100 bg-white/80 px-1 py-0.5 text-[9px] text-slate-700";
@@ -1731,8 +1743,50 @@
 
       row.appendChild(actions);
       li.appendChild(row);
-      archiveList.appendChild(li);
+      root.appendChild(li);
     });
+  }
+
+  async function loadSharedArchives() {
+    const panel = document.getElementById("shared-archive-panel");
+    const root = document.getElementById("shared-archive-list");
+    if (!panel || !root) return;
+    const shared = adminClasses.filter((c) => c.can_manage === false);
+    if (!window.ADMIN_SHARE_ARCHIVES || !shared.length) {
+      panel.classList.add("hidden");
+      root.innerHTML = "";
+      return;
+    }
+    panel.classList.remove("hidden");
+    root.innerHTML = "";
+    const targets = managedClasses();
+    for (const item of shared) {
+      const block = document.createElement("div");
+      const heading = document.createElement("p");
+      heading.className = "text-[10px] font-medium text-slate-500";
+      heading.textContent = item.name;
+      const list = document.createElement("ul");
+      list.className = "space-y-1";
+      block.append(heading, list);
+      root.appendChild(block);
+      try {
+        const res = await fetch(`/news/admin/api/classes/${encodeURIComponent(item.id)}`);
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "アーカイブを表示できません。");
+        renderArchiveList(data.class, { root: list, readOnly: true, copyTargets: targets });
+        if (!list.childElementCount) {
+          const empty = document.createElement("p");
+          empty.className = "text-[10px] text-slate-400";
+          empty.textContent = "アーカイブはありません。";
+          list.appendChild(empty);
+        }
+      } catch (err) {
+        const fail = document.createElement("p");
+        fail.className = "text-[10px] text-red-600";
+        fail.textContent = err.message || "アーカイブを表示できません。";
+        list.appendChild(fail);
+      }
+    }
   }
 
   async function refreshClassList(selectId) {
@@ -1740,17 +1794,19 @@
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || "クラス一覧の取得に失敗しました");
     adminClasses = data.classes || [];
+    if (typeof data.share_archives === "boolean") window.ADMIN_SHARE_ARCHIVES = data.share_archives;
 
     if (classSelect) {
       const prev = classSelect.value;
+      const managed = managedClasses();
       classSelect.innerHTML = "";
-      if (!data.classes.length) {
+      if (!managed.length) {
         const opt = document.createElement("option");
         opt.value = "";
         opt.textContent = "（クラス未作成）";
         classSelect.appendChild(opt);
       } else {
-        data.classes.forEach((c) => {
+        managed.forEach((c) => {
           const opt = document.createElement("option");
           opt.value = c.id;
           opt.textContent = c.name;
@@ -1758,8 +1814,9 @@
         });
       }
       const target = selectId || data.active_class_id || prev;
-      if (target) classSelect.value = target;
+      if (target && managed.some((c) => c.id === target)) classSelect.value = target;
     }
+    loadSharedArchives();
     return data;
   }
 
@@ -2259,12 +2316,13 @@
     });
   }
 
-  if (archiveList) {
-    archiveList.addEventListener("click", async (e) => {
+  const archiveClickRoot = archiveList ? archiveList.closest(".admin-archive-panel") : null;
+  if (archiveClickRoot) {
+    archiveClickRoot.addEventListener("click", async (e) => {
       const btn = e.target.closest("button");
       if (!btn) return;
       const itemEl = btn.closest("li");
-      const classId = getSelectedClassId();
+      const classId = (itemEl && itemEl.dataset.classId) || getSelectedClassId();
       const archiveIndex = parseInt(itemEl && itemEl.dataset.archiveIndex, 10);
       const archiveId = (itemEl && itemEl.dataset.archiveId) || "";
       if (!classId || !Number.isFinite(archiveIndex)) return;
@@ -4926,4 +4984,5 @@
   if (!window.ADMIN_ACTIVE_CLASS && window.ADMIN_POSTVIEW_QUESTIONS && window.ADMIN_POSTVIEW_QUESTIONS.length) {
     renderAdminPostviewPreview(window.ADMIN_POSTVIEW_QUESTIONS);
   }
+  loadSharedArchives();
 })();

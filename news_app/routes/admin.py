@@ -13,6 +13,7 @@ from news_app.access_control import (
     copy_login_text,
     current_actor,
     delete_account,
+    can_manage_class,
     deny_class,
     is_owner_session,
     issue_account,
@@ -190,6 +191,7 @@ _MANAGE_CLASS_ENDPOINTS = frozenset(
         "news_admin.api_restore_archive_lesson",
         "news_admin.api_delete_archive_lesson",
         "news_admin.api_set_archive_in_use",
+        "news_admin.api_select_class",
         "news_admin.upload_roster",
         "news_admin.get_roster_api",
         "news_admin.list_submissions",
@@ -199,7 +201,7 @@ _MANAGE_CLASS_ENDPOINTS = frozenset(
 
 _VIEW_CLASS_ENDPOINTS = frozenset(
     {
-        "news_admin.api_select_class",
+        "news_admin.api_get_class",
         "news_admin.list_class_lessons",
         "news_admin.share_link",
         "news_admin.screen_link",
@@ -441,11 +443,13 @@ def admin_index():
     classes = viewable_classes() if role else []
     submission_classes = managed_classes() if role else []
     class_id, cls = _active_class_or_none()
-    visible_ids = {c["id"] for c in classes}
-    if class_id not in visible_ids:
+    managed_ids = {c["id"] for c in submission_classes}
+    for item in classes:
+        item["can_manage"] = item["id"] in managed_ids
+    if class_id not in managed_ids:
         class_id, cls = ("", None)
-        if classes:
-            class_id = classes[0]["id"]
+        if submission_classes:
+            class_id = submission_classes[0]["id"]
             cls = get_class(class_id)
     if not role:
         state = {
@@ -479,7 +483,7 @@ def admin_index():
         actor_label=actor or "",
         submission_classes=submission_classes,
         require_teacher_login=require_teacher_login(),
-        share_archives=share_archives_enabled() if is_owner else False,
+        share_archives=share_archives_enabled() if role else False,
         login_url=url_for("news_admin.admin_login_page"),
         **appearance_context(state),
     )
@@ -641,10 +645,20 @@ def appearance_settings():
 @admin_bp.route("/api/classes", methods=["GET"])
 def api_list_classes():
     classes = viewable_classes()
+    managed_ids = {c["id"] for c in managed_classes()}
+    for item in classes:
+        item["can_manage"] = item["id"] in managed_ids
     active = get_active_class_id()
-    if active and active not in {c["id"] for c in classes}:
-        active = classes[0]["id"] if classes else ""
-    return jsonify({"ok": True, "classes": classes, "active_class_id": active})
+    if active not in managed_ids:
+        active = next(iter(managed_ids), "")
+    return jsonify(
+        {
+            "ok": True,
+            "classes": classes,
+            "active_class_id": active,
+            "share_archives": share_archives_enabled(),
+        }
+    )
 
 
 @admin_bp.route("/api/classes", methods=["POST"])
@@ -655,6 +669,18 @@ def api_create_class():
         return jsonify({"ok": True, "class": cls, "active_class_id": cls["id"]})
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
+
+
+@admin_bp.route("/api/classes/<class_id>", methods=["GET"])
+def api_get_class(class_id):
+    """閲覧専用。現在のクラスは変えない。"""
+    return jsonify(
+        {
+            "ok": True,
+            "class": get_class(class_id),
+            "can_manage": can_manage_class(class_id),
+        }
+    )
 
 
 @admin_bp.route("/api/classes/select", methods=["POST"])

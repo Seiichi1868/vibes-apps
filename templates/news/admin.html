@@ -464,10 +464,10 @@
           <div class="min-w-[10rem] flex-1">
             <label class="mb-0.5 block text-[11px] font-medium text-slate-600" for="class-select" data-i18n="managedClass">管理するクラス</label>
             <select id="class-select" class="compact-input w-full">
-              {% if not classes %}
+              {% if not submission_classes %}
               <option value="">（クラス未作成）</option>
               {% else %}
-              {% for c in classes %}
+              {% for c in submission_classes %}
               <option value="{{ c.id }}" {% if c.id == active_class_id %}selected{% endif %}>{{ c.name }}</option>
               {% endfor %}
               {% endif %}
@@ -541,6 +541,10 @@
             </p>
             <ul id="archive-list" class="mt-2 max-h-60 space-y-1 overflow-y-auto text-[10px] text-slate-600 lg:max-h-none lg:overflow-visible">
             </ul>
+            <div id="shared-archive-panel" class="mt-2 hidden border-t border-teal-100 pt-2">
+              <p class="text-[10px] font-semibold text-slate-600">他クラスのアーカイブ（閲覧のみ）</p>
+              <div id="shared-archive-list" class="mt-1 space-y-2"></div>
+            </div>
             <p id="archive-empty-message" class="mt-2 hidden rounded border border-teal-100/80 bg-white/50 px-2 py-1 text-[10px] text-slate-500" data-i18n="archiveEmpty">
               このクラスのアーカイブはまだありません。
             </p>
@@ -1003,6 +1007,7 @@
   window.DISPLAY_LANGUAGE = {{ (display_language or 'ja')|tojson }};
   window.ADMIN_ACTIVE_CLASS = {{ active_class|tojson if active_class else 'null' }};
   window.ADMIN_CLASSES = {{ classes|tojson }};
+  window.ADMIN_SHARE_ARCHIVES = {{ share_archives|tojson }};
   window.CEFR_LEVELS = {{ cefr_levels|list|tojson }};
   window.ADMIN_WARMUP_IMAGE_URL = {{ (current.warmup_image_url or '')|tojson }};
   window.ADMIN_WARMUP_QUESTIONS = {{ (current.warmup_questions or [])|tojson }};

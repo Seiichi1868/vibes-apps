@@ -176,19 +176,49 @@ class NewsTeacherAccountTests(unittest.TestCase):
         self.assertEqual(archived.status_code, 200, archived.get_data(as_text=True))
         self.assertEqual(archived.get_json()["class"]["archive"][0]["created_by"], "owner-teacher")
 
+        own_made = other.post("/news/admin/api/classes", json={"name": "Other Class"})
+        self.assertEqual(own_made.status_code, 200, own_made.get_data(as_text=True))
+        other_class_id = own_made.get_json()["class"]["id"]
+
         hidden = other.get("/news/admin/api/classes")
-        self.assertEqual([c["id"] for c in hidden.get_json()["classes"]], [])
+        self.assertEqual([c["id"] for c in hidden.get_json()["classes"]], [other_class_id])
+        self.assertEqual(other.get(f"/news/admin/api/classes/{teacher_class_id}").status_code, 403)
+        active_before = self.client.get("/news/admin/api/classes").get_json()["active_class_id"]
         self.assertEqual(other.post("/news/admin/api/classes/select", json={"class_id": teacher_class_id}).status_code, 403)
+        self.assertEqual(self.client.get("/news/admin/api/classes").get_json()["active_class_id"], active_before)
         self.assertEqual(other.get(f"/news/admin/api/submissions?class_id={teacher_class_id}").status_code, 403)
+        self.assertEqual(
+            other.post(
+                "/news/admin/api/class/archive/copy",
+                json={"class_id": teacher_class_id, "archive_index": 0, "target_class_id": other_class_id},
+            ).status_code,
+            403,
+        )
 
         self._set_toggles(share=True)
         shared = other.get("/news/admin/api/classes")
-        ids = {c["id"] for c in shared.get_json()["classes"]}
-        self.assertIn(teacher_class_id, ids)
-        self.assertIn(owner_id, ids)
-        viewed = other.post("/news/admin/api/classes/select", json={"class_id": teacher_class_id})
+        by_id = {c["id"]: c for c in shared.get_json()["classes"]}
+        self.assertIn(teacher_class_id, by_id)
+        self.assertIn(owner_id, by_id)
+        self.assertFalse(by_id[teacher_class_id]["can_manage"])
+        self.assertTrue(by_id[other_class_id]["can_manage"])
+        viewed = other.get(f"/news/admin/api/classes/{teacher_class_id}")
         self.assertEqual(viewed.status_code, 200)
         self.assertEqual(viewed.get_json()["class"]["archive"][0]["title"], "Lesson A")
+        self.assertFalse(viewed.get_json()["can_manage"])
+        self.assertEqual(other.post("/news/admin/api/classes/select", json={"class_id": teacher_class_id}).status_code, 403)
+        self.assertEqual(self.client.get("/news/admin/api/classes").get_json()["active_class_id"], active_before)
+        copied = other.post(
+            "/news/admin/api/class/archive/copy",
+            json={"class_id": teacher_class_id, "archive_index": 0, "target_class_id": other_class_id},
+        )
+        self.assertEqual(copied.status_code, 200, copied.get_data(as_text=True))
+        self.assertEqual(copied.get_json()["target_class"]["archive"][0]["title"], "Lesson A")
+        rejected_dest = other.post(
+            "/news/admin/api/class/archive/copy",
+            json={"class_id": teacher_class_id, "archive_index": 0, "target_class_id": owner_id},
+        )
+        self.assertEqual(rejected_dest.status_code, 403)
         self.assertEqual(
             other.post("/news/admin/api/class/lesson/reset", json={"class_id": teacher_class_id}).status_code,
             403,
