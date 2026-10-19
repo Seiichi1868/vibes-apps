@@ -1,0 +1,39 @@
+{% extends "news/base.html" %}
+{% block title %}ログイン | Speaking Lab News{% endblock %}
+{% block body %}
+<div class="flex min-h-dvh items-center justify-center px-4">
+  <form id="news-login-form" class="w-full max-w-sm rounded-2xl border border-teal-100 bg-white/95 p-5 shadow-lg">
+    <h1 class="text-base font-bold text-slate-800">Speaking Lab News</h1>
+    <p class="mt-1 text-[11px] text-slate-500">所有者はパスワードのみ。教員はIDとパスワード。</p>
+    <label class="mt-3 block text-[11px] font-medium text-slate-600" for="login-teacher-id">教員ID（所有者は空欄）</label>
+    <input id="login-teacher-id" type="text" autocomplete="username" class="mt-1 w-full rounded-lg border border-teal-100 px-2 py-1.5 text-sm">
+    <label class="mt-2 block text-[11px] font-medium text-slate-600" for="login-password">パスワード</label>
+    <input id="login-password" type="password" autocomplete="current-password" class="mt-1 w-full rounded-lg border border-teal-100 px-2 py-1.5 text-sm">
+    <button type="submit" class="mt-3 w-full rounded-lg bg-teal-600 py-1.5 text-sm font-semibold text-white">ログイン</button>
+    <p id="login-message" class="mt-2 hidden text-[11px] text-red-600"></p>
+  </form>
+</div>
+<script>
+  document.getElementById("news-login-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const message = document.getElementById("login-message");
+    message.classList.add("hidden");
+    const res = await fetch("/news/admin/api/login", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        teacher_id: document.getElementById("login-teacher-id").value.trim(),
+        password: document.getElementById("login-password").value,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      message.textContent = data.error || "ログインできませんでした。";
+      message.classList.remove("hidden");
+      return;
+    }
+    location.href = "/news/admin/";
+  });
+</script>
+{% endblock %}

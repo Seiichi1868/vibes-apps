@@ -34,6 +34,9 @@
   const settingsMessage = document.getElementById("settings-message");
   const adminSettingsLock = document.getElementById("admin-settings-lock");
   const adminSettingsPassword = document.getElementById("admin-settings-password");
+  const teacherLoginId = document.getElementById("teacher-login-id");
+  const adminLoginBtn = document.getElementById("admin-login-btn");
+  const adminLogoutBtn = document.getElementById("admin-logout-btn");
   const adminSettingsUnlock = document.getElementById("admin-settings-unlock");
   const adminSettingsLockMessage = document.getElementById("admin-settings-lock-message");
   const adminSettingsPanel = document.getElementById("admin-settings-panel");
@@ -1587,14 +1590,23 @@
     return span;
   }
 
-  function renderArchiveList(cls) {
-    if (!archiveList || !archiveSummary || !archiveEmptyMessage) return;
+  function managedClasses() {
+    return adminClasses.filter((c) => c.can_manage !== false);
+  }
+
+  function renderArchiveList(cls, options) {
+    options = options || {};
+    const root = options.root || archiveList;
+    if (!root || !archiveSummary || !archiveEmptyMessage) return;
     const archive = cls && Array.isArray(cls.archive) ? cls.archive : [];
     const currentClassId = cls ? cls.id : getSelectedClassId();
+    const readOnly = !!options.readOnly;
 
-    archiveSummary.textContent = t("archiveSummary", { n: archive.length });
-    archiveList.innerHTML = "";
-    archiveEmptyMessage.classList.toggle("hidden", archive.length > 0);
+    if (!options.root) {
+      archiveSummary.textContent = t("archiveSummary", { n: archive.length });
+      archiveEmptyMessage.classList.toggle("hidden", archive.length > 0);
+    }
+    root.innerHTML = "";
 
     archive.forEach((item, index) => {
       const li = document.createElement("li");
@@ -1603,6 +1615,7 @@
         ? "rounded border border-amber-300 bg-amber-50/90 px-1.5 py-1 ring-1 ring-amber-200"
         : "rounded border border-teal-100/80 bg-white/50 px-1.5 py-1";
       li.dataset.archiveIndex = String(index);
+      li.dataset.classId = currentClassId || "";
       li.dataset.inUse = inUse ? "1" : "0";
       li.dataset.archiveId = item.archive_id || "";
 
@@ -1706,9 +1719,11 @@
         deleteBtn.title = t("archiveDeleteBlocked");
       }
 
-      actions.append(openScreenBtnItem, copyScreenBtnItem, qrBtnItem, inUseBtn, restoreBtn, deleteBtn);
+      if (!readOnly) {
+        actions.append(openScreenBtnItem, copyScreenBtnItem, qrBtnItem, inUseBtn, restoreBtn, deleteBtn);
+      }
 
-      const copyTargets = adminClasses.filter((c) => c.id !== currentClassId);
+      const copyTargets = options.copyTargets || managedClasses().filter((c) => c.id !== currentClassId);
       if (copyTargets.length) {
         const targetSelect = document.createElement("select");
         targetSelect.className = "archive-copy-target rounded border border-teal-100 bg-white/80 px-1 py-0.5 text-[9px] text-slate-700";
@@ -1728,8 +1743,50 @@
 
       row.appendChild(actions);
       li.appendChild(row);
-      archiveList.appendChild(li);
+      root.appendChild(li);
     });
+  }
+
+  async function loadSharedArchives() {
+    const panel = document.getElementById("shared-archive-panel");
+    const root = document.getElementById("shared-archive-list");
+    if (!panel || !root) return;
+    const shared = adminClasses.filter((c) => c.can_manage === false);
+    if (!window.ADMIN_SHARE_ARCHIVES || !shared.length) {
+      panel.classList.add("hidden");
+      root.innerHTML = "";
+      return;
+    }
+    panel.classList.remove("hidden");
+    root.innerHTML = "";
+    const targets = managedClasses();
+    for (const item of shared) {
+      const block = document.createElement("div");
+      const heading = document.createElement("p");
+      heading.className = "text-[10px] font-medium text-slate-500";
+      heading.textContent = item.name;
+      const list = document.createElement("ul");
+      list.className = "space-y-1";
+      block.append(heading, list);
+      root.appendChild(block);
+      try {
+        const res = await fetch(`/news/admin/api/classes/${encodeURIComponent(item.id)}`);
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "アーカイブを表示できません。");
+        renderArchiveList(data.class, { root: list, readOnly: true, copyTargets: targets });
+        if (!list.childElementCount) {
+          const empty = document.createElement("p");
+          empty.className = "text-[10px] text-slate-400";
+          empty.textContent = "アーカイブはありません。";
+          list.appendChild(empty);
+        }
+      } catch (err) {
+        const fail = document.createElement("p");
+        fail.className = "text-[10px] text-red-600";
+        fail.textContent = err.message || "アーカイブを表示できません。";
+        list.appendChild(fail);
+      }
+    }
   }
 
   async function refreshClassList(selectId) {
@@ -1737,17 +1794,19 @@
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || "クラス一覧の取得に失敗しました");
     adminClasses = data.classes || [];
+    if (typeof data.share_archives === "boolean") window.ADMIN_SHARE_ARCHIVES = data.share_archives;
 
     if (classSelect) {
       const prev = classSelect.value;
+      const managed = managedClasses();
       classSelect.innerHTML = "";
-      if (!data.classes.length) {
+      if (!managed.length) {
         const opt = document.createElement("option");
         opt.value = "";
         opt.textContent = "（クラス未作成）";
         classSelect.appendChild(opt);
       } else {
-        data.classes.forEach((c) => {
+        managed.forEach((c) => {
           const opt = document.createElement("option");
           opt.value = c.id;
           opt.textContent = c.name;
@@ -1755,8 +1814,9 @@
         });
       }
       const target = selectId || data.active_class_id || prev;
-      if (target) classSelect.value = target;
+      if (target && managed.some((c) => c.id === target)) classSelect.value = target;
     }
+    loadSharedArchives();
     return data;
   }
 
@@ -1937,9 +1997,195 @@
 
   restoreAdminSettingsUnlock();
 
+  async function submitHeaderLogin() {
+    const password = adminSettingsPassword ? adminSettingsPassword.value : "";
+    const teacherId = teacherLoginId ? teacherLoginId.value.trim() : "";
+    if (!password) {
+      showAdminSettingsLockError("パスワードを入力してください。");
+      return;
+    }
+    try {
+      const res = await fetch("/news/admin/api/login", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teacher_id: teacherId, password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "ログインできませんでした。");
+      location.reload();
+    } catch (err) {
+      showAdminSettingsLockError(err.message || "ログインできませんでした。");
+    }
+  }
+
+  if (adminLoginBtn) {
+    adminLoginBtn.addEventListener("click", submitHeaderLogin);
+  }
+  if (adminLogoutBtn) {
+    adminLogoutBtn.addEventListener("click", async () => {
+      await fetch("/news/admin/api/logout", { method: "POST", credentials: "same-origin" });
+      location.reload();
+    });
+  }
+
   if (adminSettingsUnlock) {
     adminSettingsUnlock.addEventListener("click", unlockAdminSettings);
   }
+
+  const requireTeacherLoginEl = document.getElementById("require-teacher-login");
+  const shareTeacherArchivesEl = document.getElementById("share-teacher-archives");
+  const teacherIssueId = document.getElementById("teacher-issue-id");
+  const teacherIssuePassword = document.getElementById("teacher-issue-password");
+  const teacherIssueBtn = document.getElementById("teacher-issue-btn");
+  const teacherCopyBtn = document.getElementById("teacher-copy-btn");
+  const teacherAccountList = document.getElementById("teacher-account-list");
+  const teacherAccountMessage = document.getElementById("teacher-account-message");
+  const teacherPasswordVisibility = document.getElementById("teacher-password-visibility");
+  let teacherAccounts = [];
+  let teacherPasswordsVisible = false;
+  let teacherLoginUrl = `${location.origin}/news/admin/login`;
+
+  function teacherCopyText(account) {
+    return `ID: ${account.id}\nパスワード: ${account.password}\nログインURL: ${teacherLoginUrl}`;
+  }
+
+  function showTeacherAccountMessage(text, isError) {
+    if (!teacherAccountMessage) return;
+    teacherAccountMessage.textContent = text;
+    teacherAccountMessage.classList.remove("hidden", "text-red-600", "text-emerald-700");
+    teacherAccountMessage.classList.add(isError ? "text-red-600" : "text-emerald-700");
+  }
+
+  function renderTeacherAccounts() {
+    if (!teacherAccountList) return;
+    const summary = document.querySelector("#teacher-account-details summary");
+    if (summary) summary.textContent = `発行済みアカウント（${teacherAccounts.length}）`;
+    teacherAccountList.innerHTML = "";
+    teacherAccounts.forEach((account) => {
+      const row = document.createElement("li");
+      row.className = "flex items-center gap-1 whitespace-nowrap";
+      const password = teacherPasswordsVisible ? account.password : "••••";
+      const date = (account.created_at || "").slice(0, 10);
+      const idSpan = document.createElement("span");
+      idSpan.className = "w-16 truncate font-medium";
+      idSpan.textContent = account.id;
+      const passSpan = document.createElement("span");
+      passSpan.className = "w-16 truncate font-mono";
+      passSpan.textContent = password;
+      const dateSpan = document.createElement("span");
+      dateSpan.className = "w-16 text-slate-500";
+      dateSpan.textContent = date;
+      const copyBtn = document.createElement("button");
+      copyBtn.type = "button";
+      copyBtn.className = "rounded border border-teal-100 px-1.5 py-0.5";
+      copyBtn.textContent = "コピー";
+      copyBtn.addEventListener("click", () => navigator.clipboard.writeText(teacherCopyText(account)));
+      const stopBtn = document.createElement("button");
+      stopBtn.type = "button";
+      stopBtn.className = "rounded border border-amber-100 px-1.5 py-0.5";
+      stopBtn.textContent = account.disabled ? "再開" : "停止";
+      stopBtn.addEventListener("click", () => postTeacherAction(account.disabled ? "resume" : "stop", account.id));
+      const deleteBtn = document.createElement("button");
+      deleteBtn.type = "button";
+      deleteBtn.className = "rounded border border-red-100 px-1.5 py-0.5 text-red-700";
+      deleteBtn.textContent = "削除";
+      deleteBtn.addEventListener("click", () => {
+        if (!confirm(`「${account.id}」を削除しますか？この操作は元に戻せません。`)) return;
+        postTeacherAction("delete", account.id);
+      });
+      row.append(idSpan, passSpan, dateSpan, copyBtn, stopBtn, deleteBtn);
+      teacherAccountList.appendChild(row);
+    });
+  }
+
+  async function loadTeacherAccounts() {
+    if (!teacherAccountList) return;
+    const res = await fetch("/news/admin/api/access-settings", { credentials: "same-origin" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) return;
+    teacherAccounts = data.accounts || [];
+    if (data.login_url) teacherLoginUrl = data.login_url;
+    if (requireTeacherLoginEl) requireTeacherLoginEl.checked = !!data.require_teacher_login;
+    if (shareTeacherArchivesEl) shareTeacherArchivesEl.checked = !!data.share_archives;
+    renderTeacherAccounts();
+  }
+
+  async function saveTeacherAccessToggles() {
+    const res = await fetch("/news/admin/api/access-settings", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        require_teacher_login: !!(requireTeacherLoginEl && requireTeacherLoginEl.checked),
+        share_archives: !!(shareTeacherArchivesEl && shareTeacherArchivesEl.checked),
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) showTeacherAccountMessage(data.error || "設定を保存できませんでした。", true);
+    else showTeacherAccountMessage("設定を保存しました。", false);
+  }
+
+  async function postTeacherAction(action, id) {
+    const res = await fetch(`/news/admin/api/teachers/${action}`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      showTeacherAccountMessage(data.error || "操作に失敗しました。", true);
+      return;
+    }
+    teacherAccounts = data.accounts || [];
+    renderTeacherAccounts();
+  }
+
+  if (requireTeacherLoginEl) requireTeacherLoginEl.addEventListener("change", saveTeacherAccessToggles);
+  if (shareTeacherArchivesEl) shareTeacherArchivesEl.addEventListener("change", saveTeacherAccessToggles);
+  if (teacherPasswordVisibility) {
+    teacherPasswordVisibility.addEventListener("click", () => {
+      teacherPasswordsVisible = !teacherPasswordsVisible;
+      teacherPasswordVisibility.textContent = teacherPasswordsVisible ? "非表示" : "表示";
+      renderTeacherAccounts();
+    });
+  }
+  if (teacherIssueBtn) {
+    teacherIssueBtn.addEventListener("click", async () => {
+      const res = await fetch("/news/admin/api/teachers", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: teacherIssueId ? teacherIssueId.value.trim() : "",
+          password: teacherIssuePassword ? teacherIssuePassword.value : "",
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        showTeacherAccountMessage(data.error || "発行できませんでした。", true);
+        return;
+      }
+      teacherAccounts = data.accounts || [];
+      if (data.login_url) teacherLoginUrl = data.login_url;
+      renderTeacherAccounts();
+      showTeacherAccountMessage("発行しました。コピーで渡せます。", false);
+    });
+  }
+  if (teacherCopyBtn) {
+    teacherCopyBtn.addEventListener("click", async () => {
+      const id = teacherIssueId ? teacherIssueId.value.trim() : "";
+      const password = teacherIssuePassword ? teacherIssuePassword.value : "";
+      if (!id || !password) {
+        showTeacherAccountMessage("IDとパスワードを入力してください。", true);
+        return;
+      }
+      await navigator.clipboard.writeText(teacherCopyText({ id, password }));
+      showTeacherAccountMessage("コピーしました。", false);
+    });
+  }
+  if (teacherAccountList) loadTeacherAccounts();
 
   document.addEventListener("click", (e) => {
     if (!isAdminSettingsOpen()) return;
@@ -2070,12 +2316,13 @@
     });
   }
 
-  if (archiveList) {
-    archiveList.addEventListener("click", async (e) => {
+  const archiveClickRoot = archiveList ? archiveList.closest(".admin-archive-panel") : null;
+  if (archiveClickRoot) {
+    archiveClickRoot.addEventListener("click", async (e) => {
       const btn = e.target.closest("button");
       if (!btn) return;
       const itemEl = btn.closest("li");
-      const classId = getSelectedClassId();
+      const classId = (itemEl && itemEl.dataset.classId) || getSelectedClassId();
       const archiveIndex = parseInt(itemEl && itemEl.dataset.archiveIndex, 10);
       const archiveId = (itemEl && itemEl.dataset.archiveId) || "";
       if (!classId || !Number.isFinite(archiveIndex)) return;
@@ -4737,4 +4984,5 @@
   if (!window.ADMIN_ACTIVE_CLASS && window.ADMIN_POSTVIEW_QUESTIONS && window.ADMIN_POSTVIEW_QUESTIONS.length) {
     renderAdminPostviewPreview(window.ADMIN_POSTVIEW_QUESTIONS);
   }
+  loadSharedArchives();
 })();

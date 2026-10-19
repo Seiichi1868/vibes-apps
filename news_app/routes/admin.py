@@ -3,16 +3,35 @@ import logging
 from pathlib import Path
 
 import openpyxl
-from flask import Blueprint, current_app, jsonify, render_template, request, send_file, send_from_directory, url_for
+from flask import Blueprint, current_app, jsonify, redirect, render_template, request, send_file, send_from_directory, url_for
 
 logger = logging.getLogger(__name__)
 
+from news_app.access_control import (
+    actor_id,
+    attempt_login,
+    copy_login_text,
+    current_actor,
+    delete_account,
+    can_manage_class,
+    deny_class,
+    is_owner_session,
+    issue_account,
+    login_status_payload,
+    managed_classes,
+    public_accounts,
+    require_teacher_login,
+    resume_account,
+    share_archives_enabled,
+    stop_account,
+    submission_allowed,
+    update_access_settings,
+    viewable_classes,
+)
 from news_app.admin_auth import (
     check_admin_password_attempt,
     clear_admin_session,
     configure_session_cookie,
-    establish_admin_session,
-    is_admin_session,
 )
 from news_app.config import (
     AI_MODELS,
@@ -61,7 +80,6 @@ from news_app.services.storage import (
     get_submission,
     get_submissions,
     import_roster_from_excel,
-    list_classes,
     load_state,
     reset_class_current,
     restore_class_archive,
@@ -95,18 +113,11 @@ def _configure_admin_session(state):
 @admin_bp.route("/api/login", methods=["POST"])
 def admin_login():
     payload = request.get_json(silent=True) or {}
-    provided = payload.get("password")
-    if provided is None:
-        provided = payload.get("admin_password")
-    denied = check_admin_password_attempt(
-        provided,
-        matches=admin_password_matches,
-        configured=get_admin_password,
-    )
+    denied = attempt_login(payload)
     if denied:
         return denied
-    establish_admin_session()
-    return jsonify({"ok": True, "logged_in": True})
+    role, actor = current_actor()
+    return jsonify({"ok": True, "logged_in": True, "role": role, "teacher_id": actor if role == "teacher" else ""})
 
 
 @admin_bp.route("/api/logout", methods=["POST"])
@@ -119,7 +130,7 @@ def admin_logout():
 def admin_status():
     if not get_admin_password():
         return jsonify({"ok": False, "logged_in": False, "error": "管理パスワードが設定されていません。"}), 503
-    return jsonify({"ok": True, "logged_in": is_admin_session()})
+    return jsonify(login_status_payload())
 
 
 _OPEN_ADMIN_ENDPOINTS = frozenset(
@@ -128,7 +139,73 @@ _OPEN_ADMIN_ENDPOINTS = frozenset(
         "news_admin.admin_logout",
         "news_admin.admin_status",
         "news_admin.web_app_manifest",
-        "news_admin.admin_index",
+        "news_admin.admin_login_page",
+    }
+)
+
+# 教員ログイン必須が OFF のときだけ、未ログインで使える CNN10 検索。
+_CNN10_PUBLIC_ENDPOINTS = frozenset(
+    {
+        "news_admin.cnn10_episodes",
+        "news_admin.cnn10_library_status",
+        "news_admin.cnn10_library_search",
+        "news_admin.cnn10_embeddings_status",
+        "news_admin.cnn10_library_semantic_search",
+    }
+)
+
+_OWNER_ONLY_ENDPOINTS = frozenset(
+    {
+        "news_admin.save_settings",
+        "news_admin.appearance_settings",
+        "news_admin.password_check",
+        "news_admin.access_settings",
+        "news_admin.teacher_account_issue",
+        "news_admin.teacher_account_stop",
+        "news_admin.teacher_account_resume",
+        "news_admin.teacher_account_delete",
+    }
+)
+
+_MANAGE_CLASS_ENDPOINTS = frozenset(
+    {
+        "news_admin.api_save_lesson",
+        "news_admin.api_translate_lesson_script",
+        "news_admin.api_export_lesson_script_translation_docx",
+        "news_admin.api_extract_lesson_vocabulary",
+        "news_admin.api_update_lesson_vocabulary_selection",
+        "news_admin.api_toggle_vocabulary_scaffolding",
+        "news_admin.api_toggle_translation_scaffolding",
+        "news_admin.api_generate_warmup",
+        "news_admin.api_update_warmup_selection",
+        "news_admin.api_toggle_warmup_scaffolding",
+        "news_admin.api_generate_postview",
+        "news_admin.api_update_postview_selection",
+        "news_admin.api_toggle_postview_scaffolding",
+        "news_admin.api_toggle_postview_answers",
+        "news_admin.api_generate_writing_topics",
+        "news_admin.api_update_writing_selection",
+        "news_admin.api_export_lesson_materials_docx",
+        "news_admin.api_archive_lesson",
+        "news_admin.api_reset_lesson",
+        "news_admin.api_restore_archive_lesson",
+        "news_admin.api_delete_archive_lesson",
+        "news_admin.api_set_archive_in_use",
+        "news_admin.api_select_class",
+        "news_admin.upload_roster",
+        "news_admin.get_roster_api",
+        "news_admin.list_submissions",
+        "news_admin.export_submissions",
+    }
+)
+
+_VIEW_CLASS_ENDPOINTS = frozenset(
+    {
+        "news_admin.api_get_class",
+        "news_admin.list_class_lessons",
+        "news_admin.share_link",
+        "news_admin.screen_link",
+        "news_admin.screen_qr",
     }
 )
 
@@ -142,22 +219,72 @@ def _wants_admin_json() -> bool:
     return json_ok > 0 and json_ok >= html_ok
 
 
+def _request_class_id() -> str:
+    if request.view_args and request.view_args.get("class_id"):
+        return str(request.view_args.get("class_id") or "").strip()
+    if request.method == "GET":
+        return str(request.args.get("class_id") or "").strip()
+    data = request.get_json(silent=True) or {}
+    if isinstance(data, dict) and data.get("class_id"):
+        return str(data.get("class_id") or "").strip()
+    if request.form:
+        return str(request.form.get("class_id") or "").strip()
+    return ""
+
+
+def _owner_required():
+    if is_owner_session():
+        return None
+    return jsonify({"ok": False, "error": "所有者だけが操作できます。"}), 403
+
+
 @admin_bp.before_request
 def require_admin_session():
     if request.method == "OPTIONS":
         return None
-    if request.endpoint in _OPEN_ADMIN_ENDPOINTS:
+    endpoint = request.endpoint
+    if endpoint in _OPEN_ADMIN_ENDPOINTS:
         return None
-    if is_admin_session() and get_admin_password():
+
+    if endpoint == "news_admin.admin_index":
+        role, _actor = current_actor()
+        if role:
+            return None
+        if not get_admin_password():
+            return "管理パスワードが設定されていません。", 503
+        if require_teacher_login():
+            return redirect(url_for("news_admin.admin_login_page"))
         return None
-    if not get_admin_password():
-        body = {"ok": False, "error": "管理パスワードが設定されていません。"}
+
+    if endpoint in _CNN10_PUBLIC_ENDPOINTS and not require_teacher_login():
+        return None
+
+    role, _actor = current_actor()
+    if not role:
+        if not get_admin_password():
+            body = {"ok": False, "error": "管理パスワードが設定されていません。"}
+            if _wants_admin_json():
+                return jsonify(body), 503
+            return "管理パスワードが設定されていません。", 503
         if _wants_admin_json():
-            return jsonify(body), 503
-        return "管理パスワードが設定されていません。", 503
-    if _wants_admin_json():
-        return jsonify({"ok": False, "error": "ログインが必要です。"}), 401
-    return redirect(url_for("news_admin.admin_index"))
+            return jsonify({"ok": False, "error": "ログインが必要です。"}), 401
+        return redirect(url_for("news_admin.admin_login_page"))
+
+    if endpoint in _OWNER_ONLY_ENDPOINTS:
+        denied = _owner_required()
+        if denied:
+            return denied
+
+    if endpoint in _MANAGE_CLASS_ENDPOINTS or endpoint in _VIEW_CLASS_ENDPOINTS:
+        class_id = _request_class_id()
+        if endpoint in {"news_admin.list_submissions", "news_admin.export_submissions"} and not class_id:
+            return None
+        if not class_id:
+            class_id = get_active_class_id()
+        if not class_id:
+            return jsonify({"ok": False, "error": "クラスを選択または作成してください。"}), 400
+        return deny_class(class_id, manage=endpoint in _MANAGE_CLASS_ENDPOINTS)
+    return None
 
 
 @admin_bp.route("/manifest.json")
@@ -291,8 +418,17 @@ def cnn10_library_semantic_search():
         return jsonify({"ok": False, "error": f"意味検索に失敗しました: {exc}"}), 502
 
 
+@admin_bp.route("/login")
+def admin_login_page():
+    role, _actor = current_actor()
+    if role:
+        return redirect(url_for("news_admin.admin_index"))
+    return render_template("news/admin_login.html", require_teacher_login=require_teacher_login())
+
+
 @admin_bp.route("/")
 def admin_index():
+    role, actor = current_actor()
     state = load_state()
     state = {
         **state,
@@ -304,10 +440,27 @@ def admin_index():
         ),
         "default_cefr_level": resolve_cefr_level(state.get("default_cefr_level")),
     }
+    classes = viewable_classes() if role else []
+    submission_classes = managed_classes() if role else []
     class_id, cls = _active_class_or_none()
+    managed_ids = {c["id"] for c in submission_classes}
+    for item in classes:
+        item["can_manage"] = item["id"] in managed_ids
+    if class_id not in managed_ids:
+        class_id, cls = ("", None)
+        if submission_classes:
+            class_id = submission_classes[0]["id"]
+            cls = get_class(class_id)
+    if not role:
+        state = {
+            **state,
+            "openai_api_key": "",
+        }
+        cls = None
+        class_id = ""
     current = (cls or {}).get("current") or {}
-    api_key_configured = bool(get_openai_api_key())
-    classes = list_classes()
+    api_key_configured = bool(get_openai_api_key()) and role == "owner"
+    is_owner = role == "owner"
 
     return render_template(
         "news/admin.html",
@@ -324,7 +477,14 @@ def admin_index():
         start_time_display=seconds_to_display(int(current.get("start_seconds") or 0)),
         end_time_display=seconds_to_display(int(current.get("end_seconds") or 0)),
         api_key_configured=api_key_configured,
-        api_key_masked=mask_api_key(state.get("openai_api_key") or get_openai_api_key()),
+        api_key_masked=mask_api_key(state.get("openai_api_key") or "") if is_owner else "",
+        is_owner=is_owner,
+        is_logged_in=bool(role),
+        actor_label=actor or "",
+        submission_classes=submission_classes,
+        require_teacher_login=require_teacher_login(),
+        share_archives=share_archives_enabled() if role else False,
+        login_url=url_for("news_admin.admin_login_page"),
         **appearance_context(state),
     )
 
@@ -333,6 +493,76 @@ def _admin_password_denied():
     if not get_admin_password():
         return jsonify({"ok": False, "error": "管理パスワードが設定されていません。"}), 503
     return jsonify({"ok": False, "error": "管理設定のパスワードが違います。"}), 403
+
+
+@admin_bp.route("/api/access-settings", methods=["GET", "POST"])
+def access_settings():
+    if request.method == "GET":
+        return jsonify(
+            {
+                "ok": True,
+                "require_teacher_login": require_teacher_login(),
+                "share_archives": share_archives_enabled(),
+                "accounts": public_accounts(),
+                "login_url": request.url_root.rstrip("/") + url_for("news_admin.admin_login_page"),
+            }
+        )
+    data = request.get_json(silent=True) or {}
+    updated = update_access_settings(
+        require_login=data.get("require_teacher_login") if "require_teacher_login" in data else None,
+        share_archives=data.get("share_archives") if "share_archives" in data else None,
+    )
+    return jsonify({"ok": True, **updated})
+
+
+@admin_bp.route("/api/teachers", methods=["POST"])
+def teacher_account_issue():
+    data = request.get_json(silent=True) or {}
+    account, error = issue_account(str(data.get("id") or ""), data.get("password") if isinstance(data.get("password"), str) else "")
+    if error:
+        return jsonify({"ok": False, "error": error}), 400
+    login_url = request.url_root.rstrip("/") + url_for("news_admin.admin_login_page")
+    return jsonify(
+        {
+            "ok": True,
+            "account": {
+                "id": account["id"],
+                "password": account["password"],
+                "created_at": account["created_at"],
+                "disabled": False,
+            },
+            "copy_text": copy_login_text(account["id"], account["password"], login_url),
+            "accounts": public_accounts(),
+            "login_url": login_url,
+        }
+    )
+
+
+@admin_bp.route("/api/teachers/stop", methods=["POST"])
+def teacher_account_stop():
+    data = request.get_json(silent=True) or {}
+    account, error = stop_account(str(data.get("id") or ""))
+    if error:
+        return jsonify({"ok": False, "error": error}), 404
+    return jsonify({"ok": True, "accounts": public_accounts(), "id": account["id"], "disabled": True})
+
+
+@admin_bp.route("/api/teachers/resume", methods=["POST"])
+def teacher_account_resume():
+    data = request.get_json(silent=True) or {}
+    account, error = resume_account(str(data.get("id") or ""))
+    if error:
+        return jsonify({"ok": False, "error": error}), 404
+    return jsonify({"ok": True, "accounts": public_accounts(), "id": account["id"], "disabled": False})
+
+
+@admin_bp.route("/api/teachers/delete", methods=["POST"])
+def teacher_account_delete():
+    data = request.get_json(silent=True) or {}
+    error = delete_account(str(data.get("id") or ""))
+    if error:
+        return jsonify({"ok": False, "error": error}), 404
+    return jsonify({"ok": True, "accounts": public_accounts()})
 
 
 @admin_bp.route("/api/password-check", methods=["POST"])
@@ -414,17 +644,43 @@ def appearance_settings():
 
 @admin_bp.route("/api/classes", methods=["GET"])
 def api_list_classes():
-    return jsonify({"ok": True, "classes": list_classes(), "active_class_id": get_active_class_id()})
+    classes = viewable_classes()
+    managed_ids = {c["id"] for c in managed_classes()}
+    for item in classes:
+        item["can_manage"] = item["id"] in managed_ids
+    active = get_active_class_id()
+    if active not in managed_ids:
+        active = next(iter(managed_ids), "")
+    return jsonify(
+        {
+            "ok": True,
+            "classes": classes,
+            "active_class_id": active,
+            "share_archives": share_archives_enabled(),
+        }
+    )
 
 
 @admin_bp.route("/api/classes", methods=["POST"])
 def api_create_class():
     data = request.get_json(silent=True) or {}
     try:
-        cls = create_class(str(data.get("name", "")).strip())
+        cls = create_class(str(data.get("name", "")).strip(), created_by=actor_id() or "owner")
         return jsonify({"ok": True, "class": cls, "active_class_id": cls["id"]})
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
+
+
+@admin_bp.route("/api/classes/<class_id>", methods=["GET"])
+def api_get_class(class_id):
+    """閲覧専用。現在のクラスは変えない。"""
+    return jsonify(
+        {
+            "ok": True,
+            "class": get_class(class_id),
+            "can_manage": can_manage_class(class_id),
+        }
+    )
 
 
 @admin_bp.route("/api/classes/select", methods=["POST"])
@@ -1242,7 +1498,7 @@ def api_archive_lesson():
             title = fetch_youtube_title(current.get("source_url") or current.get("video_id") or "")
         if not lesson_name:
             lesson_name = str(current.get("lesson_name") or "").strip()
-        cls = archive_class_current(class_id, title, lesson_name)
+        cls = archive_class_current(class_id, title, lesson_name, created_by=actor_id() or "owner")
         return jsonify(
             {
                 "ok": True,
@@ -1322,7 +1578,15 @@ def api_copy_archive_lesson():
     target_class_id = str(data.get("target_class_id") or "").strip()
     try:
         archive_index = int(data.get("archive_index", -1))
-        source_cls, target_cls = copy_class_archive(class_id, archive_index, target_class_id)
+        source_denied = deny_class(class_id, manage=False)
+        if source_denied:
+            return source_denied
+        target_denied = deny_class(target_class_id, manage=True)
+        if target_denied:
+            return target_denied
+        source_cls, target_cls = copy_class_archive(
+            class_id, archive_index, target_class_id, created_by=actor_id() or "owner"
+        )
         return jsonify(
             {
                 "ok": True,
@@ -1517,12 +1781,17 @@ def list_class_lessons():
     return jsonify({"ok": True, "lessons": _lesson_options_for_class(class_id)})
 
 
+def _filter_managed_submissions(submissions: list[dict]) -> list[dict]:
+    allowed = {c["id"] for c in managed_classes()}
+    return [s for s in submissions if s.get("class_id") in allowed]
+
+
 @admin_bp.route("/api/submissions", methods=["GET"])
 def list_submissions():
     class_id = request.args.get("class_id") or None
     lesson_key_filter = request.args.get("lesson_key") or None
     submissions = []
-    for submission in get_submissions(class_id):
+    for submission in _filter_managed_submissions(get_submissions(class_id)):
         submission = _submission_with_lesson_display(submission)
         if lesson_key_filter and submission.get("lesson_key") != lesson_key_filter:
             continue
@@ -1539,6 +1808,9 @@ def list_submissions():
 
 @admin_bp.route("/api/submissions/<submission_id>", methods=["DELETE"])
 def delete_submission_api(submission_id):
+    denied = submission_allowed(submission_id)
+    if denied:
+        return denied
     ok = delete_submission(submission_id)
     if ok:
         return jsonify({"ok": True})
@@ -1550,7 +1822,7 @@ def export_submissions():
     """提出結果を Excel でダウンロード。?class_id=xxx で絞り込み可。"""
     class_id = request.args.get("class_id") or None
     lesson_key_filter = request.args.get("lesson_key") or None
-    submissions = get_submissions(class_id)
+    submissions = _filter_managed_submissions(get_submissions(class_id))
     submissions = [_submission_with_lesson_display(s) for s in submissions]
     if lesson_key_filter:
         submissions = [s for s in submissions if s.get("lesson_key") == lesson_key_filter]
@@ -1654,9 +1926,10 @@ def _pdf_response(submissions: list[dict], *, download_name: str, inline: bool =
 def export_submission_pdf(submission_id):
     """個別提出の評価帳票 PDF（ブラウザ表示用）。"""
     try:
+        denied = submission_allowed(submission_id)
+        if denied:
+            return denied
         submission = get_submission(submission_id)
-        if not submission:
-            return jsonify({"ok": False, "error": "データが見つかりません。"}), 404
         safe_name = _ascii_safe_filename(submission.get("student_name"), fallback="student")
         return _pdf_response(
             [_submission_for_pdf(submission)],
@@ -1679,10 +1952,12 @@ def export_submissions_pdf_bulk():
 
         wanted = {str(i) for i in ids if i}
         by_id = {}
-        for submission in get_submissions():
+        for submission in _filter_managed_submissions(get_submissions()):
             sid = submission.get("id")
             if sid in wanted:
                 by_id[sid] = _submission_for_pdf(submission)
+        if wanted - set(by_id):
+            return jsonify({"ok": False, "error": "このクラスを操作する権限がありません。"}), 403
 
         ordered = [by_id[str(i)] for i in ids if str(i) in by_id]
         if not ordered:

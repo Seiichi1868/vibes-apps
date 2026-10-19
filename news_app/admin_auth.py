@@ -117,6 +117,9 @@ def establish_admin_session() -> None:
 
 def clear_admin_session() -> None:
     session.pop(SESSION_KEY, None)
+    session.pop("news_admin_role", None)
+    session.pop("news_admin_actor", None)
+    session.pop("news_admin_rev", None)
     session.modified = True
 
 
