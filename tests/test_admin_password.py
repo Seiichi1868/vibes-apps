@@ -124,24 +124,24 @@ class AdminPasswordHttpTests(_EnvIsolation):
 
     def test_password_check_accepts_configured_password(self):
         response = self.client.post(
-            "/api/admin/password-check",
-            json={"admin_password": _CONFIGURED},
+            "/api/admin/login",
+            json={"password": _CONFIGURED},
         )
         self.assertEqual(response.status_code, 200)
         self.assertTrue((response.get_json() or {}).get("ok"))
 
     def test_password_check_rejects_wrong_password(self):
         response = self.client.post(
-            "/api/admin/password-check",
-            json={"admin_password": "wrong-password"},
+            "/api/admin/login",
+            json={"password": "wrong-password"},
         )
         self.assertEqual(response.status_code, 403)
 
     def test_password_check_fails_closed_when_unset(self):
         os.environ.pop("ADMIN_PASSWORD", None)
         response = self.client.post(
-            "/api/admin/password-check",
-            json={"admin_password": _CONFIGURED},
+            "/api/admin/login",
+            json={"password": _CONFIGURED},
         )
         self.assertEqual(response.status_code, 503)
         body = response.get_json() or {}
@@ -149,19 +149,19 @@ class AdminPasswordHttpTests(_EnvIsolation):
 
     def test_news_password_check(self):
         ok = self.client.post(
-            "/news/admin/api/password-check",
-            json={"admin_password": _CONFIGURED},
+            "/news/admin/api/login",
+            json={"password": _CONFIGURED},
         )
         self.assertEqual(ok.status_code, 200)
         bad = self.client.post(
-            "/news/admin/api/password-check",
-            json={"admin_password": "wrong-password"},
+            "/news/admin/api/login",
+            json={"password": "wrong-password"},
         )
         self.assertEqual(bad.status_code, 403)
         os.environ.pop("ADMIN_PASSWORD", None)
         unset = self.client.post(
-            "/news/admin/api/password-check",
-            json={"admin_password": _CONFIGURED},
+            "/news/admin/api/login",
+            json={"password": _CONFIGURED},
         )
         self.assertEqual(unset.status_code, 503)
 
@@ -172,8 +172,8 @@ class AdminPasswordHttpTests(_EnvIsolation):
         )
         self.assertEqual(debate_ok.status_code, 200)
         gtec_ok = self.client.post(
-            "/gtec/admin/api/settings",
-            json={"admin_password": _CONFIGURED},
+            "/gtec/admin/api/login",
+            json={"password": _CONFIGURED},
         )
         self.assertEqual(gtec_ok.status_code, 200)
         debate_bad = self.client.post(
