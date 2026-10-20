@@ -9,7 +9,13 @@ import logging
 import threading
 import uuid
 
-from debate.config import GENERATION_STUCK_SEC, TTS_STUCK_SEC
+from debate.config import (
+    GENERATION_QUEUE_STUCK_SEC,
+    GENERATION_STUCK_SEC,
+    SOLO_POOL_SIZE,
+    TTS_QUEUE_STUCK_SEC,
+    TTS_STUCK_SEC,
+)
 from debate.models import now_iso
 from debate.opponent import generate_speech
 from debate.solo import generation_guard, next_generation_targets, part_is_ai, tts_filename
@@ -41,15 +47,15 @@ def _get_pool():
             try:
                 from gevent.threadpool import ThreadPool
 
-                _pool = ThreadPool(3)
+                _pool = ThreadPool(SOLO_POOL_SIZE)
                 _use_gevent = True
-                logger.info("debate solo: using gevent.threadpool.ThreadPool")
+                logger.info("debate solo: using gevent.threadpool.ThreadPool size=%s", SOLO_POOL_SIZE)
                 return _pool
             except Exception as exc:  # noqa: BLE001
                 logger.warning("debate solo: gevent threadpool unavailable (%s)", exc)
         from concurrent.futures import ThreadPoolExecutor
 
-        _pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix="debate-solo")
+        _pool = ThreadPoolExecutor(max_workers=SOLO_POOL_SIZE, thread_name_prefix="debate-solo")
         _use_gevent = False
         logger.info("debate solo: using ThreadPoolExecutor")
         return _pool
@@ -90,7 +96,8 @@ def _mark_text_generating(session_id: str, part: str, *, is_retry: bool) -> str 
         job_id = uuid.uuid4().hex
         part_data["generation_status"] = "generating"
         part_data["generation_error"] = None
-        part_data["generation_started_at"] = now_iso()
+        part_data["generation_queued_at"] = now_iso()
+        part_data["generation_started_at"] = None
         part_data["generation_id"] = job_id
         if is_retry:
             part_data["generation_retry_at"] = now_iso()
@@ -167,7 +174,8 @@ def _mark_tts_generating(session_id: str, part: str, *, is_retry: bool) -> str |
         job_id = uuid.uuid4().hex
         part_data["tts_status"] = "generating"
         part_data["tts_error"] = None
-        part_data["tts_started_at"] = now_iso()
+        part_data["tts_queued_at"] = now_iso()
+        part_data["tts_started_at"] = None
         part_data["tts_id"] = job_id
         if is_retry:
             part_data["tts_retry_at"] = now_iso()
@@ -202,7 +210,28 @@ def _save_tts_error(session_id: str, part: str, job_id: str, message: str) -> No
         save_session(session)
 
 
+def _note_work_started(session_id: str, part: str, job_id: str, *, kind: str) -> None:
+    """プールから取り出されて処理を始めた時刻。キュー投入時刻とは分ける。"""
+    with get_session_lock(session_id):
+        session = load_session(session_id)
+        part_data = get_part(session, part) if session else None
+        if not part_data:
+            return
+        if kind == "generation":
+            if part_data.get("generation_status") != "generating":
+                return
+            if part_data.get("generation_id") not in (None, job_id):
+                return
+            part_data["generation_started_at"] = now_iso()
+        else:
+            if part_data.get("tts_status") != "generating" or part_data.get("tts_id") != job_id:
+                return
+            part_data["tts_started_at"] = now_iso()
+        save_session(session)
+
+
 def run_tts_job(session_id: str, part: str, job_id: str) -> None:
+    _note_work_started(session_id, part, job_id, kind="tts")
     session = load_session(session_id)
     if not session:
         return
@@ -239,6 +268,7 @@ def start_tts_job(session_id: str, part: str, *, force: bool = False) -> dict | 
 
 
 def run_generation_job(session_id: str, part: str, job_id: str) -> None:
+    _note_work_started(session_id, part, job_id, kind="generation")
     session = load_session(session_id)
     if not session:
         return
@@ -311,44 +341,79 @@ def _seconds_since(iso_timestamp: str | None) -> float | None:
         return None
 
 
+def _job_is_stuck(part_data: dict, *, started_key: str, queued_key: str, running_sec: int, queued_sec: int) -> bool:
+    """開始済みは running_sec、未開始（キュー）は queued_sec で判定する。"""
+    started = part_data.get(started_key)
+    if started:
+        elapsed = _seconds_since(started)
+        limit = running_sec
+    else:
+        elapsed = _seconds_since(part_data.get(queued_key))
+        limit = queued_sec
+    return elapsed is not None and elapsed >= limit
+
+
 def recover_stuck_generation(session_id: str, part: str, part_data: dict) -> dict:
-    """テキスト生成が60秒停滞したら1回リトライ、だめなら error。TTSも同様。"""
+    """テキスト生成・TTS が停滞したら1回リトライ、だめなら error。
+
+    計測はワーカーが処理を始めた時刻から。キュー待ちはより長い閾値を使う。
+    """
 
     if part_data.get("generation_status") == "generating":
-        elapsed = _seconds_since(part_data.get("generation_started_at"))
-        if elapsed is not None and elapsed >= GENERATION_STUCK_SEC:
+        stuck = _job_is_stuck(
+            part_data,
+            started_key="generation_started_at",
+            queued_key="generation_queued_at",
+            running_sec=GENERATION_STUCK_SEC,
+            queued_sec=GENERATION_QUEUE_STUCK_SEC,
+        )
+        if stuck:
             if not part_data.get("generation_retry_at"):
                 start_generation_job(session_id, part, force=True)
             else:
                 with get_session_lock(session_id):
                     session = load_session(session_id)
                     current = get_part(session, part) if session else None
-                    if current and current.get("generation_status") == "generating":
-                        still = _seconds_since(current.get("generation_started_at")) or 0
-                        if still >= GENERATION_STUCK_SEC:
-                            current["generation_status"] = "error"
-                            current["generation_error"] = (
-                                "相手の準備が完了しませんでした。再試行してください。"
-                            )
-                            save_session(session)
+                    if current and current.get("generation_status") == "generating" and _job_is_stuck(
+                        current,
+                        started_key="generation_started_at",
+                        queued_key="generation_queued_at",
+                        running_sec=GENERATION_STUCK_SEC,
+                        queued_sec=GENERATION_QUEUE_STUCK_SEC,
+                    ):
+                        current["generation_status"] = "error"
+                        current["generation_error"] = (
+                            "相手の準備が完了しませんでした。再試行してください。"
+                        )
+                        save_session(session)
                 session = load_session(session_id)
                 part_data = get_part(session, part) if session else part_data
 
     if part_data and part_data.get("tts_status") == "generating":
-        elapsed = _seconds_since(part_data.get("tts_started_at"))
-        if elapsed is not None and elapsed >= TTS_STUCK_SEC:
+        stuck = _job_is_stuck(
+            part_data,
+            started_key="tts_started_at",
+            queued_key="tts_queued_at",
+            running_sec=TTS_STUCK_SEC,
+            queued_sec=TTS_QUEUE_STUCK_SEC,
+        )
+        if stuck:
             if not part_data.get("tts_retry_at"):
                 start_tts_job(session_id, part, force=True)
             else:
                 with get_session_lock(session_id):
                     session = load_session(session_id)
                     current = get_part(session, part) if session else None
-                    if current and current.get("tts_status") == "generating":
-                        still = _seconds_since(current.get("tts_started_at")) or 0
-                        if still >= TTS_STUCK_SEC:
-                            current["tts_status"] = "error"
-                            current["tts_error"] = "音声の準備が完了しませんでした。再試行してください。"
-                            save_session(session)
+                    if current and current.get("tts_status") == "generating" and _job_is_stuck(
+                        current,
+                        started_key="tts_started_at",
+                        queued_key="tts_queued_at",
+                        running_sec=TTS_STUCK_SEC,
+                        queued_sec=TTS_QUEUE_STUCK_SEC,
+                    ):
+                        current["tts_status"] = "error"
+                        current["tts_error"] = "音声の準備が完了しませんでした。再試行してください。"
+                        save_session(session)
                 session = load_session(session_id)
                 part_data = get_part(session, part) if session else part_data
 

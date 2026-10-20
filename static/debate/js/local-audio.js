@@ -43,7 +43,7 @@
     );
   }
 
-  async function put(sessionId, part, blob, mimeType) {
+  async function put(sessionId, part, blob, mimeType, browserTranscript) {
     const id = clipId(sessionId, part);
     if (!sessionId || !part || !blob) return;
     try {
@@ -54,6 +54,7 @@
           part,
           blob,
           mimeType: mimeType || blob.type || "audio/webm",
+          browserTranscript: browserTranscript || "",
           savedAt: Date.now(),
         })
       );

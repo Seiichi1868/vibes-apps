@@ -2,6 +2,7 @@
 import logging
 import threading
 
+from debate.config import JUDGE_POOL_SIZE
 from debate.judge import run_judge
 from debate.models import now_iso
 from debate.storage import get_session_lock, load_session, save_session
@@ -31,15 +32,15 @@ def _get_pool():
             try:
                 from gevent.threadpool import ThreadPool
 
-                _pool = ThreadPool(2)
+                _pool = ThreadPool(JUDGE_POOL_SIZE)
                 _use_gevent = True
-                logger.info("debate judge: using gevent.threadpool.ThreadPool")
+                logger.info("debate judge: using gevent.threadpool.ThreadPool size=%s", JUDGE_POOL_SIZE)
                 return _pool
             except Exception as exc:  # noqa: BLE001
                 logger.warning("debate judge: gevent threadpool unavailable (%s)", exc)
         from concurrent.futures import ThreadPoolExecutor
 
-        _pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="debate-judge")
+        _pool = ThreadPoolExecutor(max_workers=JUDGE_POOL_SIZE, thread_name_prefix="debate-judge")
         _use_gevent = False
         logger.info("debate judge: using ThreadPoolExecutor")
         return _pool
@@ -47,6 +48,17 @@ def _get_pool():
 
 def run_judge_job(session_id: str) -> None:
     """LLMでジャッジを実行し、完了後にセッションJSONへ反映する。"""
+    with get_session_lock(session_id):
+        session = load_session(session_id)
+        if not session:
+            return
+        judge_result = session.get("judge_result") or {}
+        if judge_result.get("status") != "judging":
+            return
+        judge_result["work_started_at"] = now_iso()
+        session["judge_result"] = judge_result
+        save_session(session)
+
     error_message = ""
     result = None
     try:

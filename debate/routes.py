@@ -21,6 +21,7 @@ from debate.config import (
     ALLOWED_AUDIO_EXTENSIONS,
     AUDIO_DIR,
     DEFAULT_MOTIONS,
+    JUDGE_QUEUE_STUCK_SEC,
     JUDGE_STUCK_SEC,
     MAX_AUDIO_BYTES,
     PART_GUIDES,
@@ -31,6 +32,8 @@ from debate.config import (
     POI_DURATION_SEC,
     POI_OFFER_TIMEOUT_SEC,
     STATUS_LABELS,
+    TRANSCRIBE_QUEUE_STUCK_SEC,
+    TRANSCRIBE_STUCK_SEC,
     ensure_dirs,
 )
 from debate.judge_jobs import start_judge_job
@@ -71,10 +74,6 @@ debate_bp = Blueprint("debate", __name__, url_prefix="/debate")
 
 JST = timezone(timedelta(hours=9))
 
-# 文字起こしがこの秒数を超えて "transcribing" のままなら、サーバー側で復旧する
-TRANSCRIBE_STUCK_SEC = int(os.environ.get("DEBATE_TRANSCRIBE_STUCK_SEC", "90"))
-
-
 def _seconds_since(iso_timestamp: str | None) -> float | None:
     if not iso_timestamp:
         return None
@@ -113,10 +112,41 @@ def _audio_path(session_id: str, audio_url: str) -> Path | None:
     return path if path.is_file() else None
 
 
+def _transcription_stall(part_data: dict) -> tuple[float | None, int]:
+    """停滞判定の経過秒と閾値。
+
+    ワーカー開始時刻があればそこから TRANSCRIBE_STUCK_SEC。
+    未開始（キュー待ち）は再キュー時刻、なければ end_time から TRANSCRIBE_QUEUE_STUCK_SEC。
+    """
+    started = part_data.get("transcribe_started_at")
+    if started:
+        return _seconds_since(started), TRANSCRIBE_STUCK_SEC
+    anchor = part_data.get("transcribe_retry_at") or part_data.get("end_time")
+    return _seconds_since(anchor), TRANSCRIBE_QUEUE_STUCK_SEC
+
+
+def _fill_browser_fallback(part_data: dict) -> None:
+    """Whisper が空のまま確認待ちになったとき、ブラウザ下書きを本文にする。"""
+    browser = str(part_data.get("transcript_browser") or "").strip()
+    if not browser:
+        return
+    raw = str(part_data.get("transcript_raw") or "").strip()
+    edited = str(part_data.get("transcript_edited") or "").strip()
+    if raw:
+        return
+    if edited and not (
+        part_data.get("transcript_source") == "browser" and edited == browser
+    ):
+        if edited != browser:
+            return
+    part_data["transcript_edited"] = browser
+    part_data["transcript_source"] = "browser"
+
+
 def _recover_stuck_transcription(session_id: str, part: str, part_data: dict) -> dict:
     """transcribing が長時間止まっているパートを needs_review に落とす（1回だけ再試行）。"""
-    elapsed = _seconds_since(part_data.get("end_time"))
-    if elapsed is None or elapsed < TRANSCRIBE_STUCK_SEC:
+    elapsed, limit = _transcription_stall(part_data)
+    if elapsed is None or elapsed < limit:
         return part_data
 
     with get_session_lock(session_id):
@@ -131,6 +161,7 @@ def _recover_stuck_transcription(session_id: str, part: str, part_data: dict) ->
         file_path = _audio_path(session_id, current.get("audio_url", ""))
         if not retry_at and file_path:
             current["transcribe_retry_at"] = now_iso()
+            current["transcribe_started_at"] = None
             save_session(session)
             start_transcription_job(session_id, part, file_path)
             logger.warning(
@@ -145,6 +176,7 @@ def _recover_stuck_transcription(session_id: str, part: str, part_data: dict) ->
         current["transcript_error"] = (
             "文字起こしが完了しませんでした。「文字起こしを確認」から再試行するか、手動で入力してください。"
         )
+        _fill_browser_fallback(current)
         save_session(session)
         logger.warning(
             "Recovered stuck transcription session=%s part=%s elapsed=%.0fs",
@@ -563,6 +595,8 @@ def progress_screen(session_id):
         ai_text_visible_default=AI_TEXT_VISIBLE_DEFAULT,
         poi_config=_poi_config(),
         practice_label=practice_scope_label(session) if is_practice(session) else "",
+        transcribe_stuck_sec=TRANSCRIBE_STUCK_SEC,
+        transcribe_queue_stuck_sec=TRANSCRIBE_QUEUE_STUCK_SEC,
         **_background_context(),
     )
 
@@ -669,7 +703,12 @@ def upload_part_audio(session_id, part):
         part_data["transcript_raw"] = ""
         part_data["transcript_edited"] = ""
         part_data["transcript_error"] = ""
+        if "browser_transcript" in request.form:
+            part_data["transcript_browser"] = str(request.form.get("browser_transcript") or "").strip()[:20000]
+        part_data["transcript_source"] = ""
+        part_data["transcript_force_whisper"] = False
         part_data["transcribe_retry_at"] = None
+        part_data["transcribe_started_at"] = None
         part_data["elapsed_sec"] = _resolve_elapsed_sec(
             part_data, request.form.get("elapsed_sec"), end_time
         )
@@ -709,7 +748,9 @@ def submit_part_transcript(session_id, part):
             "" if transcript_raw else "文字起こし結果が空です。やり直すか、確認画面で手動入力してください。"
         )
         part_data["transcription_mode"] = "realtime"
+        part_data["transcript_source"] = ""
         part_data["transcribe_retry_at"] = None
+        part_data["transcribe_started_at"] = None
         part_data["elapsed_sec"] = _resolve_elapsed_sec(
             part_data, payload.get("elapsed_sec"), end_time
         )
@@ -737,9 +778,13 @@ def retranscribe_part(session_id, part):
         if not file_path:
             return jsonify({"error": "音声ファイルが見つかりません。録音からやり直してください。"}), 404
 
+        payload = request.get_json(silent=True) or {}
         part_data["status"] = "transcribing"
         part_data["transcript_error"] = ""
         part_data["transcribe_retry_at"] = None
+        part_data["transcribe_started_at"] = None
+        if payload.get("overwrite"):
+            part_data["transcript_force_whisper"] = True
         save_session(session)
         response_data = dict(part_data)
 
@@ -804,6 +849,11 @@ def confirm_part(session_id, part):
 
         edited = str(payload.get("transcript_edited", part_data.get("transcript_edited", "")))
         part_data["transcript_edited"] = edited
+        incoming = str(payload.get("transcript_source") or "")
+        if incoming in ("browser", "edited") and part_data.get("transcript_source") != "whisper":
+            part_data["transcript_source"] = incoming
+            if incoming == "browser" and edited.strip() and not str(part_data.get("transcript_browser") or "").strip():
+                part_data["transcript_browser"] = edited.strip()[:20000]
         part_data["status"] = "confirmed"
         save_session(session)
         targets = next_generation_targets(session, part)
@@ -838,8 +888,12 @@ def reset_part(session_id, part):
                 "transcript_raw": "",
                 "transcript_edited": "",
                 "transcript_error": "",
+                "transcript_browser": "",
+                "transcript_source": "",
+                "transcript_force_whisper": False,
                 "transcription_mode": "",
                 "transcribe_retry_at": None,
+                "transcribe_started_at": None,
                 "start_time": None,
                 "end_time": None,
                 "elapsed_sec": None,
@@ -977,8 +1031,13 @@ def get_judge_result(session_id):
     judge_result = session.get("judge_result") or new_judge_result()
 
     if judge_result.get("status") == "judging":
-        elapsed = _seconds_since(judge_result.get("started_at"))
-        if elapsed is not None and elapsed > JUDGE_STUCK_SEC:
+        if judge_result.get("work_started_at"):
+            elapsed = _seconds_since(judge_result.get("work_started_at"))
+            limit = JUDGE_STUCK_SEC
+        else:
+            elapsed = _seconds_since(judge_result.get("started_at"))
+            limit = JUDGE_QUEUE_STUCK_SEC
+        if elapsed is not None and elapsed > limit:
             with get_session_lock(session_id):
                 session = load_session(session_id)
                 if session:

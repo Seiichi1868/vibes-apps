@@ -230,6 +230,7 @@
     recognition.interimResults = true;
 
     let finalText = "";
+    let interimText = "";
     let stopped = false;
     let paused = false;
 
@@ -240,6 +241,7 @@
         if (event.results[i].isFinal) finalText += `${chunk} `;
         else interim += chunk;
       }
+      interimText = interim;
       const combined = `${finalText}${interim}`.trim();
       captionBox.textContent =
         combined || "（発話するとここに認識したテキストが表示されます）";
@@ -262,6 +264,9 @@
     }
 
     return {
+      getText() {
+        return `${finalText}${interimText}`.trim();
+      },
       stop() {
         stopped = true;
         paused = false;
@@ -685,6 +690,7 @@
     const reviewBtn = card.querySelector(".btn-review");
     const saveBtn = card.querySelector(".btn-save");
     const resetBtn = card.querySelector(".btn-reset");
+    const localSaveBtn = card.querySelector(".btn-local-save");
     const uploadingLabel = card.querySelector(".btn-uploading");
     const pill = card.querySelector("[data-status-pill]");
     const timerEl = card.querySelector("[data-timer]");
@@ -699,6 +705,7 @@
     reviewBtn.classList.add("hidden");
     if (saveBtn) saveBtn.classList.add("hidden");
     resetBtn.classList.add("hidden");
+    if (localSaveBtn) localSaveBtn.classList.add("hidden");
     uploadingLabel.classList.add("hidden");
 
     const state = cardState.get(part) || {};
@@ -734,6 +741,7 @@
     } else if (status === "needs_review") {
       reviewBtn.classList.remove("hidden");
       resetBtn.classList.remove("hidden");
+      if (localSaveBtn && card.dataset.localSave === "1") localSaveBtn.classList.remove("hidden");
       if (saveBtn) saveBtn.classList.remove("hidden");
       reviewBtn.textContent = "文字起こしを確認";
       if (elapsed !== null) {
@@ -923,7 +931,8 @@
       recorder.addEventListener("stop", () => {
         stream.getTracks().forEach((t) => t.stop());
         const blob = new Blob(chunks, { type: mimeType || "audio/webm" });
-        window.DebateLocalAudio?.put(SESSION_ID, part, blob, mimeType || "audio/webm");
+        const browserTranscript = (cardState.get(part) || {}).browserTranscript || "";
+        window.DebateLocalAudio?.put(SESSION_ID, part, blob, mimeType || "audio/webm", browserTranscript);
         uploadAudio(card, blob, mimeType || "audio/webm");
       });
 
@@ -1093,6 +1102,8 @@
 
     if (!state.recorder || state.recorder.state === "inactive") return;
 
+    state.browserTranscript = (state.liveCaption?.getText?.() || "").trim();
+    cardState.set(part, state);
     cleanupRecordingResources(card, part);
 
     activeRecordingPart = null;
@@ -1105,14 +1116,30 @@
   }
 
   // ── 文字起こし完了待ちのポーリング ──────────────────────────
-  const STUCK_TRANSCRIBE_MS = 90 * 1000;
+  const STUCK_AFTER_START_MS = Number(window.DEBATE_STUCK_AFTER_START_MS) || 150 * 1000;
+  const STUCK_WHILE_QUEUED_MS = Number(window.DEBATE_STUCK_WHILE_QUEUED_MS) || 240 * 1000;
   const UPLOAD_TIMEOUT_MS = 120 * 1000;
 
-  function isTranscriptionStuck(endTimeIso) {
-    if (!endTimeIso) return false;
-    const endedAt = new Date(endTimeIso).getTime();
-    if (Number.isNaN(endedAt)) return false;
-    return Date.now() - endedAt > STUCK_TRANSCRIBE_MS;
+  function ageMs(iso) {
+    if (!iso) return null;
+    const at = new Date(iso).getTime();
+    if (Number.isNaN(at)) return null;
+    return Date.now() - at;
+  }
+
+  function isTranscriptionStuck(source) {
+    const started = source?.transcribe_started_at || source?.dataset?.transcribeStartedAt || "";
+    const startedAge = ageMs(started);
+    if (startedAge !== null) return startedAge > STUCK_AFTER_START_MS;
+    const anchor =
+      source?.transcribe_retry_at ||
+      source?.dataset?.transcribeRetryAt ||
+      source?.end_time ||
+      source?.dataset?.endTime ||
+      "";
+    const queuedAge = ageMs(anchor);
+    if (queuedAge === null) return false;
+    return queuedAge > STUCK_WHILE_QUEUED_MS;
   }
 
   function handleStuckTranscription(card) {
@@ -1139,7 +1166,9 @@
         if (!data.status) return;
 
         if (data.status === "transcribing") {
-          if (isTranscriptionStuck(data.end_time)) {
+          if (data.transcribe_started_at) card.dataset.transcribeStartedAt = data.transcribe_started_at;
+          if (data.transcribe_retry_at) card.dataset.transcribeRetryAt = data.transcribe_retry_at;
+          if (isTranscriptionStuck(data)) {
             stopStatusPolling(part);
             handleStuckTranscription(card);
           }
@@ -1187,6 +1216,8 @@
     if (elapsedSec != null) formData.append("elapsed_sec", String(elapsedSec));
     const pois = (cardState.get(part) || {}).speakingPois;
     if (pois) formData.append("pois", JSON.stringify(pois));
+    const browserTranscript = (cardState.get(part) || {}).browserTranscript || "";
+    formData.append("browser_transcript", browserTranscript);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
@@ -1207,10 +1238,16 @@
         const partData = data.part || data;
         card.dataset.status = partData.status || "needs_review";
         card.dataset.elapsed = partData.elapsed_sec ?? "";
+        card.dataset.localSave = "1";
         renderCard(card);
-        setError(card, data.error || "保存に失敗しました。文字起こし確認画面から手動で入力できます。");
+        setError(
+          card,
+          data.error ||
+            "保存に失敗しました。この端末の録音は残っています。「端末の録音で文字起こし」を押してください。"
+        );
         return;
       }
+      card.dataset.localSave = "";
 
       card.dataset.status = data.status || "transcribing";
       card.dataset.elapsed = data.elapsed_sec ?? "";
@@ -1226,13 +1263,31 @@
       activeRecordingPart = null;
       updateRecordButtonStates();
       card.dataset.status = "needs_review";
+      card.dataset.localSave = "1";
       renderCard(card);
       const msg =
         err.name === "AbortError"
-          ? "保存がタイムアウトしました。ネットワークをご確認のうえ、やり直してください。"
-          : "保存に失敗しました。ネットワークをご確認のうえ、やり直してください。";
+          ? "保存がタイムアウトしました。この端末の録音は残っています。「端末の録音で文字起こし」を押してください。"
+          : "保存に失敗しました。この端末の録音は残っています。「端末の録音で文字起こし」を押してください。";
       setError(card, msg);
     }
+  }
+
+  async function resendLocalAudio(card) {
+    const part = card.dataset.part;
+    const local = await window.DebateLocalAudio?.get(SESSION_ID, part);
+    if (!local?.blob || local.blob.size <= 0) {
+      setError(card, "この端末に録音が見つかりません。録音からやり直してください。");
+      return;
+    }
+    const state = cardState.get(part) || {};
+    state.browserTranscript = local.browserTranscript || "";
+    cardState.set(part, state);
+    card.dataset.status = "transcribing";
+    card.dataset.localSave = "";
+    setError(card, "");
+    renderCard(card);
+    uploadAudio(card, local.blob, local.mimeType || local.blob.type || "audio/webm");
   }
 
   async function handleSavePartClick(card) {
@@ -1339,23 +1394,42 @@
     card.querySelector(".btn-reset").addEventListener("click", () => handleResetClick(card));
     card.querySelector(".btn-review").addEventListener("click", () => handleReviewClick(card));
     card.querySelector(".btn-save")?.addEventListener("click", () => handleSavePartClick(card));
+    card.querySelector(".btn-local-save")?.addEventListener("click", () => resendLocalAudio(card));
     card.querySelector("[data-poi-offer]")?.addEventListener("click", () => offerPoi(card));
     card.querySelector("[data-poi-accept]")?.addEventListener("click", () => acceptPoi(card));
     card.querySelector("[data-poi-decline]")?.addEventListener("click", () => closePoiOffer(card, "declined"));
     card.querySelector("[data-poi-end]")?.addEventListener("click", () => endActivePoi(card));
 
     if (card.dataset.status === "recording") {
-      // ページ再読み込みでMediaRecorderの実体は失われているため、サーバー側もリセットする
-      resetStaleRecording(card);
+      window.DebateLocalAudio?.get(SESSION_ID, card.dataset.part).then((local) => {
+        if (local?.blob && local.blob.size > 0 && !card.dataset.audioUrl) {
+          card.dataset.status = "needs_review";
+          card.dataset.localSave = "1";
+          renderCard(card);
+          setError(
+            card,
+            "保存が完了していません。この端末の録音は残っています。「端末の録音で文字起こし」を押してください。"
+          );
+          return;
+        }
+        resetStaleRecording(card);
+      });
     } else {
       renderCard(card);
       if (card.dataset.status === "transcribing") {
-        if (isTranscriptionStuck(card.dataset.endTime)) {
+        if (isTranscriptionStuck(card)) {
           handleStuckTranscription(card);
         } else {
           // ページ再読み込み後もバックグラウンドの文字起こし完了をポーリングで確認し続ける
           startStatusPolling(card);
         }
+      } else if (!card.dataset.audioUrl && (card.dataset.status === "needs_review" || card.dataset.status === "transcribing")) {
+        window.DebateLocalAudio?.get(SESSION_ID, card.dataset.part).then((local) => {
+          if (!local?.blob || local.blob.size <= 0) return;
+          card.dataset.localSave = "1";
+          if (card.dataset.status === "transcribing") return;
+          renderCard(card);
+        });
       } else if (card.dataset.transcriptError) {
         // 前回アクセス時に文字起こしが失敗していた場合、再読み込み後も分かるようにする
         setError(
