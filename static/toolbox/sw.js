@@ -1,5 +1,5 @@
 /* Toolbox Service Worker */
-const VERSION = "toolbox-v4";
+const VERSION = "toolbox-v5";
 const STATIC_CACHE = `${VERSION}-static`;
 const PAGE_CACHE = `${VERSION}-pages`;
 const OFFLINE_URL = "/toolbox/offline";
@@ -12,6 +12,8 @@ const OFFLINE_TOOL_PAGES = [];
 // 絶対にキャッシュしない（認証、管理、API、録音・AI関連）
 const NEVER_CACHE_PREFIXES = [
   "/toolbox/api/",
+  "/toolbox/api/qr/files",
+  "/toolbox/f/",
   "/toolbox/admin/",
   "/toolbox/login",
   "/toolbox/logout",

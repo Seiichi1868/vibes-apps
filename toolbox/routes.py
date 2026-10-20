@@ -48,6 +48,7 @@ PUBLIC_ENDPOINTS = {
     "toolbox.admin_web_app_manifest",
     "toolbox.service_worker",
     "toolbox.offline",
+    "toolbox.qr_public_file",
 }
 
 _STATIC_DIR = PROJECT_ROOT / "static" / "toolbox"

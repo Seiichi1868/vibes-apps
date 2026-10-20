@@ -24,6 +24,21 @@ USAGE_LOG_FILE = DATA_DIR / "usage_log.json"
 TALK_SESSIONS_DIR = DATA_DIR / "talk_sessions"
 AUDIO_TMP_DIR = DATA_DIR / "audio_tmp"
 TALK_AUDIO_DIR = DATA_DIR / "talk_audio"
+QR_FILES_DIR = DATA_DIR / "qr_files"
+QR_FILE_MAX_BYTES = 20 * 1024 * 1024
+QR_FILE_DEVICE_QUOTA = 200 * 1024 * 1024
+QR_FILE_ALLOWED_EXT = {"pdf", "pptx", "docx", "xlsx", "png", "jpg", "jpeg"}
+QR_FILE_MIME = {
+    "pdf": "application/pdf",
+    "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+}
+QR_FILE_TTL_DAYS_CHOICES = (1, 7, 30)
+QR_FILE_TTL_DAYS_DEFAULT = 7
 MINUTE_SPEECH_OVERLAY_FILE = DATA_DIR / "minute_speech_overlay.json"
 MINUTE_SPEECH_EMBEDDINGS_FILE = DATA_DIR / "minute_speech_embeddings.json"
 MINUTE_SPEECH_SEED_FILE = Path(__file__).resolve().parent / "data" / "minute_speech_topics_seed.json"
@@ -77,3 +92,4 @@ def ensure_dirs() -> None:
     TALK_SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
     AUDIO_TMP_DIR.mkdir(parents=True, exist_ok=True)
     TALK_AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+    QR_FILES_DIR.mkdir(parents=True, exist_ok=True)
