@@ -276,8 +276,9 @@
           <div id="admin-settings-lock" class="flex items-center gap-1">
             <input type="text" id="teacher-login-id" autocomplete="off"
               class="compact-input w-24 py-1 text-xs {% if is_logged_in %}hidden{% endif %}" placeholder="教員ID">
-            <input type="password" id="admin-settings-password" autocomplete="off"
-              class="compact-input w-24 py-1 text-xs {% if is_logged_in %}hidden{% endif %}" placeholder="パスワード">
+            <input type="password" id="admin-settings-password" autocomplete="current-password"
+              autocapitalize="off" autocorrect="off" spellcheck="false"
+              class="compact-input w-40 py-1 text-xs {% if is_logged_in %}hidden{% endif %}" placeholder="管理パスワード">
             <button type="button" id="admin-settings-unlock"
               class="rounded border border-teal-100 bg-white/80 px-2 py-1 text-[10px] font-semibold text-teal-700 shadow-sm hover:bg-teal-50 {% if not is_owner %}hidden{% endif %}">
               管理設定
