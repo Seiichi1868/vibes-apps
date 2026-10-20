@@ -5,12 +5,40 @@
   <div class="tb-stage-chrome tb-stage-chrome-top">
     <div class="tb-stage-setup">
       <h1 class="tb-tool-title">ランダム座席表</h1>
-      <div class="tb-tabs" id="tb-room-tabs" role="tablist" aria-label="保存した教室"></div>
+      <div class="tb-tabs" role="tablist" aria-label="座席の対象">
+        <button class="tb-tab" type="button" role="tab" id="tb-quick-tab" data-room="__quick__" aria-selected="false">クイック（保存なし）</button>
+        <span id="tb-room-tabs"></span>
+      </div>
+      <div id="tb-quick" class="tb-quick" hidden>
+        <div class="tb-inline-form" role="group" aria-label="番号の決め方">
+          <button class="tb-btn" type="button" id="tb-quick-mode-count" aria-pressed="true">人数</button>
+          <button class="tb-btn" type="button" id="tb-quick-mode-range" aria-pressed="false">番号の範囲</button>
+        </div>
+        <div class="tb-inline-form" id="tb-quick-count-row">
+          <label>人数
+            <input id="tb-quick-count" type="number" min="1" max="60" value="30" inputmode="numeric">
+          </label>
+        </div>
+        <div class="tb-inline-form" id="tb-quick-range-row" hidden>
+          <label>から
+            <input id="tb-quick-from" type="number" min="1" max="99" value="1" inputmode="numeric">
+          </label>
+          <label>まで
+            <input id="tb-quick-to" type="number" min="1" max="99" value="30" inputmode="numeric">
+          </label>
+        </div>
+        <details class="tb-quick-names">
+          <summary>名前を貼り付け（保存されません）</summary>
+          <textarea id="tb-quick-names" rows="4" placeholder="1行に1人"></textarea>
+        </details>
+        <p id="tb-quick-warn" class="tb-note" hidden></p>
+      </div>
       <div class="tb-inline-form">
         <button class="tb-btn" type="button" id="tb-class-new">教室を追加</button>
         <button class="tb-btn" type="button" id="tb-class-edit">名前と人数</button>
         <button class="tb-btn" type="button" id="tb-class-dup">この配置を複製</button>
         <button class="tb-btn" type="button" id="tb-class-del">このタブを削除</button>
+        <button class="tb-btn tb-btn-primary" type="button" id="tb-quick-save" hidden>教室として保存</button>
         <button class="tb-btn tb-btn-primary" type="button" id="tb-room-save">保存</button>
       </div>
       <p class="tb-note">タブは自動で保存されます。「保存」でこの端末への保存を確認できます。複製したタブを開くと、その配置を修正できます。番号の席をタップしてから別の席をタップすると入れ替えられます。空席をタップすると使えない席になります。欠席は上の番号をタップ。席数は人数以上にしてください。</p>

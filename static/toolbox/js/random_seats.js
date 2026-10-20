@@ -1,10 +1,17 @@
 (function () {
   const ROOMS_KEY = "toolbox.random_seats.rooms.v1";
   const LAST_KEY = "toolbox.random_seats.last.v1";
+  const QUICK_KEY = "toolbox.random_seats.quick.v1";
+  const QUICK_ID = "__quick__";
   let classes = [];
   let activeId = "";
   let holdSeat = null;
+  let quickNames = [];
+  let quickGridManual = false;
+  let syncingQuick = false;
   const tabs = document.getElementById("tb-room-tabs");
+  const quickTab = document.getElementById("tb-quick-tab");
+  const quickPanel = document.getElementById("tb-quick");
   const grid = document.getElementById("tb-grid");
   const board = document.getElementById("tb-seats");
   const rowsEl = document.getElementById("tb-rows");
@@ -32,6 +39,65 @@
     }
   }
 
+  function clampInt(value, min, max, fallback) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.max(min, Math.min(max, Math.round(n)));
+  }
+
+  function defaultQuick() {
+    const layout = suggestGrid(30);
+    return {
+      id: QUICK_ID,
+      name: "クイック（保存なし）",
+      mode: "count",
+      count: 30,
+      from: 1,
+      to: 30,
+      student_count: 30,
+      absent: [],
+      seats: [],
+      rows: layout.rows,
+      cols: layout.cols,
+      blocked: [],
+    };
+  }
+
+  function loadQuick() {
+    let raw = {};
+    try {
+      raw = JSON.parse(localStorage.getItem(QUICK_KEY) || "{}") || {};
+    } catch (_) {
+      raw = {};
+    }
+    const mode = raw.mode === "range" ? "range" : "count";
+    const count = clampInt(raw.count, 1, 60, 30);
+    let from = clampInt(raw.from, 1, 99, 1);
+    let to = clampInt(raw.to, 1, 99, 30);
+    if (from > to) to = from;
+    const span = mode === "range" ? Math.min(60, to - from + 1) : count;
+    const layout = suggestGrid(span);
+    const rows = clampInt(raw.rows, 1, 12, layout.rows);
+    const cols = clampInt(raw.cols, 1, 12, layout.cols);
+    if (rows !== layout.rows || cols !== layout.cols) quickGridManual = true;
+    return {
+      id: QUICK_ID,
+      name: "クイック（保存なし）",
+      mode: mode,
+      count: count,
+      from: from,
+      to: to,
+      student_count: span,
+      absent: Array.isArray(raw.absent) ? raw.absent.map(Number).filter((n) => Number.isFinite(n)) : [],
+      seats: Array.isArray(raw.seats) ? raw.seats.slice() : [],
+      rows: rows,
+      cols: cols,
+      blocked: Array.isArray(raw.blocked) ? raw.blocked.map(Number).filter((n) => Number.isFinite(n)) : [],
+    };
+  }
+
+  let quickState = loadQuick();
+
   let saveToastTimer = 0;
 
   function showSaveToast() {
@@ -50,7 +116,28 @@
     saveToastTimer = window.setTimeout(() => el.classList.remove("is-show"), 1600);
   }
 
+  function persistQuick() {
+    const saved = {
+      mode: quickState.mode === "range" ? "range" : "count",
+      count: quickState.count,
+      from: quickState.from,
+      to: quickState.to,
+      rows: quickState.rows,
+      cols: quickState.cols,
+      blocked: (quickState.blocked || []).slice(),
+      absent: (quickState.absent || []).slice(),
+      seats: (quickState.seats || []).slice(),
+    };
+    localStorage.setItem(QUICK_KEY, JSON.stringify(saved));
+  }
+
   function writeRooms(confirmSave) {
+    if (activeId === QUICK_ID) {
+      persistQuick();
+      localStorage.setItem(LAST_KEY, activeId);
+      if (confirmSave) showSaveToast();
+      return;
+    }
     classes = window.ToolboxClasses.save(classes);
     if (activeId) localStorage.setItem(LAST_KEY, activeId);
     if (confirmSave) showSaveToast();
@@ -87,12 +174,52 @@
     classes = window.ToolboxClasses.load(window.TOOLBOX_CLASSES);
   }
 
+  function isQuick(row) {
+    return !!(row && row.id === QUICK_ID);
+  }
+
   function currentClass() {
+    if (activeId === QUICK_ID) return quickState;
     return classes.find((row) => row.id === activeId) || null;
   }
 
+  function numbersOf(row) {
+    if (!row) return [];
+    if (!isQuick(row) || row.mode !== "range") {
+      const count = Math.max(0, Math.min(60, Number(row.student_count) || 0));
+      const nums = [];
+      for (let n = 1; n <= count; n += 1) nums.push(n);
+      return nums;
+    }
+    let from = clampInt(row.from, 1, 99, 1);
+    let to = clampInt(row.to, 1, 99, from);
+    if (from > to) to = from;
+    const nums = [];
+    for (let n = from; n <= to && nums.length < 60; n += 1) nums.push(n);
+    return nums;
+  }
+
+  function effectiveNumbers(row) {
+    const nums = numbersOf(row);
+    if (isQuick(row) && quickNames.length && quickNames.length !== nums.length) {
+      const count = Math.max(1, Math.min(60, quickNames.length));
+      const replaced = [];
+      for (let n = 1; n <= count; n += 1) replaced.push(n);
+      return replaced;
+    }
+    return nums;
+  }
+
+  function seatLabel(n) {
+    if (activeId === QUICK_ID && quickNames.length) {
+      const name = quickNames[n - 1];
+      if (name) return name;
+    }
+    return String(n);
+  }
+
   function defaultState(row) {
-    const suggested = suggestGrid(row ? row.student_count : 30);
+    const suggested = suggestGrid(row ? (effectiveNumbers(row).length || row.student_count) : 30);
     return { absent: [], seats: [], rows: suggested.rows, cols: suggested.cols, blocked: [] };
   }
 
@@ -100,12 +227,16 @@
     const row = currentClass();
     if (!row) return defaultState(null);
     const state = Object.assign(defaultState(row), row);
-    state.absent = state.absent.filter((n) => n >= 1 && n <= row.student_count);
+    const allowed = new Set(effectiveNumbers(row));
+    state.absent = (state.absent || []).filter((n) => allowed.has(n));
     state.rows = Math.max(1, Math.min(12, Number(state.rows) || defaultState(row).rows));
     state.cols = Math.max(1, Math.min(12, Number(state.cols) || defaultState(row).cols));
     const maxSeats = state.rows * state.cols;
     if (!Array.isArray(state.seats)) state.seats = [];
     if (state.seats.length > maxSeats) state.seats = state.seats.slice(0, maxSeats);
+    if (isQuick(row)) {
+      state.seats = state.seats.map((seat) => (seat && allowed.has(seat) ? seat : null));
+    }
     state.blocked = (state.blocked || []).filter((n) => n >= 0 && n < maxSeats);
     return state;
   }
@@ -115,11 +246,60 @@
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
+  function syncQuickForm() {
+    if (!quickPanel) return;
+    syncingQuick = true;
+    const countEl = document.getElementById("tb-quick-count");
+    const fromEl = document.getElementById("tb-quick-from");
+    const toEl = document.getElementById("tb-quick-to");
+    countEl.value = String(quickState.count);
+    fromEl.value = String(quickState.from);
+    toEl.value = String(quickState.to);
+    const range = quickState.mode === "range";
+    document.getElementById("tb-quick-count-row").hidden = range;
+    document.getElementById("tb-quick-range-row").hidden = !range;
+    document.getElementById("tb-quick-mode-count").classList.toggle("is-active", !range);
+    document.getElementById("tb-quick-mode-range").classList.toggle("is-active", range);
+    document.getElementById("tb-quick-mode-count").setAttribute("aria-pressed", String(!range));
+    document.getElementById("tb-quick-mode-range").setAttribute("aria-pressed", String(range));
+    syncingQuick = false;
+  }
+
+  function syncQuickChrome() {
+    const quick = activeId === QUICK_ID;
+    if (quickPanel) quickPanel.hidden = !quick;
+    ["tb-class-edit", "tb-class-dup", "tb-class-del"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.hidden = quick;
+    });
+    const saveAs = document.getElementById("tb-quick-save");
+    if (saveAs) saveAs.hidden = !quick;
+    if (quickTab) {
+      quickTab.classList.toggle("is-active", quick);
+      quickTab.setAttribute("aria-selected", quick ? "true" : "false");
+    }
+    if (quick) syncQuickForm();
+    const warn = document.getElementById("tb-quick-warn");
+    if (warn) {
+      const base = numbersOf(quickState);
+      if (quick && quickNames.length && quickNames.length !== base.length) {
+        warn.hidden = false;
+        warn.textContent = `名前が${quickNames.length}件あるので、人数を${Math.min(60, quickNames.length)}人として扱います。`;
+      } else {
+        warn.hidden = true;
+        warn.textContent = "";
+      }
+    }
+  }
+
   function renderClasses() {
-    if (!classes.some((row) => row.id === activeId)) activeId = classes[0] ? classes[0].id : "";
+    if (activeId !== QUICK_ID && !classes.some((row) => row.id === activeId)) {
+      activeId = classes[0] ? classes[0].id : QUICK_ID;
+    }
     tabs.innerHTML = classes.map((row) => (
       `<button class="tb-tab${row.id === activeId ? " is-active" : ""}" type="button" role="tab" aria-selected="${row.id === activeId}" data-room="${esc(row.id)}">${esc(row.name)}（${row.student_count}）</button>`
-    )).join("") || '<span class="tb-muted">保存はまだありません。「教室を追加」でタブを作れます。</span>';
+    )).join("");
+    syncQuickChrome();
     renderAll();
   }
 
@@ -130,11 +310,14 @@
       return;
     }
     const state = stateOf();
+    const nums = effectiveNumbers(row);
     grid.innerHTML = "";
-    for (let n = 1; n <= row.student_count; n += 1) {
+    nums.forEach((n) => {
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.textContent = String(n);
+      const label = seatLabel(n);
+      btn.textContent = label;
+      if (label !== String(n)) btn.classList.add("is-named");
       if (state.absent.includes(n)) btn.classList.add("is-absent");
       btn.addEventListener("click", () => {
         const next = stateOf();
@@ -146,7 +329,7 @@
         renderAll();
       });
       grid.appendChild(btn);
-    }
+    });
   }
 
   function renderBoard(previewState) {
@@ -169,7 +352,9 @@
         cell.textContent = "";
         cell.title = "使えない席。タップすると使えます";
       } else if (num) {
-        cell.textContent = String(num);
+        const label = seatLabel(num);
+        cell.textContent = label;
+        if (label !== String(num)) cell.classList.add("is-named");
         cell.title = "タップしてから別の席をタップすると移動できます";
         if (holdSeat === i) cell.classList.add("is-picked");
       } else {
@@ -225,10 +410,7 @@
     state.cols = Math.max(1, Math.min(12, Number(colsEl.value) || state.cols));
     const blocked = new Set(state.blocked || []);
     const capacity = state.rows * state.cols - blocked.size;
-    const pool = [];
-    for (let n = 1; n <= row.student_count; n += 1) {
-      if (!state.absent.includes(n)) pool.push(n);
-    }
+    const pool = effectiveNumbers(row).filter((n) => !state.absent.includes(n));
     if (pool.length > capacity) {
       alert(`席が足りません。${pool.length}人に対して席は${capacity}です。`);
       return;
@@ -293,6 +475,7 @@
   rowsEl.addEventListener("change", () => {
     const row = currentClass();
     if (!row) return;
+    if (isQuick(row)) quickGridManual = true;
     const state = stateOf();
     state.rows = Math.max(1, Math.min(12, Number(rowsEl.value) || state.rows));
     Object.assign(row, state);
@@ -302,6 +485,7 @@
   colsEl.addEventListener("change", () => {
     const row = currentClass();
     if (!row) return;
+    if (isQuick(row)) quickGridManual = true;
     const state = stateOf();
     state.cols = Math.max(1, Math.min(12, Number(colsEl.value) || state.cols));
     Object.assign(row, state);
@@ -317,9 +501,92 @@
     localStorage.setItem(LAST_KEY, activeId);
     renderClasses();
   });
+  if (quickTab) {
+    quickTab.addEventListener("click", () => {
+      activeId = QUICK_ID;
+      holdSeat = null;
+      localStorage.setItem(LAST_KEY, activeId);
+      renderClasses();
+    });
+  }
+
+  function readQuickNames() {
+    const el = document.getElementById("tb-quick-names");
+    if (!el) return [];
+    return el.value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(0, 60);
+  }
+
+  function refreshQuickSize(applyGrid) {
+    const count = clampInt(document.getElementById("tb-quick-count").value, 1, 60, quickState.count);
+    let from = clampInt(document.getElementById("tb-quick-from").value, 1, 99, quickState.from);
+    let to = clampInt(document.getElementById("tb-quick-to").value, 1, 99, quickState.to);
+    if (from > to) to = from;
+    quickState.count = count;
+    quickState.from = from;
+    quickState.to = to;
+    quickNames = readQuickNames();
+    const base = numbersOf(quickState);
+    const span = (quickNames.length && quickNames.length !== base.length)
+      ? Math.min(60, quickNames.length)
+      : base.length;
+    quickState.student_count = quickState.mode === "range" ? Math.min(60, to - from + 1) : count;
+    if (applyGrid && !quickGridManual) {
+      const layout = suggestGrid(span || quickState.student_count);
+      quickState.rows = layout.rows;
+      quickState.cols = layout.cols;
+    }
+    const allowed = new Set(effectiveNumbers(quickState));
+    quickState.absent = (quickState.absent || []).filter((n) => allowed.has(n));
+    quickState.seats = (quickState.seats || []).map((seat) => (seat && allowed.has(seat) ? seat : null));
+    writeRooms();
+    syncQuickChrome();
+    renderAll();
+  }
+
+  document.getElementById("tb-quick-mode-count").addEventListener("click", () => {
+    quickState.mode = "count";
+    refreshQuickSize(true);
+  });
+  document.getElementById("tb-quick-mode-range").addEventListener("click", () => {
+    quickState.mode = "range";
+    refreshQuickSize(true);
+  });
+  ["tb-quick-count", "tb-quick-from", "tb-quick-to"].forEach((id) => {
+    document.getElementById(id).addEventListener("change", () => {
+      if (syncingQuick) return;
+      refreshQuickSize(true);
+    });
+  });
+  document.getElementById("tb-quick-names").addEventListener("input", () => {
+    quickNames = readQuickNames();
+    refreshQuickSize(true);
+  });
 
   document.getElementById("tb-room-save").addEventListener("click", () => {
     writeRooms(true);
+  });
+
+  document.getElementById("tb-quick-save").addEventListener("click", () => {
+    const name = prompt("教室の名前", "");
+    if (!name || !name.trim()) return;
+    const span = quickState.mode === "range"
+      ? Math.min(60, quickState.to - quickState.from + 1)
+      : quickState.count;
+    const room = {
+      id: newId(),
+      name: name.trim(),
+      student_count: span,
+      absent: (quickState.absent || []).filter((n) => n >= 1 && n <= span),
+      seats: (quickState.seats || []).slice(),
+      rows: quickState.rows,
+      cols: quickState.cols,
+      blocked: (quickState.blocked || []).slice(),
+    };
+    classes.push(room);
+    activeId = room.id;
+    holdSeat = null;
+    writeRooms();
+    renderClasses();
   });
 
   function promptClass(existing) {
@@ -355,11 +622,11 @@
   document.getElementById("tb-class-new").addEventListener("click", () => promptClass(null));
   document.getElementById("tb-class-edit").addEventListener("click", () => {
     const row = currentClass();
-    if (row) promptClass(row);
+    if (row && !isQuick(row)) promptClass(row);
   });
   document.getElementById("tb-class-dup").addEventListener("click", () => {
     const row = currentClass();
-    if (!row) return;
+    if (!row || isQuick(row)) return;
     const copy = cloneRoom(row, newId(), `${row.name} のコピー`);
     classes.push(copy);
     activeId = copy.id;
@@ -368,10 +635,16 @@
   });
   document.getElementById("tb-class-del").addEventListener("click", () => {
     const row = currentClass();
-    if (!row || !confirm(`${row.name} をこの端末から削除しますか？`)) return;
+    if (!row || isQuick(row) || !confirm(`${row.name} をこの端末から削除しますか？`)) return;
     classes = classes.filter((item) => item.id !== row.id);
-    activeId = classes[0] ? classes[0].id : "";
-    writeRooms();
+    if (classes.length) {
+      activeId = classes[0].id;
+      writeRooms();
+    } else {
+      classes = window.ToolboxClasses.save(classes);
+      activeId = QUICK_ID;
+      localStorage.setItem(LAST_KEY, activeId);
+    }
     renderClasses();
   });
 
@@ -380,6 +653,8 @@
     onPrev: () => document.getElementById("tb-clear").click(),
   });
   bootRooms();
-  activeId = localStorage.getItem(LAST_KEY) || "";
+  const last = localStorage.getItem(LAST_KEY) || "";
+  if (!classes.length || !last) activeId = QUICK_ID;
+  else activeId = last;
   renderClasses();
 })();
