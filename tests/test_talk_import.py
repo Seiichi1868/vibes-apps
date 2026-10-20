@@ -169,6 +169,53 @@ class TalkImportTests(unittest.TestCase):
         self.assertEqual(stored["source"], "import")
         self.assertFalse(stored.get("audio_file"))
 
+    def test_import_keeps_original_created_at(self):
+        code = _code({
+            "title": "元の授業",
+            "transcript": "Original speech.",
+            "questions": [],
+            "created_at": "2024-03-15T09:30:00+09:00",
+            "duration_sec": 95,
+            "source": "record",
+        })
+        res = self._post(self.client, code, "device-a")
+        self.assertEqual(res.status_code, 200, res.get_data(as_text=True))
+        session = res.get_json()["session"]
+        self.assertEqual(session["created_at"], "2024-03-15T09:30:00+09:00")
+        self.assertEqual(session["duration_sec"], 95)
+        self.assertEqual(session["source"], "import")
+        stored = storage.load_talk_session(session["id"])
+        self.assertEqual(stored["created_at"], "2024-03-15T09:30:00+09:00")
+        self.assertEqual(stored["duration_sec"], 95)
+        self.assertEqual(stored["source"], "import")
+        self.assertTrue(stored.get("imported_at"))
+        self.assertNotEqual(stored["imported_at"], stored["created_at"])
+
+    def test_import_invalid_created_at_uses_now(self):
+        frozen = "2026-10-20T12:00:00+09:00"
+        code = _code({
+            "title": "不正日時",
+            "transcript": "Speech.",
+            "created_at": "yesterday",
+            "duration_sec": -3,
+        })
+        with patch("toolbox.tools.talk_check.routes.now_iso", return_value=frozen):
+            res = self._post(self.client, code, "device-a")
+        self.assertEqual(res.status_code, 200, res.get_data(as_text=True))
+        stored = storage.load_talk_session(res.get_json()["session"]["id"])
+        self.assertEqual(stored["created_at"], frozen)
+        self.assertEqual(stored["imported_at"], frozen)
+        self.assertEqual(stored["duration_sec"], 0)
+        self.assertEqual(stored["source"], "import")
+
+        missing = _code({"title": "日時なし", "transcript": "Speech."})
+        with patch("toolbox.tools.talk_check.routes.now_iso", return_value=frozen):
+            res = self._post(self.client, missing, "device-a")
+        self.assertEqual(res.status_code, 200, res.get_data(as_text=True))
+        stored = storage.load_talk_session(res.get_json()["session"]["id"])
+        self.assertEqual(stored["created_at"], frozen)
+        self.assertEqual(stored["source"], "import")
+
     def test_import_truncates_transcript(self):
         code = _code({"transcript": "x" * 70000, "title": "長い"})
         res = self._post(self.client, code, "device-a")
