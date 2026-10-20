@@ -723,6 +723,17 @@ html.tb-skip-opening .tb-opening { display: none !important; }
 }
 
 #tb-room-tabs { display: contents; }
+.tb-stage-chrome #tb-quick[hidden],
+.tb-stage-chrome #tb-class-edit[hidden],
+.tb-stage-chrome #tb-class-dup[hidden],
+.tb-stage-chrome #tb-class-del[hidden],
+.tb-stage-chrome #tb-room-save[hidden],
+.tb-stage-chrome #tb-quick-save[hidden] {
+  display: none !important;
+}
+.tb-stage-chrome #tb-quick:not([hidden]) {
+  display: block;
+}
 .tb-stage-chrome #tb-quick input,
 .tb-stage-chrome #tb-quick select,
 .tb-stage-chrome #tb-quick textarea {
