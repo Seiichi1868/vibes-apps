@@ -24,6 +24,10 @@ class QrNormalizeTests(unittest.TestCase):
         self.assertIsNone(error)
         self.assertEqual(link, "https://vibes-lab.com/debate")
 
+        link, error = normalize_url("localhost:5001/debate")
+        self.assertIsNone(error)
+        self.assertEqual(link, "https://localhost:5001/debate")
+
     def test_rejects_empty_and_non_http(self):
         self.assertEqual(normalize_url("   ")[1], "URLを入力してください。")
         self.assertEqual(normalize_url("javascript:alert(1)")[1], "http または https のURLだけ使えます。")

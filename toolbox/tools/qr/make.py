@@ -6,7 +6,30 @@ from urllib.parse import urlsplit
 import segno
 
 ALLOWED_SCHEMES = {"http", "https"}
+BLOCKED_SCHEMES = {
+    "javascript",
+    "data",
+    "vbscript",
+    "file",
+    "about",
+    "blob",
+    "mailto",
+    "ftp",
+}
 MAX_URL_LEN = 2048
+
+
+def _declared_scheme(text: str) -> str | None:
+    """`javascript:…` は拒否し、`localhost:5001/…` のようなホスト:ポートはスキームと見なさない。"""
+    if "://" in text:
+        return text.split("://", 1)[0].lower()
+    head, sep, rest = text.partition(":")
+    if not sep or not rest or "/" in head:
+        return None
+    scheme = head.lower()
+    if scheme in ALLOWED_SCHEMES or scheme in BLOCKED_SCHEMES:
+        return scheme
+    return None
 
 
 def normalize_url(raw: str) -> tuple[str | None, str | None]:
@@ -17,7 +40,10 @@ def normalize_url(raw: str) -> tuple[str | None, str | None]:
     text = text.strip("<>\"' \t")
     if not text:
         return None, "URLを入力してください。"
-    if "://" not in text:
+    scheme = _declared_scheme(text)
+    if scheme and scheme not in ALLOWED_SCHEMES:
+        return None, "http または https のURLだけ使えます。"
+    if scheme not in ALLOWED_SCHEMES:
         text = "https://" + text
     if len(text) > MAX_URL_LEN:
         return None, "URLが長すぎます。"
