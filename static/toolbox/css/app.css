@@ -657,10 +657,21 @@ html.tb-skip-opening .tb-opening { display: none !important; }
   padding: 4px 8px;
   font-size: 0.78rem;
 }
+.tb-stage-chrome .tb-tabs {
+  margin: 2px 0;
+}
+.tb-stage-chrome .tb-stage-controls .tb-inline-form label {
+  flex-direction: row;
+  align-items: center;
+}
+.tb-stage-chrome .tb-stage-controls input {
+  width: 3.2rem;
+}
 .tb-stage-chrome .tb-grid {
-  margin: 4px 0;
+  margin: 2px 0;
   gap: 4px;
-  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+  justify-content: start;
+  grid-template-columns: repeat(auto-fill, minmax(28px, 34px));
 }
 .tb-stage-chrome .tb-grid button {
   min-height: 32px;
@@ -670,9 +681,9 @@ html.tb-skip-opening .tb-opening { display: none !important; }
 
 .tb-seat-stage {
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   width: 100%;
-  min-height: 280px;
+  min-height: 0;
 }
 .tb-seat-edge {
   margin: 0;
@@ -685,7 +696,7 @@ html.tb-skip-opening .tb-opening { display: none !important; }
 .tb-seat-board {
   flex: 1;
   width: 100%;
-  min-height: 240px;
+  min-height: 0;
   display: grid;
   gap: 8px;
 }
@@ -732,19 +743,36 @@ html.tb-skip-opening .tb-opening { display: none !important; }
   display: none !important;
 }
 .tb-stage-chrome #tb-quick:not([hidden]) {
-  display: block;
+  display: inline-flex;
+  align-items: center;
 }
-.tb-stage-chrome #tb-quick input,
-.tb-stage-chrome #tb-quick select,
-.tb-stage-chrome #tb-quick textarea {
-  min-height: 44px;
-  min-width: 44px;
-  font-size: 1rem;
+.tb-stage-chrome .tb-seat-actions {
+  margin: 2px 0;
 }
-#tb-quick textarea {
-  width: 100%;
-  max-width: 28rem;
-  padding: 8px;
+.tb-stage-chrome #tb-quick label {
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  font-weight: 600;
+}
+.tb-stage-chrome #tb-quick select {
+  width: 4.2rem;
+  min-width: 0;
+  min-height: 32px;
+  padding: 2px 6px;
+  font-size: 0.85rem;
+}
+.tb-stage-chrome .tb-note-fold {
+  margin: 0 0 2px;
+  font-size: 0.75rem;
+}
+.tb-stage-chrome .tb-note-fold summary {
+  cursor: pointer;
+  color: var(--tb-muted);
+}
+.tb-stage-chrome .tb-note-fold p {
+  margin: 2px 0 0;
 }
 .tb-seat-cell.is-named,
 .tb-grid button.is-named {

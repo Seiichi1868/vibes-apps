@@ -6,7 +6,6 @@
   let classes = [];
   let activeId = "";
   let holdSeat = null;
-  let quickNames = [];
   let quickGridManual = false;
   let syncingQuick = false;
   const tabs = document.getElementById("tb-room-tabs");
@@ -50,10 +49,7 @@
     return {
       id: QUICK_ID,
       name: "クイック（保存なし）",
-      mode: "count",
       count: 30,
-      from: 1,
-      to: 30,
       student_count: 30,
       absent: [],
       seats: [],
@@ -70,24 +66,16 @@
     } catch (_) {
       raw = {};
     }
-    const mode = raw.mode === "range" ? "range" : "count";
     const count = clampInt(raw.count, 1, 60, 30);
-    let from = clampInt(raw.from, 1, 99, 1);
-    let to = clampInt(raw.to, 1, 99, 30);
-    if (from > to) to = from;
-    const span = mode === "range" ? Math.min(60, to - from + 1) : count;
-    const layout = suggestGrid(span);
+    const layout = suggestGrid(count);
     const rows = clampInt(raw.rows, 1, 12, layout.rows);
     const cols = clampInt(raw.cols, 1, 12, layout.cols);
     if (rows !== layout.rows || cols !== layout.cols) quickGridManual = true;
     return {
       id: QUICK_ID,
       name: "クイック（保存なし）",
-      mode: mode,
       count: count,
-      from: from,
-      to: to,
-      student_count: span,
+      student_count: count,
       absent: Array.isArray(raw.absent) ? raw.absent.map(Number).filter((n) => Number.isFinite(n)) : [],
       seats: Array.isArray(raw.seats) ? raw.seats.slice() : [],
       rows: rows,
@@ -118,10 +106,7 @@
 
   function persistQuick() {
     const saved = {
-      mode: quickState.mode === "range" ? "range" : "count",
       count: quickState.count,
-      from: quickState.from,
-      to: quickState.to,
       rows: quickState.rows,
       cols: quickState.cols,
       blocked: (quickState.blocked || []).slice(),
@@ -185,36 +170,17 @@
 
   function numbersOf(row) {
     if (!row) return [];
-    if (!isQuick(row) || row.mode !== "range") {
-      const count = Math.max(0, Math.min(60, Number(row.student_count) || 0));
-      const nums = [];
-      for (let n = 1; n <= count; n += 1) nums.push(n);
-      return nums;
-    }
-    let from = clampInt(row.from, 1, 99, 1);
-    let to = clampInt(row.to, 1, 99, from);
-    if (from > to) to = from;
+    const count = Math.max(0, Math.min(60, Number(row.student_count) || row.count || 0));
     const nums = [];
-    for (let n = from; n <= to && nums.length < 60; n += 1) nums.push(n);
+    for (let n = 1; n <= count; n += 1) nums.push(n);
     return nums;
   }
 
   function effectiveNumbers(row) {
-    const nums = numbersOf(row);
-    if (isQuick(row) && quickNames.length && quickNames.length !== nums.length) {
-      const count = Math.max(1, Math.min(60, quickNames.length));
-      const replaced = [];
-      for (let n = 1; n <= count; n += 1) replaced.push(n);
-      return replaced;
-    }
-    return nums;
+    return numbersOf(row);
   }
 
   function seatLabel(n) {
-    if (activeId === QUICK_ID && quickNames.length) {
-      const name = quickNames[n - 1];
-      if (name) return name;
-    }
     return String(n);
   }
 
@@ -250,18 +216,7 @@
     if (!quickPanel) return;
     syncingQuick = true;
     const countEl = document.getElementById("tb-quick-count");
-    const fromEl = document.getElementById("tb-quick-from");
-    const toEl = document.getElementById("tb-quick-to");
-    countEl.value = String(quickState.count);
-    fromEl.value = String(quickState.from);
-    toEl.value = String(quickState.to);
-    const range = quickState.mode === "range";
-    document.getElementById("tb-quick-count-row").hidden = range;
-    document.getElementById("tb-quick-range-row").hidden = !range;
-    document.getElementById("tb-quick-mode-count").classList.toggle("is-active", !range);
-    document.getElementById("tb-quick-mode-range").classList.toggle("is-active", range);
-    document.getElementById("tb-quick-mode-count").setAttribute("aria-pressed", String(!range));
-    document.getElementById("tb-quick-mode-range").setAttribute("aria-pressed", String(range));
+    if (countEl) countEl.value = String(quickState.count);
     syncingQuick = false;
   }
 
@@ -279,17 +234,6 @@
       quickTab.setAttribute("aria-selected", quick ? "true" : "false");
     }
     if (quick) syncQuickForm();
-    const warn = document.getElementById("tb-quick-warn");
-    if (warn) {
-      const base = numbersOf(quickState);
-      if (quick && quickNames.length && quickNames.length !== base.length) {
-        warn.hidden = false;
-        warn.textContent = `名前が${quickNames.length}件あるので、人数を${Math.min(60, quickNames.length)}人として扱います。`;
-      } else {
-        warn.hidden = true;
-        warn.textContent = "";
-      }
-    }
   }
 
   function renderClasses() {
@@ -510,28 +454,12 @@
     });
   }
 
-  function readQuickNames() {
-    const el = document.getElementById("tb-quick-names");
-    if (!el) return [];
-    return el.value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(0, 60);
-  }
-
   function refreshQuickSize(applyGrid) {
     const count = clampInt(document.getElementById("tb-quick-count").value, 1, 60, quickState.count);
-    let from = clampInt(document.getElementById("tb-quick-from").value, 1, 99, quickState.from);
-    let to = clampInt(document.getElementById("tb-quick-to").value, 1, 99, quickState.to);
-    if (from > to) to = from;
     quickState.count = count;
-    quickState.from = from;
-    quickState.to = to;
-    quickNames = readQuickNames();
-    const base = numbersOf(quickState);
-    const span = (quickNames.length && quickNames.length !== base.length)
-      ? Math.min(60, quickNames.length)
-      : base.length;
-    quickState.student_count = quickState.mode === "range" ? Math.min(60, to - from + 1) : count;
+    quickState.student_count = count;
     if (applyGrid && !quickGridManual) {
-      const layout = suggestGrid(span || quickState.student_count);
+      const layout = suggestGrid(count);
       quickState.rows = layout.rows;
       quickState.cols = layout.cols;
     }
@@ -543,22 +471,8 @@
     renderAll();
   }
 
-  document.getElementById("tb-quick-mode-count").addEventListener("click", () => {
-    quickState.mode = "count";
-    refreshQuickSize(true);
-  });
-  document.getElementById("tb-quick-mode-range").addEventListener("click", () => {
-    quickState.mode = "range";
-    refreshQuickSize(true);
-  });
-  ["tb-quick-count", "tb-quick-from", "tb-quick-to"].forEach((id) => {
-    document.getElementById(id).addEventListener("change", () => {
-      if (syncingQuick) return;
-      refreshQuickSize(true);
-    });
-  });
-  document.getElementById("tb-quick-names").addEventListener("input", () => {
-    quickNames = readQuickNames();
+  document.getElementById("tb-quick-count").addEventListener("change", () => {
+    if (syncingQuick) return;
     refreshQuickSize(true);
   });
 
@@ -569,9 +483,7 @@
   document.getElementById("tb-quick-save").addEventListener("click", () => {
     const name = prompt("教室の名前", "");
     if (!name || !name.trim()) return;
-    const span = quickState.mode === "range"
-      ? Math.min(60, quickState.to - quickState.from + 1)
-      : quickState.count;
+    const span = quickState.count;
     const room = {
       id: newId(),
       name: name.trim(),
