@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import json
 import logging
 import mimetypes
 import os
@@ -41,6 +43,7 @@ logger = logging.getLogger(__name__)
 
 ARCHIVE_INTERVAL_DAYS = 30
 ARCHIVE_FOLDER_NAME = "ToolboxTalkAudio"
+TRANSFER_PREFIX = "TBTALK1:"
 
 
 def _device_id() -> str:
@@ -91,6 +94,62 @@ def _public_session(session: dict, *, include_questions: bool = False) -> dict:
         row["include_inference"] = bool(session.get("include_inference"))
         row["count_requested"] = session.get("count_requested") or len(questions)
     return row
+
+
+def _decode_transfer(code: str) -> tuple[dict | None, str | None]:
+    text = str(code or "").strip()
+    if not text.startswith(TRANSFER_PREFIX):
+        return None, "引き継ぎコードの形式が正しくありません。"
+    payload = "".join(text[len(TRANSFER_PREFIX):].split())
+    if not payload:
+        return None, "引き継ぎコードの形式が正しくありません。"
+    try:
+        decoded = base64.b64decode(payload, validate=True)
+        data = json.loads(decoded.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
+        return None, "引き継ぎコードを読み取れませんでした。"
+    if not isinstance(data, dict):
+        return None, "引き継ぎコードを読み取れませんでした。"
+    return data, None
+
+
+def _import_session_from(data: dict) -> dict:
+    user = current_user()
+    transcript = str(data.get("transcript") or "").strip()[:60000]
+    browser_transcript = str(data.get("browser_transcript") or "").strip()[:60000]
+    questions = _clean_edit_questions(data.get("questions"))
+    try:
+        count_requested = int(data.get("count_requested") if data.get("count_requested") is not None else len(questions))
+    except (TypeError, ValueError):
+        count_requested = len(questions)
+    if count_requested < 0:
+        count_requested = 0
+    title = str(data.get("title") or "").strip()[:80]
+    session = {
+        "id": new_id(),
+        "user_id": user["id"],
+        "device_id": _device_id(),
+        "created_at": now_iso(),
+        "level": str(data.get("level") or "A2").strip()[:20] or "A2",
+        "source": "import",
+        "keywords": str(data.get("keywords") or "").strip()[:200],
+        "duration_sec": 0,
+        "transcript": transcript,
+        "browser_transcript": browser_transcript,
+        "questions_json": questions,
+        "question_count": len(questions),
+        "count_requested": count_requested,
+        "notes": str(data.get("notes") or "")[:400],
+        "include_inference": bool(data.get("include_inference")),
+        "wait_prompt": str(data.get("wait_prompt") or "").strip()[:160] or "Talk with your partner. What did you hear?",
+        "status": "ready" if questions else "transcribed",
+    }
+    if title:
+        session["title"] = title
+    else:
+        session["title"] = _title_for(session)
+    save_talk_session(session)
+    return session
 
 
 def _title_for(session: dict) -> str:
@@ -263,6 +322,22 @@ def register(bp):
         session["title"] = _title_for(session)
         save_talk_session(session)
         return jsonify({"ok": True, "session_id": session["id"], "session": _public_session(session)})
+
+    @bp.route("/api/talk/import", methods=["POST"])
+    @login_required
+    @tool_required("talk_check")
+    def api_import_session():
+        """別端末・別アカウントの引き継ぎコードから、音声なしのセッションを作る。"""
+        payload = request.get_json(silent=True) or {}
+        data, error = _decode_transfer(payload.get("code"))
+        if error:
+            return jsonify({"ok": False, "error": error}), 400
+        session = _import_session_from(data)
+        return jsonify({
+            "ok": True,
+            "session_id": session["id"],
+            "session": _public_session(session, include_questions=True),
+        })
 
     @bp.route("/api/talk/generate", methods=["POST"])
     @login_required

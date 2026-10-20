@@ -159,7 +159,16 @@
 
   <div data-view="history" hidden>
     <h2>履歴（アーカイブ）</h2>
-    <p class="tb-note">この端末で作成して保存した文字起こしと問題だけが表示されます。開いて修正し、そのまま再利用できます。</p>
+    <p class="tb-note">この端末で作成して保存した文字起こしと問題だけが表示されます。別の端末のコードは、下から貼り付けて取り込めます（音声は含まれません）。</p>
+    <div class="tb-actions">
+      <button class="tb-btn" type="button" id="tb-hist-import-toggle">貼り付けて取り込む</button>
+    </div>
+    <div id="tb-hist-import-box" hidden>
+      <label>引き継ぎコード
+        <textarea id="tb-hist-import-code" rows="3" placeholder="TBTALK1:…"></textarea>
+      </label>
+      <button class="tb-btn tb-btn-primary" type="button" id="tb-hist-import">取り込む</button>
+    </div>
     <ul id="tb-history-list" class="tb-history-list"></ul>
     <p class="tb-muted" id="tb-history-empty" hidden>まだ履歴はありません。</p>
     <button class="tb-btn" type="button" data-go="settings">戻る</button>
@@ -195,8 +204,10 @@
       <button class="tb-btn tb-btn-primary" type="button" id="tb-ar-play">この問題で出題 ▶</button>
       <button class="tb-btn" type="button" id="tb-ar-retranscribe" hidden>音声から文字起こしし直す</button>
       <button class="tb-btn" type="button" id="tb-ar-regenerate">文字起こしから問題を作り直す</button>
+      <button class="tb-btn" type="button" id="tb-ar-export">引き継ぎ用にコピー</button>
       <button class="tb-btn" type="button" data-go="history">一覧へ戻る</button>
     </div>
+    <textarea id="tb-ar-export-fallback" rows="3" hidden readonly></textarea>
   </div>
 </section>
 {% endblock %}
