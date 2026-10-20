@@ -33,6 +33,7 @@ def new_part(part: str, *, speaker: str = "human") -> dict:
         "transcript_error": "",
         "transcription_mode": "",
         "transcribe_retry_at": None,
+        "transcribe_started_at": None,
         "start_time": None,
         "end_time": None,
         "time_limit_sec": defaults["time_limit_sec"],

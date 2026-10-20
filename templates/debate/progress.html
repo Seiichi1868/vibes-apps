@@ -79,7 +79,10 @@
     data-time-limit="{{ part.time_limit_sec }}"
     data-elapsed="{{ part.elapsed_sec if part.elapsed_sec is not none else '' }}"
     data-transcript-error="{{ part.transcript_error or '' }}"
+    data-audio-url="{{ part.audio_url or '' }}"
     data-end-time="{{ part.end_time or '' }}"
+    data-transcribe-started-at="{{ part.transcribe_started_at or '' }}"
+    data-transcribe-retry-at="{{ part.transcribe_retry_at or '' }}"
     data-poi-allowed="{{ '1' if meta.poi_allowed else '0' }}"
     data-pois='{{ (part.pois or []) | tojson }}'
   >
@@ -195,6 +198,9 @@
       <button type="button" class="btn-reset px-4 py-2 rounded-lg border border-slate-200 text-slate-500 text-sm font-semibold hover:bg-slate-50 transition-colors">
         やり直す
       </button>
+      <button type="button" class="btn-local-save hidden px-4 py-2 rounded-lg border border-brand/40 text-brand-dark text-sm font-semibold hover:bg-brand/5 transition-colors">
+        端末の録音で文字起こし
+      </button>
       <span class="btn-uploading hidden text-xs text-amber-600 font-semibold">文字起こし中…（他パートは録音できます）</span>
       <span class="part-save-msg hidden text-xs text-emerald-600 font-medium"></span>
       <span class="part-error text-xs text-rose-600 font-medium hidden"></span>
@@ -289,8 +295,10 @@
   window.DEBATE_PART_ORDER = {{ part_order | tojson }};
   window.DEBATE_AI_TEXT_VISIBLE_DEFAULT = {{ ai_text_visible_default | tojson }};
   window.DEBATE_POI = {{ poi_config | tojson }};
+  window.DEBATE_STUCK_AFTER_START_MS = {{ (transcribe_stuck_sec * 1000) | int }};
+  window.DEBATE_STUCK_WHILE_QUEUED_MS = {{ (transcribe_queue_stuck_sec * 1000) | int }};
 </script>
-<script src="{{ url_for('static', filename='debate/js/progress.js', v='20261003a') }}"></script>
+<script src="{{ url_for('static', filename='debate/js/progress.js', v='20261020a') }}"></script>
 {% if session.mode == 'solo' or session.mode == 'practice' %}
 <script src="{{ url_for('static', filename='debate/js/solo.js', v='20261003a') }}"></script>
 {% endif %}

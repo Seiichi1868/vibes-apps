@@ -22,6 +22,19 @@ WHISPER_MODEL = os.environ.get("DEBATE_WHISPER_MODEL", "whisper-1")
 # エラーとして返せるようにする。
 WHISPER_TIMEOUT_SEC = float(os.environ.get("DEBATE_WHISPER_TIMEOUT_SEC", "45"))
 WHISPER_MAX_RETRIES = int(os.environ.get("DEBATE_WHISPER_MAX_RETRIES", "1"))
+# 1回のWhisper呼び出しが使い切る時間（タイムアウト × 初回+リトライ）
+_WHISPER_ATTEMPT_SEC = WHISPER_TIMEOUT_SEC * (WHISPER_MAX_RETRIES + 1)
+# ワーカーが処理を始めたあと、この秒数を超えて transcribing のままなら停滞とみなす。
+# 試み時間より長くし、リトライ中に needs_review へ落とさない。
+TRANSCRIBE_STUCK_SEC = int(os.environ.get("DEBATE_TRANSCRIBE_STUCK_SEC", str(int(_WHISPER_ATTEMPT_SEC + 60))))
+# まだ transcribe_started_at が無い（プール待ち）ときは end_time からこの秒数まで待つ。
+TRANSCRIBE_QUEUE_STUCK_SEC = int(
+    os.environ.get(
+        "DEBATE_TRANSCRIBE_QUEUE_STUCK_SEC",
+        str(int(_WHISPER_ATTEMPT_SEC * 2 + 60)),
+    )
+)
+TRANSCRIBE_POOL_SIZE = int(os.environ.get("DEBATE_TRANSCRIBE_POOL_SIZE", "8"))
 
 # ジャッジモデル（単価・性能スコアは debate/judge_model_pricing.py、バー算出は judge_models.py）
 from debate.judge_models import DEFAULT_JUDGE_MODEL_MODE, get_judge_model_options

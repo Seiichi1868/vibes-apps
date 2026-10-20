@@ -31,6 +31,8 @@ from debate.config import (
     POI_DURATION_SEC,
     POI_OFFER_TIMEOUT_SEC,
     STATUS_LABELS,
+    TRANSCRIBE_QUEUE_STUCK_SEC,
+    TRANSCRIBE_STUCK_SEC,
     ensure_dirs,
 )
 from debate.judge_jobs import start_judge_job
@@ -71,10 +73,6 @@ debate_bp = Blueprint("debate", __name__, url_prefix="/debate")
 
 JST = timezone(timedelta(hours=9))
 
-# 文字起こしがこの秒数を超えて "transcribing" のままなら、サーバー側で復旧する
-TRANSCRIBE_STUCK_SEC = int(os.environ.get("DEBATE_TRANSCRIBE_STUCK_SEC", "90"))
-
-
 def _seconds_since(iso_timestamp: str | None) -> float | None:
     if not iso_timestamp:
         return None
@@ -113,10 +111,23 @@ def _audio_path(session_id: str, audio_url: str) -> Path | None:
     return path if path.is_file() else None
 
 
+def _transcription_stall(part_data: dict) -> tuple[float | None, int]:
+    """停滞判定の経過秒と閾値。
+
+    ワーカー開始時刻があればそこから TRANSCRIBE_STUCK_SEC。
+    未開始（キュー待ち）は再キュー時刻、なければ end_time から TRANSCRIBE_QUEUE_STUCK_SEC。
+    """
+    started = part_data.get("transcribe_started_at")
+    if started:
+        return _seconds_since(started), TRANSCRIBE_STUCK_SEC
+    anchor = part_data.get("transcribe_retry_at") or part_data.get("end_time")
+    return _seconds_since(anchor), TRANSCRIBE_QUEUE_STUCK_SEC
+
+
 def _recover_stuck_transcription(session_id: str, part: str, part_data: dict) -> dict:
     """transcribing が長時間止まっているパートを needs_review に落とす（1回だけ再試行）。"""
-    elapsed = _seconds_since(part_data.get("end_time"))
-    if elapsed is None or elapsed < TRANSCRIBE_STUCK_SEC:
+    elapsed, limit = _transcription_stall(part_data)
+    if elapsed is None or elapsed < limit:
         return part_data
 
     with get_session_lock(session_id):
@@ -131,6 +142,7 @@ def _recover_stuck_transcription(session_id: str, part: str, part_data: dict) ->
         file_path = _audio_path(session_id, current.get("audio_url", ""))
         if not retry_at and file_path:
             current["transcribe_retry_at"] = now_iso()
+            current["transcribe_started_at"] = None
             save_session(session)
             start_transcription_job(session_id, part, file_path)
             logger.warning(
@@ -563,6 +575,8 @@ def progress_screen(session_id):
         ai_text_visible_default=AI_TEXT_VISIBLE_DEFAULT,
         poi_config=_poi_config(),
         practice_label=practice_scope_label(session) if is_practice(session) else "",
+        transcribe_stuck_sec=TRANSCRIBE_STUCK_SEC,
+        transcribe_queue_stuck_sec=TRANSCRIBE_QUEUE_STUCK_SEC,
         **_background_context(),
     )
 
@@ -670,6 +684,7 @@ def upload_part_audio(session_id, part):
         part_data["transcript_edited"] = ""
         part_data["transcript_error"] = ""
         part_data["transcribe_retry_at"] = None
+        part_data["transcribe_started_at"] = None
         part_data["elapsed_sec"] = _resolve_elapsed_sec(
             part_data, request.form.get("elapsed_sec"), end_time
         )
@@ -710,6 +725,7 @@ def submit_part_transcript(session_id, part):
         )
         part_data["transcription_mode"] = "realtime"
         part_data["transcribe_retry_at"] = None
+        part_data["transcribe_started_at"] = None
         part_data["elapsed_sec"] = _resolve_elapsed_sec(
             part_data, payload.get("elapsed_sec"), end_time
         )
@@ -740,6 +756,7 @@ def retranscribe_part(session_id, part):
         part_data["status"] = "transcribing"
         part_data["transcript_error"] = ""
         part_data["transcribe_retry_at"] = None
+        part_data["transcribe_started_at"] = None
         save_session(session)
         response_data = dict(part_data)
 
@@ -840,6 +857,7 @@ def reset_part(session_id, part):
                 "transcript_error": "",
                 "transcription_mode": "",
                 "transcribe_retry_at": None,
+                "transcribe_started_at": None,
                 "start_time": None,
                 "end_time": None,
                 "elapsed_sec": None,

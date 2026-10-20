@@ -178,8 +178,17 @@ def all_preceding_confirmed(session: dict, part: str) -> bool:
     return True
 
 
+# 失敗した保存のやり直し、確認待ち、文字起こし停滞からの再保存を許可する状態
+AUDIO_RESUBMIT_STATUSES = ("recording", "transcribing", "needs_review")
+
+
 def recording_guard(session: dict, part: str) -> tuple[bool, str]:
-    """録音開始・音声保存・リアルタイム文字起こしの共通ガード。duo なら常に許可。"""
+    """録音開始・音声保存・リアルタイム文字起こしの共通ガード。duo なら常に許可。
+
+    すでに録音を始めているパート（recording / transcribing / needs_review）は、
+    サーバー保存に失敗したあとや文字起こしが空のまま止まったあとでも、
+    同じパートの音声を POST し直せる。先行パートの再チェックでは止めない。
+    """
     if not uses_partner_flow(session):
         return True, ""
 
@@ -192,6 +201,8 @@ def recording_guard(session: dict, part: str) -> tuple[bool, str]:
         return False, "このパートは練習範囲に含まれていません。"
     if part_is_ai(part_data):
         return False, "このパートは相手AIの担当です。"
+    if str(part_data.get("status") or "") in AUDIO_RESUBMIT_STATUSES:
+        return True, ""
     if not all_preceding_confirmed(session, part):
         return False, "前のパートを確定すると解禁されます。"
     return True, ""

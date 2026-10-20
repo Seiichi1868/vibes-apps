@@ -78,6 +78,7 @@ JSON: `data/debate/sessions/<id>.json` 音声: `data/debate/audio/<id>/`
 - **POI**: 建設的スピーチ（PM/LO/MG/MO）のみ。Reply（LOR/PMR）は不可。保護時間は管理画面で開始側・終了側を別スライダー（0＝無し、既定各60秒、最大90秒）。申し出→スピーカーが受理/却下（無応答約8秒で却下）。受理後最長15秒。録音も持ち時間も止まらない（POIは同一音声に入る）。一時停止はPOI対応中は不可。
 - ライブ音量+参考字幕は表示専用。保存される文字起こしはAならWhisper、BならWeb Speech
 - 停止直後に IndexedDB へも保存（`static/debate/js/local-audio.js`）。確認画面は **同じ端末の録音を先に再生**、なければサーバーURL
+- サーバーに音声が無い（保存失敗・`audio_url` 空）が、同じ端末の IndexedDB に録音があるときは、進行画面と確認画面に **「端末の録音で文字起こし」** を出す。既存の `POST /api/sessions/<id>/parts/<part>/audio` へ再保存し、その後は再文字起こしと同じポーリング。保存失敗でも IndexedDB は消さない。`recording_guard` は `recording` / `transcribing` / `needs_review` からの再保存を許可する（先行パート未確定では止めない）
 - 「保存して中断」は録音中不可。トップへ戻り、同じ端末から再開
 
 ## 再開
@@ -88,8 +89,9 @@ JSON: `data/debate/sessions/<id>.json` 音声: `data/debate/audio/<id>/`
 
 Whisper: `debate/transcription.py`（短タイムアウト）。ジョブ: `transcription_jobs.py`
 本番 gunicorn は **gthread**（`Procfile`）。gthreadでは `ThreadPoolExecutor`。gevent monkey済みのときだけ `gevent.threadpool`。`spawn` 失敗時はスレッドへ落とす。ジャッジジョブも同じ（`judge_jobs.py`）。
-`transcribing` が約90秒停滞 → 1回再キュー → だめなら `needs_review`。クライアントも90秒で確認画面へ誘導。
-確認画面で再文字起こし可。確定は `transcript_edited` 必須。6パート確定後にジャッジ。
+文字起こしプールはワーカーあたり既定 **8**（`DEBATE_TRANSCRIBE_POOL_SIZE`）。ワーカー開始時に `transcribe_started_at` を書く。停滞判定はその時刻から（未開始のキュー待ちは `end_time` または再キュー時刻から、より長い `TRANSCRIBE_QUEUE_STUCK_SEC`）。閾値は Whisper の timeout×(retries+1) を上回る（開始後は +60秒、待ちは試み時間の2倍+60秒。環境変数 `DEBATE_TRANSCRIBE_STUCK_SEC` / `DEBATE_TRANSCRIBE_QUEUE_STUCK_SEC`）。クライアントのポーリングも同じ秒数。1回だけ再キューし、だめなら `needs_review`。
+遅れても、`needs_review` で文字起こしが空・生徒が編集/確定していなければ結果を書く。`confirmed` や `transcript_edited` ありは上書きしない。
+確認画面で再文字起こし可。サーバー音声が無いときは端末の録音から再保存できる。確定は `transcript_edited` 必須。6パート確定後にジャッジ。
 
 ## ジャッジ
 

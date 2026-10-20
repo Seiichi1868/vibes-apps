@@ -106,6 +106,10 @@
       文字起こしを再試行
     </button>
     {% endif %}
+    <button id="local-reupload-btn" type="button" hidden
+      class="px-5 py-2.5 rounded-xl border border-brand/40 text-brand-dark text-sm font-bold hover:bg-brand/5 transition-colors">
+      端末の録音で文字起こし
+    </button>
     <button id="redo-btn" type="button"
       class="px-5 py-2.5 rounded-xl border border-rose-200 text-rose-600 text-sm font-bold hover:bg-rose-50 transition-colors">
       録音をやり直す
@@ -125,5 +129,5 @@
   window.DEBATE_PART_STATUS = {{ part.status | tojson }};
   window.DEBATE_AUDIO_URL = {{ (part.audio_url or "") | tojson }};
 </script>
-<script src="{{ url_for('static', filename='debate/js/review.js', v='20260919b') }}"></script>
+<script src="{{ url_for('static', filename='debate/js/review.js', v='20261020a') }}"></script>
 {% endblock %}

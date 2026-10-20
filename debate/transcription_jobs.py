@@ -8,6 +8,8 @@ import logging
 import threading
 from pathlib import Path
 
+from debate.config import TRANSCRIBE_POOL_SIZE
+from debate.models import now_iso
 from debate.storage import get_part, get_session_lock, load_session, save_session
 from debate.transcription import transcribe_audio
 
@@ -36,22 +38,58 @@ def _get_pool():
             try:
                 from gevent.threadpool import ThreadPool
 
-                _pool = ThreadPool(4)
+                _pool = ThreadPool(TRANSCRIBE_POOL_SIZE)
                 _use_gevent = True
-                logger.info("debate transcription: using gevent.threadpool.ThreadPool")
+                logger.info(
+                    "debate transcription: using gevent.threadpool.ThreadPool size=%s",
+                    TRANSCRIBE_POOL_SIZE,
+                )
                 return _pool
             except Exception as exc:  # noqa: BLE001
                 logger.warning("debate transcription: gevent threadpool unavailable (%s)", exc)
         from concurrent.futures import ThreadPoolExecutor
 
-        _pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="debate-transcribe")
+        _pool = ThreadPoolExecutor(
+            max_workers=TRANSCRIBE_POOL_SIZE, thread_name_prefix="debate-transcribe"
+        )
         _use_gevent = False
         logger.info("debate transcription: using ThreadPoolExecutor")
         return _pool
 
 
+def _transcript_is_blank(part_data: dict) -> bool:
+    raw = str(part_data.get("transcript_raw") or "").strip()
+    edited = str(part_data.get("transcript_edited") or "").strip()
+    return not raw and not edited
+
+
+def may_apply_transcription(part_data: dict | None) -> bool:
+    """文字起こし結果を書いてよいか。
+
+    transcribing 中は書く。停滞扱いで needs_review に落ちていても、
+    文字起こしが空で、生徒が編集・確定していなければ遅いジョブの結果を書く。
+    confirmed や、transcript_edited が入ったあとは上書きしない。
+    """
+    if not part_data:
+        return False
+    status = part_data.get("status")
+    if status == "transcribing":
+        return True
+    if status == "needs_review" and _transcript_is_blank(part_data):
+        return True
+    return False
+
+
 def run_transcription_job(session_id: str, part: str, file_path: Path) -> None:
     """Whisper で文字起こしし、完了後にセッション JSON へ反映する。"""
+    with get_session_lock(session_id):
+        session = load_session(session_id)
+        part_data = get_part(session, part) if session else None
+        if not may_apply_transcription(part_data):
+            return
+        part_data["transcribe_started_at"] = now_iso()
+        save_session(session)
+
     error_message = ""
     transcript = ""
     try:
@@ -78,7 +116,7 @@ def run_transcription_job(session_id: str, part: str, file_path: Path) -> None:
         if not session:
             return
         part_data = get_part(session, part)
-        if not part_data or part_data.get("status") != "transcribing":
+        if not may_apply_transcription(part_data):
             return
 
         if error_message:

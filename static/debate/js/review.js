@@ -6,6 +6,7 @@
   const confirmBtn = document.getElementById("confirm-btn");
   const redoBtn = document.getElementById("redo-btn");
   const retranscribeBtn = document.getElementById("retranscribe-btn");
+  const localReuploadBtn = document.getElementById("local-reupload-btn");
   const transcribingBanner = document.getElementById("transcribing-banner");
   const transcriptErrorNote = document.getElementById("transcript-error-note");
   const errorBox = document.getElementById("review-error");
@@ -26,6 +27,7 @@
     if (transcribingBanner) transcribingBanner.classList.toggle("hidden", !isProcessing);
     confirmBtn.disabled = isProcessing;
     if (retranscribeBtn) retranscribeBtn.disabled = isProcessing;
+    if (localReuploadBtn) localReuploadBtn.disabled = isProcessing;
     textarea.disabled = isProcessing;
   }
 
@@ -72,6 +74,41 @@
   if (window.DEBATE_PART_STATUS === "transcribing") {
     startPolling();
   }
+
+  if (!window.DEBATE_AUDIO_URL && localReuploadBtn) {
+    window.DebateLocalAudio?.get(SESSION_ID, PART).then((local) => {
+      if (local?.blob && local.blob.size > 0) localReuploadBtn.hidden = false;
+    });
+  }
+
+  localReuploadBtn?.addEventListener("click", async () => {
+    localReuploadBtn.disabled = true;
+    localReuploadBtn.textContent = "保存して文字起こし中...";
+    hideError();
+    try {
+      const local = await window.DebateLocalAudio?.get(SESSION_ID, PART);
+      if (!local?.blob || local.blob.size <= 0) {
+        throw new Error("この端末に録音が見つかりません。録音からやり直してください。");
+      }
+      const mime = local.mimeType || local.blob.type || "audio/webm";
+      const ext = mime.includes("mp4") ? "mp4" : mime.includes("ogg") ? "ogg" : "webm";
+      const formData = new FormData();
+      formData.append("audio", local.blob, `${PART}.${ext}`);
+      const res = await fetch(`/debate/api/sessions/${SESSION_ID}/parts/${PART}/audio`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "保存のやり直しに失敗しました。");
+      window.DEBATE_AUDIO_URL = data.audio_url || window.DEBATE_AUDIO_URL;
+      localReuploadBtn.hidden = true;
+      startPolling();
+    } catch (err) {
+      localReuploadBtn.disabled = false;
+      localReuploadBtn.textContent = "端末の録音で文字起こし";
+      showError(err.message);
+    }
+  });
 
   retranscribeBtn?.addEventListener("click", async () => {
     retranscribeBtn.disabled = true;
