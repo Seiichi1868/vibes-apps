@@ -10,7 +10,11 @@
 
   window.toolboxFetch = function (url, options) {
     const next = Object.assign({ credentials: "same-origin" }, options || {});
-    next.headers = Object.assign({}, jsonHeaders(), next.headers || {});
+    const headers = Object.assign({}, jsonHeaders(), next.headers || {});
+    if (typeof FormData !== "undefined" && next.body instanceof FormData) {
+      delete headers["Content-Type"];
+    }
+    next.headers = headers;
     return fetch(url, next).then(async (res) => {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
