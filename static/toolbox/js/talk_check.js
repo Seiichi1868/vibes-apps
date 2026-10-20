@@ -1393,6 +1393,31 @@
     show("select");
   }
 
+  document.getElementById("tb-hist-import-toggle").addEventListener("click", () => {
+    const box = document.getElementById("tb-hist-import-box");
+    box.hidden = !box.hidden;
+    if (!box.hidden) document.getElementById("tb-hist-import-code").focus();
+  });
+
+  document.getElementById("tb-hist-import").addEventListener("click", (ev) => {
+    const code = document.getElementById("tb-hist-import-code").value.trim();
+    if (!code) {
+      alert("引き継ぎコードを貼り付けてください。");
+      return;
+    }
+    busy(ev.target, "取り込み中…", async () => {
+      const data = await toolboxFetch("/toolbox/api/talk/import", {
+        method: "POST",
+        body: JSON.stringify({ code }),
+      });
+      document.getElementById("tb-hist-import-code").value = "";
+      document.getElementById("tb-hist-import-box").hidden = true;
+      await loadHistory();
+      await openArchive(data.session.id || data.session_id);
+      flash("archive", "取り込みました");
+    }).catch((e) => alert(e.message));
+  });
+
   document.getElementById("tb-history-list").addEventListener("click", async (ev) => {
     const { open, del, play, local } = ev.target.dataset;
     if (open) openArchive(open).catch((e) => alert(e.message));
@@ -1511,7 +1536,7 @@
       `${(detail.questions || []).length}問`,
       `音声 ${fmtDuration(detail.duration_sec)}`,
       `CEFR ${detail.level || "-"}`,
-      { record: "録音", file: "音声ファイル", paste: "テキスト" }[detail.source] || "",
+      { record: "録音", file: "音声ファイル", paste: "テキスト", import: "引き継ぎ" }[detail.source] || "",
     ].filter(Boolean).join(" ・ ");
     ar.error.hidden = !detail.last_error;
     ar.error.textContent = detail.last_error ? `直前のエラー: ${detail.last_error}` : "";
@@ -1580,6 +1605,59 @@
       btn.textContent = label;
     });
   }
+
+  function transferPayload() {
+    syncArchiveQuestions();
+    const detail = state.detail || {};
+    return {
+      title: ar.title.value,
+      level: detail.level || "",
+      transcript: ar.transcript.value,
+      browser_transcript: detail.browser_transcript || ar.browser.textContent || "",
+      questions: ar.questions.filter((q) => (q.question || "").trim()),
+      wait_prompt: detail.wait_prompt || "",
+      notes: detail.notes || "",
+      include_inference: !!detail.include_inference,
+      count_requested: detail.count_requested,
+      keywords: detail.keywords || "",
+    };
+  }
+
+  function encodeTransfer(payload) {
+    const bytes = new TextEncoder().encode(JSON.stringify(payload));
+    let binary = "";
+    bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+    return `TBTALK1:${btoa(binary)}`;
+  }
+
+  async function copyTransfer(text) {
+    const fallback = document.getElementById("tb-ar-export-fallback");
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        fallback.hidden = true;
+        return true;
+      }
+    } catch (_) {}
+    fallback.hidden = false;
+    fallback.value = text;
+    fallback.focus();
+    fallback.select();
+    return false;
+  }
+
+  document.getElementById("tb-ar-export").addEventListener("click", (ev) => {
+    busy(ev.target, "コピー中…", async () => {
+      if (state.arDirty) {
+        try {
+          await saveArchive();
+        } catch (_) {}
+      }
+      const text = encodeTransfer(transferPayload());
+      const copied = await copyTransfer(text);
+      flash("archive", copied ? "引き継ぎ用コードをコピーしました" : "コピーできませんでした。下の文字を選択してコピーしてください");
+    }).catch((e) => alert(e.message));
+  });
 
   document.getElementById("tb-ar-save").addEventListener("click", (ev) => {
     busy(ev.target, "保存中…", saveArchive)
