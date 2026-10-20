@@ -275,7 +275,7 @@ class NewsTeacherAccountTests(unittest.TestCase):
         page = self.client.get("/news/admin/")
         html = page.get_data(as_text=True)
         self.assertEqual(page.status_code, 200)
-        self.assertIn("news/js/admin.js?v=20261019c", html)
+        self.assertRegex(html, r"news/js/admin\.js\?v=[0-9a-f]{10}")
         self.assertIn('id="admin-logout-btn"', html)
         logout = html.split('id="admin-logout-btn"', 1)[1][:180]
         self.assertNotIn("hidden", logout)

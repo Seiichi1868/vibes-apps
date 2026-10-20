@@ -87,7 +87,7 @@ class NewsSamplePreviewTests(unittest.TestCase):
         self.assertIn("クラス未設定", html)
         self.assertIn("見本の授業です", html)
         self.assertIn('data-support-id="vocab"', html)
-        self.assertIn("news/js/admin.js?v=20261019c", html)
+        self.assertRegex(html, r"news/js/admin\.js\?v=[0-9a-f]{10}")
         self.assertNotIn(">test1<", html)
         self.assertNotIn('data-tab="results"', html)
         self.assertEqual(self.storage.get_class(class_id)["name"], "test1")

@@ -1217,6 +1217,9 @@
       if (gen !== speakGen) return;
       speakUrl = URL.createObjectURL(blob);
       speakAudio = new Audio(speakUrl);
+      speakAudio.playsInline = true;
+      speakAudio.setAttribute("playsinline", "");
+      speakAudio.preload = "auto";
       speakAudio.addEventListener("ended", stopSpeak);
       await speakAudio.play();
       btn.disabled = false;

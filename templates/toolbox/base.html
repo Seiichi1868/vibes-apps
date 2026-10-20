@@ -89,7 +89,7 @@
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", function () {
-        navigator.serviceWorker.register("/toolbox/sw.js", { scope: "/toolbox/" }).catch(function () {});
+        navigator.serviceWorker.register("/toolbox/sw.js?v={{ asset_version('toolbox/sw.js') }}", { scope: "/toolbox/" }).catch(function () {});
       });
     }
   </script>
