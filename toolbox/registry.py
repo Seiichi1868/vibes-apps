@@ -38,6 +38,17 @@ TOOLS: list[dict] = [
         "default_enabled": True,
     },
     {
+        "id": "qr",
+        "name": "QRコード",
+        "description": "URLを貼ると教室スクリーンに出せる大きなQRコード。",
+        "icon": "qr",
+        "scene": "運営",
+        "route": "toolbox.qr_page",
+        "path": "/toolbox/qr",
+        "uses_ai": False,
+        "default_enabled": True,
+    },
+    {
         "id": "cnn10",
         "name": "News Talk",
         "description": "授業にあった関連テーマで動画を選び、文字起こしから語彙、事前事後の問いを作成する。",

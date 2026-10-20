@@ -10,8 +10,10 @@ def create_toolbox_blueprints() -> dict:
     from toolbox.tools.cnn10_lesson.routes import register as register_cnn10_lesson
     from toolbox.tools.minute_speech.routes import register as register_minute_speech
     from toolbox.tools.timer.routes import register as register_timer
+    from toolbox.tools.qr.routes import register as register_qr
 
     register_timer(main_bp)
+    register_qr(main_bp)
     register_minute_speech(main_bp)
     register_cnn10_lesson(main_bp)
     register_random_pick(main_bp)
