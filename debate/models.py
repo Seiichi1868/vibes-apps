@@ -31,6 +31,8 @@ def new_part(part: str, *, speaker: str = "human") -> dict:
         "transcript_raw": "",
         "transcript_edited": "",
         "transcript_error": "",
+        "transcript_browser": "",
+        "transcript_source": "",
         "transcription_mode": "",
         "transcribe_retry_at": None,
         "transcribe_started_at": None,

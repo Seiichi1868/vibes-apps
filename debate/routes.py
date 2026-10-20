@@ -125,6 +125,24 @@ def _transcription_stall(part_data: dict) -> tuple[float | None, int]:
     return _seconds_since(anchor), TRANSCRIBE_QUEUE_STUCK_SEC
 
 
+def _fill_browser_fallback(part_data: dict) -> None:
+    """Whisper が空のまま確認待ちになったとき、ブラウザ下書きを本文にする。"""
+    browser = str(part_data.get("transcript_browser") or "").strip()
+    if not browser:
+        return
+    raw = str(part_data.get("transcript_raw") or "").strip()
+    edited = str(part_data.get("transcript_edited") or "").strip()
+    if raw:
+        return
+    if edited and not (
+        part_data.get("transcript_source") == "browser" and edited == browser
+    ):
+        if edited != browser:
+            return
+    part_data["transcript_edited"] = browser
+    part_data["transcript_source"] = "browser"
+
+
 def _recover_stuck_transcription(session_id: str, part: str, part_data: dict) -> dict:
     """transcribing が長時間止まっているパートを needs_review に落とす（1回だけ再試行）。"""
     elapsed, limit = _transcription_stall(part_data)
@@ -158,6 +176,7 @@ def _recover_stuck_transcription(session_id: str, part: str, part_data: dict) ->
         current["transcript_error"] = (
             "文字起こしが完了しませんでした。「文字起こしを確認」から再試行するか、手動で入力してください。"
         )
+        _fill_browser_fallback(current)
         save_session(session)
         logger.warning(
             "Recovered stuck transcription session=%s part=%s elapsed=%.0fs",
@@ -684,6 +703,10 @@ def upload_part_audio(session_id, part):
         part_data["transcript_raw"] = ""
         part_data["transcript_edited"] = ""
         part_data["transcript_error"] = ""
+        if "browser_transcript" in request.form:
+            part_data["transcript_browser"] = str(request.form.get("browser_transcript") or "").strip()[:20000]
+        part_data["transcript_source"] = ""
+        part_data["transcript_force_whisper"] = False
         part_data["transcribe_retry_at"] = None
         part_data["transcribe_started_at"] = None
         part_data["elapsed_sec"] = _resolve_elapsed_sec(
@@ -725,6 +748,7 @@ def submit_part_transcript(session_id, part):
             "" if transcript_raw else "文字起こし結果が空です。やり直すか、確認画面で手動入力してください。"
         )
         part_data["transcription_mode"] = "realtime"
+        part_data["transcript_source"] = ""
         part_data["transcribe_retry_at"] = None
         part_data["transcribe_started_at"] = None
         part_data["elapsed_sec"] = _resolve_elapsed_sec(
@@ -754,10 +778,13 @@ def retranscribe_part(session_id, part):
         if not file_path:
             return jsonify({"error": "音声ファイルが見つかりません。録音からやり直してください。"}), 404
 
+        payload = request.get_json(silent=True) or {}
         part_data["status"] = "transcribing"
         part_data["transcript_error"] = ""
         part_data["transcribe_retry_at"] = None
         part_data["transcribe_started_at"] = None
+        if payload.get("overwrite"):
+            part_data["transcript_force_whisper"] = True
         save_session(session)
         response_data = dict(part_data)
 
@@ -822,6 +849,11 @@ def confirm_part(session_id, part):
 
         edited = str(payload.get("transcript_edited", part_data.get("transcript_edited", "")))
         part_data["transcript_edited"] = edited
+        incoming = str(payload.get("transcript_source") or "")
+        if incoming in ("browser", "edited") and part_data.get("transcript_source") != "whisper":
+            part_data["transcript_source"] = incoming
+            if incoming == "browser" and edited.strip() and not str(part_data.get("transcript_browser") or "").strip():
+                part_data["transcript_browser"] = edited.strip()[:20000]
         part_data["status"] = "confirmed"
         save_session(session)
         targets = next_generation_targets(session, part)
@@ -856,6 +888,9 @@ def reset_part(session_id, part):
                 "transcript_raw": "",
                 "transcript_edited": "",
                 "transcript_error": "",
+                "transcript_browser": "",
+                "transcript_source": "",
+                "transcript_force_whisper": False,
                 "transcription_mode": "",
                 "transcribe_retry_at": None,
                 "transcribe_started_at": None,

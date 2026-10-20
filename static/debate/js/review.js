@@ -10,6 +10,24 @@
   const transcribingBanner = document.getElementById("transcribing-banner");
   const transcriptErrorNote = document.getElementById("transcript-error-note");
   const errorBox = document.getElementById("review-error");
+  const browserNote = document.getElementById("browser-fallback-note");
+
+  function showBrowserNote(show) {
+    browserNote?.classList.toggle("hidden", !show);
+  }
+
+  function applyTranscript(data) {
+    const source = data.transcript_source || "";
+    window.DEBATE_TRANSCRIPT_SOURCE = source;
+    if (data.transcript_browser) window.DEBATE_TRANSCRIPT_BROWSER = data.transcript_browser;
+    if (data.audio_url) {
+      window.DEBATE_AUDIO_URL = data.audio_url;
+      if (retranscribeBtn) retranscribeBtn.classList.remove("hidden");
+    }
+    const next = data.transcript_edited || data.transcript_raw || "";
+    if (next || source === "whisper") textarea.value = next;
+    showBrowserNote(source === "browser");
+  }
 
   let pollTimer = null;
 
@@ -49,6 +67,7 @@
       setProcessingUI(false);
       if (retranscribeBtn) retranscribeBtn.textContent = "文字起こしを再試行";
 
+      applyTranscript(data);
       if (data.transcript_error) {
         showError(`文字起こしに失敗しました: ${data.transcript_error}`);
         if (transcriptErrorNote) {
@@ -58,7 +77,6 @@
       } else {
         hideError();
         if (transcriptErrorNote) transcriptErrorNote.classList.add("hidden");
-        textarea.value = data.transcript_edited || data.transcript_raw || "";
       }
     } catch (_) {
       // ネットワーク不調時は次回のポーリングで再試行する
@@ -94,6 +112,7 @@
       const ext = mime.includes("mp4") ? "mp4" : mime.includes("ogg") ? "ogg" : "webm";
       const formData = new FormData();
       formData.append("audio", local.blob, `${PART}.${ext}`);
+      formData.append("browser_transcript", local.browserTranscript || "");
       const res = await fetch(`/debate/api/sessions/${SESSION_ID}/parts/${PART}/audio`, {
         method: "POST",
         body: formData,
@@ -110,7 +129,28 @@
     }
   });
 
+  window.DebateLocalAudio?.get(SESSION_ID, PART).then((local) => {
+    const browser = (local?.browserTranscript || "").trim();
+    if (!browser) return;
+    if (!window.DEBATE_TRANSCRIPT_BROWSER) window.DEBATE_TRANSCRIPT_BROWSER = browser;
+    if (!textarea.value.trim() && window.DEBATE_TRANSCRIPT_SOURCE !== "whisper") {
+      textarea.value = browser;
+      window.DEBATE_TRANSCRIPT_SOURCE = "browser";
+      showBrowserNote(true);
+    }
+  });
+
   retranscribeBtn?.addEventListener("click", async () => {
+    const browser = (window.DEBATE_TRANSCRIPT_BROWSER || "").trim();
+    const current = textarea.value.trim();
+    let overwrite = false;
+    if (window.DEBATE_TRANSCRIPT_SOURCE === "browser" && browser && current && current !== browser) {
+      const replace = window.confirm(
+        "編集した文章をWhisperの文字起こしで置き換えますか？キャンセルすると、今の文章を残して再試行しません。"
+      );
+      if (!replace) return;
+      overwrite = true;
+    }
     retranscribeBtn.disabled = true;
     retranscribeBtn.textContent = "文字起こし中...";
     hideError();
@@ -118,6 +158,8 @@
     try {
       const res = await fetch(`/debate/api/sessions/${SESSION_ID}/parts/${PART}/retranscribe`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(overwrite ? { overwrite: true } : {}),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "再試行の開始に失敗しました。");
@@ -138,7 +180,17 @@
       const res = await fetch(`/debate/api/sessions/${SESSION_ID}/parts/${PART}/confirm`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transcript_edited: textarea.value }),
+        body: JSON.stringify({
+          transcript_edited: textarea.value,
+          transcript_browser: window.DEBATE_TRANSCRIPT_BROWSER || "",
+          transcript_source:
+            window.DEBATE_TRANSCRIPT_SOURCE === "browser" &&
+            textarea.value.trim() === (window.DEBATE_TRANSCRIPT_BROWSER || "").trim()
+              ? "browser"
+              : window.DEBATE_TRANSCRIPT_SOURCE === "browser"
+                ? "edited"
+                : window.DEBATE_TRANSCRIPT_SOURCE || "",
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "保存に失敗しました。");

@@ -77,6 +77,10 @@
     バックグラウンドで文字起こしを処理しています…完了すると自動的に表示が更新されます。
   </div>
 
+  <div id="browser-fallback-note" class="mb-3 rounded-lg border border-amber-400 bg-amber-50 px-3 py-3 text-sm font-bold text-amber-950{% if part.transcript_source != 'browser' %} hidden{% endif %}">
+    これはブラウザの簡易文字起こしです（精度が低い可能性があります）。「文字起こしを再試行」でWhisperの文字起こしを取り直してください。
+  </div>
+
   {% if part.transcript_error %}
   <p id="transcript-error-note" class="mb-3 text-xs text-rose-600 font-medium">
     前回の文字起こしでエラーが発生しました: {{ part.transcript_error }}
@@ -100,12 +104,10 @@
       class="px-5 py-2.5 rounded-xl bg-brand text-white text-sm font-bold shadow hover:bg-brand-dark transition-colors">
       保存して確定
     </button>
-    {% if part.audio_url %}
     <button id="retranscribe-btn" type="button"
-      class="px-5 py-2.5 rounded-xl border border-brand/40 text-brand-dark text-sm font-bold hover:bg-brand/5 transition-colors">
+      class="px-5 py-2.5 rounded-xl border border-brand/40 text-brand-dark text-sm font-bold hover:bg-brand/5 transition-colors{% if not part.audio_url %} hidden{% endif %}">
       文字起こしを再試行
     </button>
-    {% endif %}
     <button id="local-reupload-btn" type="button" hidden
       class="px-5 py-2.5 rounded-xl border border-brand/40 text-brand-dark text-sm font-bold hover:bg-brand/5 transition-colors">
       端末の録音で文字起こし
@@ -128,6 +130,8 @@
   window.DEBATE_PART = {{ part.part | tojson }};
   window.DEBATE_PART_STATUS = {{ part.status | tojson }};
   window.DEBATE_AUDIO_URL = {{ (part.audio_url or "") | tojson }};
+  window.DEBATE_TRANSCRIPT_SOURCE = {{ (part.transcript_source or "") | tojson }};
+  window.DEBATE_TRANSCRIPT_BROWSER = {{ (part.transcript_browser or "") | tojson }};
 </script>
-<script src="{{ url_for('static', filename='debate/js/review.js', v='20261020a') }}"></script>
+<script src="{{ url_for('static', filename='debate/js/review.js', v='20261020b') }}"></script>
 {% endblock %}

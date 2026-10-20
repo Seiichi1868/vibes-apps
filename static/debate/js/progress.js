@@ -230,6 +230,7 @@
     recognition.interimResults = true;
 
     let finalText = "";
+    let interimText = "";
     let stopped = false;
     let paused = false;
 
@@ -240,6 +241,7 @@
         if (event.results[i].isFinal) finalText += `${chunk} `;
         else interim += chunk;
       }
+      interimText = interim;
       const combined = `${finalText}${interim}`.trim();
       captionBox.textContent =
         combined || "（発話するとここに認識したテキストが表示されます）";
@@ -262,6 +264,9 @@
     }
 
     return {
+      getText() {
+        return `${finalText}${interimText}`.trim();
+      },
       stop() {
         stopped = true;
         paused = false;
@@ -926,7 +931,8 @@
       recorder.addEventListener("stop", () => {
         stream.getTracks().forEach((t) => t.stop());
         const blob = new Blob(chunks, { type: mimeType || "audio/webm" });
-        window.DebateLocalAudio?.put(SESSION_ID, part, blob, mimeType || "audio/webm");
+        const browserTranscript = (cardState.get(part) || {}).browserTranscript || "";
+        window.DebateLocalAudio?.put(SESSION_ID, part, blob, mimeType || "audio/webm", browserTranscript);
         uploadAudio(card, blob, mimeType || "audio/webm");
       });
 
@@ -1096,6 +1102,8 @@
 
     if (!state.recorder || state.recorder.state === "inactive") return;
 
+    state.browserTranscript = (state.liveCaption?.getText?.() || "").trim();
+    cardState.set(part, state);
     cleanupRecordingResources(card, part);
 
     activeRecordingPart = null;
@@ -1208,6 +1216,8 @@
     if (elapsedSec != null) formData.append("elapsed_sec", String(elapsedSec));
     const pois = (cardState.get(part) || {}).speakingPois;
     if (pois) formData.append("pois", JSON.stringify(pois));
+    const browserTranscript = (cardState.get(part) || {}).browserTranscript || "";
+    formData.append("browser_transcript", browserTranscript);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
@@ -1270,6 +1280,9 @@
       setError(card, "この端末に録音が見つかりません。録音からやり直してください。");
       return;
     }
+    const state = cardState.get(part) || {};
+    state.browserTranscript = local.browserTranscript || "";
+    cardState.set(part, state);
     card.dataset.status = "transcribing";
     card.dataset.localSave = "";
     setError(card, "");
