@@ -16,7 +16,11 @@
         </div>
         <div class="tb-inline-form" id="tb-quick-count-row">
           <label>人数
-            <input id="tb-quick-count" type="number" min="1" max="60" value="30" inputmode="numeric">
+            <select id="tb-quick-count">
+              {% for n in range(1, 61) %}
+              <option value="{{ n }}"{% if n == 30 %} selected{% endif %}>{{ n }}</option>
+              {% endfor %}
+            </select>
           </label>
         </div>
         <div class="tb-inline-form" id="tb-quick-range-row" hidden>

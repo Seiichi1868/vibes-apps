@@ -1,5 +1,5 @@
 /* Toolbox Service Worker */
-const VERSION = "toolbox-v6";
+const VERSION = "toolbox-v7";
 const STATIC_CACHE = `${VERSION}-static`;
 const PAGE_CACHE = `${VERSION}-pages`;
 const OFFLINE_URL = "/toolbox/offline";

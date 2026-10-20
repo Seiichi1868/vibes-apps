@@ -42,7 +42,8 @@ class RandomSeatsQuickTests(unittest.TestCase):
         self.assertEqual(page.status_code, 200)
         body = page.get_data(as_text=True)
         self.assertIn("__quick__", body)
-        self.assertIn("tb-quick-count", body)
+        self.assertIn('<select id="tb-quick-count"', body)
+        self.assertIn(">60</option>", body)
         self.assertIn("tb-quick-names", body)
         self.assertIn("random_seats.js", body)
 
