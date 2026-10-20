@@ -724,6 +724,7 @@ html.tb-skip-opening .tb-opening { display: none !important; }
 
 #tb-room-tabs { display: contents; }
 .tb-stage-chrome #tb-quick input,
+.tb-stage-chrome #tb-quick select,
 .tb-stage-chrome #tb-quick textarea {
   min-height: 44px;
   min-width: 44px;
