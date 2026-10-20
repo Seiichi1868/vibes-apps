@@ -44,8 +44,9 @@
       </div>
       <div class="flex items-center gap-1.5 shrink-0">
         <div id="admin-lock" class="flex items-center gap-1">
-          <input id="admin-password" type="password" inputmode="numeric" autocomplete="off"
-            placeholder="PW" class="admin-input admin-input-compact w-16" />
+          <input id="admin-password" type="password" autocomplete="current-password"
+            autocapitalize="off" autocorrect="off" spellcheck="false"
+            placeholder="管理パスワード" class="admin-input admin-input-compact w-40" />
           <button id="unlock-btn" type="button" class="admin-btn admin-btn-primary admin-btn-compact">解除</button>
         </div>
         <a href="/gtec" class="text-[11px] text-teal-600 hover:text-teal-800 font-medium whitespace-nowrap">← 生徒</a>

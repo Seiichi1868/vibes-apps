@@ -28,8 +28,9 @@
       <h2 class="text-sm font-bold text-slate-800 mb-2 flex items-center gap-1.5">🔒 管理設定（評価に使うAIモデル）</h2>
       <div class="flex flex-wrap items-center gap-2">
         <div id="ai-model-picker" class="flex flex-wrap gap-2"></div>
-        <input id="model-admin-password" type="password" inputmode="numeric" autocomplete="off"
-          placeholder="管理パスワード" class="lc-input w-32">
+        <input id="model-admin-password" type="password" autocomplete="current-password"
+          autocapitalize="off" autocorrect="off" spellcheck="false"
+          placeholder="管理パスワード" class="lc-input w-40">
         <button id="change-model-btn" type="button"
           class="text-xs px-3.5 py-1.5 rounded-full bg-brand text-white font-semibold hover:bg-brand-dark transition-colors">
           変更

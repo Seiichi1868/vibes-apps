@@ -13,7 +13,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Pronounce 管理">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20261016a') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20261020a') }}" />
     <style>
       .page-bg-layer {
         background-image: url("{{ url_for('static', filename=background_image) }}");
@@ -37,8 +37,10 @@
               type="password"
               id="adminSettingsPassword"
               class="admin-settings-password"
-              inputmode="numeric"
-              autocomplete="off"
+              autocomplete="current-password"
+              autocapitalize="off"
+              autocorrect="off"
+              spellcheck="false"
               aria-label="管理設定パスワード"
             />
             <button type="button" id="adminSettingsUnlock" class="admin-settings-unlock-btn">
