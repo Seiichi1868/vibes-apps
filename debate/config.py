@@ -34,7 +34,7 @@ TRANSCRIBE_QUEUE_STUCK_SEC = int(
         str(int(_WHISPER_ATTEMPT_SEC * 2 + 60)),
     )
 )
-TRANSCRIBE_POOL_SIZE = int(os.environ.get("DEBATE_TRANSCRIBE_POOL_SIZE", "8"))
+TRANSCRIBE_POOL_SIZE = int(os.environ.get("DEBATE_TRANSCRIBE_POOL_SIZE", "12"))
 
 # ジャッジモデル（単価・性能スコアは debate/judge_model_pricing.py、バー算出は judge_models.py）
 from debate.judge_models import DEFAULT_JUDGE_MODEL_MODE, get_judge_model_options
@@ -44,13 +44,26 @@ JUDGE_MODEL_OPTIONS = get_judge_model_options()
 JUDGE_MODEL_OVERRIDE = os.environ.get("DEBATE_JUDGE_MODEL", "").strip()
 JUDGE_TIMEOUT_SEC = float(os.environ.get("DEBATE_JUDGE_TIMEOUT_SEC", "90"))
 JUDGE_MAX_RETRIES = int(os.environ.get("DEBATE_JUDGE_MAX_RETRIES", "1"))
-# ジャッジが "judging" のまま長時間止まっている場合にエラー扱いへ復旧するまでの秒数
-JUDGE_STUCK_SEC = int(os.environ.get("DEBATE_JUDGE_STUCK_SEC", "180"))
+# ワーカーがジャッジを始めたあと。timeout×(retries+1) より長くする。
+_JUDGE_ATTEMPT_SEC = JUDGE_TIMEOUT_SEC * (JUDGE_MAX_RETRIES + 1)
+JUDGE_STUCK_SEC = int(os.environ.get("DEBATE_JUDGE_STUCK_SEC", str(int(_JUDGE_ATTEMPT_SEC + 60))))
+# started_at だけで work_started_at が無い（プール待ち）ときは、より長く待つ。
+JUDGE_QUEUE_STUCK_SEC = int(
+    os.environ.get("DEBATE_JUDGE_QUEUE_STUCK_SEC", str(int(_JUDGE_ATTEMPT_SEC * 2 + 60)))
+)
+JUDGE_POOL_SIZE = int(os.environ.get("DEBATE_JUDGE_POOL_SIZE", "8"))
 
 # Solo Practice: 対戦AI（ジャッジとは別系統。既定モデルはジャッジと同じ luna）
 OPPONENT_TIMEOUT_SEC = float(os.environ.get("DEBATE_OPPONENT_TIMEOUT_SEC", "90"))
 OPPONENT_MAX_RETRIES = int(os.environ.get("DEBATE_OPPONENT_MAX_RETRIES", "1"))
-GENERATION_STUCK_SEC = int(os.environ.get("DEBATE_GENERATION_STUCK_SEC", "60"))
+_OPPONENT_ATTEMPT_SEC = OPPONENT_TIMEOUT_SEC * (OPPONENT_MAX_RETRIES + 1)
+GENERATION_STUCK_SEC = int(
+    os.environ.get("DEBATE_GENERATION_STUCK_SEC", str(int(_OPPONENT_ATTEMPT_SEC + 60)))
+)
+GENERATION_QUEUE_STUCK_SEC = int(
+    os.environ.get("DEBATE_GENERATION_QUEUE_STUCK_SEC", str(int(_OPPONENT_ATTEMPT_SEC * 2 + 60)))
+)
+SOLO_POOL_SIZE = int(os.environ.get("DEBATE_SOLO_POOL_SIZE", "8"))
 
 # Solo Practice: サーバーTTS（ブラウザ speechSynthesis は使わない）
 TTS_MODEL = os.environ.get("DEBATE_TTS_MODEL", "gpt-4o-mini-tts").strip() or "gpt-4o-mini-tts"
@@ -63,7 +76,11 @@ TTS_FORMAT = "mp3"
 TTS_MAX_INPUT_CHARS = 4000
 TTS_TIMEOUT_SEC = float(os.environ.get("DEBATE_TTS_TIMEOUT_SEC", "90"))
 TTS_MAX_RETRIES = int(os.environ.get("DEBATE_TTS_MAX_RETRIES", "1"))
-TTS_STUCK_SEC = int(os.environ.get("DEBATE_TTS_STUCK_SEC", "60"))
+_TTS_ATTEMPT_SEC = TTS_TIMEOUT_SEC * (TTS_MAX_RETRIES + 1)
+TTS_STUCK_SEC = int(os.environ.get("DEBATE_TTS_STUCK_SEC", str(int(_TTS_ATTEMPT_SEC + 60))))
+TTS_QUEUE_STUCK_SEC = int(
+    os.environ.get("DEBATE_TTS_QUEUE_STUCK_SEC", str(int(_TTS_ATTEMPT_SEC * 2 + 60)))
+)
 
 # 観戦モードの読み上げ。ソロの TTS_VOICE / tts.py とは別経路。
 WATCH_SPEECH_MODEL = "gpt-4o-mini-tts"

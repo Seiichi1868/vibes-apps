@@ -21,6 +21,7 @@ from debate.config import (
     ALLOWED_AUDIO_EXTENSIONS,
     AUDIO_DIR,
     DEFAULT_MOTIONS,
+    JUDGE_QUEUE_STUCK_SEC,
     JUDGE_STUCK_SEC,
     MAX_AUDIO_BYTES,
     PART_GUIDES,
@@ -995,8 +996,13 @@ def get_judge_result(session_id):
     judge_result = session.get("judge_result") or new_judge_result()
 
     if judge_result.get("status") == "judging":
-        elapsed = _seconds_since(judge_result.get("started_at"))
-        if elapsed is not None and elapsed > JUDGE_STUCK_SEC:
+        if judge_result.get("work_started_at"):
+            elapsed = _seconds_since(judge_result.get("work_started_at"))
+            limit = JUDGE_STUCK_SEC
+        else:
+            elapsed = _seconds_since(judge_result.get("started_at"))
+            limit = JUDGE_QUEUE_STUCK_SEC
+        if elapsed is not None and elapsed > limit:
             with get_session_lock(session_id):
                 session = load_session(session_id)
                 if session:

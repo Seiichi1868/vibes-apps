@@ -43,7 +43,8 @@
 - 生徒確定後に AI テキスト生成→TTS。Opp の PM はセッション作成直後から生成可。MO→LOR は同一チェーン（並列なのは MO の TTS と LOR テキスト）。
 - AIパートは録音なし。`status=confirmed`・`elapsed_sec=null`。確認画面は進行へリダイレクト。
 - 音声: サーバーTTS（`data/debate/audio/<id>/ai_<part>.mp3`）。IndexedDB 対象外。Range 対応。自動再生しない。
-- ジョブ: `debate/solo_jobs.py`（judge_jobs と同じ起動方式）。生成: `debate/opponent.py`。TTS: `debate/tts.py`。ガード: `debate/solo.py`。
+- ジョブ: `debate/solo_jobs.py`（judge_jobs と同じ起動方式）。プールはワーカーあたり既定 **8**（全体 16、`DEBATE_SOLO_POOL_SIZE`）。生成: `debate/opponent.py`。TTS: `debate/tts.py`。ガード: `debate/solo.py`。
+- 生成・TTS の停滞も、ワーカー開始時刻（`generation_started_at` / `tts_started_at`）から測る。キュー投入は `generation_queued_at` / `tts_queued_at`。未開始は開始後より長い `*_QUEUE_STUCK_SEC`（試み時間の2倍+60秒。開始後は timeout×(retries+1)+60秒）。画面はポーリングのみ。
 - 対戦AIはジャッジと別プロンプト。`opponent.py` の硬い制約で PM/LO は P2 を名前＋一文まで（本論は MG/MO）。難易度の「両方反論」より分担が優先。
 
 ## パート練習（Part Practice）
@@ -89,7 +90,8 @@ JSON: `data/debate/sessions/<id>.json` 音声: `data/debate/audio/<id>/`
 
 Whisper: `debate/transcription.py`（短タイムアウト）。ジョブ: `transcription_jobs.py`
 本番 gunicorn は **gthread**（`Procfile`）。gthreadでは `ThreadPoolExecutor`。gevent monkey済みのときだけ `gevent.threadpool`。`spawn` 失敗時はスレッドへ落とす。ジャッジジョブも同じ（`judge_jobs.py`）。
-文字起こしプールはワーカーあたり既定 **8**（`DEBATE_TRANSCRIBE_POOL_SIZE`）。ワーカー開始時に `transcribe_started_at` を書く。停滞判定はその時刻から（未開始のキュー待ちは `end_time` または再キュー時刻から、より長い `TRANSCRIBE_QUEUE_STUCK_SEC`）。閾値は Whisper の timeout×(retries+1) を上回る（開始後は +60秒、待ちは試み時間の2倍+60秒。環境変数 `DEBATE_TRANSCRIBE_STUCK_SEC` / `DEBATE_TRANSCRIBE_QUEUE_STUCK_SEC`）。クライアントのポーリングも同じ秒数。1回だけ再キューし、だめなら `needs_review`。
+本番は gunicorn **2 ワーカー**。各プールはワーカーあたりで、同時実行の上限は 2 倍。
+文字起こしプールはワーカーあたり既定 **12**（全体 24、`DEBATE_TRANSCRIBE_POOL_SIZE`）。ワーカー開始時に `transcribe_started_at` を書く。停滞判定はその時刻から（未開始のキュー待ちは `end_time` または再キュー時刻から、より長い `TRANSCRIBE_QUEUE_STUCK_SEC`）。閾値は Whisper の timeout×(retries+1) を上回る（開始後は +60秒、待ちは試み時間の2倍+60秒。環境変数 `DEBATE_TRANSCRIBE_STUCK_SEC` / `DEBATE_TRANSCRIBE_QUEUE_STUCK_SEC`）。クライアントのポーリングも同じ秒数。1回だけ再キューし、だめなら `needs_review`。
 遅れても、`needs_review` で文字起こしが空・生徒が編集/確定していなければ結果を書く。`confirmed` や `transcript_edited` ありは上書きしない。
 確認画面で再文字起こし可。サーバー音声が無いときは端末の録音から再保存できる。確定は `transcript_edited` 必須。6パート確定後にジャッジ。
 
@@ -98,6 +100,7 @@ Whisper: `debate/transcription.py`（短タイムアウト）。ジョブ: `tran
 プロンプト正本は `debate/judge.py`（授業フロー準拠）。**PM/LOのP2概要は減点しない。LOがPMのGov P2説明不足を攻撃してもGovの欠点にしない。Gov P2の深さはMG、本格反論はMOの2番目（LORの冒頭ではない）。Opp P2の深さはMO。Opp P2本格反論はPMR。**
 論点の状態は `config.py` の `ARGUMENT_STATUS`（intact / weakened / collapsed）と `argument_status_rules_text()`。生成プロンプトも同じ文面。extended は history の action。画面は英語ラベル。旧状態名は表示時だけ変換し、保存JSONは書き換えない。勝敗は weight の合計で、同点は Content。
 モデル選択肢: `judge_model_pricing.py`（既定 `5.6-luna`）。結果画面にコストは出さない。ジャッジ中は擬似進捗ログ。
+ジャッジプールはワーカーあたり既定 **8**（全体 16、`DEBATE_JUDGE_POOL_SIZE`）。`started_at` は受付時刻、`work_started_at` はワーカー開始。停滞は開始後 `JUDGE_STUCK_SEC`（timeout×(retries+1)+60秒）、未開始は `JUDGE_QUEUE_STUCK_SEC`（試みの2倍+60秒）。画面はサーバーの状態をポーリングするだけなので、クライアントが先にエラーにしない。
 
 ## 管理
 
