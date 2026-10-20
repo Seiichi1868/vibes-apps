@@ -62,16 +62,26 @@ body.tb-display-on .tb-listening {
   color: #111;
 }
 
+body.tb-display-on .tb-qr .tb-stage-main {
+  min-height: 0;
+  overflow: hidden;
+}
+body.tb-display-on .tb-qr-stage {
+  flex: 1;
+  min-height: 0;
+  gap: 12px;
+}
 body.tb-display-on .tb-qr-image {
-  width: min(78vmin, 820px);
-  height: min(78vmin, 820px);
+  width: min(64vmin, calc(100vh - 240px), 680px);
+  height: min(64vmin, calc(100vh - 240px), 680px);
 }
 body.tb-display-on .tb-qr-url {
-  font-size: clamp(1.1rem, 2.4vw, 2rem);
+  flex-shrink: 0;
+  font-size: clamp(1rem, 2.2vw, 1.8rem);
   color: #111;
 }
 body.tb-display-on .tb-qr-frame {
-  padding: 20px;
+  padding: 16px;
   border: 0;
   box-shadow: none;
 }

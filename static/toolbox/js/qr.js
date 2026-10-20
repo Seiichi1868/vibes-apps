@@ -138,14 +138,14 @@
         if (navigator.clipboard && navigator.clipboard.writeText) {
           await navigator.clipboard.writeText(link);
         } else {
-          window.prompt("リンク:", link);
-          return;
+          throw new Error("clipboard");
         }
         const prev = copyBtn.textContent;
         copyBtn.textContent = "コピーしました";
+        setStatus("リンクをコピーしました。", false);
         window.setTimeout(() => {
           copyBtn.textContent = prev;
-        }, 1200);
+        }, 1600);
       } catch (_) {
         window.prompt("リンク:", link);
       }
