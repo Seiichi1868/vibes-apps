@@ -11,7 +11,7 @@
   let syncingQuick = false;
   const tabs = document.getElementById("tb-room-tabs");
   const quickTab = document.getElementById("tb-quick-tab");
-  const quickPanel = document.getElementById("tb-quick");
+  const quickPanel = document.querySelector(".tb-stage-setup #tb-quick");
   const grid = document.getElementById("tb-grid");
   const board = document.getElementById("tb-seats");
   const rowsEl = document.getElementById("tb-rows");
@@ -268,7 +268,7 @@
   function syncQuickChrome() {
     const quick = activeId === QUICK_ID;
     if (quickPanel) quickPanel.hidden = !quick;
-    ["tb-class-edit", "tb-class-dup", "tb-class-del"].forEach((id) => {
+    ["tb-class-edit", "tb-class-dup", "tb-class-del", "tb-room-save"].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.hidden = quick;
     });

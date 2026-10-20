@@ -77,7 +77,7 @@
         const top = Math.max(0, Math.round((window.screen.height - size.h) / 2));
         const features = `popup=yes,width=${size.w},height=${size.h},left=${left},top=${top}`;
         window.open(url, `tb-quick-${id}-${btn.dataset.size}`, features);
-        const quick = document.getElementById("tb-quick");
+        const quick = document.getElementById("tb-popout");
         if (quick) quick.classList.remove("is-open");
       });
     });
