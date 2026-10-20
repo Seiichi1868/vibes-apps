@@ -115,10 +115,36 @@ class TalkImportTests(unittest.TestCase):
     def test_import_rejects_bad_code(self):
         res = self._post(self.client, "not-a-code", "device-a")
         self.assertEqual(res.status_code, 400)
-        self.assertIn("形式", res.get_json()["error"])
+        self.assertIn("読み取れ", res.get_json()["error"])
         broken = self._post(self.client, "TBTALK1:%%%", "device-a")
         self.assertEqual(broken.status_code, 400)
         self.assertIn("読み取れ", broken.get_json()["error"])
+        listed = self._post(self.client, "TBTALK1:" + base64.b64encode(b"[1,2]").decode("ascii"), "device-a")
+        self.assertEqual(listed.status_code, 400)
+        self.assertIn("読み取れ", listed.get_json()["error"])
+
+    def test_import_accepts_messy_paste(self):
+        payload = {"title": "iPad", "transcript": "Pasted speech.", "questions": [], "level": "A2"}
+        raw = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        standard = base64.b64encode(raw).decode("ascii")
+        urlsafe = base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+        cases = [
+            standard,
+            "tbtalk1：" + standard,
+            "Tbtalk1:" + standard,
+            '\n"TBTALK1:' + standard + '"\n',
+            "メモ\u200b「TBTALK1:" + standard + "」",
+            "TBTALK1:" + urlsafe,
+            urlsafe,
+        ]
+        for code in cases:
+            with self.subTest(code=code[:24]):
+                res = self._post(self.client, code, "device-a")
+                self.assertEqual(res.status_code, 200, res.get_data(as_text=True))
+                session = res.get_json()["session"]
+                self.assertEqual(session["title"], "iPad")
+                self.assertEqual(session["source"], "import")
 
     def test_import_on_other_device_and_user(self):
         code = _code({

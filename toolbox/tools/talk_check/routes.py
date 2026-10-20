@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import re
 import mimetypes
 import os
 import tempfile
@@ -97,12 +98,24 @@ def _public_session(session: dict, *, include_questions: bool = False) -> dict:
 
 
 def _decode_transfer(code: str) -> tuple[dict | None, str | None]:
-    text = str(code or "").strip()
-    if not text.startswith(TRANSFER_PREFIX):
-        return None, "引き継ぎコードの形式が正しくありません。"
-    payload = "".join(text[len(TRANSFER_PREFIX):].split())
-    if not payload:
-        return None, "引き継ぎコードの形式が正しくありません。"
+    text = str(code or "")
+    text = re.sub(r"[\s\u200b\u200c\u200d\ufeff\u2060]", "", text)
+    text = text.translate(str.maketrans({
+        '"': "", "'": "", "`": "",
+        "“": "", "”": "", "‘": "", "’": "",
+        "「": "", "」": "", "『": "", "』": "",
+    }))
+    marker = TRANSFER_PREFIX.split(":", 1)[0]
+    found = re.search(re.escape(marker), text, flags=re.IGNORECASE)
+    if found:
+        payload = text[found.end():]
+        if payload.startswith(":") or payload.startswith("："):
+            payload = payload[1:]
+    else:
+        payload = text
+    payload = payload.replace("-", "+").replace("_", "/")
+    if payload:
+        payload += "=" * ((-len(payload)) % 4)
     try:
         decoded = base64.b64decode(payload, validate=True)
         data = json.loads(decoded.decode("utf-8"))
