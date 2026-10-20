@@ -165,7 +165,12 @@
 
   function pickRecorderMime() {
     if (!window.MediaRecorder) return "";
-    const types = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
+    const apple = /iPad|iPhone|iPod/.test(navigator.userAgent)
+      || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+      || (/Macintosh/.test(navigator.userAgent) && /^((?!chrome|android).)*safari/i.test(navigator.userAgent));
+    const types = apple
+      ? ["audio/mp4", "audio/aac", "audio/webm;codecs=opus", "audio/webm"]
+      : ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
     return types.find((type) => MediaRecorder.isTypeSupported(type)) || "";
   }
 

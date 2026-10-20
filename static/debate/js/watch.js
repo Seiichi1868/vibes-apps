@@ -341,7 +341,10 @@ function playFile(index, ratio) {
     applyPosition();
   }
   applyAudioRate();
-  audio.play().then(() => {
+  audio.playsInline = true;
+  audio.setAttribute("playsinline", "");
+  const playAttempt = audio.play();
+  if (playAttempt && playAttempt.then) playAttempt.then(() => {
     setPlayingUi(true);
     card.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }).catch(() => showNoAudio(index));

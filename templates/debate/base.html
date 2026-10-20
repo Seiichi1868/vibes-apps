@@ -76,7 +76,7 @@
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", function () {
-        navigator.serviceWorker.register("/debate/sw.js", { scope: "/debate/" }).catch(function () {});
+        navigator.serviceWorker.register("/debate/sw.js?v={{ asset_version('debate/sw.js') }}", { scope: "/debate/" }).catch(function () {});
       });
     }
   </script>

@@ -5,7 +5,12 @@
   const CATEGORY_LABELS = window.CONJUGATE_CATEGORY_LABELS || {};
   const PERSON_LABELS = window.CONJUGATE_PERSON_LABELS || { tu: "tú", el_ella_usted: "él/ella/usted" };
   const EL_HINT = window.CONJUGATE_EL_HINT || "";
-  const MIME_CANDIDATES = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
+  const IS_APPLE = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+    || (/Macintosh/.test(navigator.userAgent) && /^((?!chrome|android).)*safari/i.test(navigator.userAgent));
+  const MIME_CANDIDATES = IS_APPLE
+    ? ["audio/mp4", "audio/mp4;codecs=mp4a.40.2", "audio/aac", "audio/webm;codecs=opus", "audio/webm", "audio/ogg"]
+    : ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
 
   const progressLabel = document.getElementById("progress-label");
   const micErrorBanner = document.getElementById("mic-error-banner");
@@ -86,7 +91,7 @@
   function extensionFor(mimeType) {
     if (mimeType.includes("mp4")) return "mp4";
     if (mimeType.includes("ogg")) return "ogg";
-    return "webm";
+    return IS_APPLE ? "mp4" : "webm";
   }
 
   async function loadSession() {

@@ -632,6 +632,8 @@
       let currentTtsAudio = null;
       let browserUtteranceActive = false;
       let speechVoicesCache = [];
+      const IS_WEBKIT_SPEECH = /AppleWebKit/i.test(navigator.userAgent)
+        && !/Chrome|Chromium|CriOS|Edg|OPR|Android/i.test(navigator.userAgent);
 
       const PREFERRED_SPEECH_VOICE_NAMES = {
         ja: /kyoko|otoya|hattori|haruka|microsoft.*haruka/i,
@@ -2309,55 +2311,93 @@
 
       function startBrowserUtterance(text, voices) {
         const prepared = prepareTextForSpeech(text);
-        if (!prepared) return;
+        const chunks = splitSpeechChunks(prepared);
+        if (!chunks.length) return;
 
-        const utterance = new SpeechSynthesisUtterance(prepared);
         const config = getStudyLangConfig();
-        utterance.lang = config.speechLang;
-        utterance.rate = 1;
-        utterance.pitch = 1;
         const selectedVoice = pickSpeechVoice(voices);
-        if (selectedVoice) {
-          utterance.voice = selectedVoice;
-          if (selectedVoice.lang) utterance.lang = selectedVoice.lang;
-        }
-        utterance.onerror = () => {
-          _clearChromeTtsKeepalive();
-          browserUtteranceActive = false;
-          setListenButtonPlaying(false);
-          setStatus(t("ttsPlayFail"));
-        };
-        utterance.onstart = () => {
-          browserUtteranceActive = true;
-          setListenButtonPlaying(true);
-          setStatus(t("ttsPlayingBrowser"));
-          // Chrome desktop freezes long utterances; pause/resume every 10 s keeps it alive.
-          _clearChromeTtsKeepalive();
-          _chromeTtsKeepaliveId = setInterval(() => {
-            if (window.speechSynthesis.speaking) {
-              window.speechSynthesis.pause();
-              window.speechSynthesis.resume();
-            } else {
+        const utterances = chunks.map((chunk, index) => {
+          const utterance = new SpeechSynthesisUtterance(chunk);
+          utterance.lang = config.speechLang;
+          utterance.rate = 1;
+          utterance.pitch = 1;
+          utterance.volume = 1;
+          if (selectedVoice) {
+            utterance.voice = selectedVoice;
+            if (selectedVoice.lang) utterance.lang = selectedVoice.lang;
+          }
+          if (index === 0) {
+            utterance.onstart = () => {
+              browserUtteranceActive = true;
+              setListenButtonPlaying(true);
+              setStatus(t("ttsPlayingBrowser"));
+              // Chrome desktop freezes long utterances; pause/resume every 10 s keeps it alive.
+              // Safari では pause/resume が音程の崩れた再生になるので使わない。
               _clearChromeTtsKeepalive();
-            }
-          }, 10000);
-        };
-        utterance.onend = () => {
-          _clearChromeTtsKeepalive();
-          browserUtteranceActive = false;
-          setListenButtonPlaying(false);
-          setStatus(t("ttsDone"));
-        };
+              if (!IS_WEBKIT_SPEECH) {
+                _chromeTtsKeepaliveId = setInterval(() => {
+                  if (window.speechSynthesis.speaking) {
+                    window.speechSynthesis.pause();
+                    window.speechSynthesis.resume();
+                  } else {
+                    _clearChromeTtsKeepalive();
+                  }
+                }, 10000);
+              }
+            };
+          }
+          if (index === utterancesLengthMinus(chunks)) {
+            utterance.onerror = () => {
+              _clearChromeTtsKeepalive();
+              browserUtteranceActive = false;
+              setListenButtonPlaying(false);
+              setStatus(t("ttsPlayFail"));
+            };
+            utterance.onend = () => {
+              _clearChromeTtsKeepalive();
+              browserUtteranceActive = false;
+              setListenButtonPlaying(false);
+              setStatus(t("ttsDone"));
+            };
+          }
+          return utterance;
+        });
 
         // Chrome: cancel() then immediate speak() silently drops the utterance.
-        // Wrapping speak() in setTimeout(0) lets the cancel flush first.
+        // Safari は遅延するとユーザー操作の外になり無音になるので、同じターンで speak する。
         window.speechSynthesis.cancel();
-        setTimeout(() => {
-          if (window.speechSynthesis.paused) {
+        const speakAll = () => {
+          if (window.speechSynthesis.paused && !IS_WEBKIT_SPEECH) {
             window.speechSynthesis.resume();
           }
-          window.speechSynthesis.speak(utterance);
-        }, 50);
+          utterances.forEach((utterance) => window.speechSynthesis.speak(utterance));
+        };
+        if (IS_WEBKIT_SPEECH) speakAll();
+        else setTimeout(speakAll, 50);
+      }
+
+      function utterancesLengthMinus(chunks) {
+        return chunks.length - 1;
+      }
+
+      function splitSpeechChunks(text) {
+        const clean = String(text || "").replace(/\s+/g, " ").trim();
+        if (!clean) return [];
+        if (!IS_WEBKIT_SPEECH || clean.length <= 180) return [clean];
+        const parts = clean.split(/(?<=[.!?。！？])\s+/);
+        const chunks = [];
+        let buf = "";
+        parts.forEach((part) => {
+          const next = buf ? `${buf} ${part}` : part;
+          if (next.length > 180 && buf) {
+            chunks.push(buf);
+            buf = part;
+          } else {
+            buf = next;
+          }
+        });
+        if (buf) chunks.push(buf);
+        return chunks.length ? chunks : [clean];
       }
 
       function speakWithBrowserTTS(text) {
@@ -2372,11 +2412,13 @@
         }
         window.speechSynthesis.cancel();
 
-        const voices = speechVoicesCache.length
+        const voicesNow = speechVoicesCache.length
           ? speechVoicesCache
           : window.speechSynthesis.getVoices();
-        if (voices.length) {
-          startBrowserUtterance(text, voices);
+        // Safari はユーザー操作の外で speak すると無音になる。声一覧を待たずに lang だけで開始する。
+        if (voicesNow.length || IS_WEBKIT_SPEECH) {
+          startBrowserUtterance(text, voicesNow);
+          if (!voicesNow.length) void ensureSpeechVoicesReady();
           return;
         }
 
@@ -2394,8 +2436,12 @@
         if ("speechSynthesis" in window) {
           window.speechSynthesis.cancel();
         }
-        const audio = new Audio(url);
+        const audio = currentTtsAudio || new Audio();
         currentTtsAudio = audio;
+        audio.setAttribute("playsinline", "");
+        audio.playsInline = true;
+        audio.preload = "auto";
+        audio.src = url;
         audio.onplay = () => {
           setListenButtonPlaying(true);
           setStatus(cached ? t("ttsPlayingCached") : t("ttsPlayingOpenai"));
@@ -2453,6 +2499,17 @@
           pauseCurrentTtsPlayback();
           setStatus(t("ttsStopped"));
           return;
+        }
+
+        if (IS_WEBKIT_SPEECH) {
+          if (!currentTtsAudio) currentTtsAudio = new Audio();
+          currentTtsAudio.setAttribute("playsinline", "");
+          currentTtsAudio.playsInline = true;
+          if (!currentTtsAudio.src) {
+            currentTtsAudio.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+          }
+          const primed = currentTtsAudio.play();
+          if (primed && primed.catch) primed.catch(() => {});
         }
 
         try {

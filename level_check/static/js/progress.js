@@ -1,6 +1,11 @@
 (() => {
   const SESSION_ID = window.LEVEL_CHECK_SESSION_ID;
-  const MIME_CANDIDATES = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
+  const IS_APPLE = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+    || (/Macintosh/.test(navigator.userAgent) && /^((?!chrome|android).)*safari/i.test(navigator.userAgent));
+  const MIME_CANDIDATES = IS_APPLE
+    ? ["audio/mp4", "audio/mp4;codecs=mp4a.40.2", "audio/aac", "audio/webm;codecs=opus", "audio/webm", "audio/ogg"]
+    : ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
   const VAD_THRESHOLD = 0.06;
   const AUDIO_PROMPT_TYPES = new Set(["A", "B", "C", "D", "E"]);
   const TIMER_TYPES = new Set(["A", "E", "F"]);
@@ -33,7 +38,7 @@
   function extensionFor(mimeType) {
     if (mimeType.includes("mp4")) return "mp4";
     if (mimeType.includes("ogg")) return "ogg";
-    return "webm";
+    return IS_APPLE ? "mp4" : "webm";
   }
 
   function setError(card, message) {
@@ -130,12 +135,35 @@
       return false;
     }
     window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = "en-US";
-    utter.rate = 0.95;
-    utter.onend = finish;
-    utter.onerror = finish;
-    window.speechSynthesis.speak(utter);
+    const voices = window.speechSynthesis.getVoices();
+    const voice = voices.find((item) => item.lang === "en-US" && item.localService)
+      || voices.find((item) => (item.lang || "").toLowerCase().startsWith("en"));
+    const chunks = IS_APPLE && text.length > 180
+      ? text.split(/(?<=[.!?])\s+/).reduce((acc, part) => {
+          if (!acc.length) return [part];
+          const next = `${acc[acc.length - 1]} ${part}`;
+          if (next.length > 180) return acc.concat(part);
+          return acc.slice(0, -1).concat(next);
+        }, [])
+      : [text];
+    chunks.forEach((chunk, index) => {
+      const utter = new SpeechSynthesisUtterance(chunk);
+      utter.lang = voice && voice.lang ? voice.lang : "en-US";
+      utter.rate = 1;
+      utter.pitch = 1;
+      utter.volume = 1;
+      if (voice) utter.voice = voice;
+      if (index === chunks.length - 1) {
+        utter.onend = finish;
+        utter.onerror = finish;
+      }
+      window.speechSynthesis.speak(utter);
+    });
+    if (!voices.length) {
+      window.speechSynthesis.addEventListener("voiceschanged", () => {
+        window.speechSynthesis.getVoices();
+      }, { once: true });
+    }
     return true;
   }
 
@@ -147,6 +175,9 @@
 
     if (audioUrl) {
       const audio = new Audio(audioUrl);
+      audio.playsInline = true;
+      audio.setAttribute("playsinline", "");
+      audio.preload = "auto";
       currentAudio = audio;
       let done = false;
       const complete = () => {

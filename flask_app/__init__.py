@@ -26,6 +26,10 @@ def create_app(config_class=Config):
 
     cors.init_app(app)
 
+    from flask_app.asset_cache import install as install_asset_cache
+
+    install_asset_cache(app)
+
     @app.route("/static/manifest.json")
     def web_app_manifest():
         """PWA manifest を application/manifest+json で配信する。

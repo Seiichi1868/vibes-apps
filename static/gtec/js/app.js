@@ -512,6 +512,11 @@ function isMobileDevice() {
   return /Mobi|Android|iPad|iPhone|iPod/i.test(navigator.userAgent);
 }
 
+function isWebKitSpeech() {
+  return /AppleWebKit/i.test(navigator.userAgent)
+    && !/Chrome|Chromium|CriOS|Edg|OPR|Android/i.test(navigator.userAgent);
+}
+
 function isChromeBrowser() {
   return /Chrome/i.test(navigator.userAgent) && !/Edg|OPR|Brave/i.test(navigator.userAgent);
 }
@@ -530,13 +535,10 @@ function unlockAudioSync() {
     }
   } catch (_) {}
 
-  // 音声合成もジェスチャー内で primer を流す（iOS でのセッション認証）
+  // iOS は無音の primer が合成音声を詰まらせることがある。resume だけにする。
   if ('speechSynthesis' in window) {
     try {
-      speechSynthesis.cancel();
-      const primer = new SpeechSynthesisUtterance(' ');
-      primer.volume = 0;
-      speechSynthesis.speak(primer);
+      if (speechSynthesis.paused) speechSynthesis.resume();
     } catch (_) {}
   }
 }
@@ -552,7 +554,8 @@ function ensureVoicesLoaded() {
       };
       if (tryResolve()) return;
       speechSynthesis.addEventListener('voiceschanged', () => tryResolve(), { once: true });
-      setTimeout(() => resolve(speechSynthesis.getVoices()), 1500);
+      const pollId = setInterval(() => { if (tryResolve()) clearInterval(pollId); }, 200);
+      setTimeout(() => { clearInterval(pollId); resolve(speechSynthesis.getVoices()); }, 1500);
     });
   }
   return voicesReadyPromise;
@@ -644,8 +647,8 @@ function speakWithBrowser(text) {
     setTimeout(() => {
       if (App.cancelRequested) { resolve(false); return; }
 
-      const makeUtt = (fallbackVoice = false) => {
-        const utt = new SpeechSynthesisUtterance(text);
+      const makeUtt = (fallbackVoice = false, chunk = text) => {
+        const utt = new SpeechSynthesisUtterance(chunk);
         utt.lang = 'en-US';
         utt.rate = 1;
         utt.pitch = 1;
@@ -664,27 +667,46 @@ function speakWithBrowser(text) {
       // 3 秒以内に onstart が来なければ false（サーバー TTS へ）
       const failTimer = setTimeout(() => { if (!started) { speechSynthesis.cancel(); done(false); } }, 3000);
 
-      const utt = makeUtt();
+      const chunks = isWebKitSpeech() && text.length > 180
+        ? text.split(/(?<=[.!?])\s+/).reduce((acc, part) => {
+            const next = acc.length && (acc[acc.length - 1] + ' ' + part).length <= 180
+              ? acc.slice(0, -1).concat(acc[acc.length - 1] + ' ' + part)
+              : acc.concat(part);
+            return next;
+          }, [])
+        : [text];
+      const utt = makeUtt(false, chunks[0] || text);
       App.currentUtterance = utt;
 
       utt.onstart = () => { started = true; clearTimeout(failTimer); };
-      utt.onend   = () => { clearTimeout(failTimer); done(true); };
       utt.onerror = () => { clearTimeout(failTimer); done(false); };
-
-      speechSynthesis.speak(utt);
-
-      // Chrome: voice 指定で始まらない場合、voice なしで再試行
-      setTimeout(() => {
-        if (!started && !App.cancelRequested) {
-          speechSynthesis.cancel();
-          const utt2 = makeUtt(true);
-          App.currentUtterance = utt2;
-          utt2.onstart = () => { started = true; clearTimeout(failTimer); };
-          utt2.onend   = () => { clearTimeout(failTimer); done(true); };
-          utt2.onerror = () => { clearTimeout(failTimer); done(false); };
-          speechSynthesis.speak(utt2);
+      utt.onend = () => {
+        if (chunks.length === 1) { clearTimeout(failTimer); done(true); }
+      };
+      chunks.forEach((chunk, index) => {
+        const piece = index === 0 ? utt : makeUtt(false, chunk);
+        if (index === 0) App.currentUtterance = piece;
+        if (index > 0) {
+          piece.onend = () => { if (index === chunks.length - 1) { clearTimeout(failTimer); done(true); } };
+          piece.onerror = () => { clearTimeout(failTimer); done(false); };
         }
-      }, 400);
+        speechSynthesis.speak(piece);
+      });
+
+      // Chrome: voice 指定で始まらない場合、voice なしで再試行。Safari では cancel の再実行が壊れた音になる。
+      if (!isWebKitSpeech()) {
+        setTimeout(() => {
+          if (!started && !App.cancelRequested) {
+            speechSynthesis.cancel();
+            const utt2 = makeUtt(true);
+            App.currentUtterance = utt2;
+            utt2.onstart = () => { started = true; clearTimeout(failTimer); };
+            utt2.onend   = () => { clearTimeout(failTimer); done(true); };
+            utt2.onerror = () => { clearTimeout(failTimer); done(false); };
+            speechSynthesis.speak(utt2);
+          }
+        }, 400);
+      }
     }, 80);
   });
 }
@@ -722,6 +744,8 @@ async function speakFromServer(text) {
   return new Promise((resolve, reject) => {
     const audio = new Audio(url);
     audio.playsInline = true;
+    audio.setAttribute('playsinline', '');
+    audio.preload = 'auto';
     App.currentAudio = audio;
     const cleanup = () => { audio.onended = audio.onerror = null; if (App.currentAudio === audio) App.currentAudio = null; };
     audio.onended = () => { cleanup(); resolve(); };
