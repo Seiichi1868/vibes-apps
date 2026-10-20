@@ -1620,6 +1620,9 @@
       include_inference: !!detail.include_inference,
       count_requested: detail.count_requested,
       keywords: detail.keywords || "",
+      created_at: detail.created_at || "",
+      duration_sec: Number(detail.duration_sec) || 0,
+      source: detail.source || "",
     };
   }
 

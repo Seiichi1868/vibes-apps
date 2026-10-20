@@ -126,6 +126,35 @@ def _decode_transfer(code: str) -> tuple[dict | None, str | None]:
     return data, None
 
 
+def _imported_created_at(raw) -> str:
+    text = str(raw or "").strip()
+    if not text:
+        return now_iso()
+    try:
+        parsed = datetime.fromisoformat(text)
+    except (TypeError, ValueError):
+        return now_iso()
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=JST)
+    else:
+        parsed = parsed.astimezone(JST)
+    return parsed.isoformat(timespec="seconds")
+
+
+def _imported_duration(raw) -> int | float:
+    if isinstance(raw, bool) or raw is None:
+        return 0
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return 0
+    if value < 0 or value != value or value == float("inf"):
+        return 0
+    if value.is_integer():
+        return int(value)
+    return value
+
+
 def _import_session_from(data: dict) -> dict:
     user = current_user()
     transcript = str(data.get("transcript") or "").strip()[:60000]
@@ -142,11 +171,12 @@ def _import_session_from(data: dict) -> dict:
         "id": new_id(),
         "user_id": user["id"],
         "device_id": _device_id(),
-        "created_at": now_iso(),
+        "created_at": _imported_created_at(data.get("created_at")),
+        "imported_at": now_iso(),
         "level": str(data.get("level") or "A2").strip()[:20] or "A2",
         "source": "import",
         "keywords": str(data.get("keywords") or "").strip()[:200],
-        "duration_sec": 0,
+        "duration_sec": _imported_duration(data.get("duration_sec")),
         "transcript": transcript,
         "browser_transcript": browser_transcript,
         "questions_json": questions,
