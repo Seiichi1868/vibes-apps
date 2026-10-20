@@ -1640,9 +1640,13 @@
       }
     } catch (_) {}
     fallback.hidden = false;
+    fallback.readOnly = true;
     fallback.value = text;
     fallback.focus();
     fallback.select();
+    try {
+      fallback.setSelectionRange(0, text.length);
+    } catch (_) {}
     return false;
   }
 
@@ -1655,7 +1659,7 @@
       }
       const text = encodeTransfer(transferPayload());
       const copied = await copyTransfer(text);
-      flash("archive", copied ? "引き継ぎ用コードをコピーしました" : "コピーできませんでした。下の文字を選択してコピーしてください");
+      flash("archive", copied ? `コピーしました（${text.length}文字）` : "コピーできませんでした。下の文字を選択してコピーしてください");
     }).catch((e) => alert(e.message));
   });
 
