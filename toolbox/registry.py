@@ -5,6 +5,17 @@ from copy import deepcopy
 
 TOOLS: list[dict] = [
     {
+        "id": "qr",
+        "name": "QRコード",
+        "description": "タイトル付きでQRを作り、期限までアーカイブに残す。",
+        "icon": "qr",
+        "scene": "運営",
+        "route": "toolbox.qr_page",
+        "path": "/toolbox/qr",
+        "uses_ai": False,
+        "default_enabled": True,
+    },
+    {
         "id": "timer",
         "name": "タイマー",
         "description": "カウントダウン。表示モードで大きな数字。",

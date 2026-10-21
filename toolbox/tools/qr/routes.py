@@ -9,11 +9,13 @@ from toolbox.tools.qr.files import (
     QrFileError,
     body_path_for,
     delete_file,
+    extend_file,
     get_by_token,
     list_files,
     purge_expired,
     save_upload,
 )
+from toolbox.tools.qr.store import delete_link, extend_link, list_links, save_link
 from toolbox.tools.qr.make import normalize_url, png_data_uri
 
 _UPLOAD_MARGIN = 1024 * 1024
@@ -35,7 +37,9 @@ def _public_file(row: dict) -> dict:
     return {
         "id": row["id"],
         "name": row.get("original_name") or "",
+        "title": row.get("title") or row.get("original_name") or "",
         "size": int(row.get("size") or 0),
+        "created_at": row.get("created_at") or "",
         "expires_at": row.get("expires_at") or "",
         "url": _file_url(row["token"]),
     }
@@ -94,7 +98,93 @@ def register(bp):
             qr_image = png_data_uri(link)
         except Exception as exc:
             return jsonify({"ok": False, "error": f"QRの生成に失敗しました: {exc}"}), 500
+        if request.method == "POST" and (request.get_json(silent=True) or {}).get("save"):
+            user = current_user()
+            payload = request.get_json(silent=True) or {}
+            try:
+                save_link(
+                    user_id=user["id"],
+                    device_id=_device_id(),
+                    title=payload.get("title") or "",
+                    url=link,
+                    ttl_days=payload.get("days") or QR_FILE_TTL_DAYS_DEFAULT,
+                )
+            except QrFileError as exc:
+                return jsonify({"ok": False, "error": exc.message}), exc.status
         return jsonify({"ok": True, "link": link, "qr": qr_image})
+
+    def _archive_rows():
+        user = current_user()
+        device = _device_id()
+        purge_expired()
+        items = []
+        for row in list_links(user["id"], device):
+            url = row.get("url") or ""
+            items.append({
+                "kind": "link",
+                "id": row.get("id") or "",
+                "title": row.get("title") or "",
+                "text": url,
+                "created_at": row.get("created_at") or "",
+                "expires_at": row.get("expires_at") or "",
+                "qr": png_data_uri(url),
+            })
+        for row in list_files(user["id"], device):
+            item = _with_qr(row)
+            items.append({
+                "kind": "file",
+                "id": item["id"],
+                "title": item.get("title") or item.get("name") or "",
+                "text": item["url"],
+                "created_at": item.get("created_at") or "",
+                "expires_at": item.get("expires_at") or "",
+                "qr": item["qr"],
+            })
+        items.sort(key=lambda item: item.get("created_at") or "", reverse=True)
+        return items
+
+    @bp.route("/api/qr/archive", methods=["GET"])
+    @login_required
+    @tool_required("qr")
+    def api_qr_archive():
+        try:
+            items = _archive_rows()
+        except Exception as exc:
+            return jsonify({"ok": False, "error": f"一覧の取得に失敗しました: {exc}"}), 500
+        return jsonify({"ok": True, "items": items})
+
+    @bp.route("/api/qr/links/<item_id>/extend", methods=["POST"])
+    @login_required
+    @tool_required("qr")
+    def api_qr_link_extend(item_id):
+        user = current_user()
+        payload = request.get_json(silent=True) or {}
+        try:
+            extend_link(item_id, user["id"], _device_id(), payload.get("days") or QR_FILE_TTL_DAYS_DEFAULT)
+        except QrFileError as exc:
+            return jsonify({"ok": False, "error": exc.message}), exc.status
+        return jsonify({"ok": True})
+
+    @bp.route("/api/qr/links/<item_id>/delete", methods=["POST"])
+    @login_required
+    @tool_required("qr")
+    def api_qr_link_delete(item_id):
+        user = current_user()
+        if not delete_link(item_id, user["id"], _device_id()):
+            return jsonify({"ok": False, "error": "このQRは見つかりません。"}), 404
+        return jsonify({"ok": True})
+
+    @bp.route("/api/qr/files/<file_id>/extend", methods=["POST"])
+    @login_required
+    @tool_required("qr")
+    def api_qr_file_extend(file_id):
+        user = current_user()
+        payload = request.get_json(silent=True) or {}
+        try:
+            extend_file(file_id, user["id"], _device_id(), payload.get("days") or QR_FILE_TTL_DAYS_DEFAULT)
+        except QrFileError as exc:
+            return jsonify({"ok": False, "error": exc.message}), exc.status
+        return jsonify({"ok": True})
 
     @bp.route("/api/qr/files", methods=["GET", "POST"])
     @login_required
@@ -123,6 +213,7 @@ def register(bp):
                 original_name=upload.filename,
                 data=data,
                 ttl_days=ttl,
+                title=request.form.get("title") or "",
             )
             item = _public_file(row)
             qr_image = png_data_uri(item["url"])

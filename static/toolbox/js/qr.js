@@ -1,5 +1,7 @@
 (function () {
   const form = document.getElementById("tb-qr-form");
+  const titleInput = document.getElementById("tb-qr-title");
+  const daysInput = document.getElementById("tb-qr-days");
   const input = document.getElementById("tb-qr-input");
   const statusEl = document.getElementById("tb-qr-status");
   const emptyEl = document.getElementById("tb-qr-empty");
@@ -87,11 +89,23 @@
       tabFile.classList.toggle("is-active", fileMode);
       tabFile.setAttribute("aria-selected", fileMode ? "true" : "false");
     }
-    if (fileMode) loadFiles();
+    if (fileMode) loadArchive();
+  }
+
+  function selectedDays() {
+    return (daysInput && daysInput.value) || (ttlInput && ttlInput.value) || "7";
+  }
+
+  function currentTitle() {
+    return titleInput ? titleInput.value.trim() : "";
   }
 
   async function generate(raw) {
     const text = String(raw || "").trim();
+    if (!currentTitle()) {
+      setStatus("タイトルを入力してください。", true);
+      return;
+    }
     if (!text) {
       hideQr();
       setStatus("URLを入力または貼り付けるとQRコードが出ます。", false);
@@ -102,22 +116,24 @@
     try {
       const data = await window.toolboxFetch("/toolbox/api/qr", {
         method: "POST",
-        body: JSON.stringify({ url: text }),
+        headers: { "X-Toolbox-Device": deviceId() },
+        body: JSON.stringify({
+          url: text,
+          title: currentTitle(),
+          days: selectedDays(),
+          save: true,
+        }),
       });
       if (seq !== requestSeq) return;
       if (!data.ok) throw new Error(data.error || "QRの取得に失敗しました");
       showQr(data.link, data.qr);
-      setStatus("生徒が読み取れるように、スクリーンに大きく出してください。", false);
+      setStatus("保存しました。生徒が読み取れるように、スクリーンに大きく出してください。", false);
+      loadArchive();
     } catch (err) {
       if (seq !== requestSeq) return;
       hideQr();
       setStatus(err.message || "QRの作成に失敗しました。", true);
     }
-  }
-
-  function scheduleGenerate() {
-    clearTimeout(debounceId);
-    debounceId = window.setTimeout(() => generate(input ? input.value : ""), 280);
   }
 
   function selectInput() {
@@ -143,30 +159,50 @@
     return m + "/" + d + " " + hh + ":" + mm + " まで";
   }
 
-  async function loadFiles() {
+  function formatCreated(iso) {
+    if (!iso) return "";
+    const dt = new Date(iso);
+    if (Number.isNaN(dt.getTime())) return "";
+    return (dt.getMonth() + 1) + "/" + dt.getDate() + " 作成";
+  }
+
+  async function copyText(text) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        throw new Error("clipboard");
+      }
+      setStatus("リンクをコピーしました。", false);
+    } catch (_) {
+      window.prompt("リンク:", text);
+    }
+  }
+
+  async function loadArchive() {
     if (!listEl) return;
     try {
-      const data = await window.toolboxFetch("/toolbox/api/qr/files", {
+      const data = await window.toolboxFetch("/toolbox/api/qr/archive", {
         headers: { "X-Toolbox-Device": deviceId() },
       });
       listEl.innerHTML = "";
-      const files = data.files || [];
-      if (!files.length) {
+      const items = data.items || [];
+      if (!items.length) {
         const empty = document.createElement("li");
         empty.className = "tb-muted";
         empty.textContent = "まだありません";
         listEl.appendChild(empty);
         return;
       }
-      files.forEach((file) => {
+      items.forEach((item) => {
         const li = document.createElement("li");
         li.className = "tb-qr-list-item";
         const meta = document.createElement("div");
         meta.className = "tb-qr-list-meta";
         const name = document.createElement("strong");
-        name.textContent = file.name || "ファイル";
+        name.textContent = item.title || "無題";
         const sub = document.createElement("span");
-        sub.textContent = formatSize(file.size) + " · " + formatExpiry(file.expires_at);
+        sub.textContent = formatCreated(item.created_at) + " · 削除期限 " + formatExpiry(item.expires_at);
         meta.appendChild(name);
         meta.appendChild(sub);
         const actions = document.createElement("div");
@@ -174,20 +210,28 @@
         const show = document.createElement("button");
         show.type = "button";
         show.className = "tb-btn";
-        show.textContent = "QRを出す";
+        show.textContent = "表示";
         show.addEventListener("click", () => {
-          showQr(file.url, file.qr);
+          showQr(item.text, item.qr);
           setStatus("生徒が読み取れるように、スクリーンに大きく出してください。", false);
         });
+        const copy = document.createElement("button");
+        copy.type = "button";
+        copy.className = "tb-btn";
+        copy.textContent = "コピー";
+        copy.addEventListener("click", () => copyText(item.text));
+        const extend = document.createElement("button");
+        extend.type = "button";
+        extend.className = "tb-btn";
+        extend.textContent = "期限延長";
+        extend.addEventListener("click", () => extendItem(item));
         const remove = document.createElement("button");
         remove.type = "button";
         remove.className = "tb-btn";
         remove.textContent = "削除";
-        remove.addEventListener("click", () => removeFile(file.id));
-        actions.appendChild(show);
-        actions.appendChild(remove);
-        li.appendChild(meta);
-        li.appendChild(actions);
+        remove.addEventListener("click", () => removeItem(item));
+        actions.append(show, copy, extend, remove);
+        li.append(meta, actions);
         listEl.appendChild(li);
       });
     } catch (err) {
@@ -195,14 +239,40 @@
     }
   }
 
-  async function removeFile(id) {
+  async function extendItem(item) {
+    const path = item.kind === "file"
+      ? "/toolbox/api/qr/files/" + encodeURIComponent(item.id) + "/extend"
+      : "/toolbox/api/qr/links/" + encodeURIComponent(item.id) + "/extend";
     try {
-      await window.toolboxFetch("/toolbox/api/qr/files/" + encodeURIComponent(id), {
-        method: "DELETE",
+      await window.toolboxFetch(path, {
+        method: "POST",
         headers: { "X-Toolbox-Device": deviceId() },
+        body: JSON.stringify({ days: selectedDays() }),
       });
+      setStatus("削除期限を延ばしました。", false);
+      loadArchive();
+    } catch (err) {
+      setStatus(err.message || "延長に失敗しました。", true);
+    }
+  }
+
+  async function removeItem(item) {
+    if (!confirm("「" + (item.title || "このQR") + "」を削除しますか？")) return;
+    try {
+      if (item.kind === "file") {
+        await window.toolboxFetch("/toolbox/api/qr/files/" + encodeURIComponent(item.id), {
+          method: "DELETE",
+          headers: { "X-Toolbox-Device": deviceId() },
+        });
+      } else {
+        await window.toolboxFetch("/toolbox/api/qr/links/" + encodeURIComponent(item.id) + "/delete", {
+          method: "POST",
+          headers: { "X-Toolbox-Device": deviceId() },
+          body: "{}",
+        });
+      }
       setStatus("削除しました。", false);
-      loadFiles();
+      loadArchive();
     } catch (err) {
       setStatus(err.message || "削除に失敗しました。", true);
     }
@@ -210,8 +280,13 @@
 
   function uploadFile(file, ttl) {
     const fd = new FormData();
+    if (!currentTitle()) {
+      setStatus("タイトルを入力してください。", true);
+      return;
+    }
     fd.append("file", file);
     fd.append("ttl_days", ttl);
+    fd.append("title", currentTitle());
     if (progress) progress.hidden = false;
     if (progressBar) progressBar.style.width = "0%";
     if (uploadBtn) uploadBtn.disabled = true;
@@ -236,7 +311,7 @@
       showQr(data.file.url, data.qr);
       setStatus("アップロードしました。生徒が読み取れるように、スクリーンに大きく出してください。", false);
       if (fileInput) fileInput.value = "";
-      loadFiles();
+      loadArchive();
     };
     xhr.onerror = () => {
       if (uploadBtn) uploadBtn.disabled = false;
@@ -270,34 +345,17 @@
   }
 
   if (input) {
-    input.addEventListener("input", scheduleGenerate);
-    input.addEventListener("paste", () => {
-      window.setTimeout(() => {
-        clearTimeout(debounceId);
-        generate(input.value);
-      }, 0);
-    });
     input.addEventListener("focus", selectInput);
     input.addEventListener("click", selectInput);
-    input.addEventListener("keydown", (ev) => {
-      if (ev.key === "Enter") {
-        ev.preventDefault();
-        clearTimeout(debounceId);
-        generate(input.value);
-      }
-    });
     const params = new URLSearchParams(window.location.search);
     const fromQuery = (params.get("url") || "").trim();
     let fromStore = "";
     try { fromStore = (sessionStorage.getItem(STORAGE_KEY) || "").trim(); } catch (_) {}
-    if (fromQuery) {
-      input.value = fromQuery;
-      generate(fromQuery);
-    } else if (fromStore) {
-      input.value = fromStore;
-      generate(fromStore);
-    }
+    if (fromQuery) input.value = fromQuery;
+    else if (fromStore) input.value = fromStore;
   }
+
+  loadArchive();
 
   if (copyBtn) {
     copyBtn.addEventListener("click", async () => {

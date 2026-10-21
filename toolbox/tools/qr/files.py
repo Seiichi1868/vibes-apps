@@ -95,6 +95,15 @@ def magic_ok(ext: str, data: bytes) -> bool:
     return any(data.startswith(sig) for sig in signatures)
 
 
+def require_title(raw: str) -> str:
+    title = (raw or "").strip()
+    if not title:
+        raise QrFileError("タイトルを入力してください。")
+    if len(title) > 80:
+        raise QrFileError("タイトルは80文字以内にしてください。")
+    return title
+
+
 def normalize_ttl(raw) -> int:
     try:
         days = int(raw)
@@ -154,6 +163,28 @@ def get_by_token(token: str) -> dict | None:
     return None
 
 
+def extend_file(file_id: str, user_id: str, device_id: str, ttl_days) -> dict:
+    safe = _safe_id(file_id)
+    if not safe:
+        raise QrFileError("このQRは見つかりません。", 404)
+    days = normalize_ttl(ttl_days)
+    now = now_dt()
+    with _lock:
+        row = _load_meta(_meta_path(safe))
+        if not row or row.get("user_id") != user_id or row.get("device_id") != device_id:
+            raise QrFileError("このQRは見つかりません。", 404)
+        if _is_expired(row, now):
+            raise QrFileError("このQRは見つかりません。", 404)
+        from toolbox.storage import _parse_dt
+
+        base = _parse_dt(row.get("expires_at")) or now
+        if base < now:
+            base = now
+        row["expires_at"] = (base + timedelta(days=days)).isoformat(timespec="seconds")
+        _write_json(_meta_path(safe), row)
+    return row
+
+
 def delete_file(file_id: str, user_id: str, device_id: str) -> bool:
     safe = _safe_id(file_id)
     if not safe:
@@ -171,7 +202,8 @@ def delete_file(file_id: str, user_id: str, device_id: str) -> bool:
     return True
 
 
-def save_upload(*, user_id: str, device_id: str, original_name: str, data: bytes, ttl_days: int) -> dict:
+def save_upload(*, user_id: str, device_id: str, original_name: str, data: bytes, ttl_days: int, title: str) -> dict:
+    title = require_title(title)
     ext = extension_of(original_name)
     if len(data) > config.QR_FILE_MAX_BYTES:
         raise QrFileError("ファイルは20MBまでです。", 413)
@@ -190,6 +222,7 @@ def save_upload(*, user_id: str, device_id: str, original_name: str, data: bytes
         "token": secrets.token_urlsafe(16),
         "user_id": user_id,
         "device_id": device_id,
+        "title": title,
         "original_name": display_name,
         "ext": ext,
         "size": len(data),

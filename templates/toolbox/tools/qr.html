@@ -4,7 +4,10 @@
 <section class="tb-tool tb-qr tb-stage-tool" data-display-root>
   <div class="tb-stage-chrome tb-stage-chrome-top">
     <h1 class="tb-tool-title">QRコード</h1>
-    <p class="tb-note">URLを貼るか、ファイルをアップロードすると、生徒用の大きなQRが出ます。</p>
+    <p class="tb-note">タイトルを付けてURLを貼るか、ファイルをアップロードすると、生徒用の大きなQRが出てアーカイブに残ります。</p>
+    <label class="tb-qr-url-label">タイトル（必須）
+      <input id="tb-qr-title" type="text" maxlength="80" required placeholder="例: 1年A 宿題">
+    </label>
     <div class="tb-tabs" role="tablist" aria-label="QRの種類">
       <button class="tb-tab is-active" type="button" id="tb-qr-tab-url" role="tab" aria-selected="true" aria-controls="tb-qr-panel-url">URL</button>
       <button class="tb-tab" type="button" id="tb-qr-tab-file" role="tab" aria-selected="false" aria-controls="tb-qr-panel-file">ファイル</button>
@@ -14,8 +17,15 @@
         <label class="tb-qr-url-label">URL
           <input id="tb-qr-input" type="text" inputmode="url" autocomplete="url" spellcheck="false" autocapitalize="off" placeholder="https://vibes-app-auz1.onrender.com/debate" aria-describedby="tb-qr-status">
         </label>
+        <label class="tb-qr-url-label">削除されるまでの日数
+          <select id="tb-qr-days">
+            <option value="1">1日</option>
+            <option value="7" selected>7日</option>
+            <option value="30">30日</option>
+          </select>
+        </label>
         <div class="tb-actions">
-          <button class="tb-btn tb-btn-primary" type="submit" id="tb-qr-make">QRを出す</button>
+          <button class="tb-btn tb-btn-primary" type="submit" id="tb-qr-make">QRを出して保存</button>
         </div>
       </form>
     </div>
@@ -39,15 +49,15 @@
           <button class="tb-btn tb-btn-primary" type="submit" id="tb-qr-upload">アップロードしてQRを出す</button>
         </div>
       </form>
-      <h2 class="tb-qr-list-title">アップロード済み</h2>
-      <ul class="tb-qr-list" id="tb-qr-list"></ul>
     </div>
     <div class="tb-actions">
       <button class="tb-btn" type="button" id="tb-qr-copy">リンクをコピー</button>
       <a class="tb-btn" id="tb-qr-download" hidden download="qr.png">画像を保存</a>
       <button class="tb-btn" type="button" data-display-enter>大きく表示</button>
     </div>
-    <p class="tb-muted" id="tb-qr-status" role="status">URLを入力または貼り付けるとQRコードが出ます。</p>
+    <p class="tb-muted" id="tb-qr-status" role="status">タイトルとURLを入れてQRを出してください。</p>
+    <h2 class="tb-qr-list-title">アーカイブ</h2>
+    <ul class="tb-qr-list" id="tb-qr-list"></ul>
   </div>
   <div class="tb-stage-main">
     <div class="tb-qr-stage" id="tb-qr-stage">

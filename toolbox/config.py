@@ -41,6 +41,7 @@ QR_FILE_TTL_DAYS_CHOICES = (1, 7, 30)
 QR_FILE_TTL_DAYS_DEFAULT = 7
 MINUTE_SPEECH_OVERLAY_FILE = DATA_DIR / "minute_speech_overlay.json"
 MINUTE_SPEECH_EMBEDDINGS_FILE = DATA_DIR / "minute_speech_embeddings.json"
+QR_ARCHIVE_FILE = DATA_DIR / "qr_archive.json"
 MINUTE_SPEECH_SEED_FILE = Path(__file__).resolve().parent / "data" / "minute_speech_topics_seed.json"
 
 COOKIE_NAME = "toolbox_session"
