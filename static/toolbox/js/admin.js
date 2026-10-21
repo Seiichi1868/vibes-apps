@@ -257,7 +257,7 @@
         <tr>
           <td>${esc(s.user)}</td>
           <td>${esc(fmtDate(s.created_at))}</td>
-          <td>${esc(s.title)}</td>
+          <td>${esc(s.title)}${s.source === "import" ? ' <span class="tb-badge">コピー</span>' : ""}</td>
           <td>${esc(s.level || "—")}</td>
           <td>${esc(s.question_count || 0)}</td>
           <td>${esc(STATUS_LABEL[s.status] || s.status || "—")}</td>

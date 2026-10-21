@@ -289,6 +289,7 @@ def admin_talk_sessions():
             "question_count": session.get("question_count") if session.get("question_count") is not None else len(questions),
             "created_at": session.get("created_at") or "",
             "status": session.get("status") or "",
+            "source": session.get("source") or "",
         })
 
     def sort_key(row):

@@ -1354,6 +1354,7 @@
       empty.hidden = rows.length > 0;
       list.innerHTML = rows.map((s) => {
         const status = STATUS_LABEL[s.status] || "";
+        const copy = s.source === "import" ? ' <span class="tb-badge">コピー</span>' : "";
         const meta = [
           fmtDate(s.created_at),
           `${s.question_count || 0}問`,
@@ -1362,7 +1363,7 @@
         ].join(" ・ ");
         return `
         <li data-id="${esc(s.id)}">
-          <div class="tb-hist-title">${esc(s.title)}${status ? ` <span class="tb-badge">${esc(status)}</span>` : ""}${s.last_error ? ' <span class="tb-badge tb-badge-warn">エラーあり</span>' : ""}</div>
+          <div class="tb-hist-title">${esc(s.title)}${copy}${status ? ` <span class="tb-badge">${esc(status)}</span>` : ""}${s.last_error ? ' <span class="tb-badge tb-badge-warn">エラーあり</span>' : ""}</div>
           <div class="tb-muted tb-hist-meta">${esc(meta)}</div>
           <div class="tb-actions">
             <button class="tb-btn" type="button" data-open="${esc(s.id)}">開く・修正</button>
@@ -1536,7 +1537,7 @@
       `${(detail.questions || []).length}問`,
       `音声 ${fmtDuration(detail.duration_sec)}`,
       `CEFR ${detail.level || "-"}`,
-      { record: "録音", file: "音声ファイル", paste: "テキスト", import: "引き継ぎ" }[detail.source] || "",
+      { record: "録音", file: "音声ファイル", paste: "テキスト", import: "コピー" }[detail.source] || "",
     ].filter(Boolean).join(" ・ ");
     ar.error.hidden = !detail.last_error;
     ar.error.textContent = detail.last_error ? `直前のエラー: ${detail.last_error}` : "";
