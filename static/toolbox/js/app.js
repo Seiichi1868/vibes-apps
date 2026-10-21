@@ -92,7 +92,7 @@
       opening.classList.add("is-hide");
       document.dispatchEvent(new CustomEvent("toolbox:opening-done"));
       window.setTimeout(() => opening.remove(), 320);
-    }, 1950);
+    }, 2200);
   }
 
   const blank = document.getElementById("tb-blank");
