@@ -293,7 +293,6 @@
       if (isGradedCorrect(result)) {
         if (!streakUp && !guardianUsed) {
           window.SoundFX.correct();
-          if (progress.coin_earned) window.SoundFX.coin();
         }
       } else {
         window.SoundFX.incorrect();
