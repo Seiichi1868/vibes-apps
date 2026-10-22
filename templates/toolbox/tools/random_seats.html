@@ -28,7 +28,7 @@
       </div>
       <details class="tb-note tb-note-fold">
         <summary>使い方</summary>
-        <p>タブは自動で保存されます。クイックは1番から人数ぶんです。番号をタップすると欠席、席をタップすると入れ替えや空席にできます。席数は人数以上にしてください。</p>
+        <p>タブは自動で保存されます。クイックは1番から人数ぶんです。番号をタップすると欠席、席をタップすると入れ替えや空席にできます。席数は人数以上にしてください。テスト用座席はスピーキングテスト向けで、前後左右が続かないよう空席を挟みます。人数が使える席の半数より多いときは、隣り合う組が最も少なくなる配置になります。</p>
       </details>
     </div>
     <div class="tb-stage-controls">
@@ -39,6 +39,12 @@
       </label>
       <label>列
         <input id="tb-cols" type="number" min="1" max="12" value="5">
+      </label>
+      <label>配置
+        <select id="tb-seat-mode" aria-label="配置のしかた">
+          <option value="random">ランダム</option>
+          <option value="test">テスト用座席</option>
+        </select>
       </label>
       <button class="tb-btn tb-btn-primary" type="button" id="tb-shuffle">配置する</button>
       <button class="tb-btn" type="button" id="tb-clear">全リセット</button>

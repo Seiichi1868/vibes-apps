@@ -56,6 +56,7 @@
       rows: layout.rows,
       cols: layout.cols,
       blocked: [],
+      mode: "random",
     };
   }
 
@@ -81,6 +82,7 @@
       rows: rows,
       cols: cols,
       blocked: Array.isArray(raw.blocked) ? raw.blocked.map(Number).filter((n) => Number.isFinite(n)) : [],
+      mode: raw.mode === "test" ? "test" : "random",
     };
   }
 
@@ -112,6 +114,7 @@
       blocked: (quickState.blocked || []).slice(),
       absent: (quickState.absent || []).slice(),
       seats: (quickState.seats || []).slice(),
+      mode: quickState.mode === "test" ? "test" : "random",
     };
     localStorage.setItem(QUICK_KEY, JSON.stringify(saved));
   }
@@ -138,6 +141,7 @@
       rows: row.rows,
       cols: row.cols,
       blocked: (row.blocked || []).slice(),
+      mode: row.mode === "test" ? "test" : "random",
       pick: {
         absent: ((row.pick || {}).absent || []).slice(),
         picked: ((row.pick || {}).picked || []).slice(),
@@ -186,7 +190,7 @@
 
   function defaultState(row) {
     const suggested = suggestGrid(row ? (effectiveNumbers(row).length || row.student_count) : 30);
-    return { absent: [], seats: [], rows: suggested.rows, cols: suggested.cols, blocked: [] };
+    return { absent: [], seats: [], rows: suggested.rows, cols: suggested.cols, blocked: [], mode: "random" };
   }
 
   function stateOf() {
@@ -204,6 +208,7 @@
       state.seats = state.seats.map((seat) => (seat && allowed.has(seat) ? seat : null));
     }
     state.blocked = (state.blocked || []).filter((n) => n >= 0 && n < maxSeats);
+    state.mode = state.mode === "test" ? "test" : "random";
     return state;
   }
 
@@ -281,6 +286,8 @@
     const state = previewState || stateOf();
     rowsEl.value = String(state.rows);
     colsEl.value = String(state.cols);
+    const modeEl = document.getElementById("tb-seat-mode");
+    if (modeEl) modeEl.value = state.mode === "test" ? "test" : "random";
     board.style.gridTemplateColumns = `repeat(${state.cols}, minmax(0, 1fr))`;
     board.style.gridTemplateRows = `repeat(${state.rows}, minmax(0, 1fr))`;
     board.innerHTML = "";
@@ -361,6 +368,16 @@
     }
     const total = state.rows * state.cols;
 
+    function shuffleInPlace(list) {
+      for (let i = list.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = list[i];
+        list[i] = list[j];
+        list[j] = tmp;
+      }
+      return list;
+    }
+
     function arrange(list) {
       const seats = [];
       let placed = 0;
@@ -368,6 +385,65 @@
         if (blocked.has(i)) seats.push(null);
         else seats.push(list[placed++] || null);
       }
+      return seats;
+    }
+
+    function orthoNeighbors(index) {
+      const rowIndex = Math.floor(index / state.cols);
+      const colIndex = index % state.cols;
+      const near = [];
+      if (rowIndex > 0) near.push(index - state.cols);
+      if (rowIndex + 1 < state.rows) near.push(index + state.cols);
+      if (colIndex > 0) near.push(index - 1);
+      if (colIndex + 1 < state.cols) near.push(index + 1);
+      return near;
+    }
+
+    function arrangeTest(list) {
+      const open = [];
+      for (let i = 0; i < total; i += 1) {
+        if (!blocked.has(i)) open.push(i);
+      }
+      const groups = [[], []];
+      open.forEach((index) => {
+        const rowIndex = Math.floor(index / state.cols);
+        const colIndex = index % state.cols;
+        groups[(rowIndex + colIndex) % 2].push(index);
+      });
+      const primary = groups[0].length >= groups[1].length ? groups[0] : groups[1];
+      const secondary = primary === groups[0] ? groups[1] : groups[0];
+      shuffleInPlace(primary);
+      const chosen = [];
+      if (list.length <= primary.length) {
+        chosen.push(...primary.slice(0, list.length));
+      } else {
+        chosen.push(...primary);
+        const filled = new Set(primary);
+        const remain = secondary.slice();
+        let rest = list.length - primary.length;
+        while (rest > 0 && remain.length) {
+          let best = 0;
+          let bestScore = Infinity;
+          const ties = [];
+          remain.forEach((index, at) => {
+            const score = orthoNeighbors(index).filter((near) => filled.has(near)).length;
+            if (score < bestScore) {
+              bestScore = score;
+              ties.length = 0;
+              ties.push(at);
+            } else if (score === bestScore) ties.push(at);
+          });
+          best = ties[Math.floor(Math.random() * ties.length)];
+          const pick = remain.splice(best, 1)[0];
+          filled.add(pick);
+          chosen.push(pick);
+          rest -= 1;
+        }
+      }
+      const seats = new Array(total).fill(null);
+      chosen.forEach((index, at) => {
+        seats[index] = list[at];
+      });
       return seats;
     }
 
@@ -382,8 +458,12 @@
       return copy;
     }
 
+    const modeEl = document.getElementById("tb-seat-mode");
+    state.mode = modeEl && modeEl.value === "test" ? "test" : "random";
+    const place = state.mode === "test" ? arrangeTest : arrange;
+
     const apply = () => {
-      state.seats = arrange(shuffledPool());
+      state.seats = place(shuffledPool());
       Object.assign(row, state);
       writeRooms();
       renderAll();
@@ -396,7 +476,7 @@
 
     const start = Date.now();
     const spin = () => {
-      const preview = Object.assign({}, state, { seats: arrange(shuffledPool()) });
+      const preview = Object.assign({}, state, { seats: place(shuffledPool()) });
       renderBoard(preview);
       if (Date.now() - start < 1100) requestAnimationFrame(spin);
       else apply();
@@ -408,10 +488,12 @@
   document.getElementById("tb-clear").addEventListener("click", () => {
     const row = currentClass();
     if (!row) return;
+    const prev = stateOf();
     const next = defaultState(row);
     next.rows = Math.max(1, Math.min(12, Number(rowsEl.value) || next.rows));
     next.cols = Math.max(1, Math.min(12, Number(colsEl.value) || next.cols));
-    next.blocked = stateOf().blocked || [];
+    next.blocked = prev.blocked || [];
+    next.mode = prev.mode === "test" ? "test" : "random";
     Object.assign(row, next);
     writeRooms();
     renderAll();
@@ -425,6 +507,15 @@
     Object.assign(row, state);
     writeRooms();
     renderBoard();
+  });
+  document.getElementById("tb-seat-mode").addEventListener("change", () => {
+    const row = currentClass();
+    if (!row) return;
+    const state = stateOf();
+    const modeEl = document.getElementById("tb-seat-mode");
+    state.mode = modeEl && modeEl.value === "test" ? "test" : "random";
+    Object.assign(row, state);
+    writeRooms();
   });
   colsEl.addEventListener("change", () => {
     const row = currentClass();
@@ -493,6 +584,7 @@
       rows: quickState.rows,
       cols: quickState.cols,
       blocked: (quickState.blocked || []).slice(),
+      mode: quickState.mode === "test" ? "test" : "random",
     };
     classes.push(room);
     activeId = room.id;
