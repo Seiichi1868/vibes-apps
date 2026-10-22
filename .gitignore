@@ -67,6 +67,9 @@ data/conjugate/sessions/*
 data/trigger/audio/*
 data/trigger/sessions/*
 
+# 1分スピーチ採点: 数値記録・設定（音声は一時領域。ここには置かない）
+data/speech_rec/
+
 # Toolbox: 一時音声・理解確認セッション（data/toolbox/*.json は上の *.json ルールで除外済み）
 data/toolbox/audio_tmp/*
 data/toolbox/talk_sessions/*
