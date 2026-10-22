@@ -8,8 +8,13 @@ from pathlib import Path
 
 from speech_rec.assignments import get_assignment, now, records_dir
 from speech_rec.config import audio_tmp_dir
-from speech_rec.metrics import measure, wpm_points
+from speech_rec.delivery import SOURCE as DELIVERY_SOURCE
+from speech_rec.delivery import delivery_level
+from speech_rec.evaluate import run_eval
+from speech_rec.metrics import measure
 from speech_rec.openai_client import SpeechRecAIError, transcribe_words
+from speech_rec.rubric import PROMPT_VERSION, RUBRIC_VERSION
+from speech_rec.scoring import score as score_levels
 from speech_rec.pricing import WHISPER_MODEL, estimate_whisper_usd
 from speech_rec.settings import get_settings
 from speech_rec.store import read_json, write_json
@@ -27,6 +32,7 @@ WHISPER_HINT = "Um, uh, so, well, I think, you know, like... Okay."
 enabled = True
 _pool: ThreadPoolExecutor | None = None
 _transcribe = transcribe_words
+_evaluate = run_eval
 
 
 def start() -> None:
@@ -96,29 +102,86 @@ def process(assignment_id: str, record_id: str) -> None:
             _fail(assignment_id, record_id, "too_short", metrics=metrics, cost=cost)
             return
         _write_view(record_id, text, words, settings)
-        flags = []
-        snr = metrics.get("snr_db")
-        if isinstance(snr, (int, float)) and snr < NOISY_SNR_DB:
-            flags.append("noisy")
-        if metrics["words_counted"] < 30:
-            flags.append("short_speech")
-        fresh = _load(assignment_id, record_id) or record
-        fresh["status"] = "done"
-        fresh["error_code"] = None
-        fresh["metrics"] = metrics
-        fresh["scores"] = {
-            "wpm_points": wpm_points(metrics["words_counted"], score_config),
-            "config_version": score_config.get("version"),
-        }
-        fresh["flags"] = flags
-        fresh["cost_usd"] = round(cost, 6)
-        fresh.pop("transcript", None)
-        _save(fresh)
-    except SpeechRecAIError as exc:
-        _fail(assignment_id, record_id, "whisper_failed" if exc.code != "no_api_key" else "whisper_failed")
+        try:
+            _finish_scores(assignment, record_id, metrics, text, cost, settings)
+        except SpeechRecAIError:
+            _fail(assignment_id, record_id, "eval_failed", metrics=metrics, cost=cost)
+    except SpeechRecAIError:
+        _fail(assignment_id, record_id, "whisper_failed")
     finally:
         if not settings.get("calibration_mode"):
             _delete_audio(record_id)
+
+
+def reevaluate(assignment_id: str, record_id: str) -> None:
+    """文字起こしが残っていれば Whisper を呼ばずに評価だけやり直す。"""
+    record = _load(assignment_id, record_id)
+    view = load_view(record_id)
+    if not record or not view or not str(view.get("transcript") or "").strip():
+        _fail(assignment_id, record_id, "eval_failed")
+        return
+    settings = get_settings()
+    assignment = get_assignment(assignment_id) or {}
+    metrics = record.get("metrics") if isinstance(record.get("metrics"), dict) else {}
+    try:
+        _finish_scores(assignment, record_id, metrics, str(view.get("transcript")), float(record.get("cost_usd") or 0), settings)
+    except SpeechRecAIError:
+        _fail(assignment_id, record_id, "eval_failed", metrics=metrics, cost=record.get("cost_usd"))
+
+
+def enqueue_eval(assignment_id: str, record_id: str) -> None:
+    if not enabled:
+        reevaluate(assignment_id, record_id)
+        return
+    start()
+    assert _pool is not None
+    _pool.submit(reevaluate, assignment_id, record_id)
+
+
+def _finish_scores(assignment: dict, record_id: str, metrics: dict, transcript: str, whisper_cost: float, settings: dict) -> None:
+    topic = (assignment.get("topic") or {}).get("text") or ""
+    model = str(settings.get("eval_model") or "gpt-4o-mini")
+    parsed = _evaluate(
+        topic,
+        transcript,
+        int(assignment.get("speak_sec") or 60),
+        model,
+        words_counted=int(metrics.get("words_counted") or 0),
+    )
+    levels = dict(parsed["levels"])
+    levels["delivery"] = delivery_level(metrics, settings.get("delivery_rules") or [])
+    scored = score_levels(levels, int(metrics.get("words_counted") or 0), bool(parsed["on_topic"]), settings["score_config"])
+    flags = list(parsed["flags"])
+    snr = metrics.get("snr_db")
+    if isinstance(snr, (int, float)) and snr < NOISY_SNR_DB and "noisy" not in flags:
+        flags.append("noisy")
+    fresh = _load(assignment["id"], record_id) or {"id": record_id, "assignment_id": assignment.get("id")}
+    fresh["status"] = "done"
+    fresh["error_code"] = None
+    fresh["metrics"] = metrics
+    fresh["levels"] = levels
+    fresh["oreo"] = parsed["oreo"]
+    fresh["scores"] = scored
+    fresh["flags"] = flags
+    fresh["delivery_source"] = DELIVERY_SOURCE
+    fresh["eval"] = {"model": parsed["model"], "prompt_version": parsed.get("prompt_version") or PROMPT_VERSION}
+    fresh["rubric_version"] = RUBRIC_VERSION
+    fresh["cost_usd"] = round(float(whisper_cost) + float(parsed["cost_usd"]), 6)
+    for banned in ("transcript", "evidence", "comment", "sentences", "student_feedback"):
+        fresh.pop(banned, None)
+    _save(fresh)
+    _merge_view(record_id, parsed["view"], settings)
+
+
+def _merge_view(record_id: str, extra: dict, settings: dict) -> None:
+    path = audio_tmp_dir() / f"{record_id}.view.json"
+    current = read_json(path, {})
+    if not isinstance(current, dict):
+        current = {}
+    current.update(extra)
+    if "expires_at" not in current:
+        current["expires_at"] = (now() + timedelta(minutes=int(settings.get("transcript_ttl_min") or 30))).isoformat(timespec="seconds")
+    write_json(path, current)
 
 
 def recover_stalled() -> None:

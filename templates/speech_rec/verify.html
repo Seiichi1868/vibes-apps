@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>確認コード</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 1.5rem auto; max-width: 36rem; padding: 0 1rem; }
+    input, button { font: inherit; padding: .4rem .6rem; }
+    td { padding: .2rem .8rem .2rem 0; vertical-align: top; }
+  </style>
+</head>
+<body>
+  {% if not authed %}
+    <h1>確認コード</h1>
+    <form id="unlock">
+      <label>管理パスワード<input id="password" type="password" required></label>
+      <button type="submit">開く</button>
+      <p id="err"></p>
+    </form>
+    <script>
+      document.getElementById("unlock").onsubmit = async (event) => {
+        event.preventDefault();
+        const res = await fetch("/rec/admin/unlock", {
+          method: "POST",
+          headers: {"Content-Type": "application/json", "X-Speech-Rec-Request": "1"},
+          body: JSON.stringify({password: document.getElementById("password").value}),
+        });
+        if (!res.ok) { document.getElementById("err").textContent = "パスワードが違います。"; return; }
+        location.reload();
+      };
+    </script>
+  {% else %}
+    <h1>確認コード</h1>
+    <form method="get">
+      <input name="code" value="{{ code or '' }}" placeholder="K7M2-9QXA" autocomplete="off">
+      <button type="submit">照合</button>
+    </form>
+    {% if missing %}<p>見つかりません。</p>{% endif %}
+    {% if row %}
+      <table>
+        <tr><td>日時</td><td>{{ row.created_at }}</td></tr>
+        <tr><td>お題</td><td>{{ row.topic }}</td></tr>
+        <tr><td>試行</td><td>{{ row.attempt }}</td></tr>
+        <tr><td>レベル</td><td>{{ row.levels }}</td></tr>
+        <tr><td>点数</td><td>{{ row.scores }}</td></tr>
+        <tr><td>フラグ</td><td>{{ row.flags }}</td></tr>
+      </table>
+    {% endif %}
+  {% endif %}
+</body>
+</html>

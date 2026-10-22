@@ -9,10 +9,35 @@ from speech_rec.assignments import (
     get_assignment,
     list_assignments,
     live_counts,
+    records_dir,
 )
+from speech_rec.store import list_json_files, read_json
 from speech_rec.auth import require_admin, require_admin_header
 from speech_rec.qr import qr_data_uri, student_url
 from speech_rec.settings import get_settings, save_settings
+
+
+def _find_code(code: str) -> dict | None:
+    root = records_dir("_").parent
+    if not root.is_dir():
+        return None
+    for folder in root.iterdir():
+        if not folder.is_dir():
+            continue
+        for path in list_json_files(folder):
+            row = read_json(path)
+            if isinstance(row, dict) and str(row.get("verify_code") or "").upper() == code:
+                assignment = get_assignment(str(row.get("assignment_id") or folder.name)) or {}
+                return {
+                    "created_at": row.get("created_at"),
+                    "topic": (assignment.get("topic") or {}).get("text") or "",
+                    "attempt": row.get("attempt"),
+                    "levels": row.get("levels") or {},
+                    "scores": row.get("scores") or {},
+                    "flags": row.get("flags") or [],
+                    "verify_code": row.get("verify_code"),
+                }
+    return None
 
 
 def register_teacher_routes(bp: Blueprint) -> None:
@@ -90,3 +115,11 @@ def register_teacher_routes(bp: Blueprint) -> None:
             updates["id_fields"] = allowed
         saved = save_settings(updates)
         return jsonify({"ok": True, "student_enabled": saved["student_enabled"], "id_fields": saved["id_fields"]})
+
+    @bp.route("/verify", methods=["GET", "POST"])
+    def verify_page():
+        if not g.speech_rec_admin:
+            return render_template("speech_rec/verify.html", authed=False, row=None, missing=False)
+        code = (request.values.get("code") or "").strip().upper()
+        found = _find_code(code) if code else None
+        return render_template("speech_rec/verify.html", authed=True, row=found, missing=bool(code) and found is None, code=code)

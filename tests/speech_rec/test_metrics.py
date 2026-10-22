@@ -45,6 +45,7 @@ class JobTests(unittest.TestCase):
         self.jobs = jobs
         self._orig_audio = config.audio_tmp_dir
         self._orig_transcribe = jobs._transcribe
+        self._orig_eval = jobs._evaluate
         config.audio_tmp_dir = lambda: self.audio
         submissions.audio_tmp_dir = lambda: self.audio
         jobs.audio_tmp_dir = lambda: self.audio
@@ -71,6 +72,7 @@ class JobTests(unittest.TestCase):
         submissions.audio_tmp_dir = self._orig_audio
         self.jobs.audio_tmp_dir = self._orig_audio
         self.jobs._transcribe = self._orig_transcribe
+        self.jobs._evaluate = self._orig_eval
         self.jobs.enabled = True
         for root in (self.dir, self.audio):
             for path in sorted(root.rglob("*"), reverse=True):
@@ -87,9 +89,26 @@ class JobTests(unittest.TestCase):
             return {"text": "word " * 12, "words": words, "duration": 20}
 
         self.jobs._transcribe = fake
+
+        def fake_eval(*_args, **_kwargs):
+            return {
+                "on_topic": True,
+                "levels": {"general_description": 4, "language_use": 3, "topic_development": 4},
+                "oreo": {"opinion_open": True, "reason": True, "example": False, "opinion_close": True},
+                "flags": ["no_example"],
+                "cost_usd": 0.001,
+                "model": "gpt-4o-mini",
+                "prompt_version": "ms-eval-v1",
+                "view": {"comments": {"general_description": "よい"}, "evidence": {"example": "secret quote"}, "sentences": [], "student_feedback": {"next_step": "例を足そう"}},
+            }
+
+        self.jobs._evaluate = fake_eval
         self.jobs.process("asg1", "rec1")
         record = read_json(self.dir / "records" / "asg1" / "rec1.json")
         self.assertEqual(record["status"], "done")
+        self.assertNotIn("evidence", record)
+        self.assertNotIn("comment", record)
+        self.assertNotIn("student_feedback", record)
         self.assertEqual(record["metrics"]["words_counted"], 12)
         self.assertEqual(record["scores"]["wpm_points"], 12)
         self.assertIn("noisy", record["flags"])
