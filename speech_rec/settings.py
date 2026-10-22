@@ -22,6 +22,14 @@ DEFAULT_SCORE_CONFIG: dict[str, Any] = {
     "off_topic_multiplier": 1.0,
 }
 
+DEFAULT_DELIVERY_RULES: list[dict[str, Any]] = [
+    {"level": 6, "pause_n": 1, "pause_max": 1.5, "silent_ratio": 0.10},
+    {"level": 5, "pause_n": 3, "pause_max": 2.0, "silent_ratio": 0.20},
+    {"level": 4, "pause_n": 5, "pause_max": 3.0, "silent_ratio": 0.30},
+    {"level": 3, "pause_n": 8, "pause_max": 4.5, "silent_ratio": 0.40},
+    {"level": 2, "pause_n": 12, "pause_max": 7.0, "silent_ratio": 0.55},
+]
+
 DEFAULTS: dict[str, Any] = {
     "student_enabled": False,
     "id_fields": {
@@ -42,6 +50,7 @@ DEFAULTS: dict[str, Any] = {
     "calibration_mode": False,
     "whisper_hint": False,
     "score_config": DEFAULT_SCORE_CONFIG,
+    "delivery_rules": DEFAULT_DELIVERY_RULES,
 }
 
 
@@ -61,6 +70,8 @@ def get_settings() -> dict[str, Any]:
             merged["score_config"].update(value)
             if isinstance(value.get("w"), dict):
                 merged["score_config"]["w"] = {**DEFAULT_SCORE_CONFIG["w"], **value["w"]}
+        elif key == "delivery_rules" and isinstance(value, list) and value:
+            merged["delivery_rules"] = value
         elif key in merged:
             merged[key] = value
     return merged

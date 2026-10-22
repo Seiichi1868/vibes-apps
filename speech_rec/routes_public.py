@@ -4,10 +4,11 @@ from __future__ import annotations
 from flask import Blueprint, jsonify, render_template, request
 from werkzeug.exceptions import RequestEntityTooLarge
 
-from speech_rec.assignments import availability, find_by_token, public_view
+from speech_rec.assignments import availability, find_by_token, public_view, records_dir
 from speech_rec.config import MAX_UPLOAD_BYTES
-from speech_rec.jobs import recover_stalled
+from speech_rec.jobs import enqueue_eval, load_view, recover_stalled
 from speech_rec.settings import get_settings
+from speech_rec.store import write_json
 from speech_rec.submissions import accept_audio, load_by_read_token, public_status
 from speech_rec.usage import daily_limit_reached
 
@@ -75,3 +76,24 @@ def register_public_routes(bp: Blueprint) -> None:
             return jsonify({"ok": False, "error": "not_found"}), 404
         detail = request.args.get("detail") == "1"
         return jsonify(public_status(record, detail=detail))
+
+    @bp.post("/api/r/<read_token>/reevaluate")
+    def reevaluate(read_token):
+        if daily_limit_reached():
+            return jsonify({"ok": False, "error": "limit"}), 429
+        record = load_by_read_token(read_token)
+        if not record:
+            return jsonify({"ok": False, "error": "not_found"}), 404
+        if record.get("error_code") != "eval_failed":
+            return jsonify({"ok": False, "error": "retry"}), 400
+        if int(record.get("eval_retries") or 0) >= 3:
+            return jsonify({"ok": False, "error": "retry"}), 400
+        view = load_view(str(record.get("id") or ""))
+        if not view or not str(view.get("transcript") or "").strip():
+            return jsonify({"ok": False, "error": "expired"}), 409
+        record["eval_retries"] = int(record.get("eval_retries") or 0) + 1
+        record["status"] = "processing"
+        record["error_code"] = None
+        write_json(records_dir(record["assignment_id"]) / f"{record['id']}.json", record)
+        enqueue_eval(record["assignment_id"], record["id"])
+        return jsonify({"ok": True, "read_token": read_token}), 202

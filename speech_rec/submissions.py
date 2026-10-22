@@ -247,8 +247,15 @@ def _queue(assignment_id: str, record_id: str) -> None:
 
 
 def public_status(record: dict, *, detail: bool = False) -> dict:
+    from speech_rec.assignments import get_assignment
+    from speech_rec.jobs import load_view
+    from speech_rec.metrics import FILLERS, normalize_word
+
     metrics = record.get("metrics") if isinstance(record.get("metrics"), dict) else {}
     scores = record.get("scores") if isinstance(record.get("scores"), dict) else {}
+    assignment = get_assignment(str(record.get("assignment_id") or "")) or {}
+    view = load_view(str(record.get("id") or "")) if record.get("status") == "done" or detail else None
+    feedback = (view or {}).get("student_feedback") if isinstance((view or {}).get("student_feedback"), dict) else {}
     body = {
         "ok": True,
         "status": record.get("status"),
@@ -258,16 +265,26 @@ def public_status(record: dict, *, detail: bool = False) -> dict:
         "attempts_per_device": 2,
         "verify_code": record.get("verify_code"),
         "created_at": record.get("created_at"),
+        "topic": (assignment.get("topic") or {}).get("text") or "",
+        "show_points": bool(assignment.get("show_points", True)),
         "words_counted": metrics.get("words_counted"),
         "wpm_points": scores.get("wpm_points"),
+        "levels": record.get("levels") or {},
+        "scores": scores,
+        "oreo": record.get("oreo") or {},
         "flags": record.get("flags") or [],
+        "next_step": feedback.get("next_step") or "",
     }
-    if detail and record.get("status") == "done":
-        from speech_rec.jobs import load_view
-
-        view = load_view(str(record.get("id") or ""))
+    if detail:
         if view:
+            words = view.get("words") or []
+            fillers = [row[0] for row in words if isinstance(row, (list, tuple)) and normalize_word(row[0]) in FILLERS]
             body["transcript"] = view.get("transcript") or ""
+            body["comments"] = view.get("comments") or {}
+            body["evidence"] = view.get("evidence") or {}
+            body["fillers"] = fillers
+            body["detail_expired"] = False
         else:
             body["transcript"] = None
+            body["detail_expired"] = True
     return body

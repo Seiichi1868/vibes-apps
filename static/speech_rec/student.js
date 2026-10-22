@@ -308,6 +308,105 @@
     await poll(data.read_token);
   }
 
+  function reevalButton(readToken) {
+    const button = document.createElement("button");
+    button.className = "primary";
+    button.textContent = "もう一度採点";
+    button.onclick = async () => {
+      const res = await fetch(`/rec/api/r/${encodeURIComponent(readToken)}/reevaluate`, { method: "POST" });
+      if (res.status === 409) {
+        const kept = await window.SpeechRecAudio.loadClip(token);
+        if (!kept) {
+          app.innerHTML = `<p class="err">期限が切れたので、もう一度録音してください。</p>`;
+          return;
+        }
+        await upload(kept.blob, kept.meta || {}, "");
+        return;
+      }
+      if (!res.ok) {
+        app.innerHTML = `<p class="err">もう一度採点できませんでした。</p>`;
+        return;
+      }
+      await poll(readToken);
+    };
+    return button;
+  }
+
+  function bars(level) {
+    const n = Math.max(0, Math.min(6, Number(level) || 0));
+    return `<span class="ticks">${[1, 2, 3, 4, 5, 6].map((i) => `<i class="${i <= n ? "on" : ""}"></i>`).join("")}</span>`;
+  }
+
+  function points(data, key) {
+    if (!data.show_points) return "";
+    const value = data.scores && data.scores.points ? data.scores.points[key] : "";
+    return esc(value);
+  }
+
+  function renderScore(data) {
+    const oreo = data.oreo || {};
+    const mark = (on) => `<span class="dot ${on ? "on" : ""}"></span>`;
+    const when = esc(String(data.created_at || "").replace("T", " ").slice(0, 16));
+    const total = data.show_points && data.scores ? esc(data.scores.total) : "—";
+    const wpm = data.show_points ? esc(data.wpm_points) : "—";
+    const rubric = data.show_points && data.scores ? esc(Math.round((data.scores.total || 0) - (data.wpm_points || 0))) : "—";
+    app.className = "app sheet";
+    app.innerHTML = `
+      <p class="meta">${when} ・ 試行 ${esc(data.attempt)}/${esc(data.attempts_per_device)}</p>
+      <p class="topic">${esc(data.topic)}</p>
+      <p class="total">${total}</p>
+      <p class="sub">WPM点 ${wpm} ／ ルーブリック ${rubric}</p>
+      <div class="bars">
+        <div class="bar-row"><span>General Description</span>${bars((data.levels || {}).general_description)}<span>${points(data, "general_description")}</span></div>
+        <div class="bar-row"><span>Delivery（流暢さ）</span>${bars((data.levels || {}).delivery)}<span>${points(data, "delivery")}</span></div>
+        <div class="bar-row"><span>Language Use</span>${bars((data.levels || {}).language_use)}<span>${points(data, "language_use")}</span></div>
+        <div class="bar-row"><span>Topic Development</span>${bars((data.levels || {}).topic_development)}<span>${points(data, "topic_development")}</span></div>
+      </div>
+      <p class="oreo">OREO ${mark(oreo.opinion_open)} O ${mark(oreo.reason)} R ${mark(oreo.example)} E ${mark(oreo.opinion_close)} O</p>
+      <p class="next">次の一歩：${esc(data.next_step || "")}</p>
+      <div class="foot">
+        <p class="note-line">※AI評価・参考／発音は含みません</p>
+        <button type="button" id="detail">くわしく</button>
+        <span class="code">${esc(data.verify_code || "")}</span>
+      </div>`;
+    document.getElementById("detail").onclick = () => openDetail(state.readToken);
+  }
+
+  async function openDetail(readToken) {
+    app.className = "app detail";
+    const res = await fetch(`/rec/api/r/${encodeURIComponent(readToken)}?detail=1`);
+    const data = await res.json().catch(() => ({}));
+    if (data.detail_expired || data.transcript == null) {
+      app.innerHTML = `<p class="err">期限が切れました</p><button type="button" id="back">結果に戻る</button>`;
+      document.getElementById("back").onclick = () => renderScore(state.result || data);
+      return;
+    }
+    const comments = data.comments || {};
+    const evidence = data.evidence || {};
+    app.innerHTML = `
+      <button type="button" id="back">結果に戻る</button>
+      <h2>くわしく</h2>
+      <p>${esc(data.transcript)}</p>
+      <p>General Description：${esc(comments.general_description || "")}</p>
+      <p>Language Use：${esc(comments.language_use || "")}</p>
+      <p>Topic Development：${esc(comments.topic_development || "")}</p>
+      <p>Opinion ${esc(evidence.opinion_open || "")}</p>
+      <p>Reason ${esc(evidence.reason || "")}</p>
+      <p>Example ${esc(evidence.example || "")}</p>
+      <p>結び ${esc(evidence.opinion_close || "")}</p>
+      <p>フィラー（参考）：${esc((data.fillers || []).join(", "))}</p>
+      <button type="button" id="play">自分の録音を聞く</button>`;
+    document.getElementById("back").onclick = () => renderScore(state.result || data);
+    document.getElementById("play").onclick = () => {
+      if (!state.audioBlob) {
+        document.getElementById("play").textContent = "この画面を開き直すと録音は聞けません";
+        return;
+      }
+      const audio = new Audio(URL.createObjectURL(state.audioBlob));
+      audio.play();
+    };
+  }
+
   function retryButton(recordId) {
     const button = document.createElement("button");
     button.className = "primary";
@@ -340,16 +439,20 @@
     }
     if (data.status === "done") {
       clearRead();
+      const kept = await window.SpeechRecAudio.loadClip(token).catch(() => null);
+      state.audioBlob = kept && kept.blob;
       await window.SpeechRecAudio.deleteClip(token).catch(() => {});
-      const noisy = (data.flags || []).includes("noisy") ? "　周囲の音が大きいので、語数は参考です。" : "";
-      app.innerHTML = `<p class="status">語数 ${esc(data.words_counted)}　WPM点 ${esc(data.wpm_points)}</p><p class="small">試行 ${esc(data.attempt)}。内容の評価は次の更新です。${esc(noisy)}</p>`;
+      state.result = data;
+      state.readToken = readToken;
+      renderScore(data);
       return;
     }
     if (data.status === "error") {
-      clearRead();
+      if (data.error_code !== "eval_failed") clearRead();
       const quiet = data.error_code === "too_short" || data.error_code === "silent";
-      app.innerHTML = `<p class="err">${esc(quiet ? "録音が短すぎるか、ほとんど言葉がありません。回数には数えません。" : "文字起こしができませんでした。端末に残した音声でもう一度採点できます。")}</p>`;
-      if (!quiet) app.appendChild(retryButton(data.id));
+      app.innerHTML = `<p class="err">${esc(quiet ? "録音が短すぎるか、ほとんど言葉がありません。回数には数えません。" : data.error_code === "eval_failed" ? "評価ができませんでした。文字起こしが残っていれば、もう一度採点できます。" : "文字起こしができませんでした。端末に残した音声でもう一度採点できます。")}</p>`;
+      if (data.error_code === "eval_failed") app.appendChild(reevalButton(readToken));
+      else if (!quiet) app.appendChild(retryButton(data.id));
       return;
     }
     app.innerHTML = `<p class="status">時間がかかっています。端末に残した音声でもう一度採点できます。</p>`;
@@ -373,5 +476,6 @@
     };
   }
 
-  load();
+  if (document.body.dataset.preview) renderScore(JSON.parse(document.body.dataset.preview));
+  else load();
 })();
