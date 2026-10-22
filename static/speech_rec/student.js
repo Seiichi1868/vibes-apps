@@ -8,7 +8,21 @@
     localStorage.setItem(deviceKey, deviceId);
   }
 
+  const readKey = `speech_rec_read:${token}`;
+  const audioMode = document.body.dataset.audio || "default";
   const state = { info: null, blobs: [], mime: "", recorder: null, stream: null, samples: [], stopTimer: 0, hidden: false };
+
+  function micConstraint() {
+    if (audioMode === "ns_on_agc_off") {
+      return { noiseSuppression: true, autoGainControl: false, echoCancellation: true };
+    }
+    if (audioMode === "ns_off") return { noiseSuppression: false };
+    return true;
+  }
+
+  function clearRead() {
+    localStorage.removeItem(readKey);
+  }
 
   function esc(value) {
     return String(value ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
@@ -49,6 +63,11 @@
     const res = await fetch(`/rec/api/a/${encodeURIComponent(token)}`);
     const data = await res.json().catch(() => ({ reason: "not_found" }));
     state.info = data;
+    const pending = localStorage.getItem(readKey);
+    if (pending && data.ok) {
+      poll(pending);
+      return;
+    }
     if (!data.ok) {
       app.innerHTML = `<p class="status">${esc(reasons(data.reason))}</p>`;
       const kept = await window.SpeechRecAudio.loadClip(token).catch(() => null);
@@ -102,7 +121,7 @@
   async function startPrep() {
     const err = document.getElementById("err");
     try {
-      state.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      state.stream = await navigator.mediaDevices.getUserMedia({ audio: micConstraint() });
     } catch (error) {
       err.textContent = "マイクが使えません。ブラウザの設定でこのサイトのマイクを許可してください。";
       return;
@@ -281,42 +300,56 @@
       failed(text, data.error);
       return;
     }
+    localStorage.setItem(readKey, data.read_token);
     await poll(data.read_token);
   }
 
+  function retryButton(recordId) {
+    const button = document.createElement("button");
+    button.className = "primary";
+    button.textContent = "もう一度採点";
+    button.onclick = async () => {
+      const kept = await window.SpeechRecAudio.loadClip(token);
+      if (!kept) {
+        app.innerHTML = `<p class="err">端末の録音が見つかりません。もう一度録音してください。</p>`;
+        return;
+      }
+      await upload(kept.blob, kept.meta || {}, recordId || "");
+    };
+    return button;
+  }
+
   async function poll(readToken) {
+    localStorage.setItem(readKey, readToken);
     app.innerHTML = `<p class="status" id="phase">文字起こし中…</p>`;
     let data = {};
-    for (let i = 0; i < 40; i += 1) {
+    const started = Date.now();
+    let wait = 1500;
+    while (Date.now() - started < 180000) {
       const res = await fetch(`/rec/api/r/${encodeURIComponent(readToken)}`);
       data = await res.json().catch(() => ({}));
       if (data.status === "done" || data.status === "error") break;
-      document.getElementById("phase").textContent = data.status === "received" ? "送信しました。文字起こしを待っています。" : "文字起こし中…";
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const phase = document.getElementById("phase");
+      if (phase) phase.textContent = data.status === "received" ? "送信しました。文字起こしを待っています。" : "文字起こし中…";
+      await new Promise((resolve) => setTimeout(resolve, wait));
+      wait = Math.min(5000, wait + 500);
     }
     if (data.status === "done") {
+      clearRead();
       await window.SpeechRecAudio.deleteClip(token).catch(() => {});
       const noisy = (data.flags || []).includes("noisy") ? "　周囲の音が大きいので、語数は参考です。" : "";
       app.innerHTML = `<p class="status">語数 ${esc(data.words_counted)}　WPM点 ${esc(data.wpm_points)}</p><p class="small">試行 ${esc(data.attempt)}。内容の評価は次の更新です。${esc(noisy)}</p>`;
       return;
     }
-    if (data.status === "error" && data.error_code === "whisper_failed") {
-      app.innerHTML = `<p class="err">文字起こしができませんでした。端末に残した音声でもう一度採点できます。</p><button id="retry" class="primary">もう一度採点</button>`;
-      document.getElementById("retry").onclick = async () => {
-        const kept = await window.SpeechRecAudio.loadClip(token);
-        if (!kept) {
-          app.innerHTML = `<p class="err">端末の録音が見つかりません。もう一度録音してください。</p>`;
-          return;
-        }
-        await upload(kept.blob, kept.meta || {}, data.id);
-      };
-      return;
-    }
     if (data.status === "error") {
-      app.innerHTML = `<p class="err">${esc(data.error_code === "too_short" || data.error_code === "silent" ? "録音が短すぎるか、ほとんど言葉がありません。回数には数えません。" : "採点できませんでした。")}</p>`;
+      clearRead();
+      const quiet = data.error_code === "too_short" || data.error_code === "silent";
+      app.innerHTML = `<p class="err">${esc(quiet ? "録音が短すぎるか、ほとんど言葉がありません。回数には数えません。" : "文字起こしができませんでした。端末に残した音声でもう一度採点できます。")}</p>`;
+      if (!quiet) app.appendChild(retryButton(data.id));
       return;
     }
-    app.innerHTML = `<p class="status">まだ処理中です。この画面を開き直すと続きを確認できます。</p>`;
+    app.innerHTML = `<p class="status">時間がかかっています。端末に残した音声でもう一度採点できます。</p>`;
+    app.appendChild(retryButton(data.id));
   }
 
   function failed(message) {
@@ -330,6 +363,7 @@
       upload(kept.blob, kept.meta || {});
     };
     document.getElementById("drop").onclick = async () => {
+      clearRead();
       await window.SpeechRecAudio.deleteClip(token);
       app.innerHTML = `<p class="status">削除しました。</p>`;
     };

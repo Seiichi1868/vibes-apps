@@ -40,6 +40,7 @@ DEFAULTS: dict[str, Any] = {
     "record_retention_days": 60,
     "pause_gap_sec": 0.8,
     "calibration_mode": False,
+    "whisper_hint": False,
     "score_config": DEFAULT_SCORE_CONFIG,
 }
 
