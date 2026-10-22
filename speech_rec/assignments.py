@@ -48,9 +48,9 @@ def create_assignment(payload: dict) -> dict:
     hours = int(payload.get("ttl_hours") or 24)
     if hours not in TTL_HOURS:
         raise ValueError("ttl")
-    prep = int(payload.get("prep_sec") or 60)
+    prep = 60 if payload.get("prep_sec") is None else int(payload.get("prep_sec"))
     speak = int(payload.get("speak_sec") or 60)
-    if not (10 <= prep <= 180 and 10 <= speak <= 180):
+    if not (0 <= prep <= 180 and 10 <= speak <= 180):
         raise ValueError("seconds")
     limit = int(payload.get("max_submissions") or 40)
     if not (1 <= limit <= 200):

@@ -147,6 +147,10 @@ class AssignmentFlowTests(unittest.TestCase):
         )
         self.assertEqual(short.get_json()["error"], "too_short")
 
+    def test_prep_zero_is_allowed(self):
+        row = create_assignment({"text": "No preparation.", "prep_sec": 0, "speak_sec": 60})
+        self.assertEqual(row["prep_sec"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()
