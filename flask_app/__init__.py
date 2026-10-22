@@ -71,6 +71,7 @@ def create_app(config_class=Config):
     from conjugate import create_conjugate_blueprints
     from trigger import create_trigger_blueprints
     from toolbox import create_toolbox_blueprints, register_cli
+    from speech_rec import create_blueprint as create_speech_rec_blueprint
 
     app.register_blueprint(main_bp)
     app.register_blueprint(public_bp, url_prefix="/public")
@@ -97,6 +98,7 @@ def create_app(config_class=Config):
 
     toolbox_bps = create_toolbox_blueprints()
     app.register_blueprint(toolbox_bps["main"])
+    app.register_blueprint(create_speech_rec_blueprint())
     register_cli(app)
     app.register_blueprint(gate_bp, url_prefix="/api")
     app.register_blueprint(grammar_bp, url_prefix="/api")

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>1分スピーチ 管理</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 36rem; padding: 0 1rem; color: #1a1a1a; }
+    h1 { font-size: 1.25rem; }
+    .muted { color: #555; }
+    label { display: block; margin: 1rem 0 .35rem; }
+    input { font: inherit; padding: .4rem .5rem; width: 16rem; }
+    button { font: inherit; margin-top: .8rem; padding: .4rem .8rem; }
+    .err { color: #9b1c1c; min-height: 1.2em; }
+    table { border-collapse: collapse; margin-top: 1rem; }
+    td { padding: .25rem .8rem .25rem 0; }
+  </style>
+</head>
+<body>
+  <h1>1分スピーチ 管理</h1>
+  {% if not ready %}
+    <p>管理パスワード（ADMIN_PASSWORD）が未設定です。</p>
+  {% elif not authed %}
+    <p class="muted">生徒向けの公開はまだありません。ここは教員用の入口です。</p>
+    <form id="unlock">
+      <label for="password">管理パスワード</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <div><button type="submit">開く</button></div>
+      <p class="err" id="err"></p>
+    </form>
+    <script>
+      document.getElementById("unlock").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const err = document.getElementById("err");
+        err.textContent = "";
+        const res = await fetch("/rec/admin/unlock", {
+          method: "POST",
+          headers: {"Content-Type": "application/json", "X-Speech-Rec-Request": "1"},
+          body: JSON.stringify({password: document.getElementById("password").value}),
+        });
+        if (!res.ok) {
+          err.textContent = "パスワードが違います。";
+          return;
+        }
+        location.reload();
+      });
+    </script>
+  {% else %}
+    <p class="muted">生徒向けの入口は次の更新まで閉じたままです（student_enabled={{ "オン" if settings.student_enabled else "オフ" }}）。</p>
+    <table>
+      <tr><td>今日</td><td>${{ "%.4f"|format(summary.today_usd) }}（約 {{ "%.0f"|format(summary.today_usd * jpy_per_usd) }} 円）</td></tr>
+      <tr><td>今月</td><td>${{ "%.4f"|format(summary.month_usd) }}（約 {{ "%.0f"|format(summary.month_usd * jpy_per_usd) }} 円）</td></tr>
+      <tr><td>1日の上限</td><td>${{ "%.2f"|format(summary.daily_limit_usd) }}</td></tr>
+      <tr><td>評価モデル</td><td>{{ settings.eval_model }}</td></tr>
+    </table>
+    <form id="lock">
+      <button type="submit">ログアウト</button>
+    </form>
+    <script>
+      document.getElementById("lock").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        await fetch("/rec/admin/lock", {method: "POST", headers: {"X-Speech-Rec-Request": "1"}});
+        location.reload();
+      });
+    </script>
+  {% endif %}
+</body>
+</html>
