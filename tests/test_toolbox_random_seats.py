@@ -82,5 +82,7 @@ class RandomSeatsQuickTests(unittest.TestCase):
         saved = re.search(r"const saved = \{([\s\S]*?)\};", body)
         self.assertIsNotNone(saved)
         keys = re.findall(r"^\s*([A-Za-z0-9_]+)\s*:", saved.group(1), re.M)
-        self.assertEqual(keys, ["count", "rows", "cols", "blocked", "absent", "seats"])
+        self.assertEqual(keys, ["count", "rows", "cols", "blocked", "absent", "seats", "mode"])
+        self.assertIn('id="tb-seat-mode"', Path("templates/toolbox/tools/random_seats.html").read_text(encoding="utf-8"))
+        self.assertIn("function arrangeTest", js)
         json.dumps(keys)
