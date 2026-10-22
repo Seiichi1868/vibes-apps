@@ -22,24 +22,20 @@ WORKERS = 6
 STALL_SEC = 120
 NOISY_SNR_DB = 15
 MAX_WHISPER_SEC = 75
-# ヒント文は、実音声で「フィラーが残るか / 無音を創作するか」を比べるまで付けない。
-WHISPER_PROMPT = ""
+WHISPER_HINT = "Um, uh, so, well, I think, you know, like... Okay."
 
 enabled = True
 _pool: ThreadPoolExecutor | None = None
-_recovered = False
 _transcribe = transcribe_words
 
 
 def start() -> None:
-    global _pool, _recovered
+    global _pool
     if _pool is None:
         _pool = ThreadPoolExecutor(max_workers=WORKERS, thread_name_prefix="speech_rec")
     sweep_audio()
     sweep_views()
-    if not _recovered:
-        _recovered = True
-        recover_stalled()
+    recover_stalled()
 
 
 def enqueue(assignment_id: str, record_id: str) -> None:
@@ -72,7 +68,8 @@ def process(assignment_id: str, record_id: str) -> None:
         _fail(assignment_id, record_id, "whisper_failed")
         return
     try:
-        result = _transcribe(audio, language="en", prompt=WHISPER_PROMPT)
+        prompt = WHISPER_HINT if settings.get("whisper_hint") else ""
+        result = _transcribe(audio, language="en", prompt=prompt)
         text, words, duration = _parse(result)
         if duration is not None and float(duration) > MAX_WHISPER_SEC:
             _fail(assignment_id, record_id, "too_long")
@@ -125,30 +122,33 @@ def process(assignment_id: str, record_id: str) -> None:
 
 
 def recover_stalled() -> None:
-    root = records_dir("")
-    parent = root.parent
-    if not parent.is_dir():
+    """received / queued / processing が120秒を超えたら、音声が残っていれば1回だけ再投入する。"""
+    root = records_dir("_").parent
+    if not root.is_dir():
         return
     cutoff = now() - timedelta(seconds=STALL_SEC)
-    for folder in parent.iterdir():
+    pending = {"received", "queued", "processing"}
+    for folder in root.iterdir():
         if not folder.is_dir():
             continue
         for path in folder.glob("*.json"):
             record = read_json(path)
-            if not isinstance(record, dict) or record.get("status") != "processing":
+            if not isinstance(record, dict) or record.get("status") not in pending:
                 continue
-            started = _parse_time(str(record.get("processing_started") or ""))
+            started = _parse_time(str(record.get("processing_started") or record.get("created_at") or ""))
             if started is None or started > cutoff:
                 continue
-            if int(record.get("stall_requeues") or 0) >= 1:
-                record["status"] = "error"
-                record["error_code"] = "whisper_failed"
+            record_id = str(record.get("id") or path.stem)
+            audio_left = _find_audio(record_id) is not None
+            if audio_left and int(record.get("stall_requeues") or 0) < 1:
+                record["stall_requeues"] = int(record.get("stall_requeues") or 0) + 1
+                record["status"] = "queued"
                 write_json(path, record)
+                enqueue(str(record.get("assignment_id") or folder.name), record_id)
                 continue
-            record["stall_requeues"] = int(record.get("stall_requeues") or 0) + 1
-            record["status"] = "queued"
+            record["status"] = "error"
+            record["error_code"] = "whisper_failed"
             write_json(path, record)
-            enqueue(str(record.get("assignment_id") or folder.name), str(record.get("id") or path.stem))
 
 
 def sweep_views() -> None:

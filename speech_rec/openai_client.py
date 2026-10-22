@@ -23,7 +23,7 @@ def _client():
         raise SpeechRecAIError("no_api_key")
     from openai import OpenAI
 
-    return OpenAI(api_key=key)
+    return OpenAI(api_key=key, timeout=45, max_retries=0)
 
 
 def _status(exc: BaseException) -> int | None:
@@ -48,8 +48,11 @@ def _call(fn, *, retries: int = 2, sleeper=time.sleep):
             raise
         except Exception as exc:  # noqa: BLE001 — SDK 例外をコードだけに潰す
             status = _status(exc)
-            last = "rate_limited" if status == 429 else "request_failed"
+            timed_out = "Timeout" in type(exc).__name__
+            last = "timeout" if timed_out else ("rate_limited" if status == 429 else "request_failed")
             logger.warning("speech_rec openai failed status=%s attempt=%s", status, attempt + 1)
+            if timed_out:
+                raise SpeechRecAIError("timeout") from None
             if status == 429 and attempt < retries:
                 sleeper(delay)
                 delay *= 2

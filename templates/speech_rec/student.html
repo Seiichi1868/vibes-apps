@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>1分スピーチ</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='speech_rec/student.css') }}?v=2">
+  <link rel="stylesheet" href="{{ url_for('static', filename='speech_rec/student.css') }}?v=3">
 </head>
-<body data-token="{{ token }}">
+<body data-token="{{ token }}" data-audio="{{ rec_audio }}">
   <main id="app" class="app">
     <p class="status">読み込み中…</p>
   </main>
-  <script src="{{ url_for('static', filename='speech_rec/audio_store.js') }}?v=2"></script>
-  <script src="{{ url_for('static', filename='speech_rec/student.js') }}?v=2"></script>
+  <script src="{{ url_for('static', filename='speech_rec/audio_store.js') }}?v=3"></script>
+  <script src="{{ url_for('static', filename='speech_rec/student.js') }}?v=3"></script>
 </body>
 </html>

@@ -5,14 +5,19 @@ import fcntl
 import secrets
 from pathlib import Path
 
+import hashlib
+import hmac
+
 from speech_rec.assignments import (
     device_attempt_count,
+    device_error_count,
     now,
+    pending_count,
     reads_dir,
     records_dir,
     submission_count,
 )
-from speech_rec.config import audio_tmp_dir
+from speech_rec.config import DEVICE_SALT, ERROR_CAP, QUEUE_LIMIT, audio_tmp_dir
 from speech_rec.store import read_json, write_json
 
 MAX_BYTES = 3 * 1024 * 1024
@@ -22,6 +27,14 @@ MIN_DURATION_MS = 8_000
 AUDIO_TTL_SEC = 2 * 60 * 60
 COUNTING = {"received", "queued", "processing", "done"}
 VERIFY_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+
+
+def device_hash(raw: str) -> str:
+    """署名鍵と専用 salt から HMAC を作る。記録にはこの値だけを残す。"""
+    from flask import current_app
+
+    secret = str(current_app.config.get("SECRET_KEY") or "speech-rec-dev-secret")
+    return hmac.new(secret.encode(), f"{DEVICE_SALT}:{raw}".encode(), hashlib.sha256).hexdigest()
 
 
 def verify_code() -> str:
@@ -126,9 +139,10 @@ def _client_metrics(raw: str) -> dict:
 def accept_audio(assignment: dict, *, file_bytes: bytes, mime: str, form, settings: dict) -> dict:
     """受付できれば記録。できなければ {'error': code}。音声は data/ に書かない。"""
     sweep_audio()
-    device_id = str(form.get("device_id") or "").strip()
-    if len(device_id) < 8 or len(device_id) > 80:
+    raw_device = str(form.get("device_id") or "").strip()
+    if len(raw_device) < 8 or len(raw_device) > 80:
         return {"error": "device"}
+    device_id = device_hash(raw_device)
     try:
         duration_ms = int(form.get("duration_ms") or 0)
     except ValueError:
@@ -147,10 +161,14 @@ def accept_audio(assignment: dict, *, file_bytes: bytes, mime: str, form, settin
     cap = int(float(settings.get("audio_cap_mb") or 100) * 1024 * 1024)
     lock = _lock()
     try:
+        if pending_count() >= QUEUE_LIMIT:
+            return {"error": "busy"}
         if audio_bytes_used() + len(file_bytes) > cap:
             return {"error": "busy"}
         if retry_of:
             return _retry(assignment, retry_of, device_id, file_bytes, mime, duration_ms, form)
+        if device_error_count(assignment["id"], device_id) >= ERROR_CAP:
+            return {"error": "attempts"}
         if submission_count(assignment["id"]) >= int(assignment.get("max_submissions") or 0):
             return {"error": "full"}
         used = device_attempt_count(assignment["id"], device_id)

@@ -11,7 +11,11 @@ REPO_ROOT = PACKAGE_ROOT.parent
 COOKIE_NAME = "speech_rec_admin"
 COOKIE_MAX_AGE = 12 * 60 * 60
 SESSION_SALT = "speech-rec-admin-v1"
+DEVICE_SALT = "speech-rec-device-v1"
 ADMIN_HEADER = "X-Speech-Rec-Request"
+MAX_UPLOAD_BYTES = 4 * 1024 * 1024
+QUEUE_LIMIT = 60
+ERROR_CAP = 6
 
 
 def data_dir() -> Path:

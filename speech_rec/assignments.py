@@ -11,6 +11,7 @@ from speech_rec.store import list_json_files, read_json, write_json
 JST = ZoneInfo("Asia/Tokyo")
 TTL_HOURS = (3, 24, 168)
 COUNTING_STATUSES = {"received", "queued", "processing", "done"}
+PENDING_STATUSES = {"received", "queued", "processing"}
 
 
 def now() -> datetime:
@@ -174,6 +175,30 @@ def public_view(row: dict, *, student_enabled: bool, id_fields: dict) -> dict:
         "school_year": school_year(),
         "remaining": max(0, int(row.get("max_submissions") or 0) - submission_count(row["id"])),
     }
+
+
+def pending_count() -> int:
+    root = data_dir() / "records"
+    if not root.is_dir():
+        return 0
+    total = 0
+    for folder in root.iterdir():
+        if not folder.is_dir():
+            continue
+        for path in list_json_files(folder):
+            row = read_json(path)
+            if isinstance(row, dict) and row.get("status") in PENDING_STATUSES:
+                total += 1
+    return total
+
+
+def device_error_count(assignment_id: str, device_id: str) -> int:
+    total = 0
+    for path in list_json_files(records_dir(assignment_id)):
+        row = read_json(path)
+        if isinstance(row, dict) and row.get("device_id") == device_id and row.get("status") == "error":
+            total += 1
+    return total
 
 
 def device_attempt_count(assignment_id: str, device_id: str) -> int:
