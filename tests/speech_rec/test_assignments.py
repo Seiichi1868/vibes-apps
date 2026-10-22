@@ -25,6 +25,10 @@ class AssignmentFlowTests(unittest.TestCase):
 
         config.audio_tmp_dir = lambda: self.audio
         submissions.audio_tmp_dir = lambda: self.audio
+        import speech_rec.jobs as jobs
+
+        jobs.enabled = False
+        jobs.audio_tmp_dir = lambda: self.audio
         from flask import Flask
 
         from speech_rec import create_blueprint
@@ -46,6 +50,10 @@ class AssignmentFlowTests(unittest.TestCase):
 
         config.audio_tmp_dir = self._orig_audio
         submissions.audio_tmp_dir = self._orig_audio
+        import speech_rec.jobs as jobs
+
+        jobs.enabled = True
+        jobs.audio_tmp_dir = self._orig_audio
         for root in (self.dir, self.audio):
             for path in sorted(root.rglob("*"), reverse=True):
                 if path.is_file():

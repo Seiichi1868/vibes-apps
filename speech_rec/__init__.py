@@ -13,4 +13,11 @@ def create_blueprint() -> Blueprint:
     register_admin_routes(bp)
     register_teacher_routes(bp)
     register_public_routes(bp)
+
+    @bp.before_request
+    def _start_jobs():
+        from speech_rec.jobs import start
+
+        start()
+
     return bp

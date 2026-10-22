@@ -58,4 +58,5 @@ def register_public_routes(bp: Blueprint) -> None:
         record = load_by_read_token(read_token)
         if not record:
             return jsonify({"ok": False, "error": "not_found"}), 404
-        return jsonify(public_status(record))
+        detail = request.args.get("detail") == "1"
+        return jsonify(public_status(record, detail=detail))

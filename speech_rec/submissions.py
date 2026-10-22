@@ -67,7 +67,7 @@ def audio_bytes_used() -> int:
         return 0
     total = 0
     for path in root.iterdir():
-        if path.is_file() and path.name != ".lock":
+        if path.is_file() and path.name != ".lock" and not path.name.endswith(".view.json"):
             try:
                 total += path.stat().st_size
             except OSError:
@@ -162,7 +162,8 @@ def accept_audio(assignment: dict, *, file_bytes: bytes, mime: str, form, settin
         record = _base_record(assignment, record_id, device_id, token, duration_ms, form, fields, attempt=used + 1)
         write_json(records_dir(assignment["id"]) / f"{record_id}.json", record)
         write_json(reads_dir() / f"{token}.json", {"assignment_id": assignment["id"], "record_id": record_id})
-        return {"read_token": token, "attempt": record["attempt"], "audio_path": str(path)}
+        _queue(assignment["id"], record_id)
+        return {"read_token": token, "attempt": record["attempt"], "record_id": record_id}
     finally:
         fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
         lock.close()
@@ -209,6 +210,7 @@ def _retry(assignment, retry_of, device_id, file_bytes, mime, duration_ms, form)
         assignment, record["id"], device_id, record["read_token"], duration_ms, form, record.get("id_fields"), attempt=record["attempt"]
     )["metrics"]
     write_json(records_dir(assignment["id"]) / f"{record['id']}.json", record)
+    _queue(assignment["id"], record["id"])
     return {"read_token": record["read_token"], "attempt": record["attempt"], "retry": True}
 
 
@@ -220,8 +222,16 @@ def load_by_read_token(token: str) -> dict | None:
     return record if isinstance(record, dict) else None
 
 
-def public_status(record: dict) -> dict:
-    return {
+def _queue(assignment_id: str, record_id: str) -> None:
+    from speech_rec.jobs import enqueue
+
+    enqueue(assignment_id, record_id)
+
+
+def public_status(record: dict, *, detail: bool = False) -> dict:
+    metrics = record.get("metrics") if isinstance(record.get("metrics"), dict) else {}
+    scores = record.get("scores") if isinstance(record.get("scores"), dict) else {}
+    body = {
         "ok": True,
         "status": record.get("status"),
         "error_code": record.get("error_code"),
@@ -230,4 +240,16 @@ def public_status(record: dict) -> dict:
         "attempts_per_device": 2,
         "verify_code": record.get("verify_code"),
         "created_at": record.get("created_at"),
+        "words_counted": metrics.get("words_counted"),
+        "wpm_points": scores.get("wpm_points"),
+        "flags": record.get("flags") or [],
     }
+    if detail and record.get("status") == "done":
+        from speech_rec.jobs import load_view
+
+        view = load_view(str(record.get("id") or ""))
+        if view:
+            body["transcript"] = view.get("transcript") or ""
+        else:
+            body["transcript"] = None
+    return body
