@@ -1116,7 +1116,7 @@
       use.textContent = "このお題を使う";
       use.addEventListener("click", () => useSearched(Object.assign({}, item, { used: topicIsUsed(item) })));
       const actions = cardActions();
-      actions.append(use, nextToggleButton(item), usedToggleButton(item));
+      actions.append(use, nextToggleButton(item), usedToggleButton(item), speechEvalButton(item));
       card.appendChild(actions);
       box.appendChild(card);
     });
@@ -1184,6 +1184,26 @@
   function restoreYear(year) {
     const rows = ((archivedYears()[String(year)] || []).slice());
     rows.forEach((row) => restoreArchived(row));
+  }
+
+  function speechEvalButton(item) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "tb-btn";
+    button.textContent = "スピーチ評価";
+    button.addEventListener("click", () => {
+      const prep = document.getElementById("ms-prep");
+      const speak = document.getElementById("ms-speak");
+      document.dispatchEvent(new CustomEvent("speechrec:open", {
+        detail: {
+          id: item.id,
+          text: item.text,
+          prep: prep ? Number(prep.value) : 60,
+          speak: speak ? Number(speak.value) : 60,
+        },
+      }));
+    });
+    return button;
   }
 
   function cardActions() {
@@ -1413,7 +1433,7 @@
         card.remove();
       });
       const actions = cardActions();
-      actions.append(use, nextToggleButton(item), usedToggleButton(item), hide);
+      actions.append(use, nextToggleButton(item), usedToggleButton(item), hide, speechEvalButton(item));
       card.appendChild(actions);
       box.appendChild(card);
     });

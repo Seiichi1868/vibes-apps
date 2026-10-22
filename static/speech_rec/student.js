@@ -130,6 +130,10 @@
       navigator.wakeLock.request("screen").catch(() => {});
     }
     state.identity = selectedId();
+    if (!Number(state.info.prep_sec)) {
+      beginSpeech();
+      return;
+    }
     runCountdown(state.info.prep_sec, "準備", ["Opinion", "Reason", "Example", "Opinion"], beginSpeech, "準備おわり");
   }
 
