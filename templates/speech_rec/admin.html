@@ -5,15 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>1分スピーチ 管理</title>
   <style>
-    body { font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 36rem; padding: 0 1rem; color: #1a1a1a; }
-    h1 { font-size: 1.25rem; }
-    .muted { color: #555; }
-    label { display: block; margin: 1rem 0 .35rem; }
-    input { font: inherit; padding: .4rem .5rem; width: 16rem; }
-    button { font: inherit; margin-top: .8rem; padding: .4rem .8rem; }
-    .err { color: #9b1c1c; min-height: 1.2em; }
-    table { border-collapse: collapse; margin-top: 1rem; }
-    td { padding: .25rem .8rem .25rem 0; }
+    body { font-family: system-ui, sans-serif; margin: 0; padding: .4rem; color: #1a1a1a; font-size: .85rem; }
+    h1 { font-size: 1rem; margin: 0 0 .35rem; }
+    h2 { font-size: .92rem; margin: 0 0 .3rem; }
+    .muted { color: #555; margin: .2rem 0; }
+    .box { border: 1px solid #e6e0d4; border-left: 5px solid #8a8175; border-radius: 8px; padding: .35rem .5rem; margin: .35rem 0; }
+    .cost { border-left-color: #8a6a12; background: #fbf8ef; }
+    .set { border-left-color: #1f4d3a; background: #f4faf6; }
+    .gaps { border-left-color: #1d4e89; background: #f3f7fc; }
+    label { display: block; margin: .2rem 0; }
+    label:has(input[type="checkbox"]) { display: flex; gap: .35rem; align-items: center; }
+    input, select { font: inherit; padding: .15rem .35rem; }
+    input[type="number"] { width: 5.5rem; }
+    button { font: inherit; margin-top: .25rem; padding: .2rem .55rem; }
+    .err { color: #9b1c1c; min-height: 1em; margin: .15rem 0; }
+    table { border-collapse: collapse; }
+    td { padding: .05rem .6rem .05rem 0; }
   </style>
 </head>
 <body>
@@ -46,15 +53,16 @@
       });
     </script>
   {% else %}
-    <p class="muted">生徒向けの入口は次の更新まで閉じたままです（student_enabled={{ "オン" if settings.student_enabled else "オフ" }}）。</p>
-    <p><a href="/rec/admin/results">結果一覧</a></p>
+    <section class="box cost">
+    <h2>費用</h2>
     <table>
       <tr><td>今日</td><td>${{ "%.4f"|format(summary.today_usd) }}（約 {{ "%.0f"|format(summary.today_usd * jpy_per_usd) }} 円）</td></tr>
       <tr><td>今月</td><td>${{ "%.4f"|format(summary.month_usd) }}（約 {{ "%.0f"|format(summary.month_usd * jpy_per_usd) }} 円）</td></tr>
       <tr><td>1日の上限</td><td>${{ "%.2f"|format(summary.daily_limit_usd) }}</td></tr>
       <tr><td>評価モデル</td><td>{{ settings.eval_model }}</td></tr>
     </table>
-    <form id="settings">
+    </section>
+    <form id="settings" class="box set">
       <h2>設定</h2>
       <label><input type="checkbox" name="student_enabled" {% if settings.student_enabled %}checked{% endif %}> 生徒に公開する</label>
       <label><input type="checkbox" name="id_enabled" {% if settings.id_fields.enabled %}checked{% endif %}> 学年・クラス・番号を聞く</label>
@@ -69,13 +77,13 @@
       <label>記録の保持（日） <input name="record_retention_days" type="number" step="1" value="{{ settings.record_retention_days }}"></label>
       <div><button type="submit">設定を保存</button></div>
       <p class="err" id="set-err"></p>
+      <p class="muted">再計算は結果一覧から。APIは使いません。</p>
     </form>
-    <form id="purge">
+    <form id="purge" class="box gaps">
       <button type="submit">期限切れの記録を削除</button>
       <p class="err" id="purge-err"></p>
     </form>
-    <p class="muted">点数だけの再計算は<a href="/rec/admin/results">結果一覧</a>から行います。APIは使いません。</p>
-    <form id="gaps">
+    <form id="gaps" class="box gaps">
       <h2>間の閾値（秒）</h2>
       <label>文末 sentence_gap_min <input name="sentence_gap_min" type="number" step="0.1" value="{{ settings.sentence_gap_min }}"></label>
       <label>読点 clause_gap_min <input name="clause_gap_min" type="number" step="0.1" value="{{ settings.clause_gap_min }}"></label>
