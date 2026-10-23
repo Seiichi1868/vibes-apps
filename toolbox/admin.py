@@ -43,6 +43,7 @@ from toolbox.storage import (
     update_app_settings,
 )
 from toolbox.usage import measured_stats, usage_summary
+from platform_ops import get_app, list_apps_with_status, set_app_operational
 
 # 管理パスワード解除のみで保存可（再入力不要）
 SETTINGS_NO_REAUTH_KEYS = frozenset({"timer_end_rate"})
@@ -192,6 +193,7 @@ def admin_page():
         **_totp_context(current_user()),
         totp_error=request.args.get("totp_error") or "",
         totp_ok=request.args.get("totp_ok") or "",
+        platform_apps=list_apps_with_status(),
         **_minute_speech_admin_context(),
     )
 
@@ -426,6 +428,20 @@ def admin_delete_user(user_id):
         return jsonify({"ok": False, "error": "最後の管理者は削除できません。"}), 400
     delete_user(user_id)
     return jsonify({"ok": True})
+
+
+@main_bp.route("/admin/api/platform-apps/<app_id>/operational", methods=["POST"])
+@admin_panel_required
+def admin_set_platform_app(app_id):
+    guard = require_admin_reauth()
+    if guard:
+        return guard
+    if not get_app(app_id):
+        return jsonify({"ok": False, "error": "アプリが見つかりません。"}), 404
+    payload = request.get_json(silent=True) or {}
+    operational = bool(payload.get("operational"))
+    row = set_app_operational(app_id, operational)
+    return jsonify({"ok": True, **row})
 
 
 @main_bp.route("/admin/api/tools/<tool_id>/enabled", methods=["POST"])

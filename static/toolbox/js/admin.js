@@ -107,6 +107,15 @@
     });
   });
 
+  document.querySelectorAll("input[data-platform-app]").forEach((input) => {
+    input.addEventListener("change", () => {
+      withReauth(() => toolboxFetch(`/toolbox/admin/api/platform-apps/${input.dataset.platformApp}/operational`, {
+        method: "POST",
+        body: JSON.stringify({ operational: input.checked }),
+      }));
+    });
+  });
+
   const soundForm = document.getElementById("tb-sound-form");
   const soundStatus = document.getElementById("tb-sound-status");
   let soundStatusTimer = 0;

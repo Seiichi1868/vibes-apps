@@ -380,10 +380,20 @@
   <p class="tb-muted" id="tb-talk-archives-empty" hidden>まだ履歴はありません。</p>
   </details>
 
-  <details class="tb-admin-block" data-block="links" open>
-  <summary><span class="tb-drag" aria-hidden="true">⋮⋮</span>既存アプリ連携</summary>
-  <p class="tb-note">News Talk は上の「ツールの公開設定」でもオン・オフできます。公開中ならランチャーの導入からも開けます。字幕取得は News とは別の複製です。</p>
-  <p><a class="tb-btn tb-btn-primary" href="{{ url_for('toolbox.cnn10_lesson_page') }}">News Talk を開く</a></p>
+  <details class="tb-admin-block" data-block="platform-apps" open>
+  <summary><span class="tb-drag" aria-hidden="true">⋮⋮</span>他のアプリの稼働管理</summary>
+  <p class="tb-note">オフにしたアプリは利用者向けの画面と API をブロックし、メンテナンス表示になります。Toolbox 本体を止めた場合も、この管理画面（/toolbox/admin）は開けます。</p>
+  <ul class="tb-tool-toggles">
+    {% for app in platform_apps %}
+    <li>
+      <span>{{ app.name }}<span class="tb-muted tb-platform-app-desc">{{ app.description }}</span></span>
+      <label class="tb-switch">
+        <input type="checkbox" data-platform-app="{{ app.id }}" role="switch" aria-label="{{ app.name }}を稼働" {% if app.operational %}checked{% endif %}>
+        <span class="tb-switch-track"><span class="tb-switch-thumb"></span></span>
+      </label>
+    </li>
+    {% endfor %}
+  </ul>
   </details>
 </div>
 </section>
