@@ -322,26 +322,40 @@
   <details class="tb-admin-block" data-block="migrate" open>
   <summary><span class="tb-drag" aria-hidden="true">⋮⋮</span>設定の引き継ぎ（ブラウザ間コピー）</summary>
   <p class="tb-note">クラス・教員・座席などの設定はブラウザごとに保存されるため、Safari から Chrome へは自動では引き継がれません。Safari で「コピー用データを作る」→ Chrome の管理画面で貼り付けて「反映する」を押してください。スピーチ理解度チェックの履歴（アーカイブ）はサーバー保存なので、同じアカウントでログインすれば自動で見られます。</p>
-  <div class="tb-dir-box">
-    <p><strong>コピーするツール</strong></p>
-    <ul class="tb-tool-toggles">
-      <li><span>クラス・教員（共通）</span><label class="tb-switch"><input type="checkbox" name="tb-mig" value="classes" role="switch" aria-label="クラス・教員（共通）を含める" checked><span class="tb-switch-track"><span class="tb-switch-thumb"></span></span></label></li>
-      <li><span>ランダム席替え</span><label class="tb-switch"><input type="checkbox" name="tb-mig" value="seats" role="switch" aria-label="ランダム席替えを含める" checked><span class="tb-switch-track"><span class="tb-switch-thumb"></span></span></label></li>
-      <li><span>ランダム指名</span><label class="tb-switch"><input type="checkbox" name="tb-mig" value="pick" role="switch" aria-label="ランダム指名を含める" checked><span class="tb-switch-track"><span class="tb-switch-thumb"></span></span></label></li>
-      <li><span>1分スピーチ</span><label class="tb-switch"><input type="checkbox" name="tb-mig" value="speech" role="switch" aria-label="1分スピーチを含める" checked><span class="tb-switch-track"><span class="tb-switch-thumb"></span></span></label></li>
-      <li><span>スピーチ理解度チェックの設定</span><label class="tb-switch"><input type="checkbox" name="tb-mig" value="talk" role="switch" aria-label="スピーチ理解度チェックの設定を含める" checked><span class="tb-switch-track"><span class="tb-switch-thumb"></span></span></label></li>
-    </ul>
-    <div class="tb-row-actions">
-      <button class="tb-btn tb-btn-primary" type="button" id="tb-mig-export">コピー用データを作る</button>
-      <button class="tb-btn" type="button" id="tb-mig-copy">クリップボードにコピー</button>
-      <button class="tb-btn" type="button" id="tb-mig-download">ファイルで保存</button>
-    </div>
-    <textarea id="tb-mig-text" rows="6" style="width:100%" placeholder="ここにコピー用データが出ます。別のブラウザではここに貼り付けます。"></textarea>
-    <div class="tb-row-actions">
-      <input type="file" id="tb-mig-file" accept="application/json,.json">
-      <button class="tb-btn tb-btn-primary" type="button" id="tb-mig-import">反映する（このブラウザの同じ設定は上書き）</button>
-    </div>
-    <p class="tb-muted" id="tb-mig-status"></p>
+  <div class="tb-mig-sections">
+    <section class="tb-mig-section">
+      <h3>コピーするツール</h3>
+      <ul class="tb-tool-toggles">
+        <li><span>クラス・教員（共通）</span><label class="tb-switch"><input type="checkbox" name="tb-mig" value="classes" role="switch" aria-label="クラス・教員（共通）を含める" checked><span class="tb-switch-track"><span class="tb-switch-thumb"></span></span></label></li>
+        <li><span>ランダム席替え</span><label class="tb-switch"><input type="checkbox" name="tb-mig" value="seats" role="switch" aria-label="ランダム席替えを含める" checked><span class="tb-switch-track"><span class="tb-switch-thumb"></span></span></label></li>
+        <li><span>ランダム指名</span><label class="tb-switch"><input type="checkbox" name="tb-mig" value="pick" role="switch" aria-label="ランダム指名を含める" checked><span class="tb-switch-track"><span class="tb-switch-thumb"></span></span></label></li>
+        <li><span>1分スピーチ</span><label class="tb-switch"><input type="checkbox" name="tb-mig" value="speech" role="switch" aria-label="1分スピーチを含める" checked><span class="tb-switch-track"><span class="tb-switch-thumb"></span></span></label></li>
+        <li><span>スピーチ理解度チェックの設定</span><label class="tb-switch"><input type="checkbox" name="tb-mig" value="talk" role="switch" aria-label="スピーチ理解度チェックの設定を含める" checked><span class="tb-switch-track"><span class="tb-switch-thumb"></span></span></label></li>
+      </ul>
+    </section>
+    <section class="tb-mig-section">
+      <h3>送る側（データを作る）</h3>
+      <div class="tb-dir-box">
+        <p class="tb-note">今のブラウザの設定から JSON を作ります。</p>
+        <div class="tb-row-actions">
+          <button class="tb-btn tb-btn-primary" type="button" id="tb-mig-export">コピー用データを作る</button>
+          <button class="tb-btn" type="button" id="tb-mig-copy">クリップボードにコピー</button>
+          <button class="tb-btn" type="button" id="tb-mig-download">ファイルで保存</button>
+        </div>
+      </div>
+    </section>
+    <section class="tb-mig-section">
+      <h3>受け取る側（別ブラウザで反映）</h3>
+      <div class="tb-dir-box">
+        <p class="tb-note">下の欄に貼り付けるか、保存した JSON ファイルを選んでから反映します。</p>
+        <textarea id="tb-mig-text" class="tb-mig-text" rows="6" placeholder="ここにコピー用データが出ます。別のブラウザではここに貼り付けます。"></textarea>
+        <div class="tb-row-actions tb-mig-import-row">
+          <input type="file" id="tb-mig-file" accept="application/json,.json">
+          <button class="tb-btn tb-btn-primary" type="button" id="tb-mig-import">反映する（このブラウザの同じ設定は上書き）</button>
+        </div>
+        <p class="tb-muted" id="tb-mig-status" role="status" aria-live="polite"></p>
+      </div>
+    </section>
   </div>
   </details>
 
