@@ -7,7 +7,9 @@
   <h1>管理画面</h1>
   <p class="tb-lead">重要操作は管理パスワードの再入力が必要です（15分有効）。</p>
 
-  <h2>ログイン</h2>
+<div id="tb-admin-blocks">
+  <section class="tb-admin-block" draggable="true" data-block="login">
+  <h2><span class="tb-drag" aria-hidden="true">⋮⋮</span>ログイン</h2>
   <ul class="tb-tool-toggles">
     <li>
       <span>教員ログイン</span>
@@ -18,8 +20,15 @@
     </li>
   </ul>
   <p class="tb-note" id="tb-login-required-note">{% if settings.login_required_enabled %}オンのあいだは、ランチャーと各ツールで教員ログインが必要です。{% else %}オフのあいだは、ランチャーと各ツールにログインなしで入れます。{% endif %}</p>
+  </section>
 
-  <h2>認証アプリ</h2>
+  <section class="tb-admin-block" draggable="true" data-block="minute-speech">
+  <h2><span class="tb-drag" aria-hidden="true">⋮⋮</span>1分スピーチ管理</h2>
+  <p class="tb-note"><a href="{{ url_for('toolbox.minute_speech_admin_page') }}">設定・費用、結果、出題QR、確認コード、お題</a></p>
+  </section>
+
+  <section class="tb-admin-block" draggable="true" data-block="totp">
+  <h2><span class="tb-drag" aria-hidden="true">⋮⋮</span>認証アプリ</h2>
   <p class="tb-note">ログイン中の教員アカウント（{{ totp_account or "未ログイン" }}）に紐づきます。パスワード変更には、登録したアプリの6桁が必要です。</p>
   {% if totp_error %}<p class="tb-error" role="alert">{{ totp_error }}</p>{% endif %}
   {% if totp_ok %}<p class="tb-ok" role="status">{{ totp_ok }}</p>{% endif %}
@@ -47,8 +56,10 @@
     <button class="tb-btn tb-btn-primary" type="submit">QRコードを発行する</button>
   </form>
   {% endif %}
+  </section>
 
-  <h2>ユーザー管理</h2>
+  <section class="tb-admin-block" draggable="true" data-block="users">
+  <h2><span class="tb-drag" aria-hidden="true">⋮⋮</span>ユーザー管理</h2>
   <form id="tb-user-form" class="tb-inline-form">
     <input name="username" placeholder="ユーザー名" required>
     <input name="password" type="password" placeholder="パスワード（4文字以上）" minlength="4" required>
@@ -78,8 +89,10 @@
       </tbody>
     </table>
   </div>
+  </section>
 
-  <h2>ツール公開設定</h2>
+  <section class="tb-admin-block" draggable="true" data-block="tools">
+  <h2><span class="tb-drag" aria-hidden="true">⋮⋮</span>ツール公開設定</h2>
   <ul class="tb-tool-toggles">
     {% for tool in tools %}
     <li>
@@ -91,8 +104,10 @@
     </li>
     {% endfor %}
   </ul>
+  </section>
 
-  <h2>利用状況</h2>
+  <section class="tb-admin-block" draggable="true" data-block="usage">
+  <h2><span class="tb-drag" aria-hidden="true">⋮⋮</span>利用状況</h2>
   <p>今日 {{ usage.today.count }} 回 / 約 ${{ "%.4f"|format(usage.today.est_cost_usd) }}　・　今月 {{ usage.month.count }} 回 / 約 ${{ "%.4f"|format(usage.month.est_cost_usd) }}</p>
   <p>本日の使用 ${{ "%.4f"|format(usage.used_today_usd) }} / 上限 ${{ "%.2f"|format(usage.daily_limit_usd) }}</p>
   <div class="tb-split">
@@ -117,8 +132,10 @@
       </ul>
     </div>
   </div>
+  </section>
 
-  <h2>設定</h2>
+  <section class="tb-admin-block" draggable="true" data-block="limits">
+  <h2><span class="tb-drag" aria-hidden="true">⋮⋮</span>設定</h2>
   <form id="tb-limit-form" class="tb-inline-form">
     <label>1日の利用上限（USD）
       <input name="daily_limit_usd" type="number" step="0.1" min="0" value="{{ settings.daily_limit_usd }}">
@@ -129,8 +146,10 @@
     </label>
     <button class="tb-btn tb-btn-primary" type="submit">保存</button>
   </form>
+  </section>
 
-  <h2>モデル選択 <span class="tb-badge tb-badge-mute">参考値</span></h2>
+  <section class="tb-admin-block" draggable="true" data-block="models">
+  <h2><span class="tb-drag" aria-hidden="true">⋮⋮</span>モデル選択 <span class="tb-badge tb-badge-mute">参考値</span></h2>
   <p class="tb-note">性能・コスパは参考値。所要時間と平均費用は実測。価格未設定は選べません。</p>
   <div class="tb-sorts">
     <span>並び替え:</span>
@@ -176,7 +195,7 @@
   </div>
 
   <h3>検索用モデル（埋め込み）</h3>
-  <p class="tb-note">1分スピーチのAI検索で使います。推定/回は検索1回（約40トークン）です。全件のインデックス作成費用は <a href="{{ url_for('toolbox.minute_speech_admin_page') }}">1分スピーチのお題管理</a> に出します。価格未設定は選べません。</p>
+  <p class="tb-note">1分スピーチのAI検索で使います。推定/回は検索1回（約40トークン）です。全件のインデックス作成費用は <a href="{{ url_for('toolbox.minute_speech_admin_page') }}">1分スピーチ管理</a> に出します。価格未設定は選べません。</p>
   <div class="tb-table-wrap">
     <table class="tb-table tb-model-table" data-kind="embed">
       <thead>
@@ -212,11 +231,10 @@
       </tbody>
     </table>
   </div>
+  </section>
 
-  <h2>1分スピーチ</h2>
-  <p class="tb-note"><a href="{{ url_for('toolbox.minute_speech_admin_page') }}">お題の管理・分類・検索インデックス</a></p>
-
-  <h2>音管理</h2>
+  <section class="tb-admin-block" draggable="true" data-block="sound">
+  <h2><span class="tb-drag" aria-hidden="true">⋮⋮</span>音管理</h2>
   <p class="tb-note">タイマー終了音の再生速度です。1 が元の速さ、初期値は 3（3倍速）です。1分スピーチの終了音も同じ設定を使います。</p>
   <form id="tb-sound-form" class="tb-inline-form">
     <label>タイマー終了音の速さ
@@ -225,15 +243,19 @@
     <button class="tb-btn tb-btn-primary" type="submit">保存</button>
     <span class="tb-muted" id="tb-sound-status" role="status" aria-live="polite"></span>
   </form>
+  </section>
 
-  <h2>音声の保存先フォルダ</h2>
+  <section class="tb-admin-block" draggable="true" data-block="folder">
+  <h2><span class="tb-drag" aria-hidden="true">⋮⋮</span>音声の保存先フォルダ</h2>
   <p class="tb-note">このブラウザで録音した音声の保存先です。選んだフォルダは、同じパソコンのスピーチ理解度チェックでも使われます。</p>
   <div class="tb-dir-box">
     <p class="tb-muted" id="tb-dir-status">確認中…</p>
     <button class="tb-btn" type="button" id="tb-dir-pick">保存先フォルダを選ぶ</button>
   </div>
+  </section>
 
-  <h2>設定の引き継ぎ（ブラウザ間コピー）</h2>
+  <section class="tb-admin-block" draggable="true" data-block="migrate">
+  <h2><span class="tb-drag" aria-hidden="true">⋮⋮</span>設定の引き継ぎ（ブラウザ間コピー）</h2>
   <p class="tb-note">クラス・教員・座席などの設定はブラウザごとに保存されるため、Safari から Chrome へは自動では引き継がれません。Safari で「コピー用データを作る」→ Chrome の管理画面で貼り付けて「反映する」を押してください。スピーチ理解度チェックの履歴（アーカイブ）はサーバー保存なので、同じアカウントでログインすれば自動で見られます。</p>
   <div class="tb-dir-box">
     <p><strong>コピーするツール</strong></p>
@@ -254,8 +276,10 @@
     </div>
     <p class="tb-muted" id="tb-mig-status"></p>
   </div>
+  </section>
 
-  <h2>スピーチ理解度チェックの履歴</h2>
+  <section class="tb-admin-block" draggable="true" data-block="talk">
+  <h2><span class="tb-drag" aria-hidden="true">⋮⋮</span>スピーチ理解度チェックの履歴</h2>
   <p class="tb-note">全ユーザーの文字起こしと問題です。見出しをクリックすると並び替えできます。</p>
   <div class="tb-table-wrap">
     <table class="tb-table" id="tb-talk-archives">
@@ -273,10 +297,14 @@
     </table>
   </div>
   <p class="tb-muted" id="tb-talk-archives-empty" hidden>まだ履歴はありません。</p>
+  </section>
 
-  <h2>既存アプリ連携</h2>
+  <section class="tb-admin-block" draggable="true" data-block="links">
+  <h2><span class="tb-drag" aria-hidden="true">⋮⋮</span>既存アプリ連携</h2>
   <p class="tb-note">News Talk は上の「ツール公開設定」でもオン・オフできます。公開中ならランチャーの導入からも開けます。字幕取得は News とは別の複製です。</p>
   <p><a class="tb-btn tb-btn-primary" href="{{ url_for('toolbox.cnn10_lesson_page') }}">News Talk を開く</a></p>
+  </section>
+</div>
 </section>
 
 <div class="tb-modal" id="tb-reauth" hidden>

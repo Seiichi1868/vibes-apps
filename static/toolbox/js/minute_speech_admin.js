@@ -116,6 +116,13 @@
     load(true).catch((err) => alert(err.message));
   });
   document.getElementById("ms-more").addEventListener("click", () => load(false).catch((err) => alert(err.message)));
+  document.querySelectorAll(".tb-ms-panels details").forEach((panel) => {
+    panel.addEventListener("toggle", () => {
+      const frame = panel.querySelector("iframe");
+      if (panel.open && frame && !frame.src) frame.src = frame.dataset.src;
+    });
+  });
+
   document.getElementById("ms-embed-refresh").addEventListener("click", () => poll("/toolbox/admin/api/minute-speech/embed/estimate", "ms-embed-job"));
   document.getElementById("ms-classify-refresh").addEventListener("click", () => poll("/toolbox/admin/api/minute-speech/classify/estimate", "ms-classify-job"));
   document.getElementById("ms-embed-start").addEventListener("click", () => {
