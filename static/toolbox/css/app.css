@@ -519,6 +519,19 @@ html.tb-skip-opening .tb-opening { display: none !important; }
 .tb-switch input:checked + .tb-switch-track .tb-switch-thumb { transform: translateX(16px); }
 .tb-switch input:focus-visible + .tb-switch-track { outline: 2px solid #2db892; outline-offset: 2px; }
 
+.tb-form label.tb-switch,
+.tb-inline-form label.tb-switch {
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 0;
+  gap: 8px;
+}
+.tb-admin .tb-tool-toggles .tb-switch {
+  font-weight: 500;
+  font-size: inherit;
+  gap: 0;
+}
+
 .sr-overlay {
   position: fixed;
   inset: 0;

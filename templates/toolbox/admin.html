@@ -18,9 +18,8 @@
     <li>
       <span>教員ログイン</span>
       <label class="tb-switch">
-        <input type="checkbox" id="tb-login-required" role="switch" {% if settings.login_required_enabled %}checked{% endif %}>
+        <input type="checkbox" id="tb-login-required" role="switch" aria-label="教員ログインを必須にする" {% if settings.login_required_enabled %}checked{% endif %}>
         <span class="tb-switch-track"><span class="tb-switch-thumb"></span></span>
-        <span>必須にする</span>
       </label>
     </li>
   </ul>
@@ -167,9 +166,8 @@
     <li>
       <span>{{ tool.name }}</span>
       <label class="tb-switch">
-        <input type="checkbox" data-tool="{{ tool.id }}" role="switch" {% if tool_settings[tool.id].enabled %}checked{% endif %}>
+        <input type="checkbox" data-tool="{{ tool.id }}" role="switch" aria-label="{{ tool.name }}を公開" {% if tool_settings[tool.id].enabled %}checked{% endif %}>
         <span class="tb-switch-track"><span class="tb-switch-thumb"></span></span>
-        <span>公開</span>
       </label>
     </li>
     {% endfor %}
@@ -327,11 +325,11 @@
   <div class="tb-dir-box">
     <p><strong>コピーするツール</strong></p>
     <ul class="tb-tool-toggles">
-      <li><span>クラス・教員（共通）</span><label class="tb-switch"><input type="checkbox" name="tb-mig" value="classes" role="switch" checked><span class="tb-switch-track"><span class="tb-switch-thumb"></span></span><span>含める</span></label></li>
-      <li><span>ランダム席替え</span><label class="tb-switch"><input type="checkbox" name="tb-mig" value="seats" role="switch" checked><span class="tb-switch-track"><span class="tb-switch-thumb"></span></span><span>含める</span></label></li>
-      <li><span>ランダム指名</span><label class="tb-switch"><input type="checkbox" name="tb-mig" value="pick" role="switch" checked><span class="tb-switch-track"><span class="tb-switch-thumb"></span></span><span>含める</span></label></li>
-      <li><span>1分スピーチ</span><label class="tb-switch"><input type="checkbox" name="tb-mig" value="speech" role="switch" checked><span class="tb-switch-track"><span class="tb-switch-thumb"></span></span><span>含める</span></label></li>
-      <li><span>スピーチ理解度チェックの設定</span><label class="tb-switch"><input type="checkbox" name="tb-mig" value="talk" role="switch" checked><span class="tb-switch-track"><span class="tb-switch-thumb"></span></span><span>含める</span></label></li>
+      <li><span>クラス・教員（共通）</span><label class="tb-switch"><input type="checkbox" name="tb-mig" value="classes" role="switch" aria-label="クラス・教員（共通）を含める" checked><span class="tb-switch-track"><span class="tb-switch-thumb"></span></span></label></li>
+      <li><span>ランダム席替え</span><label class="tb-switch"><input type="checkbox" name="tb-mig" value="seats" role="switch" aria-label="ランダム席替えを含める" checked><span class="tb-switch-track"><span class="tb-switch-thumb"></span></span></label></li>
+      <li><span>ランダム指名</span><label class="tb-switch"><input type="checkbox" name="tb-mig" value="pick" role="switch" aria-label="ランダム指名を含める" checked><span class="tb-switch-track"><span class="tb-switch-thumb"></span></span></label></li>
+      <li><span>1分スピーチ</span><label class="tb-switch"><input type="checkbox" name="tb-mig" value="speech" role="switch" aria-label="1分スピーチを含める" checked><span class="tb-switch-track"><span class="tb-switch-thumb"></span></span></label></li>
+      <li><span>スピーチ理解度チェックの設定</span><label class="tb-switch"><input type="checkbox" name="tb-mig" value="talk" role="switch" aria-label="スピーチ理解度チェックの設定を含める" checked><span class="tb-switch-track"><span class="tb-switch-thumb"></span></span></label></li>
     </ul>
     <div class="tb-row-actions">
       <button class="tb-btn tb-btn-primary" type="button" id="tb-mig-export">コピー用データを作る</button>
