@@ -308,13 +308,20 @@ def public_status(record: dict, *, detail: bool = False) -> dict:
     from speech_rec.settings import get_settings
 
     settings = get_settings()
+    pause_level = record.get("delivery_pause_level")
+    if pause_level is None:
+        pause_level = (record.get("levels") or {}).get("delivery") or 0
     reason = delivery_reason(
         metrics,
         settings.get("delivery_rules") or [],
-        int((record.get("levels") or {}).get("delivery") or 0),
+        int(pause_level),
         noisy="noisy" in (record.get("flags") or []),
     )
-    body["delivery_text"] = reason["text"]
+    text = reason["text"]
+    cap = scores.get("delivery_cap")
+    if cap and int((record.get("levels") or {}).get("delivery") or 0) < int(pause_level):
+        text += f"話す速さがWPM{scores.get('wpm')}のため、流暢さは{cap}点までです。"
+    body["delivery_text"] = text
     body["delivery_hint"] = reason["hint"]
     if detail:
         if view:

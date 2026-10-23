@@ -13,7 +13,7 @@ from speech_rec.evaluate import run_eval
 from speech_rec.metrics import measure
 from speech_rec.openai_client import SpeechRecAIError, transcribe_words
 from speech_rec.rubric import PROMPT_VERSION, RUBRIC_VERSION
-from speech_rec.scoring import score as score_levels
+from speech_rec.scoring import cap_delivery_level, score as score_levels, speaking_wpm
 from speech_rec.pricing import WHISPER_MODEL, estimate_whisper_usd
 from speech_rec.settings import get_settings
 from speech_rec.store import read_json, write_json
@@ -155,7 +155,16 @@ def _finish_scores(assignment: dict, record_id: str, metrics: dict, transcript: 
     )
     levels = dict(parsed["levels"])
     levels["delivery"] = delivery_level(metrics, settings.get("delivery_rules") or [])
-    scored = score_levels(levels, int(metrics.get("words_counted") or 0), bool(parsed["on_topic"]), settings["score_config"])
+    pause_level = int(levels["delivery"])
+    speak_sec = float(assignment.get("speak_sec") or 60)
+    scored = score_levels(
+        levels,
+        int(metrics.get("words_counted") or 0),
+        bool(parsed["on_topic"]),
+        settings["score_config"],
+        speak_sec=speak_sec,
+    )
+    levels["delivery"] = cap_delivery_level(pause_level, speaking_wpm(int(metrics.get("words_counted") or 0), speak_sec))
     flags = list(parsed["flags"])
     snr = metrics.get("snr_db")
     if isinstance(snr, (int, float)) and snr < NOISY_SNR_DB and "noisy" not in flags:
@@ -168,7 +177,9 @@ def _finish_scores(assignment: dict, record_id: str, metrics: dict, transcript: 
     fresh["oreo"] = parsed["oreo"]
     fresh["scores"] = scored
     fresh["flags"] = flags
-    reason = delivery_reason(metrics, settings.get("delivery_rules") or [], int(levels["delivery"]), noisy="noisy" in flags)
+    reason = delivery_reason(metrics, settings.get("delivery_rules") or [], pause_level, noisy="noisy" in flags)
+    fresh["delivery_pause_level"] = pause_level
+    fresh["wpm"] = scored.get("wpm")
     fresh["delivery_limiting"] = reason["limiting"]
     fresh["delivery_source"] = DELIVERY_SOURCE
     fresh["eval"] = {"model": parsed["model"], "prompt_version": parsed.get("prompt_version") or PROMPT_VERSION}
