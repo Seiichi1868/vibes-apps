@@ -264,7 +264,7 @@ def load_view(record_id: str) -> dict | None:
 
 
 def _write_view(record_id: str, text: str, words: list, settings: dict) -> None:
-    ttl = int(settings.get("transcript_ttl_min") or 30)
+    ttl = 24 * 60 if settings.get("calibration_mode") else int(settings.get("transcript_ttl_min") or 30)
     payload = {
         "transcript": text,
         "words": [[word, start, end] for word, start, end in words],

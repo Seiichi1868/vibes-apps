@@ -161,7 +161,7 @@ def accept_audio(assignment: dict, *, file_bytes: bytes, mime: str, form, settin
     cap = int(float(settings.get("audio_cap_mb") or 100) * 1024 * 1024)
     lock = _lock()
     try:
-        if pending_count() >= QUEUE_LIMIT:
+        if pending_count() >= int(settings.get("queue_limit") or QUEUE_LIMIT):
             return {"error": "busy"}
         if audio_bytes_used() + len(file_bytes) > cap:
             return {"error": "busy"}

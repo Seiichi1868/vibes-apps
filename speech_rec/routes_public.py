@@ -47,7 +47,12 @@ def register_public_routes(bp: Blueprint) -> None:
         if not row:
             return jsonify({"ok": False, "reason": "not_found"}), 404
         settings = get_settings()
-        return jsonify(public_view(row, student_enabled=bool(settings.get("student_enabled")), id_fields=settings["id_fields"]))
+        return jsonify(public_view(
+            row,
+            student_enabled=bool(settings.get("student_enabled")),
+            id_fields=settings["id_fields"],
+            calibration_mode=bool(settings.get("calibration_mode")),
+        ))
 
     @bp.post("/api/a/<token>/submit")
     def submit(token):

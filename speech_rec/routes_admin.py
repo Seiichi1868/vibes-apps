@@ -13,7 +13,15 @@ from speech_rec.auth import (
 )
 from speech_rec.config import admin_password
 from speech_rec.pricing import EVAL_MODELS, JPY_PER_USD
-from speech_rec.results import assignment_choices, csv_text, delete_assignment_records, delete_record, list_results, recalc
+from speech_rec.results import (
+    assignment_choices,
+    csv_text,
+    delete_assignment_records,
+    delete_record,
+    list_results,
+    purge_expired,
+    recalc,
+)
 from speech_rec.settings import get_settings, save_settings
 from speech_rec.usage import summarize
 
@@ -95,6 +103,37 @@ def register_admin_routes(bp: Blueprint) -> None:
     def lock():
         response = jsonify({"ok": True})
         return clear_admin_cookie(response)
+
+    @bp.post("/admin/settings")
+    @require_admin_header
+    @require_admin
+    def save_admin_settings():
+        body = request.get_json(silent=True) or {}
+        updates = {}
+        if "student_enabled" in body:
+            updates["student_enabled"] = bool(body["student_enabled"])
+        if "calibration_mode" in body:
+            updates["calibration_mode"] = bool(body["calibration_mode"])
+        if "eval_model" in body and str(body["eval_model"]) in EVAL_MODELS:
+            updates["eval_model"] = str(body["eval_model"])
+        for key in ("daily_limit_usd", "queue_limit", "record_retention_days"):
+            if key not in body:
+                continue
+            try:
+                number = float(body[key])
+            except (TypeError, ValueError):
+                return jsonify({"ok": False, "error": key}), 400
+            updates[key] = int(number) if key != "daily_limit_usd" else round(number, 2)
+        if isinstance(body.get("id_fields"), dict) and "enabled" in body["id_fields"]:
+            updates["id_fields"] = {"enabled": bool(body["id_fields"]["enabled"])}
+        saved = save_settings(updates)
+        return jsonify({"ok": True, "student_enabled": saved["student_enabled"], "calibration_mode": saved["calibration_mode"]})
+
+    @bp.post("/admin/purge")
+    @require_admin_header
+    @require_admin
+    def purge():
+        return jsonify({"ok": True, "deleted": purge_expired()})
 
     @bp.post("/admin/gaps")
     @require_admin_header

@@ -43,6 +43,7 @@ DEFAULTS: dict[str, Any] = {
     },
     "eval_model": "gpt-4o-mini",
     "daily_limit_usd": 2.0,
+    "queue_limit": 60,
     "audio_cap_mb": 100,
     "transcript_ttl_min": 30,
     "record_retention_days": 60,
