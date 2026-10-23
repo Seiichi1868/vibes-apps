@@ -53,10 +53,31 @@
       <tr><td>1日の上限</td><td>${{ "%.2f"|format(summary.daily_limit_usd) }}</td></tr>
       <tr><td>評価モデル</td><td>{{ settings.eval_model }}</td></tr>
     </table>
+    <form id="gaps">
+      <h2>間の閾値（秒）</h2>
+      <label>文末 sentence_gap_min <input name="sentence_gap_min" type="number" step="0.1" value="{{ settings.sentence_gap_min }}"></label>
+      <label>読点 clause_gap_min <input name="clause_gap_min" type="number" step="0.1" value="{{ settings.clause_gap_min }}"></label>
+      <label>文の途中 mid_gap_min <input name="mid_gap_min" type="number" step="0.1" value="{{ settings.mid_gap_min }}"></label>
+      <label>句読点不明 unknown_gap_min <input name="unknown_gap_min" type="number" step="0.1" value="{{ settings.unknown_gap_min }}"></label>
+      <div><button type="submit">保存</button></div>
+      <p class="err" id="gap-err"></p>
+    </form>
     <form id="lock">
       <button type="submit">ログアウト</button>
     </form>
     <script>
+      document.getElementById("gaps").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = event.target;
+        const body = {};
+        for (const input of form.querySelectorAll("input")) body[input.name] = input.value;
+        const res = await fetch("/rec/admin/gaps", {
+          method: "POST",
+          headers: {"Content-Type": "application/json", "X-Speech-Rec-Request": "1"},
+          body: JSON.stringify(body),
+        });
+        document.getElementById("gap-err").textContent = res.ok ? "保存しました。" : "保存できませんでした。";
+      });
       document.getElementById("lock").addEventListener("submit", async (event) => {
         event.preventDefault();
         await fetch("/rec/admin/lock", {method: "POST", headers: {"X-Speech-Rec-Request": "1"}});

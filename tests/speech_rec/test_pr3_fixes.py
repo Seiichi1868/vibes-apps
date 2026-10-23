@@ -123,7 +123,7 @@ class FixTests(unittest.TestCase):
         with self.app.app_context():
             digest = device_hash("device-errors")
         folder = self.dir / "records" / self.assignment_id
-        for index in range(6):
+        for index in range(10):
             write_json(folder / f"err{index}.json", {"id": f"err{index}", "status": "error", "device_id": digest})
         res = self._send("device-errors")
         self.assertEqual(res.status_code, 409)

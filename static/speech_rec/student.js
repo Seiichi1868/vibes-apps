@@ -100,9 +100,9 @@
     app.innerHTML = `
       <p class="topic">${esc(info.topic)}</p>
       ${idSelects(info)}
-      <p class="note">あなたの声は採点のため、外部のAIサービス（OpenAI）に送られます。このアプリには音声を残しません。文字起こしは30分で消えます。結果は先生に提出するスクリーンショットだけに残ります。</p>
-      <p class="small">準備 ${info.prep_sec} 秒 → スピーチ ${info.speak_sec} 秒。端末ごとに ${info.attempts_per_device} 回まで。</p>
-      <button id="start" class="primary">マイクを許可して準備スタート</button>
+      <p class="mine"><a href="/rec/my">自分の結果</a></p>
+      <p class="note">下のボタンを押してスピーチを開始してください。終わると評価が表示されるので、スクリーンショットで保存してください。音声は採点後すぐに、文字起こしやコメントは30分後に、サーバーから自動的に削除されます。</p>
+      <button id="start" class="primary">${Number(info.prep_sec) > 0 ? "準備スタート" : "スピーチ開始"}</button>
       <p class="err" id="err"></p>`;
     document.getElementById("start").onclick = startPrep;
   }
@@ -291,7 +291,7 @@
       const text = {
         too_short: "録音が短すぎるか、ほとんど音がありません。回数には数えません。",
         too_long: "録音が長すぎるため受け取れませんでした。",
-        attempts: "この端末の回数（2回）を使い切りました。",
+        attempts: "上限に達したので、これ以上は送信できません。担当者に確認してください。",
         full: "提出の上限に達しました。",
         busy: "混み合っています。30秒後にもう一度おしてください。",
         limit: "本日の受付上限に達しました。",
@@ -305,6 +305,7 @@
       return;
     }
     localStorage.setItem(readKey, data.read_token);
+    rememberHistory(data.read_token);
     await poll(data.read_token);
   }
 
@@ -352,7 +353,7 @@
     const rubric = data.show_points && data.scores ? esc(Math.round((data.scores.total || 0) - (data.wpm_points || 0))) : "—";
     app.className = "app sheet";
     app.innerHTML = `
-      <p class="meta">${when} ・ 試行 ${esc(data.attempt)}/${esc(data.attempts_per_device)}</p>
+      <p class="meta"><a href="/rec/my">自分の結果</a> ${when} ・ 試行 ${esc(data.attempt)}</p>
       <p class="topic">${esc(data.topic)}</p>
       <p class="total">${total}</p>
       <p class="sub">WPM点 ${wpm} ／ ルーブリック ${rubric}</p>
@@ -363,10 +364,8 @@
         <div class="bar-row"><span>Topic Development</span>${bars((data.levels || {}).topic_development)}<span>${points(data, "topic_development")}</span></div>
       </div>
       <p class="oreo">OREO ${mark(oreo.opinion_open)} O ${mark(oreo.reason)} R ${mark(oreo.example)} E ${mark(oreo.opinion_close)} O</p>
-      <p class="next">次の一歩：${esc(data.next_step || "")}</p>
       <div class="foot">
-        <p class="note-line">※AI評価・参考／発音は含みません</p>
-        <button type="button" id="detail">くわしく</button>
+        <button type="button" id="detail">詳細</button>
         <span class="code">${esc(data.verify_code || "")}</span>
       </div>`;
     document.getElementById("detail").onclick = () => openDetail(state.readToken);
@@ -383,28 +382,99 @@
     }
     const comments = data.comments || {};
     const evidence = data.evidence || {};
+    const levels = data.levels || {};
     app.innerHTML = `
       <button type="button" id="back">結果に戻る</button>
-      <h2>くわしく</h2>
-      <p>${esc(data.transcript)}</p>
-      <p>General Description：${esc(comments.general_description || "")}</p>
-      <p>Language Use：${esc(comments.language_use || "")}</p>
-      <p>Topic Development：${esc(comments.topic_development || "")}</p>
+      <h2>詳細</h2>
+      <div id="player"><button type="button" id="play">再生</button><input id="seek" type="range" min="0" max="1000" value="0"></div>
+      <p>General Description ${esc(levels.general_description || "")}：${esc(comments.general_description || "")}</p>
+      <p>Delivery（流暢さ） ${esc(levels.delivery || "")}：${esc(data.delivery_text || "")}</p>
+      <p>Language Use ${esc(levels.language_use || "")}：${esc(comments.language_use || "")}</p>
+      <p>Topic Development ${esc(levels.topic_development || "")}：${esc(comments.topic_development || "")}</p>
+      <p>次の一歩：${esc(data.next_step || "")}</p>
       <p>Opinion ${esc(evidence.opinion_open || "")}</p>
       <p>Reason ${esc(evidence.reason || "")}</p>
       <p>Example ${esc(evidence.example || "")}</p>
       <p>結び ${esc(evidence.opinion_close || "")}</p>
-      <p>フィラー（参考）：${esc((data.fillers || []).join(", "))}</p>
-      <button type="button" id="play">自分の録音を聞く</button>`;
-    document.getElementById("back").onclick = () => renderScore(state.result || data);
-    document.getElementById("play").onclick = () => {
-      if (!state.audioBlob) {
-        document.getElementById("play").textContent = "この画面を開き直すと録音は聞けません";
+      <p>${esc(data.transcript)}</p>`;
+    document.getElementById("back").onclick = () => {
+      stopPlayer();
+      renderScore(state.result || data);
+    };
+    bindPlayer(state.audioBlob, state.durationMs);
+  }
+
+  const player = { audio: null, url: "" };
+
+  function stopPlayer() {
+    if (!player.audio) return;
+    player.audio.pause();
+    if (player.url) URL.revokeObjectURL(player.url);
+    player.url = "";
+    player.audio.removeAttribute("src");
+    player.audio.load();
+  }
+
+  function bindPlayer(blob, durationMs) {
+    const button = document.getElementById("play");
+    const seek = document.getElementById("seek");
+    if (!blob) {
+      button.textContent = "この画面を開き直すと録音は聞けません";
+      button.disabled = true;
+      return;
+    }
+    if (!player.audio) player.audio = new Audio();
+    stopPlayer();
+    player.url = URL.createObjectURL(blob);
+    const audio = player.audio;
+    audio.src = player.url;
+    const fallback = Math.max(0, Number(durationMs) || 0) / 1000;
+    const known = () => (Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : fallback);
+    audio.addEventListener("loadedmetadata", () => {
+      if (!Number.isFinite(audio.duration)) {
+        const back = () => {
+          audio.currentTime = 0;
+          audio.removeEventListener("durationchange", back);
+        };
+        audio.addEventListener("durationchange", back);
+        try { audio.currentTime = 1e101; } catch (error) { /* ブラウザが拒否することがある */ }
+      }
+    }, { once: true });
+    button.onclick = () => {
+      if (!audio.paused) {
+        audio.pause();
+        button.textContent = "再生";
         return;
       }
-      const audio = new Audio(URL.createObjectURL(state.audioBlob));
       audio.play();
+      button.textContent = "停止";
     };
+    audio.ontimeupdate = () => {
+      const length = known();
+      if (length > 0) seek.value = String(Math.round((audio.currentTime / length) * 1000));
+    };
+    audio.onended = () => {
+      audio.currentTime = 0;
+      seek.value = "0";
+      button.textContent = "再生";
+    };
+    seek.oninput = () => {
+      const length = known();
+      if (length > 0) audio.currentTime = (Number(seek.value) / 1000) * length;
+    };
+    window.addEventListener("pagehide", stopPlayer, { once: true });
+  }
+
+  function rememberHistory(readToken) {
+    const key = "speechrec:history";
+    const now = Date.now();
+    const keep = 60 * 24 * 60 * 60 * 1000;
+    let rows = [];
+    try { rows = JSON.parse(localStorage.getItem(key) || "[]"); } catch (error) { rows = []; }
+    if (!Array.isArray(rows)) rows = [];
+    rows = rows.filter((row) => row && row.read_token && now - Number(row.saved_at) < keep && row.read_token !== readToken);
+    rows.push({ read_token: readToken, saved_at: now });
+    localStorage.setItem(key, JSON.stringify(rows.slice(-30)));
   }
 
   function retryButton(recordId) {
@@ -441,6 +511,7 @@
       clearRead();
       const kept = await window.SpeechRecAudio.loadClip(token).catch(() => null);
       state.audioBlob = kept && kept.blob;
+      state.durationMs = kept && kept.meta ? kept.meta.duration_ms : 0;
       await window.SpeechRecAudio.deleteClip(token).catch(() => {});
       state.result = data;
       state.readToken = readToken;

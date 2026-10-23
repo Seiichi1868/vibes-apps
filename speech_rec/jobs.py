@@ -8,8 +8,7 @@ from pathlib import Path
 
 from speech_rec.assignments import get_assignment, now, records_dir
 from speech_rec.config import audio_tmp_dir
-from speech_rec.delivery import SOURCE as DELIVERY_SOURCE
-from speech_rec.delivery import delivery_level
+from speech_rec.delivery import SOURCE as DELIVERY_SOURCE, delivery_level, delivery_reason
 from speech_rec.evaluate import run_eval
 from speech_rec.metrics import measure
 from speech_rec.openai_client import SpeechRecAIError, transcribe_words
@@ -87,7 +86,13 @@ def process(assignment_id: str, record_id: str) -> None:
             grace_sec=float(score_config.get("grace_sec") or 0),
             pause_gap_sec=float(settings.get("pause_gap_sec") or 0.8),
             exclude_fillers=bool(score_config.get("exclude_nonlexical_fillers", True)),
+            text=text,
+            sentence_gap_min=float(settings.get("sentence_gap_min") or 2),
+            clause_gap_min=float(settings.get("clause_gap_min") or 1.2),
+            mid_gap_min=float(settings.get("mid_gap_min") or 0.5),
+            unknown_gap_min=float(settings.get("unknown_gap_min") or 1),
         )
+        metrics.pop("boundaries", None)
         client = record.get("metrics") if isinstance(record.get("metrics"), dict) else {}
         for key in ("rms_p10", "rms_p90", "snr_db", "duration_ms"):
             if key in client:
@@ -163,6 +168,8 @@ def _finish_scores(assignment: dict, record_id: str, metrics: dict, transcript: 
     fresh["oreo"] = parsed["oreo"]
     fresh["scores"] = scored
     fresh["flags"] = flags
+    reason = delivery_reason(metrics, settings.get("delivery_rules") or [], int(levels["delivery"]), noisy="noisy" in flags)
+    fresh["delivery_limiting"] = reason["limiting"]
     fresh["delivery_source"] = DELIVERY_SOURCE
     fresh["eval"] = {"model": parsed["model"], "prompt_version": parsed.get("prompt_version") or PROMPT_VERSION}
     fresh["rubric_version"] = RUBRIC_VERSION
