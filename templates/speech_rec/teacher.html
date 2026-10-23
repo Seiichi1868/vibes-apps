@@ -9,7 +9,9 @@
     h1 { font-size: 1rem; margin: 0 0 .3rem; }
     .box { border: 1px solid #e6e0d4; border-left: 5px solid #0b6e4f; border-radius: 8px; padding: .35rem .5rem; margin: .35rem 0; background: #f4faf6; }
     label { display: block; margin: .2rem 0; }
-    label:has(input[type="checkbox"]) { display: flex; gap: .35rem; align-items: center; }
+    label.sw { display: flex; flex-direction: row; align-items: center; gap: .55rem; font-weight: 600; cursor: pointer; }
+    label.sw input { appearance: none; width: 52px; height: 30px; margin: 0; border: 0; border-radius: 999px; background: #c5bfb4 radial-gradient(circle at 15px 50%, #fff 10px, transparent 11px) no-repeat; cursor: pointer; }
+    label.sw input:checked { background-color: #1f7a4d; background-image: radial-gradient(circle at 37px 50%, #fff 10px, transparent 11px); }
     input, textarea, select, button { font: inherit; }
     input, select, textarea { padding: .15rem .35rem; }
     textarea { width: 100%; min-height: 3.2rem; }
@@ -44,8 +46,8 @@
   {% else %}
     <h1>出題を作る</h1>
     <form id="make" class="box">
-      <label><input id="enabled" type="checkbox" {% if settings.student_enabled %}checked{% endif %}> 生徒に公開する</label>
-      <label><input id="id-on" type="checkbox" {% if settings.id_fields.enabled %}checked{% endif %}> 学年・クラス・番号を聞く</label>
+      <label class="sw"><input id="enabled" type="checkbox" {% if settings.student_enabled %}checked{% endif %}> 生徒に公開する</label>
+      <label class="sw"><input id="id-on" type="checkbox" {% if settings.id_fields.enabled %}checked{% endif %}> 学年・クラス・番号を聞く</label>
       <label>お題（英文）<textarea id="text" required></textarea></label>
       <div class="row">
         <label>準備（秒）<input id="prep" type="number" value="60" min="10" max="180"></label>
