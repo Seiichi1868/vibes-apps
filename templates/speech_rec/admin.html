@@ -14,9 +14,12 @@
     .set { border-left-color: #1f4d3a; background: #f4faf6; }
     .gaps { border-left-color: #1d4e89; background: #f3f7fc; }
     label { display: block; margin: .2rem 0; }
-    label.sw { display: flex; flex-direction: row; align-items: center; gap: .55rem; font-weight: 600; cursor: pointer; }
-    label.sw input { appearance: none; width: 52px; height: 30px; margin: 0; border: 0; border-radius: 999px; background: #c5bfb4 radial-gradient(circle at 15px 50%, #fff 10px, transparent 11px) no-repeat; cursor: pointer; }
-    label.sw input:checked { background-color: #1f7a4d; background-image: radial-gradient(circle at 37px 50%, #fff 10px, transparent 11px); }
+    label.sw { position: relative; display: flex; flex-direction: row; align-items: center; gap: .45rem; font-weight: 600; cursor: pointer; }
+    label.sw input { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; }
+    label.sw .track { display: block; width: 36px; height: 20px; background: #cbd5e1; border-radius: 999px; position: relative; flex: 0 0 36px; }
+    label.sw .thumb { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; background: #fff; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: transform .2s; }
+    label.sw input:checked + .track { background: #2db892; }
+    label.sw input:checked + .track .thumb { transform: translateX(16px); }
     input, select { font: inherit; padding: .15rem .35rem; }
     input[type="number"] { width: 5.5rem; }
     button { font: inherit; margin-top: .25rem; padding: .2rem .55rem; }
@@ -66,9 +69,9 @@
     </section>
     <form id="settings" class="box set">
       <h2>設定</h2>
-      <label class="sw"><input type="checkbox" name="student_enabled" {% if settings.student_enabled %}checked{% endif %}> 生徒に公開する</label>
-      <label class="sw"><input type="checkbox" name="id_enabled" {% if settings.id_fields.enabled %}checked{% endif %}> 学年・クラス・番号を聞く</label>
-      <label class="sw"><input type="checkbox" name="calibration_mode" {% if settings.calibration_mode %}checked{% endif %}> 校正モード（録音と文字起こしを24時間残す）</label>
+      <label class="sw"><input type="checkbox" name="student_enabled" role="switch" {% if settings.student_enabled %}checked{% endif %}><span class="track"><span class="thumb"></span></span>生徒に公開する</label>
+      <label class="sw"><input type="checkbox" name="id_enabled" role="switch" {% if settings.id_fields.enabled %}checked{% endif %}><span class="track"><span class="thumb"></span></span>学年・クラス・番号を聞く</label>
+      <label class="sw"><input type="checkbox" name="calibration_mode" role="switch" {% if settings.calibration_mode %}checked{% endif %}><span class="track"><span class="thumb"></span></span>校正モード（録音と文字起こしを24時間残す）</label>
       <label>評価モデル
         <select name="eval_model">
           {% for model in models %}<option value="{{ model }}" {% if model == settings.eval_model %}selected{% endif %}>{{ model }}</option>{% endfor %}

@@ -469,10 +469,11 @@ html.tb-skip-opening .tb-opening { display: none !important; }
 .tb-check input { min-height: 20px; width: 20px; }
 
 .tb-switch {
+  position: relative;
   display: inline-flex;
   flex-direction: row;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin: 0;
   font-weight: 600;
   cursor: pointer;
@@ -481,33 +482,42 @@ html.tb-skip-opening .tb-opening { display: none !important; }
 .tb-inline-form .tb-switch input,
 .tb-admin .tb-inline-form .tb-switch input,
 .tb-switch input {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 52px;
-  min-width: 52px;
-  max-width: 52px;
-  height: 30px;
-  min-height: 30px;
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  min-width: 0;
+  max-width: 0;
+  height: 0;
+  min-height: 0;
   margin: 0;
   padding: 0;
   border: 0;
+  flex: 0 0 0;
+}
+.tb-switch-track {
+  display: block;
+  width: 36px;
+  height: 20px;
+  background: #cbd5e1;
   border-radius: 999px;
-  background-color: #c5bfb4;
-  background-image: radial-gradient(circle at 15px 50%, #fff 10px, transparent 11px);
-  background-repeat: no-repeat;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
-  cursor: pointer;
-  flex: 0 0 52px;
+  position: relative;
+  flex: 0 0 36px;
+  transition: background 0.2s;
 }
-.tb-switch input:checked {
-  background-color: #1f7a4d;
-  background-image: radial-gradient(circle at 37px 50%, #fff 10px, transparent 11px);
+.tb-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
-.tb-switch input:focus-visible {
-  outline: 2px solid #1f4d3a;
-  outline-offset: 3px;
-}
-.tb-switch span { font-weight: 600; }
+.tb-switch input:checked + .tb-switch-track { background: #2db892; }
+.tb-switch input:checked + .tb-switch-track .tb-switch-thumb { transform: translateX(16px); }
+.tb-switch input:focus-visible + .tb-switch-track { outline: 2px solid #2db892; outline-offset: 2px; }
 
 .sr-overlay {
   position: fixed;
