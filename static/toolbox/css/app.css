@@ -1018,7 +1018,13 @@ html.tb-skip-opening .tb-opening { display: none !important; }
 .tb-admin-block[data-block="folder"] { border-left-color: #2f6f6f; background: #f2fafa; }
 .tb-admin-block[data-block="migrate"] { border-left-color: #4d5e8a; background: #f4f6fb; }
 .tb-admin-block[data-block="talk"] { border-left-color: #6a5a2a; background: #faf7ef; }
-.tb-admin-block[data-block="links"] { border-left-color: #3f6b3a; background: #f4faf3; }
+.tb-admin-block[data-block="platform-apps"] { border-left-color: #3f6b3a; background: #f4faf3; }
+.tb-platform-app-desc {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 400;
+  margin-top: 2px;
+}
 .tb-admin-block.is-over { outline: 2px dashed #1f4d3a; }
 .tb-drag { cursor: grab; color: #8a8175; margin-right: 6px; letter-spacing: -2px; }
 .tb-admin h2 {

@@ -111,6 +111,15 @@ def create_app(config_class=Config):
     app.register_blueprint(languages_bp, url_prefix="/api")
 
     @app.before_request
+    def _platform_app_maintenance():
+        from platform_ops import maintenance_response
+
+        blocked = maintenance_response(request.path, request.accept_mimetypes)
+        if blocked:
+            return blocked
+        return None
+
+    @app.before_request
     def _public_kill_switch():
         """/public/ 配下のみを対象にした Kill-Switch。
 
