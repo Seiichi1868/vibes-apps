@@ -1192,6 +1192,38 @@ body.tb-display-on .tb-refresh-row:hover { opacity: 0.8; }
   gap: 6px;
 }
 .tb-dir-box p { margin: 0; font-size: 0.85rem; }
+.tb-mig-sections {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+}
+.tb-mig-section h3 {
+  margin: 0 0 6px;
+  font-size: 0.9rem;
+  color: #3d4a66;
+}
+.tb-mig-section .tb-tool-toggles { margin: 0; }
+.tb-mig-section .tb-dir-box { gap: 10px; }
+.tb-mig-text {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 7rem;
+  padding: 8px 10px;
+  border: 1px solid var(--tb-line);
+  border-radius: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  resize: vertical;
+  background: #fafbfc;
+}
+.tb-mig-import-row {
+  align-items: center;
+}
+.tb-mig-import-row input[type="file"] {
+  max-width: 100%;
+  font-size: 0.8rem;
+}
 .tb-archive-banner {
   display: grid;
   gap: 8px;
