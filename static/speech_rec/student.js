@@ -84,6 +84,7 @@
     }
     if (!data.ok) {
       app.innerHTML = `<p class="status">${esc(reasons(data.reason))}</p>`;
+      watchSettings();
       const kept = await window.SpeechRecAudio.loadClip(token).catch(() => null);
       if (kept && data.reason !== "preparing") {
         app.insertAdjacentHTML("beforeend", `<p class="small">前回の録音が端末に残っています。</p><button id="retry" class="primary">もう一度採点</button>`);
@@ -92,6 +93,27 @@
       return;
     }
     intro();
+    watchSettings();
+  }
+
+  function watchSettings() {
+    if (state.watching) return;
+    state.watching = true;
+    setInterval(async () => {
+      if (state.recorder || state.stopTimer) return;
+      const onForm = document.getElementById("start");
+      const waiting = document.querySelector("#app > p.status");
+      if (!onForm && !waiting) return;
+      const res = await fetch(`/rec/api/a/${encodeURIComponent(token)}`);
+      const data = await res.json().catch(() => null);
+      if (!data || !state.info || data.settings_rev === state.info.settings_rev) return;
+      state.info = data;
+      if (!data.ok) {
+        app.innerHTML = `<p class="status">${esc(reasons(data.reason))}</p>`;
+        return;
+      }
+      intro();
+    }, 3000);
   }
 
   function idSelects(info) {

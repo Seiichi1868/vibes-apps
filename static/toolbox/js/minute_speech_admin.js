@@ -1,4 +1,5 @@
 (function () {
+  if (!document.getElementById("ms-filters")) return;
   const modal = document.getElementById("tb-reauth");
   const form = document.getElementById("tb-reauth-form");
   const errorEl = document.getElementById("tb-reauth-error");
@@ -6,6 +7,7 @@
   let offset = 0;
 
   function withReauth(fn) {
+    if (window.tbWithReauth) return window.tbWithReauth(fn);
     return fn().catch((err) => {
       if (err.data && err.data.error === "confirm_required") {
         pending = fn;
@@ -18,6 +20,7 @@
     });
   }
 
+  if (!window.tbAdminBound) {
   form.addEventListener("submit", (ev) => {
     ev.preventDefault();
     toolboxFetch("/toolbox/admin/api/reauth", {
@@ -40,6 +43,7 @@
     modal.hidden = true;
     pending = null;
   });
+  }
 
   function filters() {
     const fd = new FormData(document.getElementById("ms-filters"));

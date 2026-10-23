@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import time
 
-from flask import jsonify, render_template, request
+from flask import jsonify, redirect, render_template, request, url_for
 
 from toolbox.auth import (
     admin_panel_required,
@@ -291,14 +291,7 @@ def register(bp):
     @bp.route("/admin/minute-speech")
     @admin_panel_required
     def minute_speech_admin_page():
-        return render_template(
-            "toolbox/admin_minute_speech.html",
-            embed_status=embed.index_status(),
-            embed_estimate=embed.index_estimate(),
-            classify_estimate=classify.estimate(),
-            sim_min=get_setting("minute_speech_sim_min"),
-            translate_query=_bool(get_setting("minute_speech_translate_query"), True),
-        )
+        return redirect(url_for("toolbox.admin_page") + "#minute-speech")
 
     @bp.route("/admin/api/minute-speech/topics")
     @admin_panel_required

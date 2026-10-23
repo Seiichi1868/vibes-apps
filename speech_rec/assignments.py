@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from speech_rec.config import data_dir
+from speech_rec.settings import get_settings
 from speech_rec.store import list_json_files, read_json, write_json
 
 JST = ZoneInfo("Asia/Tokyo")
@@ -175,6 +176,7 @@ def public_view(row: dict, *, student_enabled: bool, id_fields: dict, calibratio
         "school_year": school_year(),
         "calibration_mode": calibration_mode,
         "remaining": max(0, int(row.get("max_submissions") or 0) - submission_count(row["id"])),
+        "settings_rev": int(get_settings().get("settings_rev") or 0),
     }
 
 

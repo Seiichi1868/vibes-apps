@@ -6,10 +6,14 @@
 <section class="tb-admin">
   <h1>管理画面</h1>
   <p class="tb-lead">重要操作は管理パスワードの再入力が必要です（15分有効）。</p>
+  <div class="tb-admin-savebar">
+    <button class="tb-btn tb-btn-primary" type="button" id="tb-admin-save">保存</button>
+    <span class="tb-muted" id="tb-admin-save-status" role="status" aria-live="polite"></span>
+  </div>
 
 <div id="tb-admin-blocks">
-  <section class="tb-admin-block" draggable="true" data-block="login">
-  <h2><span class="tb-drag" aria-hidden="true">⋮⋮</span>ログイン</h2>
+  <details class="tb-admin-block" data-block="login" open>
+  <summary><span class="tb-drag" aria-hidden="true">⋮⋮</span>ログイン</summary>
   <ul class="tb-tool-toggles">
     <li>
       <span>教員ログイン</span>
@@ -20,15 +24,79 @@
     </li>
   </ul>
   <p class="tb-note" id="tb-login-required-note">{% if settings.login_required_enabled %}オンのあいだは、ランチャーと各ツールで教員ログインが必要です。{% else %}オフのあいだは、ランチャーと各ツールにログインなしで入れます。{% endif %}</p>
-  </section>
+  </details>
 
-  <section class="tb-admin-block" draggable="true" data-block="minute-speech">
-  <h2><span class="tb-drag" aria-hidden="true">⋮⋮</span>1分スピーチ管理</h2>
-  <p class="tb-note"><a href="{{ url_for('toolbox.minute_speech_admin_page') }}">設定・費用、結果、出題QR、確認コード、お題</a></p>
-  </section>
+  <details class="tb-admin-block" data-block="minute-speech" open>
+  <summary><span class="tb-drag" aria-hidden="true">⋮⋮</span>1分スピーチ管理</summary>
+  <div class="tb-row-actions">
+    <button class="tb-btn tb-btn-primary" type="button" id="ms-publish">保存してQRと生徒画面に反映</button>
+    <span class="tb-muted" id="ms-publish-status" role="status"></span>
+  </div>
+  <div class="tb-ms-panels">
+    <details data-speech="settings"><summary>設定・費用</summary><iframe data-src="/rec/admin" title="設定・費用"></iframe></details>
+    <details data-speech="results"><summary>結果一覧</summary><iframe data-src="/rec/admin/results" title="結果一覧"></iframe></details>
+    <details data-speech="qr"><summary>出題QR</summary><iframe data-src="/rec/teacher" title="出題QR"></iframe></details>
+    <details data-speech="verify"><summary>確認コード</summary><iframe data-src="/rec/verify" title="確認コード"></iframe></details>
+  </div>
+  <details class="tb-fold">
+  <summary>検索・分類・お題一覧</summary>
+  <p class="tb-note">編集は data/toolbox の上書きファイルに保存され、再デプロイしても残ります。シード自体は書き換えません。</p>
+  <h2>検索インデックス</h2>
+  <p id="ms-embed-status">モデル {{ embed_status.model or "未作成" }} / 件数 {{ embed_status.count }} / 未反映 {{ embed_status.stale }} / 更新 {{ embed_status.updated_at or "—" }}</p>
+  <p class="tb-note">差分 {{ embed_estimate.count }} 件の推定費用: {% if embed_estimate.est_cost_usd is not none %}${{ embed_estimate.est_cost_usd }}{% else %}算出できません{% endif %}（{{ embed_estimate.model or "モデル未選択" }}、{{ embed_estimate.dim }}次元）。検索1回の目安 {% if embed_estimate.search_est_usd is not none %}${{ embed_estimate.search_est_usd }}{% else %}—{% endif %}。</p>
+  <div class="tb-actions">
+    <button class="tb-btn" type="button" id="ms-embed-refresh">推定費用を確認</button>
+    <button class="tb-btn tb-btn-primary" type="button" id="ms-embed-start">作成／更新</button>
+  </div>
+  <p class="tb-note" id="ms-embed-job"></p>
+  <h2>難易度と日本語訳</h2>
+  <p class="tb-note">未付与 {{ classify_estimate.count }} 件、約 {{ classify_estimate.batches }} 回。推定費用 {% if classify_estimate.est_cost_usd is not none %}${{ classify_estimate.est_cost_usd }}{% else %}算出できません{% endif %}（{{ classify_estimate.model or "—" }}）。実行前に確認します。sensitive と判定されたお題は非公開になります。</p>
+  <div class="tb-actions">
+    <button class="tb-btn" type="button" id="ms-classify-refresh">推定費用を確認</button>
+    <button class="tb-btn tb-btn-primary" type="button" id="ms-classify-start">分類を実行</button>
+    <button class="tb-btn" type="button" id="ms-approve">未確認のAI判定を一括承認</button>
+    <button class="tb-btn" type="button" id="ms-hide-flags">フラグ付きをすべて非公開に</button>
+  </div>
+  <p class="tb-note" id="ms-classify-job"></p>
+  <form id="ms-admin-settings" class="tb-inline-form">
+    <label>AI検索の類似度しきい値
+      <input name="minute_speech_sim_min" type="number" min="0" max="0.95" step="0.01" value="{{ sim_min }}">
+    </label>
+    <label class="tb-check"><input name="minute_speech_translate_query" type="checkbox" {% if translate_query %}checked{% endif %}> 日本語訳がない索引では検索語を英語にしてから探す</label>
+    <button class="tb-btn" type="submit">保存</button>
+  </form>
+  <details class="tb-fold">
+  <summary>お題一覧</summary>
+  <form id="ms-filters" class="tb-inline-form">
+    <input name="q" type="search" placeholder="本文・訳">
+    <select name="type"><option value="">タイプ</option><option value="1">1</option><option value="2">2</option></select>
+    <select name="status"><option value="">状態</option><option value="active">公開</option><option value="hidden">非公開</option></select>
+    <select name="flagged"><option value="">フラグ</option><option value="yes">あり</option><option value="no">なし</option></select>
+    <select name="level"><option value="">難易度</option><option value="none">未設定</option><option>1</option><option>2</option><option>3</option></select>
+    <select name="has_ja"><option value="">日本語訳</option><option value="yes">あり</option><option value="no">なし</option></select>
+    <button class="tb-btn" type="submit">絞り込み</button>
+  </form>
+  <div class="tb-table-wrap">
+    <table class="tb-table">
+      <thead><tr><th>タイプ</th><th>本文</th><th>訳・難易度</th><th></th></tr></thead>
+      <tbody id="ms-rows"></tbody>
+    </table>
+  </div>
+  <button class="tb-btn" type="button" id="ms-more">さらに表示</button>
+  </details>
+  <h2>オリジナルお題を追加</h2>
+  <form id="ms-add" class="tb-stack">
+    <label>タイプ <select name="type"><option value="1">タイプ1</option><option value="2">タイプ2</option></select></label>
+    <label>本文 <textarea name="text" rows="3" required></textarea></label>
+    <label>難易度 <select name="level"><option value="">未設定</option><option>1</option><option>2</option><option>3</option></select></label>
+    <label>日本語訳 <input name="ja" type="text"></label>
+    <button class="tb-btn tb-btn-primary" type="submit">追加</button>
+  </form>
+  </details>
+  </details>
 
-  <section class="tb-admin-block" draggable="true" data-block="totp">
-  <h2><span class="tb-drag" aria-hidden="true">⋮⋮</span>認証アプリ</h2>
+  <details class="tb-admin-block" data-block="totp" open>
+  <summary><span class="tb-drag" aria-hidden="true">⋮⋮</span>認証アプリ</summary>
   <p class="tb-note">ログイン中の教員アカウント（{{ totp_account or "未ログイン" }}）に紐づきます。パスワード変更には、登録したアプリの6桁が必要です。</p>
   {% if totp_error %}<p class="tb-error" role="alert">{{ totp_error }}</p>{% endif %}
   {% if totp_ok %}<p class="tb-ok" role="status">{{ totp_ok }}</p>{% endif %}
@@ -56,10 +124,10 @@
     <button class="tb-btn tb-btn-primary" type="submit">QRコードを発行する</button>
   </form>
   {% endif %}
-  </section>
+  </details>
 
-  <section class="tb-admin-block" draggable="true" data-block="users">
-  <h2><span class="tb-drag" aria-hidden="true">⋮⋮</span>ユーザー管理</h2>
+  <details class="tb-admin-block" data-block="users">
+  <summary><span class="tb-drag" aria-hidden="true">⋮⋮</span>ユーザー管理</summary>
   <form id="tb-user-form" class="tb-inline-form">
     <input name="username" placeholder="ユーザー名" required>
     <input name="password" type="password" placeholder="パスワード（4文字以上）" minlength="4" required>
@@ -89,10 +157,10 @@
       </tbody>
     </table>
   </div>
-  </section>
+  </details>
 
-  <section class="tb-admin-block" draggable="true" data-block="tools">
-  <h2><span class="tb-drag" aria-hidden="true">⋮⋮</span>ツール公開設定</h2>
+  <details class="tb-admin-block" data-block="tools">
+  <summary><span class="tb-drag" aria-hidden="true">⋮⋮</span>ツールの公開設定</summary>
   <ul class="tb-tool-toggles">
     {% for tool in tools %}
     <li>
@@ -104,10 +172,10 @@
     </li>
     {% endfor %}
   </ul>
-  </section>
+  </details>
 
-  <section class="tb-admin-block" draggable="true" data-block="usage">
-  <h2><span class="tb-drag" aria-hidden="true">⋮⋮</span>利用状況</h2>
+  <details class="tb-admin-block" data-block="usage" open>
+  <summary><span class="tb-drag" aria-hidden="true">⋮⋮</span>利用状況</summary>
   <p>今日 {{ usage.today.count }} 回 / 約 ${{ "%.4f"|format(usage.today.est_cost_usd) }}　・　今月 {{ usage.month.count }} 回 / 約 ${{ "%.4f"|format(usage.month.est_cost_usd) }}</p>
   <p>本日の使用 ${{ "%.4f"|format(usage.used_today_usd) }} / 上限 ${{ "%.2f"|format(usage.daily_limit_usd) }}</p>
   <div class="tb-split">
@@ -132,10 +200,6 @@
       </ul>
     </div>
   </div>
-  </section>
-
-  <section class="tb-admin-block" draggable="true" data-block="limits">
-  <h2><span class="tb-drag" aria-hidden="true">⋮⋮</span>設定</h2>
   <form id="tb-limit-form" class="tb-inline-form">
     <label>1日の利用上限（USD）
       <input name="daily_limit_usd" type="number" step="0.1" min="0" value="{{ settings.daily_limit_usd }}">
@@ -144,12 +208,12 @@
       <input name="parallel_browser_stt" type="checkbox" {% if settings.parallel_browser_stt %}checked{% endif %}>
       ブラウザ文字起こしの並行実行を既定で使う
     </label>
-    <button class="tb-btn tb-btn-primary" type="submit">保存</button>
+    <button class="tb-btn tb-btn-primary" type="submit">この欄を保存</button>
   </form>
-  </section>
+  </details>
 
-  <section class="tb-admin-block" draggable="true" data-block="models">
-  <h2><span class="tb-drag" aria-hidden="true">⋮⋮</span>モデル選択 <span class="tb-badge tb-badge-mute">参考値</span></h2>
+  <details class="tb-admin-block" data-block="models">
+  <summary><span class="tb-drag" aria-hidden="true">⋮⋮</span>モデル選択 <span class="tb-badge tb-badge-mute">参考値</span></summary>
   <p class="tb-note">性能・コスパは参考値。所要時間と平均費用は実測。価格未設定は選べません。</p>
   <div class="tb-sorts">
     <span>並び替え:</span>
@@ -195,7 +259,7 @@
   </div>
 
   <h3>検索用モデル（埋め込み）</h3>
-  <p class="tb-note">1分スピーチのAI検索で使います。推定/回は検索1回（約40トークン）です。全件のインデックス作成費用は <a href="{{ url_for('toolbox.minute_speech_admin_page') }}">1分スピーチ管理</a> に出します。価格未設定は選べません。</p>
+  <p class="tb-note">1分スピーチのAI検索で使います。推定/回は検索1回（約40トークン）です。全件のインデックス作成費用は上の「1分スピーチ管理」に出します。価格未設定は選べません。</p>
   <div class="tb-table-wrap">
     <table class="tb-table tb-model-table" data-kind="embed">
       <thead>
@@ -231,10 +295,10 @@
       </tbody>
     </table>
   </div>
-  </section>
+  </details>
 
-  <section class="tb-admin-block" draggable="true" data-block="sound">
-  <h2><span class="tb-drag" aria-hidden="true">⋮⋮</span>音管理</h2>
+  <details class="tb-admin-block" data-block="sound" open>
+  <summary><span class="tb-drag" aria-hidden="true">⋮⋮</span>音管理</summary>
   <p class="tb-note">タイマー終了音の再生速度です。1 が元の速さ、初期値は 3（3倍速）です。1分スピーチの終了音も同じ設定を使います。</p>
   <form id="tb-sound-form" class="tb-inline-form">
     <label>タイマー終了音の速さ
@@ -243,19 +307,19 @@
     <button class="tb-btn tb-btn-primary" type="submit">保存</button>
     <span class="tb-muted" id="tb-sound-status" role="status" aria-live="polite"></span>
   </form>
-  </section>
+  </details>
 
-  <section class="tb-admin-block" draggable="true" data-block="folder">
-  <h2><span class="tb-drag" aria-hidden="true">⋮⋮</span>音声の保存先フォルダ</h2>
+  <details class="tb-admin-block" data-block="folder" open>
+  <summary><span class="tb-drag" aria-hidden="true">⋮⋮</span>音声の保存先フォルダ</summary>
   <p class="tb-note">このブラウザで録音した音声の保存先です。選んだフォルダは、同じパソコンのスピーチ理解度チェックでも使われます。</p>
   <div class="tb-dir-box">
     <p class="tb-muted" id="tb-dir-status">確認中…</p>
     <button class="tb-btn" type="button" id="tb-dir-pick">保存先フォルダを選ぶ</button>
   </div>
-  </section>
+  </details>
 
-  <section class="tb-admin-block" draggable="true" data-block="migrate">
-  <h2><span class="tb-drag" aria-hidden="true">⋮⋮</span>設定の引き継ぎ（ブラウザ間コピー）</h2>
+  <details class="tb-admin-block" data-block="migrate" open>
+  <summary><span class="tb-drag" aria-hidden="true">⋮⋮</span>設定の引き継ぎ（ブラウザ間コピー）</summary>
   <p class="tb-note">クラス・教員・座席などの設定はブラウザごとに保存されるため、Safari から Chrome へは自動では引き継がれません。Safari で「コピー用データを作る」→ Chrome の管理画面で貼り付けて「反映する」を押してください。スピーチ理解度チェックの履歴（アーカイブ）はサーバー保存なので、同じアカウントでログインすれば自動で見られます。</p>
   <div class="tb-dir-box">
     <p><strong>コピーするツール</strong></p>
@@ -276,10 +340,10 @@
     </div>
     <p class="tb-muted" id="tb-mig-status"></p>
   </div>
-  </section>
+  </details>
 
-  <section class="tb-admin-block" draggable="true" data-block="talk">
-  <h2><span class="tb-drag" aria-hidden="true">⋮⋮</span>スピーチ理解度チェックの履歴</h2>
+  <details class="tb-admin-block" data-block="talk">
+  <summary><span class="tb-drag" aria-hidden="true">⋮⋮</span>スピーチ理解度チェックの履歴</summary>
   <p class="tb-note">全ユーザーの文字起こしと問題です。見出しをクリックすると並び替えできます。</p>
   <div class="tb-table-wrap">
     <table class="tb-table" id="tb-talk-archives">
@@ -297,13 +361,13 @@
     </table>
   </div>
   <p class="tb-muted" id="tb-talk-archives-empty" hidden>まだ履歴はありません。</p>
-  </section>
+  </details>
 
-  <section class="tb-admin-block" draggable="true" data-block="links">
-  <h2><span class="tb-drag" aria-hidden="true">⋮⋮</span>既存アプリ連携</h2>
-  <p class="tb-note">News Talk は上の「ツール公開設定」でもオン・オフできます。公開中ならランチャーの導入からも開けます。字幕取得は News とは別の複製です。</p>
+  <details class="tb-admin-block" data-block="links" open>
+  <summary><span class="tb-drag" aria-hidden="true">⋮⋮</span>既存アプリ連携</summary>
+  <p class="tb-note">News Talk は上の「ツールの公開設定」でもオン・オフできます。公開中ならランチャーの導入からも開けます。字幕取得は News とは別の複製です。</p>
   <p><a class="tb-btn tb-btn-primary" href="{{ url_for('toolbox.cnn10_lesson_page') }}">News Talk を開く</a></p>
-  </section>
+  </details>
 </div>
 </section>
 
@@ -322,4 +386,5 @@
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='toolbox/js/admin.js', v=toolbox_cache) }}"></script>
+<script src="{{ url_for('static', filename='toolbox/js/minute_speech_admin.js', v=toolbox_cache) }}"></script>
 {% endblock %}

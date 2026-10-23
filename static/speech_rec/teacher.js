@@ -12,12 +12,16 @@
       }),
     });
   }
-  document.getElementById("enabled").onchange = saveFlags;
-  document.getElementById("id-on").onchange = saveFlags;
+  window.addEventListener("message", async (event) => {
+    if (event.origin !== location.origin || !event.data || event.data.type !== "tb-speech-apply") return;
+    await saveFlags();
+    if (event.source) event.source.postMessage({ type: "tb-speech-applied" }, location.origin);
+  });
 
   document.getElementById("make").onsubmit = async (event) => {
     event.preventDefault();
     document.getElementById("err").textContent = "";
+    await saveFlags();
     const res = await fetch("/rec/api/t/assignments", {
       method: "POST",
       headers,

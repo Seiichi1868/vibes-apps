@@ -802,6 +802,12 @@ html.tb-skip-opening .tb-opening { display: none !important; }
   margin-bottom: 4px;
   font-size: 1.2rem;
 }
+.tb-admin-savebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 8px;
+}
 .tb-admin-block {
   border: 1px solid #e6e0d4;
   border-left: 5px solid #8a8175;
@@ -810,6 +816,19 @@ html.tb-skip-opening .tb-opening { display: none !important; }
   margin: 6px 0;
   background: #fff;
 }
+.tb-admin-block > summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 1rem;
+  margin: 2px 0 4px;
+  list-style: none;
+}
+.tb-admin-block > summary::-webkit-details-marker { display: none; }
+.tb-admin-block > summary::before {
+  content: "▸ ";
+  color: #8a8175;
+}
+.tb-admin-block[open] > summary::before { content: "▾ "; }
 .tb-admin-block[data-block="login"] { border-left-color: #1f4d3a; background: #f4faf6; }
 .tb-admin-block[data-block="minute-speech"] { border-left-color: #0b6e4f; background: #e7f6ee; }
 .tb-admin-block[data-block="totp"] { border-left-color: #1d4e89; background: #f3f7fc; }
