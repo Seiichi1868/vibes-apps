@@ -346,4 +346,45 @@
       migStatus.textContent = `${keys.length} 件を反映しました。各ツールを開き直してください。`;
     });
   }
+
+  const blocks = document.getElementById("tb-admin-blocks");
+  if (blocks) {
+    const orderKey = "toolbox-admin-order";
+    let saved = [];
+    try { saved = JSON.parse(localStorage.getItem(orderKey) || "[]"); } catch (error) { saved = []; }
+    if (Array.isArray(saved)) {
+      saved.forEach((id) => {
+        const node = blocks.querySelector(`[data-block="${id}"]`);
+        if (node) blocks.appendChild(node);
+      });
+    }
+    let dragged = null;
+    blocks.querySelectorAll(".tb-admin-block").forEach((block) => {
+      block.removeAttribute("draggable");
+      const handle = block.querySelector(".tb-drag");
+      if (handle) {
+        handle.draggable = true;
+        handle.addEventListener("dragstart", (event) => {
+          dragged = block;
+          event.dataTransfer.effectAllowed = "move";
+        });
+      }
+      block.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        block.classList.add("is-over");
+      });
+      block.addEventListener("dragleave", () => block.classList.remove("is-over"));
+      block.addEventListener("drop", (event) => {
+        event.preventDefault();
+        block.classList.remove("is-over");
+        if (!dragged || dragged === block) return;
+        const items = [...blocks.children];
+        const from = items.indexOf(dragged);
+        const to = items.indexOf(block);
+        if (from < to) block.after(dragged);
+        else block.before(dragged);
+        localStorage.setItem(orderKey, JSON.stringify([...blocks.children].map((node) => node.dataset.block)));
+      });
+    });
+  }
 })();
