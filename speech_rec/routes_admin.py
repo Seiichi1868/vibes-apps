@@ -13,7 +13,7 @@ from speech_rec.auth import (
 )
 from speech_rec.config import admin_password
 from speech_rec.pricing import EVAL_MODELS, JPY_PER_USD
-from speech_rec.settings import get_settings
+from speech_rec.settings import get_settings, save_settings
 from speech_rec.usage import summarize
 
 
@@ -55,6 +55,20 @@ def register_admin_routes(bp: Blueprint) -> None:
     def lock():
         response = jsonify({"ok": True})
         return clear_admin_cookie(response)
+
+    @bp.post("/admin/gaps")
+    @require_admin_header
+    @require_admin
+    def save_gaps():
+        body = request.get_json(silent=True) or {}
+        updates = {}
+        for key in ("sentence_gap_min", "clause_gap_min", "mid_gap_min", "unknown_gap_min"):
+            try:
+                updates[key] = round(float(body.get(key)), 2)
+            except (TypeError, ValueError):
+                return jsonify({"ok": False, "error": key}), 400
+        saved = save_settings(updates)
+        return jsonify({"ok": True, **{key: saved[key] for key in updates}})
 
     @bp.get("/api/t/usage")
     @require_admin_header

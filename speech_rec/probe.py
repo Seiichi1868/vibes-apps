@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 from speech_rec.jobs import WHISPER_HINT, _parse
-from speech_rec.metrics import measure
+from speech_rec.metrics import align_boundaries, measure
 from speech_rec.openai_client import transcribe_words
 from speech_rec.settings import get_settings
 
@@ -28,14 +28,21 @@ def main(argv: list[str] | None = None) -> int:
         grace_sec=float(settings["score_config"].get("grace_sec") or 3),
         pause_gap_sec=float(settings.get("pause_gap_sec") or 0.8),
         exclude_fillers=bool(settings["score_config"].get("exclude_nonlexical_fillers", True)),
+        text=text,
+        sentence_gap_min=float(settings.get("sentence_gap_min") or 2),
+        clause_gap_min=float(settings.get("clause_gap_min") or 1.2),
+        mid_gap_min=float(settings.get("mid_gap_min") or 0.5),
+        unknown_gap_min=float(settings.get("unknown_gap_min") or 1),
     )
     print(f"duration_sec={duration}")
     print(
         f"words_counted={row['words_counted']} pause_n={row['pause_n']} "
-        f"pause_max={row['pause_max']} silent_ratio={row['silent_ratio']}"
+        f"pause_max={row['pause_max']} silent_ratio={row['silent_ratio']} "
+        f"boundary_info={row['boundary_info']}"
     )
-    for word, start, end in words:
-        print(f"{start:7.2f}-{end:7.2f}  {word}")
+    aligned, _info = align_boundaries(text, words)
+    for token, start, end, mark in aligned:
+        print(f"{start:7.2f}-{end:7.2f}  {token}{mark}")
     print("---")
     print(text)
     return 0

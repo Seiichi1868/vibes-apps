@@ -16,13 +16,25 @@ AUDIO_PRESETS = {"default", "ns_on_agc_off", "ns_off"}
 
 
 def register_public_routes(bp: Blueprint) -> None:
+    @bp.get("/my")
+    def my_page():
+        return render_template("speech_rec/my.html")
+
+    @bp.post("/api/my")
+    def my_results():
+        body = request.get_json(silent=True) or {}
+        tokens = body.get("tokens") if isinstance(body.get("tokens"), list) else []
+        from speech_rec.submissions import history_rows
+
+        return jsonify({"ok": True, "rows": history_rows([str(token) for token in tokens[:30]])})
+
     @bp.errorhandler(RequestEntityTooLarge)
     def too_large(_exc):
         return jsonify({"ok": False, "error": "too_long"}), 413
 
     @bp.get("/<token>")
     def student_page(token):
-        if token in {"admin", "teacher", "api"} or not find_by_token(token):
+        if token in {"admin", "teacher", "api", "my"} or not find_by_token(token):
             return ("見つかりません", 404)
         mode = request.args.get("rec_audio") or "default"
         if mode not in AUDIO_PRESETS:

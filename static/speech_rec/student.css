@@ -45,25 +45,27 @@ button.primary { background: #1f4d3a; color: #fff; border-color: #1f4d3a; }
   flex-direction: column;
   justify-content: space-between;
   gap: .35rem;
-  padding: .45rem .6rem .4rem;
+  padding: .3rem .5rem .25rem;
 }
-.sheet .meta { font-size: clamp(9px, 2.4vw, 12px); color: #6b645b; margin: 0; }
+.sheet .meta { font-size: clamp(10px, 2.8vw, 14px); color: #6b645b; margin: 0; }
+.mine { margin: 0; text-align: right; font-size: .8rem; }
+.mine a, .meta a { color: #1f4d3a; }
 .sheet .topic {
-  font-size: clamp(12px, 3.4vw, 16px);
+  font-size: clamp(14px, 3.9vw, 18px);
   line-height: 1.25;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.total { font-size: clamp(28px, 9vw, 42px); font-weight: 750; margin: 0; line-height: 1; }
-.sub { font-size: clamp(11px, 3vw, 14px); margin: 0; }
+.total { font-size: clamp(32px, 10.4vw, 48px); font-weight: 750; margin: 0; line-height: 1; }
+.sub { font-size: clamp(13px, 3.5vw, 16px); margin: 0; }
 .bars { display: flex; flex-direction: column; gap: .2rem; }
-.bar-row { display: grid; grid-template-columns: 1fr auto auto; gap: .35rem; align-items: center; font-size: clamp(10px, 2.8vw, 13px); }
+.bar-row { display: grid; grid-template-columns: 1fr auto auto; gap: .35rem; align-items: center; font-size: clamp(12px, 3.2vw, 15px); }
 .ticks { display: flex; gap: 2px; }
-.ticks i { width: clamp(8px, 2.4vw, 12px); height: clamp(8px, 2.2vw, 10px); background: #d9d3c7; display: block; }
+.ticks i { width: clamp(9px, 2.8vw, 14px); height: clamp(9px, 2.5vw, 12px); background: #d9d3c7; display: block; }
 .ticks i.on { background: #1f4d3a; }
-.oreo { display: flex; gap: .7rem; font-size: clamp(12px, 3.2vw, 15px); margin: 0; }
+.oreo { display: flex; gap: .7rem; font-size: clamp(14px, 3.7vw, 17px); margin: 0; }
 .dot { width: .7em; height: .7em; border-radius: 50%; display: inline-block; border: 1px solid #1c1915; vertical-align: middle; }
 .dot.on { background: #1f4d3a; }
 .next { font-size: clamp(11px, 3vw, 14px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0; }

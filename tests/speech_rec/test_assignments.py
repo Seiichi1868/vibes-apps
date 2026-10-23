@@ -135,11 +135,15 @@ class AssignmentFlowTests(unittest.TestCase):
         self.assertEqual(blocked.get_json()["error"], "full")
         other = create_assignment({"text": "Attempts.", "max_submissions": 40})
         token = other["token"]
-        self.assertEqual(send("same-device").status_code, 202)
-        self.assertEqual(send("same-device").status_code, 202)
-        third = send("same-device")
-        self.assertEqual(third.status_code, 409)
-        self.assertEqual(third.get_json()["error"], "attempts")
+        for _ in range(5):
+            self.assertEqual(send("same-device").status_code, 202)
+        blocked_attempt = send("same-device")
+        self.assertEqual(blocked_attempt.status_code, 409)
+        self.assertEqual(blocked_attempt.get_json()["error"], "attempts")
+        page = self.client.get("/rec/my")
+        self.assertEqual(page.status_code, 200)
+        missing = self.client.post("/rec/api/my", json={"tokens": ["no-such-token"]})
+        self.assertEqual(missing.get_json()["rows"][0]["state"], "expired")
         short = self.client.post(
             f"/rec/api/a/{token}/submit",
             data={"audio": (self._wav(100), "a.m4a"), "duration_ms": "1000", "device_id": "same-device"},

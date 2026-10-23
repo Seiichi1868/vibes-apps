@@ -68,7 +68,7 @@ def create_assignment(payload: dict) -> dict:
         "speak_sec": speak,
         "grace_sec": 3,
         "max_submissions": limit,
-        "attempts_per_device": 2,
+        "attempts_per_device": 5,
         "show_points": bool(payload.get("show_points", True)),
         "rubric_version": "s5-sem2-v1",
     }
@@ -170,7 +170,7 @@ def public_view(row: dict, *, student_enabled: bool, id_fields: dict) -> dict:
         "prep_sec": row.get("prep_sec"),
         "speak_sec": row.get("speak_sec"),
         "show_points": bool(row.get("show_points", True)),
-        "attempts_per_device": int(row.get("attempts_per_device") or 2),
+        "attempts_per_device": int(row.get("attempts_per_device") or 5),
         "id_fields": id_fields,
         "school_year": school_year(),
         "remaining": max(0, int(row.get("max_submissions") or 0) - submission_count(row["id"])),

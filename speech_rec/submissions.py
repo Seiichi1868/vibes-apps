@@ -17,7 +17,7 @@ from speech_rec.assignments import (
     records_dir,
     submission_count,
 )
-from speech_rec.config import DEVICE_SALT, ERROR_CAP, QUEUE_LIMIT, audio_tmp_dir
+from speech_rec.config import DEVICE_SALT, QUEUE_LIMIT, audio_tmp_dir
 from speech_rec.store import read_json, write_json
 
 MAX_BYTES = 3 * 1024 * 1024
@@ -167,12 +167,13 @@ def accept_audio(assignment: dict, *, file_bytes: bytes, mime: str, form, settin
             return {"error": "busy"}
         if retry_of:
             return _retry(assignment, retry_of, device_id, file_bytes, mime, duration_ms, form)
-        if device_error_count(assignment["id"], device_id) >= ERROR_CAP:
+        error_cap = int(assignment.get("attempts_per_device") or 5) * 2
+        if device_error_count(assignment["id"], device_id) >= error_cap:
             return {"error": "attempts"}
         if submission_count(assignment["id"]) >= int(assignment.get("max_submissions") or 0):
             return {"error": "full"}
         used = device_attempt_count(assignment["id"], device_id)
-        if used >= int(assignment.get("attempts_per_device") or 2):
+        if used >= int(assignment.get("attempts_per_device") or 5):
             return {"error": "attempts"}
         record_id = secrets.token_hex(6)
         token = read_token()
@@ -232,6 +233,34 @@ def _retry(assignment, retry_of, device_id, file_bytes, mime, duration_ms, form)
     return {"read_token": record["read_token"], "attempt": record["attempt"], "retry": True}
 
 
+def history_rows(tokens: list[str]) -> list[dict]:
+    """端末が持つ read_token の数値だけを返す。本文は含めない。"""
+    from speech_rec.assignments import get_assignment
+
+    rows = []
+    for token in tokens[:30]:
+        record = load_by_read_token(token)
+        if not isinstance(record, dict):
+            rows.append({"read_token": token, "state": "expired"})
+            continue
+        scores = record.get("scores") if isinstance(record.get("scores"), dict) else {}
+        assignment = get_assignment(str(record.get("assignment_id") or "")) or {}
+        rows.append({
+            "read_token": token,
+            "state": record.get("status"),
+            "created_at": record.get("created_at"),
+            "topic": (assignment.get("topic") or {}).get("text") or "",
+            "attempt": record.get("attempt"),
+            "total": scores.get("total"),
+            "points": scores.get("points") or {},
+            "levels": record.get("levels") or {},
+            "wpm_points": scores.get("wpm_points"),
+            "verify_code": record.get("verify_code"),
+            "show_points": bool(assignment.get("show_points", True)),
+        })
+    return rows
+
+
 def load_by_read_token(token: str) -> dict | None:
     pointer = read_json(reads_dir() / f"{token}.json")
     if not isinstance(pointer, dict):
@@ -262,7 +291,7 @@ def public_status(record: dict, *, detail: bool = False) -> dict:
         "error_code": record.get("error_code"),
         "id": record.get("id"),
         "attempt": record.get("attempt"),
-        "attempts_per_device": 2,
+        "attempts_per_device": int(assignment.get("attempts_per_device") or 5),
         "verify_code": record.get("verify_code"),
         "created_at": record.get("created_at"),
         "topic": (assignment.get("topic") or {}).get("text") or "",
@@ -275,6 +304,18 @@ def public_status(record: dict, *, detail: bool = False) -> dict:
         "flags": record.get("flags") or [],
         "next_step": feedback.get("next_step") or "",
     }
+    from speech_rec.delivery import delivery_reason
+    from speech_rec.settings import get_settings
+
+    settings = get_settings()
+    reason = delivery_reason(
+        metrics,
+        settings.get("delivery_rules") or [],
+        int((record.get("levels") or {}).get("delivery") or 0),
+        noisy="noisy" in (record.get("flags") or []),
+    )
+    body["delivery_text"] = reason["text"]
+    body["delivery_hint"] = reason["hint"]
     if detail:
         if view:
             words = view.get("words") or []
