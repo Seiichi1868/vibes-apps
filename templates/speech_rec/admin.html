@@ -47,6 +47,7 @@
     </script>
   {% else %}
     <p class="muted">生徒向けの入口は次の更新まで閉じたままです（student_enabled={{ "オン" if settings.student_enabled else "オフ" }}）。</p>
+    <p><a href="/rec/admin/results">結果一覧</a></p>
     <table>
       <tr><td>今日</td><td>${{ "%.4f"|format(summary.today_usd) }}（約 {{ "%.0f"|format(summary.today_usd * jpy_per_usd) }} 円）</td></tr>
       <tr><td>今月</td><td>${{ "%.4f"|format(summary.month_usd) }}（約 {{ "%.0f"|format(summary.month_usd * jpy_per_usd) }} 円）</td></tr>

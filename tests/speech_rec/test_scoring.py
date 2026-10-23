@@ -1,6 +1,9 @@
 """Delivery・点数・評価JSONの検証。"""
 import json
+import os
+import tempfile
 import unittest
+from pathlib import Path
 
 from speech_rec.delivery import delivery_level
 from speech_rec.evaluate import interpret
@@ -25,6 +28,42 @@ class ScoringTests(unittest.TestCase):
         self.assertEqual(row["points"]["language_use"], 25)
         self.assertEqual(row["wpm_points"], 92)
         self.assertEqual(row["total"], 30 + 35 + 25 + 30 + 92)
+
+    def test_slow_wpm_caps_delivery_points(self):
+        levels = {"general_description": 4, "delivery": 6, "language_use": 4, "topic_development": 4}
+        self.assertEqual(score(levels, 81, True, DEFAULT_SCORE_CONFIG, speak_sec=60)["points"]["delivery"], 40)
+        self.assertEqual(score(levels, 80, True, DEFAULT_SCORE_CONFIG)["points"]["delivery"], 35)
+        self.assertEqual(score(levels, 60, True, DEFAULT_SCORE_CONFIG)["points"]["delivery"], 30)
+        self.assertEqual(score(levels, 40, True, DEFAULT_SCORE_CONFIG)["points"]["delivery"], 20)
+        self.assertEqual(score(levels, 30, True, DEFAULT_SCORE_CONFIG)["points"]["delivery"], 10)
+        self.assertIsNone(score(levels, 90, True, DEFAULT_SCORE_CONFIG)["delivery_cap"])
+
+    def test_recalc_caps_saved_delivery_without_transcript(self):
+        root = Path(tempfile.mkdtemp(prefix="speech-rec-recalc-"))
+        os.environ["SPEECH_REC_DATA_DIR"] = str(root)
+        from speech_rec.results import csv_text, recalc
+        from speech_rec.store import write_json
+
+        (root / "assignments").mkdir()
+        write_json(root / "assignments" / "asg.json", {"id": "asg", "speak_sec": 60, "topic": {"text": "Town"}})
+        (root / "records" / "asg").mkdir(parents=True)
+        write_json(root / "records" / "asg" / "rec.json", {
+            "id": "rec",
+            "status": "done",
+            "levels": {"general_description": 4, "delivery": 6, "language_use": 4, "topic_development": 4},
+            "metrics": {"words_counted": 30},
+            "flags": [],
+            "oreo": {},
+            "verify_code": "ABCD-EFGH",
+        })
+        self.assertEqual(recalc("asg"), 1)
+        from speech_rec.store import read_json
+        saved = read_json(root / "records" / "asg" / "rec.json")
+        self.assertEqual(saved["scores"]["points"]["delivery"], 10)
+        self.assertEqual(saved["levels"]["delivery"], 1)
+        self.assertEqual(saved["delivery_pause_level"], 6)
+        self.assertNotIn("transcript", saved)
+        self.assertTrue(csv_text("asg").splitlines()[1].startswith("rec") or "ABCD-EFGH" in csv_text("asg"))
 
     def test_off_topic_multiplier(self):
         config = json.loads(json.dumps(DEFAULT_SCORE_CONFIG))

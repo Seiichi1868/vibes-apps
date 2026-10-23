@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>結果一覧</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: .6rem; color: #1a1a1a; }
+    table { border-collapse: collapse; font-size: 12px; }
+    th, td { height: 22px; padding: 0 .25rem; border-bottom: 1px solid #e6e0d6; white-space: nowrap; text-align: right; }
+    th { position: sticky; top: 0; background: #f6f4ef; cursor: pointer; font-weight: 650; }
+    td.sticky, th.sticky { position: sticky; left: 0; background: #fff; text-align: left; }
+    th.sticky { background: #f6f4ef; }
+    td.sticky2, th.sticky2 { position: sticky; left: 40px; background: #fff; }
+    .num { font-family: ui-monospace, monospace; }
+    .code { font-size: 10px; color: #888; }
+    .flag { color: #8d1d1d; }
+    .mean { font-weight: 700; }
+    button, select, input { font: inherit; }
+    .lv1 { background: #f4efe6; } .lv2 { background: #efe4cf; } .lv3 { background: #e7d3ae; }
+    .lv4 { background: #d7c08a; } .lv5 { background: #c4a86a; } .lv6 { background: #1f4d3a; color: #fff; }
+  </style>
+</head>
+<body>
+  <p><a href="/rec/admin">管理に戻る</a></p>
+  <label>出題 <select id="assignment"></select></label>
+  <input id="code" placeholder="確認コード" size="10">
+  <select id="status"><option value="">状態</option><option value="done">完了</option><option value="error">エラー</option><option value="processing">処理中</option></select>
+  <button id="reload" type="button">更新</button>
+  <button id="csv" type="button">CSV</button>
+  <button id="recalc" type="button">再計算</button>
+  <button id="drop-all" type="button">この出題を削除</button>
+  <div style="overflow:auto; max-height: calc(100vh - 4.5rem);">
+    <table id="grid"></table>
+  </div>
+  <script id="choices" type="application/json">{{ assignments|tojson }}</script>
+  <script src="{{ url_for('static', filename='speech_rec/results.js') }}?v=1"></script>
+</body>
+</html>
