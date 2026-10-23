@@ -192,7 +192,26 @@ def admin_page():
         **_totp_context(current_user()),
         totp_error=request.args.get("totp_error") or "",
         totp_ok=request.args.get("totp_ok") or "",
+        **_minute_speech_admin_context(),
     )
+
+
+def _minute_speech_admin_context() -> dict:
+    from toolbox.storage import get_setting
+    from toolbox.tools.minute_speech import classify, embed
+
+    raw = get_setting("minute_speech_translate_query")
+    if raw is None:
+        translate = True
+    else:
+        translate = str(raw).strip().lower() in {"1", "true", "yes", "on"}
+    return {
+        "embed_status": embed.index_status(),
+        "embed_estimate": embed.index_estimate(),
+        "classify_estimate": classify.estimate(),
+        "sim_min": get_setting("minute_speech_sim_min"),
+        "translate_query": translate,
+    }
 
 
 def _totp_context(user: dict | None) -> dict:

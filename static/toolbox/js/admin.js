@@ -17,6 +17,7 @@
     });
   }
 
+  window.tbAdminBound = true;
   form.addEventListener("submit", (ev) => {
     ev.preventDefault();
     toolboxFetch("/toolbox/admin/api/reauth", {
@@ -39,6 +40,7 @@
     modal.hidden = true;
     pending = null;
   });
+  window.tbWithReauth = withReauth;
 
   document.getElementById("tb-user-form").addEventListener("submit", (ev) => {
     ev.preventDefault();
@@ -139,7 +141,9 @@
         daily_limit_usd: Number(fd.get("daily_limit_usd")),
         parallel_browser_stt: fd.get("parallel_browser_stt") === "on",
       }),
-    }).then(() => alert("保存しました。")));
+    }).then(() => {
+      if (!window.tbAdminQuiet) alert("保存しました。");
+    }));
   });
 
   document.querySelectorAll(".tb-model-table").forEach((table) => {
@@ -347,9 +351,59 @@
     });
   }
 
+  function askFrame(frame, sendType, replyType) {
+    return new Promise((resolve) => {
+      if (!frame || !frame.src || !frame.contentWindow) {
+        resolve(false);
+        return;
+      }
+      const timer = window.setTimeout(() => {
+        window.removeEventListener("message", onMessage);
+        resolve(false);
+      }, 2500);
+      function onMessage(event) {
+        if (event.origin !== location.origin || !event.data || event.data.type !== replyType) return;
+        window.clearTimeout(timer);
+        window.removeEventListener("message", onMessage);
+        resolve(!!event.data.ok || replyType === "tb-speech-applied");
+      }
+      window.addEventListener("message", onMessage);
+      frame.contentWindow.postMessage({ type: sendType }, location.origin);
+    });
+  }
+
+  async function publishSpeech() {
+    const status = document.getElementById("ms-publish-status");
+    const qrPanel = document.querySelector('details[data-speech="qr"]');
+    const settingsFrame = document.querySelector('iframe[title="設定・費用"]');
+    const qrFrame = document.querySelector('iframe[title="出題QR"]');
+    if (qrPanel) {
+      qrPanel.open = true;
+      if (qrFrame && !qrFrame.src) qrFrame.src = qrFrame.dataset.src;
+    }
+    if (status) status.textContent = "反映しています…";
+    await askFrame(settingsFrame, "tb-speech-save", "tb-speech-saved");
+    if (qrFrame && !qrFrame.src) qrFrame.src = qrFrame.dataset.src;
+    await new Promise((resolve) => window.setTimeout(resolve, qrFrame && qrFrame.src ? 400 : 0));
+    await askFrame(qrFrame, "tb-speech-apply", "tb-speech-applied");
+    try {
+      await fetch("/rec/api/t/publish", {
+        method: "POST",
+        headers: { "X-Speech-Rec-Request": "1" },
+      });
+      if (status) status.textContent = "QRと、開いている生徒画面に反映しました。";
+    } catch (error) {
+      if (status) status.textContent = "生徒画面への通知に失敗しました。";
+    }
+  }
+
+  const publishBtn = document.getElementById("ms-publish");
+  if (publishBtn) publishBtn.addEventListener("click", () => { publishSpeech(); });
+
   const blocks = document.getElementById("tb-admin-blocks");
   if (blocks) {
     const orderKey = "toolbox-admin-order";
+    const openKey = "toolbox-admin-open";
     let saved = [];
     try { saved = JSON.parse(localStorage.getItem(orderKey) || "[]"); } catch (error) { saved = []; }
     if (Array.isArray(saved)) {
@@ -358,12 +412,25 @@
         if (node) blocks.appendChild(node);
       });
     }
+    let savedOpen = null;
+    try { savedOpen = JSON.parse(localStorage.getItem(openKey) || "null"); } catch (error) { savedOpen = null; }
+    if (savedOpen && typeof savedOpen === "object") {
+      blocks.querySelectorAll("details.tb-admin-block").forEach((node) => {
+        if (Object.prototype.hasOwnProperty.call(savedOpen, node.dataset.block)) {
+          node.open = !!savedOpen[node.dataset.block];
+        }
+      });
+    }
     let dragged = null;
     blocks.querySelectorAll(".tb-admin-block").forEach((block) => {
       block.removeAttribute("draggable");
       const handle = block.querySelector(".tb-drag");
       if (handle) {
         handle.draggable = true;
+        handle.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        });
         handle.addEventListener("dragstart", (event) => {
           dragged = block;
           event.dataTransfer.effectAllowed = "move";
@@ -386,5 +453,25 @@
         localStorage.setItem(orderKey, JSON.stringify([...blocks.children].map((node) => node.dataset.block)));
       });
     });
+    const saveAll = document.getElementById("tb-admin-save");
+    const saveStatus = document.getElementById("tb-admin-save-status");
+    if (saveAll) {
+      saveAll.addEventListener("click", async () => {
+        const openState = {};
+        blocks.querySelectorAll("details.tb-admin-block").forEach((node) => {
+          openState[node.dataset.block] = node.open;
+        });
+        localStorage.setItem(openKey, JSON.stringify(openState));
+        localStorage.setItem(orderKey, JSON.stringify([...blocks.children].map((node) => node.dataset.block)));
+        window.tbAdminQuiet = true;
+        const limitForm = document.getElementById("tb-limit-form");
+        const sound = document.getElementById("tb-sound-form");
+        if (limitForm) limitForm.requestSubmit();
+        if (sound) sound.requestSubmit();
+        window.setTimeout(() => { window.tbAdminQuiet = false; }, 500);
+        await publishSpeech();
+        if (saveStatus) saveStatus.textContent = "開閉と設定を保存し、生徒画面へ反映しました。";
+      });
+    }
   }
 })();

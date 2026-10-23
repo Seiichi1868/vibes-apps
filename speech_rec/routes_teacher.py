@@ -14,7 +14,7 @@ from speech_rec.assignments import (
 from speech_rec.store import list_json_files, read_json
 from speech_rec.auth import require_admin, require_admin_header
 from speech_rec.qr import qr_data_uri, student_url
-from speech_rec.settings import get_settings, save_settings
+from speech_rec.settings import bump_settings_rev, get_settings, save_settings
 
 
 def _find_code(code: str) -> dict | None:
@@ -113,8 +113,23 @@ def register_teacher_routes(bp: Blueprint) -> None:
             if "enabled" in body["id_fields"]:
                 allowed["enabled"] = bool(body["id_fields"]["enabled"])
             updates["id_fields"] = allowed
-        saved = save_settings(updates)
-        return jsonify({"ok": True, "student_enabled": saved["student_enabled"], "id_fields": saved["id_fields"]})
+        saved = save_settings(updates) if updates else get_settings()
+        if not updates:
+            bump_settings_rev()
+            saved = get_settings()
+        return jsonify({
+            "ok": True,
+            "student_enabled": saved["student_enabled"],
+            "id_fields": saved["id_fields"],
+            "settings_rev": saved["settings_rev"],
+        })
+
+    @bp.post("/api/t/publish")
+    @require_admin_header
+    @require_admin
+    def publish_to_students():
+        rev = bump_settings_rev()
+        return jsonify({"ok": True, "settings_rev": rev})
 
     @bp.route("/verify", methods=["GET", "POST"])
     def verify_page():

@@ -54,6 +54,7 @@ DEFAULTS: dict[str, Any] = {
     "unknown_gap_min": 1.0,
     "calibration_mode": False,
     "whisper_hint": False,
+    "settings_rev": 0,
     "score_config": DEFAULT_SCORE_CONFIG,
     "delivery_rules": DEFAULT_DELIVERY_RULES,
 }
@@ -93,5 +94,15 @@ def save_settings(updates: dict[str, Any]) -> dict[str, Any]:
             current["score_config"].update(value)
         else:
             current[key] = value
+    current["settings_rev"] = int(current.get("settings_rev") or 0) + 1
     write_json(settings_path(), current)
     return current
+
+
+def bump_settings_rev() -> int:
+    """設定の中身は変えず、開いている生徒画面へ取り直しを知らせる。"""
+    current = get_settings()
+    rev = int(current.get("settings_rev") or 0) + 1
+    current["settings_rev"] = rev
+    write_json(settings_path(), current)
+    return rev

@@ -114,6 +114,15 @@
           body: JSON.stringify(body),
         });
         document.getElementById("set-err").textContent = res.ok ? "保存しました。" : "保存できませんでした。";
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ type: "tb-speech-saved", ok: res.ok }, location.origin);
+        }
+      });
+      window.addEventListener("message", (event) => {
+        if (event.origin !== location.origin || !event.data || event.data.type !== "tb-speech-save") return;
+        const form = document.getElementById("settings");
+        if (form) form.requestSubmit();
+        else if (window.parent) window.parent.postMessage({ type: "tb-speech-saved", ok: false }, location.origin);
       });
       document.getElementById("purge").addEventListener("submit", async (event) => {
         event.preventDefault();
