@@ -161,7 +161,7 @@ def close_assignment(assignment_id: str) -> dict | None:
     return row
 
 
-def public_view(row: dict, *, student_enabled: bool, id_fields: dict) -> dict:
+def public_view(row: dict, *, student_enabled: bool, id_fields: dict, calibration_mode: bool = False) -> dict:
     reason = availability(row, student_enabled=student_enabled)
     return {
         "ok": reason is None,
@@ -173,6 +173,7 @@ def public_view(row: dict, *, student_enabled: bool, id_fields: dict) -> dict:
         "attempts_per_device": int(row.get("attempts_per_device") or 5),
         "id_fields": id_fields,
         "school_year": school_year(),
+        "calibration_mode": calibration_mode,
         "remaining": max(0, int(row.get("max_submissions") or 0) - submission_count(row["id"])),
     }
 

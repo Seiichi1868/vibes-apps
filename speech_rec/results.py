@@ -154,5 +154,32 @@ def csv_text(assignment_id: str) -> str:
     return buffer.getvalue()
 
 
+def purge_expired() -> int:
+    """保持日数を過ぎた数値記録を消す。音声ファイルは対象にしない。"""
+    from datetime import timedelta
+
+    from speech_rec.assignments import now
+
+    days = int(get_settings().get("record_retention_days") or 60)
+    cutoff = now() - timedelta(days=days)
+    removed = 0
+    root = records_dir("_").parent
+    if not root.is_dir():
+        return 0
+    for folder in root.iterdir():
+        if not folder.is_dir():
+            continue
+        for path in list_json_files(folder):
+            record = read_json(path)
+            if not isinstance(record, dict):
+                continue
+            from speech_rec.assignments import parse_time
+
+            moment = parse_time(str(record.get("created_at") or ""))
+            if moment is not None and moment < cutoff and delete_record(folder.name, str(record.get("id") or path.stem)):
+                removed += 1
+    return removed
+
+
 def assignment_choices() -> list[dict]:
     return [{"id": row["id"], "label": row.get("label") or str((row.get("topic") or {}).get("text") or "")[:40], "created_at": row.get("created_at")} for row in list_assignments()]

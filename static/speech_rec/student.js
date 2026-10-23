@@ -63,6 +63,20 @@
     const res = await fetch(`/rec/api/a/${encodeURIComponent(token)}`);
     const data = await res.json().catch(() => ({ reason: "not_found" }));
     state.info = data;
+    const resume = new URLSearchParams(location.search).get("resume");
+    if (resume) {
+      const result = await fetch(`/rec/api/r/${encodeURIComponent(resume)}?detail=1`);
+      const body = await result.json().catch(() => ({}));
+      if (body.status === "done") {
+        const kept = await window.SpeechRecAudio.loadClip(token).catch(() => null);
+        state.audioBlob = kept && kept.blob;
+        state.durationMs = kept && kept.meta ? kept.meta.duration_ms : 0;
+        state.result = body;
+        state.readToken = resume;
+        renderScore(body);
+        return;
+      }
+    }
     const pending = localStorage.getItem(readKey);
     if (pending && data.ok) {
       poll(pending);
@@ -101,10 +115,19 @@
       <p class="topic">${esc(info.topic)}</p>
       ${idSelects(info)}
       <p class="mine"><a href="/rec/my">自分の結果</a></p>
+      ${info.calibration_mode ? `<p class="err">この回は録音と文字起こしが24時間保存されます。</p>` : ""}
       <p class="note">下のボタンを押してスピーチを開始してください。終わると評価が表示されるので、スクリーンショットで保存してください。音声は採点後すぐに、文字起こしやコメントは30分後に、サーバーから自動的に削除されます。</p>
       <button id="start" class="primary">${Number(info.prep_sec) > 0 ? "準備スタート" : "スピーチ開始"}</button>
       <p class="err" id="err"></p>`;
     document.getElementById("start").onclick = startPrep;
+    window.SpeechRecAudio.loadClip(token).then((kept) => {
+      if (!kept || !document.getElementById("start")) return;
+      const again = document.createElement("button");
+      again.type = "button";
+      again.textContent = "録音からもう一度評価";
+      again.onclick = () => upload(kept.blob, kept.meta || {}, (kept.meta && kept.meta.retry_of) || "");
+      document.getElementById("err").before(again);
+    }).catch(() => {});
   }
 
   function selectedId() {
@@ -475,12 +498,17 @@
     rows = rows.filter((row) => row && row.read_token && now - Number(row.saved_at) < keep && row.read_token !== readToken);
     rows.push({ read_token: readToken, saved_at: now });
     localStorage.setItem(key, JSON.stringify(rows.slice(-30)));
+    sessionStorage.setItem("speechrec:current", JSON.stringify({
+      path: location.pathname + location.search.replace(/([?&])resume=[^&]*/g, "").replace(/[?&]$/, ""),
+      read_token: readToken,
+      saved_at: now,
+    }));
   }
 
   function retryButton(recordId) {
     const button = document.createElement("button");
     button.className = "primary";
-    button.textContent = "もう一度採点";
+    button.textContent = "録音からもう一度評価";
     button.onclick = async () => {
       const kept = await window.SpeechRecAudio.loadClip(token);
       if (!kept) {
@@ -521,12 +549,15 @@
     if (data.status === "error") {
       if (data.error_code !== "eval_failed") clearRead();
       const quiet = data.error_code === "too_short" || data.error_code === "silent";
-      app.innerHTML = `<p class="err">${esc(quiet ? "録音が短すぎるか、ほとんど言葉がありません。回数には数えません。" : data.error_code === "eval_failed" ? "評価ができませんでした。文字起こしが残っていれば、もう一度採点できます。" : "文字起こしができませんでした。端末に残した音声でもう一度採点できます。")}</p>`;
-      if (data.error_code === "eval_failed") app.appendChild(reevalButton(readToken));
-      else if (!quiet) app.appendChild(retryButton(data.id));
+      app.innerHTML = `<p class="err">${esc(quiet ? "録音が短すぎるか、ほとんど言葉がありません。回数には数えません。" : "評価が出ませんでした。端末の録音からもう一度評価できます。")}</p>`;
+      if (!quiet) {
+        const kept = await window.SpeechRecAudio.loadClip(token).catch(() => null);
+        if (kept) await window.SpeechRecAudio.saveClip(token, kept.blob, { ...(kept.meta || {}), retry_of: data.id });
+        app.appendChild(retryButton(data.id));
+      }
       return;
     }
-    app.innerHTML = `<p class="status">時間がかかっています。端末に残した音声でもう一度採点できます。</p>`;
+    app.innerHTML = `<p class="status">時間がかかっています。端末に残した音声でもう一度評価できます。</p>`;
     app.appendChild(retryButton(data.id));
   }
 
