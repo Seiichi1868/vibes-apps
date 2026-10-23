@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>結果一覧</title>
   <style>
-    body { font-family: system-ui, sans-serif; margin: .6rem; color: #1a1a1a; }
+    body { font-family: system-ui, sans-serif; margin: 0; padding: .35rem; color: #1a1a1a; font-size: .8rem; }
+    .bar { display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; margin: 0 0 .3rem; }
+    button, select, input { font: inherit; padding: .1rem .35rem; }
     table { border-collapse: collapse; font-size: 12px; }
     th, td { height: 22px; padding: 0 .25rem; border-bottom: 1px solid #e6e0d6; white-space: nowrap; text-align: right; }
     th { position: sticky; top: 0; background: #f6f4ef; cursor: pointer; font-weight: 650; }
@@ -22,7 +24,7 @@
   </style>
 </head>
 <body>
-  <p><a href="/rec/admin">管理に戻る</a></p>
+  <div class="bar">
   <label>出題 <select id="assignment"></select></label>
   <input id="code" placeholder="確認コード" size="10">
   <select id="status"><option value="">状態</option><option value="done">完了</option><option value="error">エラー</option><option value="processing">処理中</option></select>
@@ -30,6 +32,7 @@
   <button id="csv" type="button">CSV</button>
   <button id="recalc" type="button">再計算</button>
   <button id="drop-all" type="button">この出題を削除</button>
+  </div>
   <div style="overflow:auto; max-height: calc(100vh - 4.5rem);">
     <table id="grid"></table>
   </div>

@@ -5,9 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>確認コード</title>
   <style>
-    body { font-family: system-ui, sans-serif; margin: 1.5rem auto; max-width: 36rem; padding: 0 1rem; }
-    input, button { font: inherit; padding: .4rem .6rem; }
-    td { padding: .2rem .8rem .2rem 0; vertical-align: top; }
+    body { font-family: system-ui, sans-serif; margin: 0; padding: .4rem; font-size: .85rem; }
+    h1 { font-size: 1rem; margin: 0 0 .3rem; }
+    .box { border: 1px solid #e6e0d4; border-left: 5px solid #6b4c9a; border-radius: 8px; padding: .35rem .5rem; background: #f7f4fb; }
+    input, button { font: inherit; padding: .15rem .4rem; }
+    td { padding: .05rem .5rem .05rem 0; vertical-align: top; }
   </style>
 </head>
 <body>
@@ -32,7 +34,7 @@
     </script>
   {% else %}
     <h1>確認コード</h1>
-    <form method="get">
+    <form method="get" class="box">
       <input name="code" value="{{ code or '' }}" placeholder="K7M2-9QXA" autocomplete="off">
       <button type="submit">照合</button>
     </form>
