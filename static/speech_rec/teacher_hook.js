@@ -34,7 +34,7 @@
         <h2>スピーチ評価のQR</h2>
         <p class="sr-topic">${text}</p>
         <label class="sr-field">管理パスワード（ログイン済みなら空でよい）<input id="sr-pass" type="password" autocomplete="current-password"></label>
-        <label class="tb-switch"><input id="sr-on" type="checkbox"><span>生徒に公開する</span></label>
+        <label class="tb-switch"><input id="sr-on" type="checkbox" role="switch"><span class="tb-switch-track"><span class="tb-switch-thumb"></span></span><span>生徒に公開する</span></label>
         <div class="sr-row">
           <label class="sr-field">準備（秒・0で準備なし）<input id="sr-prep" type="number" min="0" max="180" value="${Number(detail.prep) || 0}"></label>
           <label class="sr-field">発話（秒）<input id="sr-speak" type="number" min="10" max="180" value="${Number(detail.speak) || 60}"></label>

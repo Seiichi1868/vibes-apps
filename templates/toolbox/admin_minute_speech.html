@@ -38,7 +38,7 @@
     <label>AI検索の類似度しきい値
       <input name="minute_speech_sim_min" type="number" min="0" max="0.95" step="0.01" value="{{ sim_min }}">
     </label>
-    <label class="tb-switch"><input name="minute_speech_translate_query" type="checkbox" {% if translate_query %}checked{% endif %}><span>日本語訳がない索引では検索語を英語にしてから探す</span></label>
+    <label class="tb-switch"><input name="minute_speech_translate_query" type="checkbox" role="switch" {% if translate_query %}checked{% endif %}><span class="tb-switch-track"><span class="tb-switch-thumb"></span></span><span>日本語訳がない索引では検索語を英語にしてから探す</span></label>
     <button class="tb-btn" type="submit">保存</button>
   </form>
 
