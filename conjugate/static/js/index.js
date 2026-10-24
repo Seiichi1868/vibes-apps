@@ -6,8 +6,9 @@
     } else {
       const openingMs = Math.max(400, Number(window.CONJUGATE_OPENING_MS || 2000));
       openingOverlay.style.setProperty("--splash-ms", `${openingMs}ms`);
-      if (window.SoundFX && window.SoundFX.opening) window.SoundFX.opening();
-      setTimeout(() => openingOverlay.remove(), openingMs + 40);
+      const removeLater = () => setTimeout(() => openingOverlay.remove(), openingMs + 40);
+      if (window.__vscOpeningStarted !== false) removeLater();
+      else window.addEventListener("vscOpeningStart", removeLater, { once: true });
     }
   }
 
