@@ -4,7 +4,7 @@
 const SoundFX = (() => {
   const MUTE_KEY = "sfx_muted";
   const SFX_BASE = "/static/audio/conjugate/";
-  const SFX_VERSION = "20261022d";
+  const SFX_VERSION = "20261024b";
   const VOLUME = 0.5;
   const TAP_SELECTOR = [
     ".vsc-btn-primary",
@@ -346,6 +346,7 @@ const SoundFX = (() => {
     navigate: () => playNav(),
     opening() {
       if (window.__vscOpeningPlayed) return;
+      if (!document.getElementById("opening-overlay")) return;
       const early = window.__vscOpeningEarlyAudio;
       if (early && !early.paused && early.currentTime > 0 && !early.ended) {
         window.__vscOpeningPlayed = true;
@@ -367,10 +368,7 @@ const SoundFX = (() => {
           window.clearTimeout(audio._cutTimer);
           audio._cutTimer = window.setTimeout(() => stopHtml("opening"), durationMs);
         }).catch(() => {
-          document.addEventListener("pointerdown", () => {
-            unlock();
-            start();
-          }, { once: true, capture: true });
+          // 自動再生が許可されない場合は無音のままにする（最初のタップで遅れて鳴らさない）
         });
       }
     },

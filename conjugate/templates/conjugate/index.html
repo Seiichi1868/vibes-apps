@@ -7,7 +7,7 @@
 
 {% block head %}
 {% if appearance.opening_enabled %}
-<link rel="preload" href="{{ url_for('static', filename='audio/conjugate/sfx-opening.mp3', v='20261022d') }}" as="fetch" crossorigin>
+<link rel="preload" href="{{ url_for('static', filename='audio/conjugate/sfx-opening.mp3', v='20261024b') }}" as="fetch" crossorigin>
 {% endif %}
 {% endblock %}
 
@@ -33,7 +33,7 @@
   try {
     if (localStorage.getItem("sfx_muted") === "true") return;
   } catch (_) {}
-  var url = {{ url_for('static', filename='audio/conjugate/sfx-opening.mp3', v='20261022d') | tojson }};
+  var url = {{ url_for('static', filename='audio/conjugate/sfx-opening.mp3', v='20261024b') | tojson }};
   var audio = new Audio(url);
   audio.preload = "auto";
   audio.volume = 0.5;
