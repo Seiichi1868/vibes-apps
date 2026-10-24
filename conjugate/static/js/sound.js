@@ -4,7 +4,7 @@
 const SoundFX = (() => {
   const MUTE_KEY = "sfx_muted";
   const SFX_BASE = "/static/audio/conjugate/";
-  const SFX_VERSION = "20261022c";
+  const SFX_VERSION = "20261022d";
   const VOLUME = 0.5;
   const TAP_SELECTOR = [
     ".vsc-btn-primary",
@@ -323,6 +323,15 @@ const SoundFX = (() => {
       if (muted) {
         Object.keys(active).forEach(stopChannel);
         Object.keys(htmlSounds).forEach(stopHtml);
+        const early = window.__vscOpeningEarlyAudio;
+        if (early) {
+          try {
+            early.pause();
+            early.currentTime = 0;
+          } catch (_) {
+            /* ignore */
+          }
+        }
       }
     },
     isMuted() {
@@ -336,6 +345,12 @@ const SoundFX = (() => {
     guardian: () => play("guardian", { channel: "guardian", stops: ["tap"] }),
     navigate: () => playNav(),
     opening() {
+      if (window.__vscOpeningPlayed) return;
+      const early = window.__vscOpeningEarlyAudio;
+      if (early && !early.paused && early.currentTime > 0 && !early.ended) {
+        window.__vscOpeningPlayed = true;
+        return;
+      }
       const start = () => play("opening", { channel: "opening" });
       unlock();
       if (decoded.opening && audioCtx && audioCtx.state === "running") {
