@@ -119,7 +119,7 @@
     <div class="vsc-vocab-card">
       <p class="vsc-vocab-kicker">MEANING QUIZ</p>
       <h3 class="vsc-vocab-title">単語の意味を4択で練習</h3>
-      <p class="vsc-vocab-body">登録した動詞の意味を、活用とは別に覚えましょう。日本語⇔スペイン語の両方向に対応しています。</p>
+      <p class="vsc-vocab-body">必須動詞の意味をマスターしよう</p>
       <div class="vsc-vocab-master-split">
         <button type="button" class="vsc-vocab-master" data-open-stat="vocab" aria-haspopup="dialog">
           <span class="vsc-vocab-master-label">日本語 → スペイン語</span>
@@ -147,7 +147,7 @@
     <div class="vsc-vocab-card">
       <p class="vsc-vocab-kicker">NOUNS</p>
       <h3 class="vsc-vocab-title">単語をカテゴリーごとに練習</h3>
-      <p class="vsc-vocab-body">カテゴリーを選ぶと、その中の単語だけを4択で練習できます。日本語には英語も小さく付きます。</p>
+      <p class="vsc-vocab-body vsc-vocab-body-compact">カテゴリーを選ぶと、その中の単語だけを4択で練習できます。</p>
       {% for cat in noun_categories %}
       <div class="vsc-noun-cat">
         <div class="vsc-noun-cat-head">
@@ -155,11 +155,11 @@
           <span class="vsc-noun-cat-count">{{ cat.count }}語</span>
         </div>
         <div class="vsc-vocab-actions">
-          <button type="button" class="vsc-vocab-btn" data-noun-category="{{ cat.id }}" data-noun-direction="ja_to_es">
+          <button type="button" class="vsc-vocab-btn vsc-vocab-btn-compact" data-noun-category="{{ cat.id }}" data-noun-direction="ja_to_es">
             <span class="vsc-vocab-btn-label">日本語 → スペイン語</span>
             <span class="vsc-vocab-btn-meta">{{ cat.label }}</span>
           </button>
-          <button type="button" class="vsc-vocab-btn" data-noun-category="{{ cat.id }}" data-noun-direction="es_to_ja">
+          <button type="button" class="vsc-vocab-btn vsc-vocab-btn-compact" data-noun-category="{{ cat.id }}" data-noun-direction="es_to_ja">
             <span class="vsc-vocab-btn-label">スペイン語 → 日本語</span>
             <span class="vsc-vocab-btn-meta">{{ cat.label }}</span>
           </button>
@@ -170,7 +170,6 @@
 
 
     <div class="vsc-promo-card" id="practice">
-      <p class="vsc-promo-kicker">本日のおすすめ</p>
       {% if weak_verbs %}
       <h3 class="vsc-promo-title">前回間違えた動詞を復習しよう</h3>
       <p class="vsc-promo-body">{{ weak_verbs | map(attribute='infinitive') | join(' / ') }}</p>
