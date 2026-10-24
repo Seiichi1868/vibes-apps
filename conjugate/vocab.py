@@ -73,7 +73,7 @@ def build_noun_questions(category: str, direction: str, count: int | None = None
         chosen.append(random.choice(pool))
 
     key = "es" if direction == "ja_to_es" else "ja"
-    kicker = "この日本語の名詞は？" if direction == "ja_to_es" else "このスペイン語の意味は？"
+    kicker = "この日本語は？" if direction == "ja_to_es" else "このスペイン語の意味は？"
     questions = []
     for noun in chosen:
         distractors = _pick_distractors(noun, pool, key, n=3)
@@ -95,8 +95,16 @@ def build_noun_questions(category: str, direction: str, count: int | None = None
                 "category_label": NOUN_CATEGORY_LABELS.get(category, category),
                 "direction": direction,
                 "prompt": noun["ja"] if direction == "ja_to_es" else noun["es"],
+                "prompt_en": noun.get("en", "") if direction == "ja_to_es" else "",
                 "prompt_kicker": kicker,
-                "choices": [{"id": cid, "label": opt[key]} for cid, opt in zip(choice_ids, options)],
+                "choices": [
+                    {
+                        "id": cid,
+                        "label": opt[key],
+                        "en": opt.get("en", "") if key == "ja" else "",
+                    }
+                    for cid, opt in zip(choice_ids, options)
+                ],
                 "correct_choice_id": choice_ids[correct_idx],
                 "answer": None,
             }
@@ -164,6 +172,7 @@ def public_vocab_question(question: dict) -> dict:
         "kind": "vocab",
         "direction": question["direction"],
         "prompt": question["prompt"],
+        "prompt_en": question.get("prompt_en") or "",
         "prompt_kicker": question.get("prompt_kicker") or "",
         "choices": list(question["choices"]),
         "answer": None,

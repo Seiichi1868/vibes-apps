@@ -86,19 +86,35 @@ class VocabQuizTests(unittest.TestCase):
 class NounQuizTests(unittest.TestCase):
     def test_vegetables_cover_the_list_once_each(self):
         questions = build_noun_questions("vegetables", "ja_to_es")
-        self.assertEqual(len(questions), 10)
+        self.assertEqual(len(questions), 18)
         prompts = {q["prompt"] for q in questions}
         self.assertIn("にんじん", prompts)
         self.assertIn("じゃがいも", prompts)
+        self.assertIn("玉ねぎ", prompts)
+        self.assertIn("アボカド", prompts)
         for q in questions:
             labels = [c["label"] for c in q["choices"]]
             self.assertEqual(len(set(labels)), 4)
-            self.assertEqual(q["prompt_kicker"], "この日本語の名詞は？")
+            self.assertEqual(q["prompt_kicker"], "この日本語は？")
+            self.assertTrue(q["prompt_en"])
         papa = next(q for q in questions if q["meaning_ja"] == "じゃがいも")
         self.assertIn("la papa / la patata", [c["label"] for c in papa["choices"]])
 
+    def test_food_categories_cover_each_list(self):
+        expected = {
+            "fruits": 15,
+            "ingredients": 12,
+            "kitchen": 13,
+            "cooking": 13,
+        }
+        for category, count in expected.items():
+            questions = build_noun_questions(category, "es_to_ja")
+            self.assertEqual(len(questions), count)
+            for q in questions:
+                self.assertTrue(all(c["en"] for c in q["choices"]))
+
     def test_unknown_category_is_empty(self):
-        self.assertEqual(build_noun_questions("fruits", "es_to_ja"), [])
+        self.assertEqual(build_noun_questions("unknown", "es_to_ja"), [])
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@
   const directionPill = document.getElementById("direction-pill");
   const promptKicker = document.getElementById("prompt-kicker");
   const promptWord = document.getElementById("prompt-word");
+  const promptEn = document.getElementById("prompt-en");
   const choiceList = document.getElementById("choice-list");
   const feedbackBox = document.getElementById("feedback-box");
   const nextBtn = document.getElementById("next-btn");
@@ -57,6 +58,10 @@
     directionPill.textContent = copy.pill;
     promptKicker.textContent = q.prompt_kicker || copy.kicker;
     promptWord.textContent = q.prompt;
+    if (promptEn) {
+      promptEn.textContent = q.prompt_en || "";
+      promptEn.classList.toggle("hidden", !q.prompt_en);
+    }
     updateProgress();
 
     choiceList.innerHTML = "";
@@ -65,7 +70,15 @@
       btn.type = "button";
       btn.className = "vsc-choice-btn";
       btn.dataset.choiceId = choice.id;
-      btn.textContent = choice.label;
+      const label = document.createElement("span");
+      label.textContent = choice.label;
+      btn.appendChild(label);
+      if (choice.en) {
+        const en = document.createElement("span");
+        en.className = "vsc-choice-en";
+        en.textContent = choice.en;
+        btn.appendChild(en);
+      }
       btn.addEventListener("click", () => handleChoice(choice.id));
       choiceList.appendChild(btn);
     });
