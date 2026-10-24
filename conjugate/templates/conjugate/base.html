@@ -34,7 +34,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('conjugate.static', filename='css/style.css', v='20261024a') }}">
+  <link rel="stylesheet" href="{{ url_for('conjugate.static', filename='css/style.css', v='20261024c') }}">
   {% block head %}{% endblock %}
 </head>
 <body class="relative min-h-screen antialiased vsc-body {% block body_class %}{% endblock %}">
@@ -91,8 +91,8 @@
   </nav>
   {% endif %}
 
-  <script src="{{ url_for('conjugate.static', filename='js/sound.js', v='20261024b') }}"></script>
-  <script src="{{ url_for('conjugate.static', filename='js/fx.js', v='20261022c') }}"></script>
+  <script src="{{ url_for('conjugate.static', filename='js/sound.js', v='20261024c') }}"></script>
+  <script src="{{ url_for('conjugate.static', filename='js/fx.js', v='20261024c') }}"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

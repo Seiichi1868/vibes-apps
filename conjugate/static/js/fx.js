@@ -410,7 +410,9 @@
     const skip = document.documentElement.classList.contains("vsc-skip-opening");
     if (overlay && !skip) {
       const ms = Math.max(400, Number(window.CONJUGATE_OPENING_MS || 2000));
-      window.setTimeout(startVisualFx, ms);
+      const later = () => window.setTimeout(startVisualFx, ms);
+      if (window.__vscOpeningStarted !== false) later();
+      else window.addEventListener("vscOpeningStart", later, { once: true });
       return;
     }
     startVisualFx();

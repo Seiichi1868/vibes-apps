@@ -7,7 +7,7 @@
 
 {% block head %}
 {% if appearance.opening_enabled %}
-<link rel="preload" href="{{ url_for('static', filename='audio/conjugate/sfx-opening.mp3', v='20261024b') }}" as="fetch" crossorigin>
+<link rel="preload" href="{{ url_for('static', filename='audio/conjugate/sfx-opening.mp3', v='20261024c') }}" as="fetch" crossorigin>
 {% endif %}
 {% endblock %}
 
@@ -26,23 +26,51 @@
     <h1 class="vsc-splash-title">Spanish Lab Conjugate</h1>
     <p class="vsc-splash-tagline">See. Transform. Speak the form.</p>
   </div>
+  <button type="button" id="opening-gate" class="vsc-splash-gate hidden">タップして始める</button>
 </div>
 <script>
 (function () {
-  if (document.documentElement.classList.contains("vsc-skip-opening")) return;
+  function started() {
+    if (window.__vscOpeningStarted) return;
+    window.__vscOpeningStarted = true;
+    window.dispatchEvent(new Event("vscOpeningStart"));
+  }
+  window.__vscOpeningStarted = false;
+  var overlay = document.getElementById("opening-overlay");
+  if (document.documentElement.classList.contains("vsc-skip-opening")) { started(); return; }
   try {
-    if (localStorage.getItem("sfx_muted") === "true") return;
+    if (localStorage.getItem("sfx_muted") === "true") { started(); return; }
   } catch (_) {}
-  var url = {{ url_for('static', filename='audio/conjugate/sfx-opening.mp3', v='20261024b') | tojson }};
+  var url = {{ url_for('static', filename='audio/conjugate/sfx-opening.mp3', v='20261024c') | tojson }};
   var audio = new Audio(url);
   audio.preload = "auto";
   audio.volume = 0.5;
   window.__vscOpeningEarlyAudio = audio;
-  var attempt = audio.play();
+
+  function showGate() {
+    var gate = document.getElementById("opening-gate");
+    if (!overlay || !gate) { started(); return; }
+    overlay.classList.add("is-gated");
+    gate.classList.remove("hidden");
+    gate.addEventListener("click", function () {
+      var p = audio.play();
+      if (p && p.catch) p.catch(function () {});
+      window.__vscOpeningPlayed = true;
+      gate.classList.add("hidden");
+      overlay.classList.remove("is-gated");
+      started();
+    }, { once: true });
+  }
+
+  var attempt;
+  try { attempt = audio.play(); } catch (_) { attempt = null; }
   if (attempt && attempt.then) {
     attempt.then(function () {
       window.__vscOpeningPlayed = true;
-    }).catch(function () {});
+      started();
+    }).catch(showGate);
+  } else {
+    showGate();
   }
 })();
 </script>
@@ -281,5 +309,5 @@
   window.CONJUGATE_OPENING_MS = {{ appearance.opening_ms | tojson }};
   window.CONJUGATE_PROGRESS = {{ progress | tojson }};
 </script>
-<script src="{{ url_for('conjugate.static', filename='js/index.js', v='20261017f') }}"></script>
+<script src="{{ url_for('conjugate.static', filename='js/index.js', v='20261024c') }}"></script>
 {% endblock %}

@@ -4,7 +4,7 @@
 const SoundFX = (() => {
   const MUTE_KEY = "sfx_muted";
   const SFX_BASE = "/static/audio/conjugate/";
-  const SFX_VERSION = "20261024b";
+  const SFX_VERSION = "20261024c";
   const VOLUME = 0.5;
   const TAP_SELECTOR = [
     ".vsc-btn-primary",
