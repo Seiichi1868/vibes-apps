@@ -202,8 +202,10 @@ def admin_status():
 
 @debate_admin_bp.route("/api/settings", methods=["GET", "POST"])
 def admin_settings():
+    from debate.paid_limits import refresh_paid_limit_toggle, set_paid_daily_limit_enabled
+
     if request.method == "GET":
-        return jsonify(_settings_response(load_settings()))
+        return jsonify(_settings_response(refresh_paid_limit_toggle()))
 
     payload = request.get_json(silent=True) or {}
 
@@ -238,6 +240,16 @@ def admin_settings():
         speech_mode = str(payload.get("speech_mode") or "")
         if speech_mode in ("openai", "browser"):
             updates["speech_mode"] = speech_mode
+    limit_update = None
+    if "paid_daily_limit_enabled" in payload:
+        limit_update = bool(payload.get("paid_daily_limit_enabled"))
+
+    if limit_update is not None:
+        refresh_paid_limit_toggle()
+        saved = set_paid_daily_limit_enabled(limit_update)
+        if updates:
+            saved = update_settings(**updates)
+        return jsonify(_settings_response(saved))
 
     if not updates:
         return jsonify(_settings_response(load_settings()))
@@ -342,10 +354,14 @@ def admin_create_script():
     model_mode = str(payload.get("model_mode") or payload.get("script_model_mode") or "").strip()
     if not model_mode:
         model_mode = load_settings().get("script_model_mode") or DEFAULT_SCRIPT_MODEL_MODE
+    from debate.paid_limits import PaidLimitError, consume
     from debate.script_jobs import start_script_job
 
     try:
+        consume("script")
         script = start_script_job(motion, level, winner, model_mode)
+    except PaidLimitError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 429
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     from debate.script_storage import script_admin_summary
@@ -475,8 +491,12 @@ def admin_queue_script_audio(script_id):
     from debate.speech_jobs import queue_script_speech
     from debate.script_storage import script_admin_summary
 
+    from debate.paid_limits import PaidLimitError
+
     try:
         script = queue_script_speech(script_id, only, force=bool(part))
+    except PaidLimitError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 429
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     return jsonify({"ok": True, "script": script_admin_summary(script)})

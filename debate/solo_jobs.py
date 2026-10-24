@@ -257,11 +257,30 @@ def run_tts_job(session_id: str, part: str, job_id: str) -> None:
     logger.info("TTS finished session=%s part=%s file=%s", session_id, part, filename)
 
 
+def _tts_id(session_id: str, part: str) -> str | None:
+    session = load_session(session_id)
+    part_data = get_part(session, part) if session else None
+    if not part_data:
+        return None
+    value = part_data.get("tts_id")
+    return str(value) if value else None
+
+
 def start_tts_job(session_id: str, part: str, *, force: bool = False) -> dict | None:
+    before_id = _tts_id(session_id, part)
     job_id = _mark_tts_generating(session_id, part, is_retry=force)
     if not job_id:
         session = load_session(session_id)
         return get_part(session, part) if session else None
+    if job_id != before_id:
+        from debate.paid_limits import PaidLimitError, consume
+
+        try:
+            consume("tts")
+        except PaidLimitError as exc:
+            _save_tts_error(session_id, part, job_id, str(exc))
+            session = load_session(session_id)
+            return get_part(session, part) if session else None
     _spawn(run_tts_job, session_id, part, job_id)
     session = load_session(session_id)
     return get_part(session, part) if session else None
@@ -309,6 +328,14 @@ def start_generation_job(session_id: str, part: str, *, force: bool = False) -> 
         start_followup_generation(session_id, part)
         return get_part(load_session(session_id), part)
 
+    from debate.paid_limits import PaidLimitError, consume
+
+    try:
+        consume("script")
+    except PaidLimitError as exc:
+        _save_text_error(session_id, part, None, str(exc))
+        raise
+
     job_id = _mark_text_generating(session_id, part, is_retry=force)
     if not job_id:
         session = load_session(session_id)
@@ -323,8 +350,13 @@ def start_followup_generation(session_id: str, confirmed_part: str) -> None:
     session = load_session(session_id)
     if not session:
         return
+    from debate.paid_limits import PaidLimitError
+
     for target in next_generation_targets(session, confirmed_part):
-        start_generation_job(session_id, target)
+        try:
+            start_generation_job(session_id, target)
+        except PaidLimitError:
+            continue
 
 
 def _seconds_since(iso_timestamp: str | None) -> float | None:

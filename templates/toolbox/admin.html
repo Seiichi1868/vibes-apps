@@ -130,7 +130,7 @@
   <summary><span class="tb-drag" aria-hidden="true">⋮⋮</span>ユーザー管理</summary>
   <form id="tb-user-form" class="tb-inline-form">
     <input name="username" placeholder="ユーザー名" required>
-    <input name="password" type="password" placeholder="パスワード（4文字以上）" minlength="4" required>
+    <input name="password" type="password" placeholder="パスワード（8文字以上）" minlength="8" required>
     <select name="role">
       <option value="teacher">teacher</option>
       <option value="admin">admin</option>
@@ -177,6 +177,7 @@
   <details class="tb-admin-block" data-block="usage" open>
   <summary><span class="tb-drag" aria-hidden="true">⋮⋮</span>利用状況</summary>
   <p>今日 {{ usage.today.count }} 回 / 約 ${{ "%.4f"|format(usage.today.est_cost_usd) }}　・　今月 {{ usage.month.count }} 回 / 約 ${{ "%.4f"|format(usage.month.est_cost_usd) }}</p>
+  <p>ゲスト合算: 直近1日 {{ usage.guest.day.count }} 回 / 約 ${{ "%.4f"|format(usage.guest.day.est_cost_usd) }}　・　1週間 {{ usage.guest.week.count }} 回 / 約 ${{ "%.4f"|format(usage.guest.week.est_cost_usd) }}　・　1か月 {{ usage.guest.month.count }} 回 / 約 ${{ "%.4f"|format(usage.guest.month.est_cost_usd) }}</p>
   <p>本日の使用 ${{ "%.4f"|format(usage.used_today_usd) }} / 上限 ${{ "%.2f"|format(usage.daily_limit_usd) }}</p>
   <div class="tb-split">
     <div>

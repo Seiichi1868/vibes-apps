@@ -3,11 +3,43 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+_INSECURE_SECRET_KEYS = {
+    "",
+    "your-secret-key-here",
+    "toolbox-dev-secret",
+    "speech-rec-dev-secret",
+    "local-dev-flask-secret",
+}
+LOCAL_DEV_SECRET_KEY = "local-dev-flask-secret"
+
+
+def _truthy(value: str | None) -> bool:
+    return (value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def is_production_runtime() -> bool:
+    if _truthy(os.environ.get("RENDER")):
+        return True
+    env = (os.environ.get("FLASK_ENV") or os.environ.get("ENV") or "").strip().lower()
+    return env == "production"
+
+
+def resolve_flask_secret_key() -> str:
+    """FLASK_SECRET_KEY を返す。本番で未設定・既知の固定値なら起動できない。"""
+    key = (os.environ.get("FLASK_SECRET_KEY") or "").strip()
+    if is_production_runtime():
+        if not key or key in _INSECURE_SECRET_KEYS:
+            raise RuntimeError("FLASK_SECRET_KEY が未設定です。本番では起動できません。")
+        return key
+    if key and key not in {"your-secret-key-here"}:
+        return key
+    return LOCAL_DEV_SECRET_KEY
+
 
 class Config:
     """アプリケーション設定"""
     BASE_DIR = BASE_DIR
-    SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", "your-secret-key-here")
+    SECRET_KEY = LOCAL_DEV_SECRET_KEY
 
     TEMPLATE_FOLDER = BASE_DIR / "templates"
     STATIC_FOLDER = BASE_DIR / "static"
@@ -52,6 +84,7 @@ class Config:
 
     @staticmethod
     def init_app(app):
+        app.config["SECRET_KEY"] = resolve_flask_secret_key()
         os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
         os.makedirs(Config.HISTORY_DIR, exist_ok=True)
         Config.AUDIO_CACHE_DIR.mkdir(parents=True, exist_ok=True)

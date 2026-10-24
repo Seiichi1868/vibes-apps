@@ -10,9 +10,20 @@ from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from speech_rec.config import ADMIN_HEADER, COOKIE_MAX_AGE, COOKIE_NAME, SESSION_SALT, admin_password
 
 
+def _runtime_secret() -> str:
+    import os
+
+    secret = str(current_app.config.get("SECRET_KEY") or os.environ.get("FLASK_SECRET_KEY") or "").strip()
+    render = (os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
+    env = (os.environ.get("FLASK_ENV") or os.environ.get("ENV") or "").strip().lower()
+    production = render or env == "production"
+    if production and (not secret or secret in {"local-dev-flask-secret", "speech-rec-dev-secret", "your-secret-key-here"}):
+        raise RuntimeError("FLASK_SECRET_KEY が未設定です。本番では起動できません。")
+    return secret or "local-dev-flask-secret"
+
+
 def _serializer() -> URLSafeTimedSerializer:
-    secret = current_app.config.get("SECRET_KEY") or "speech-rec-dev-secret"
-    return URLSafeTimedSerializer(str(secret), salt=SESSION_SALT)
+    return URLSafeTimedSerializer(_runtime_secret(), salt=SESSION_SALT)
 
 
 def cookie_secure() -> bool:

@@ -914,9 +914,13 @@ def start_part_generation(session_id, part):
     if not allowed:
         return jsonify({"error": message}), CONFLICT
 
+    from debate.paid_limits import PaidLimitError
     from debate.solo_jobs import start_generation_job
 
-    part_data = start_generation_job(session_id, part)
+    try:
+        part_data = start_generation_job(session_id, part)
+    except PaidLimitError as exc:
+        return jsonify({"error": str(exc)}), 429
     if not part_data:
         return jsonify({"error": "生成を開始できませんでした。"}), 400
     return jsonify(generation_view(part_data)), 202
@@ -975,9 +979,12 @@ def retry_part_tts(session_id, part):
     if part_data.get("generation_status") != "done":
         return jsonify({"error": "テキストの生成が完了してから音声を再試行できます。"}), CONFLICT
 
+    from debate.paid_limits import LIMIT_MESSAGE
     from debate.solo_jobs import start_tts_job
 
     updated = start_tts_job(session_id, part, force=True)
+    if updated and updated.get("tts_status") == "error" and updated.get("tts_error") == LIMIT_MESSAGE:
+        return jsonify({"error": LIMIT_MESSAGE}), 429
     return jsonify(generation_view(updated)), 202
 
 
@@ -1009,6 +1016,21 @@ def start_judge(session_id):
             else:
                 message = f"すべてのパートを確定してから実行してください（未確定: {', '.join(missing)}）。"
             return jsonify({"error": message}), 400
+
+    from debate.paid_limits import PaidLimitError, consume
+
+    try:
+        consume("judge")
+    except PaidLimitError as exc:
+        return jsonify({"error": str(exc)}), 429
+
+    with get_session_lock(session_id):
+        session = load_session(session_id)
+        if not session:
+            return jsonify({"error": "セッションが見つかりません。"}), 404
+        missing = _unconfirmed_parts(session)
+        if missing:
+            return jsonify({"error": "すべてのパートを確定してから実行してください。"}), 400
 
         judge_result = new_judge_result()
         judge_result["status"] = "judging"

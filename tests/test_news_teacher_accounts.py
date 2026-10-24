@@ -108,7 +108,8 @@ class NewsTeacherAccountTests(unittest.TestCase):
         self.assertIn("pass-1234", issued["copy_text"])
         self.assertIn("/news/admin/login", issued["copy_text"])
         listed = self.client.get("/news/admin/api/access-settings")
-        self.assertEqual(listed.get_json()["accounts"][0]["password"], "pass-1234")
+        self.assertNotIn("password", listed.get_json()["accounts"][0])
+        self.assertNotIn("password_hash", listed.get_json()["accounts"][0])
 
         short = self.client.post("/news/admin/api/teachers", json={"id": "ab", "password": "no"})
         self.assertEqual(short.status_code, 400)
@@ -302,3 +303,43 @@ class NewsTeacherAccountTests(unittest.TestCase):
             json={"teacher_id": "teacher1", "password": "pass-1234"},
         )
         self.assertEqual(locked_teacher.status_code, 429)
+
+    def test_password_is_hashed_and_legacy_plaintext_migrates(self):
+        import json
+        from pathlib import Path
+
+        from news_app.access_control import _store_path
+
+        self._login_owner()
+        issued = self._issue(password="pass-1234")
+        self.assertEqual(issued["account"]["password"], "pass-1234")
+        short = self.client.post("/news/admin/api/teachers", json={"id": "shortpw", "password": "1234567"})
+        self.assertEqual(short.status_code, 400)
+        self.assertIn("8", short.get_json()["error"])
+        stored = json.loads(Path(_store_path()).read_text(encoding="utf-8"))
+        saved = stored["accounts"][0]
+        self.assertNotIn("password", saved)
+        self.assertTrue(saved["password_hash"])
+        listed = self.client.get("/news/admin/api/access-settings")
+        self.assertNotIn("pass-1234", json.dumps(listed.get_json()["accounts"]))
+
+        stored["accounts"].append(
+            {
+                "id": "legacy",
+                "password": "legacy-pass",
+                "created_at": "2020-01-01T00:00:00Z",
+                "disabled": False,
+                "rev": 1,
+            }
+        )
+        Path(_store_path()).write_text(json.dumps(stored), encoding="utf-8")
+        client = self.app.test_client()
+        res = client.post("/news/admin/api/login", json={"teacher_id": "legacy", "password": "legacy-pass"})
+        self.assertEqual(res.status_code, 200)
+        migrated = json.loads(Path(_store_path()).read_text(encoding="utf-8"))
+        legacy = next(row for row in migrated["accounts"] if row["id"] == "legacy")
+        self.assertNotIn("password", legacy)
+        self.assertTrue(legacy.get("password_hash"))
+        again = self.app.test_client()
+        res = again.post("/news/admin/api/login", json={"teacher_id": "legacy", "password": "legacy-pass"})
+        self.assertEqual(res.status_code, 200)

@@ -2092,11 +2092,18 @@
   const teacherAccountMessage = document.getElementById("teacher-account-message");
   const teacherPasswordVisibility = document.getElementById("teacher-password-visibility");
   let teacherAccounts = [];
+  const teacherIssuedPasswords = {};
   let teacherPasswordsVisible = false;
   let teacherLoginUrl = `${location.origin}/news/admin/login`;
 
+  function teacherPassword(account) {
+    return teacherIssuedPasswords[account.id] || account.password || "";
+  }
+
   function teacherCopyText(account) {
-    return `ID: ${account.id}\nパスワード: ${account.password}\nログインURL: ${teacherLoginUrl}`;
+    const password = teacherPassword(account);
+    if (!password) return "";
+    return `ID: ${account.id}\nパスワード: ${password}\nログインURL: ${teacherLoginUrl}`;
   }
 
   function showTeacherAccountMessage(text, isError) {
@@ -2114,7 +2121,8 @@
     teacherAccounts.forEach((account) => {
       const row = document.createElement("li");
       row.className = "flex items-center gap-1 whitespace-nowrap";
-      const password = teacherPasswordsVisible ? account.password : "••••";
+      const known = teacherPassword(account);
+      const password = teacherPasswordsVisible ? (known || "再表示不可") : "••••";
       const date = (account.created_at || "").slice(0, 10);
       const idSpan = document.createElement("span");
       idSpan.className = "w-16 truncate font-medium";
@@ -2129,7 +2137,14 @@
       copyBtn.type = "button";
       copyBtn.className = "rounded border border-teal-100 px-1.5 py-0.5";
       copyBtn.textContent = "コピー";
-      copyBtn.addEventListener("click", () => navigator.clipboard.writeText(teacherCopyText(account)));
+      copyBtn.addEventListener("click", () => {
+        const text = teacherCopyText(account);
+        if (!text) {
+          showTeacherAccountMessage("このパスワードは保存していないため、発行直後以外はコピーできません。", true);
+          return;
+        }
+        navigator.clipboard.writeText(text);
+      });
       const stopBtn = document.createElement("button");
       stopBtn.type = "button";
       stopBtn.className = "rounded border border-amber-100 px-1.5 py-0.5";
@@ -2219,9 +2234,12 @@
         return;
       }
       teacherAccounts = data.accounts || [];
+      if (data.account && data.account.password) {
+        teacherIssuedPasswords[data.account.id] = data.account.password;
+      }
       if (data.login_url) teacherLoginUrl = data.login_url;
       renderTeacherAccounts();
-      showTeacherAccountMessage("発行しました。コピーで渡せます。", false);
+      showTeacherAccountMessage("発行しました。パスワードはこの画面を閉じると再表示できません。", false);
     });
   }
   async function writeTeacherClipboard(text) {

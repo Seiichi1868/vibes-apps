@@ -85,8 +85,47 @@ def _needs_speech(script_id: str, part: dict) -> bool:
     return not part_audio_ready(script_id, part)
 
 
+def _speech_targets(script_id: str, only_parts: list[str] | None, force: bool) -> list[str]:
+    wanted = None
+    if only_parts is not None:
+        wanted = []
+        for name in only_parts:
+            if name not in PART_ORDER:
+                raise ValueError("不明なパートです。")
+            if name not in wanted:
+                wanted.append(name)
+    names: list[str] = []
+    script = load_script(script_id)
+    if not script:
+        raise ValueError("スクリプトが見つかりません。")
+    if script.get("generation_status") != "draft" or not script.get("parts"):
+        raise ValueError("生成が終わった本文があるスクリプトだけ音声を作れます。")
+    for part in script.get("parts") or []:
+        if not isinstance(part, dict):
+            continue
+        name = str(part.get("part") or "")
+        if name not in PART_ORDER:
+            continue
+        if wanted is not None and name not in wanted:
+            continue
+        audio = _audio(part)
+        if str(audio.get("status") or "") == "generating":
+            continue
+        if wanted is None and not _needs_speech(script_id, part):
+            continue
+        if wanted is not None and not force and not _needs_speech(script_id, part):
+            continue
+        names.append(name)
+    return names
+
+
 def queue_script_speech(script_id: str, only_parts: list[str] | None = None, *, force: bool = False) -> dict:
     """必要なパートを generating にしてジョブを起動する。force はそのパートを作り直す。"""
+    planned = _speech_targets(script_id, only_parts, force)
+    if planned:
+        from debate.paid_limits import consume
+
+        consume("tts", len(planned))
     wanted = None
     if only_parts is not None:
         wanted = []

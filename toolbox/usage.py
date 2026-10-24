@@ -5,7 +5,7 @@ import json
 import logging
 import time
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from toolbox.config import (
     GENERATE_MAX_RETRIES,
@@ -17,7 +17,7 @@ from toolbox.config import (
 from toolbox.model_catalog import resolved_catalog
 from toolbox.openai_http import OpenAIHttpError, _ssl_context, chat_completions
 from toolbox.pricing import estimate_embed_usd, estimate_generate_usd, estimate_transcribe_usd, has_price
-from toolbox.storage import append_usage, get_setting, list_usage, now_dt
+from toolbox.storage import JST, append_usage, get_setting, list_usage, list_users, now_dt
 
 logger = logging.getLogger(__name__)
 
@@ -336,7 +336,39 @@ def usage_summary() -> dict:
         "by_tool_month": _by("tool_id", lambda row: _in_month(row, month)),
         "daily_limit_usd": float(get_setting("daily_limit_usd") or 0),
         "used_today_usd": round(today_cost_usd(), 4),
+        "guest": guest_usage_summary(),
     }
+
+
+def guest_usage_summary(now: datetime | None = None) -> dict:
+    """ゲストユーザー合算。直近24時間・7日・30日。"""
+    current = now or now_dt()
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=JST)
+    guest_ids = {user.get("id") for user in list_users() if user.get("is_guest") and user.get("id")}
+    rows = [
+        row
+        for row in list_usage()
+        if row.get("user_id") in guest_ids and row.get("kind") in ("transcribe", "llm", "embed")
+    ]
+    windows = {"day": timedelta(days=1), "week": timedelta(days=7), "month": timedelta(days=30)}
+    summary = {}
+    for name, span in windows.items():
+        start = current - span
+        items = []
+        for row in rows:
+            dt = _parse_ts(row.get("ts"))
+            if dt is None:
+                continue
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=JST)
+            if start <= dt <= current:
+                items.append(row)
+        summary[name] = {
+            "count": len(items),
+            "est_cost_usd": round(sum(float(row.get("est_cost_usd") or 0) for row in items), 4),
+        }
+    return summary
 
 
 def measured_stats(model_id: str, kind: str) -> dict:

@@ -246,6 +246,17 @@
     </div>
 
     <div>
+      <h3 class="text-sm font-bold text-slate-800 mb-2">有料APIの1日上限</h3>
+      <label class="panel-soft flex items-start gap-3 rounded-xl px-4 py-3 cursor-pointer">
+        <input type="checkbox" id="paid-daily-limit" class="mt-1 accent-teal-600" checked>
+        <span>
+          <span class="block text-sm font-semibold text-slate-800">上限あり（各20回 / 日）</span>
+          <span class="block text-xs text-slate-500 mt-0.5">台本生成・ジャッジ・読み上げTTSを、種類ごとにサーバー全体で1日20回まで。オフにするとオフにした時刻から24時間は上限なしで、その後の確認時に自動でオンに戻ります。</span>
+        </span>
+      </label>
+    </div>
+
+    <div>
       <h3 class="text-sm font-bold text-slate-800 mb-2">観戦の読み上げ</h3>
       <div class="flex flex-col sm:flex-row gap-3" id="speech-mode-picker">
         <label class="panel-soft flex items-start gap-3 rounded-xl px-4 py-3 cursor-pointer flex-1">
@@ -294,5 +305,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='debate/js/admin.js', v='20261018a') }}"></script>
+<script src="{{ url_for('static', filename='debate/js/admin.js', v='20261024a') }}"></script>
 {% endblock %}
