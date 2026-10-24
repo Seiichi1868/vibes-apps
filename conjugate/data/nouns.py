@@ -40,8 +40,8 @@ NOUNS = [
         "category": "vegetables",
         "ja": "キャベツ",
         "en": "cabbage",
-        "es": "el repollo / la col",
-        "reading": "エル レポージョ / ラ コル",
+        "es": "el repollo（南米） / la col（スペイン）",
+        "reading": "エル レポージョ（南米） / ラ コル（スペイン）",
     },
     {
         "id": "veg-tomate",
@@ -80,8 +80,8 @@ NOUNS = [
         "category": "vegetables",
         "ja": "じゃがいも",
         "en": "potato",
-        "es": "la papa / la patata",
-        "reading": "ラ パパ（中南米） / ラ パタタ（スペイン）",
+        "es": "la papa（南米） / la patata（スペイン）",
+        "reading": "ラ パパ（南米） / ラ パタタ（スペイン）",
     },
     {
         "id": "veg-lechuga",
@@ -224,8 +224,8 @@ NOUNS = [
         "category": "fruits",
         "ja": "バナナ",
         "en": "banana",
-        "es": "el plátano / la banana",
-        "reading": "エル プラタノ / ラ バナナ",
+        "es": "el plátano（スペイン） / la banana（南米）",
+        "reading": "エル プラタノ（スペイン） / ラ バナナ（南米）",
     },
     {
         "id": "fruit-melon",
@@ -240,8 +240,8 @@ NOUNS = [
         "category": "fruits",
         "ja": "もも",
         "en": "peach",
-        "es": "el melocotón / el durazno",
-        "reading": "エル メロコトン（スペイン） / エル ドゥラスノ（中南米）",
+        "es": "el melocotón（スペイン） / el durazno（南米）",
+        "reading": "エル メロコトン（スペイン） / エル ドゥラスノ（南米）",
     },
     {
         "id": "fruit-ciruela",

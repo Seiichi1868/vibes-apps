@@ -98,7 +98,7 @@ class NounQuizTests(unittest.TestCase):
             self.assertEqual(q["prompt_kicker"], "この日本語は？")
             self.assertTrue(q["prompt_en"])
         papa = next(q for q in questions if q["meaning_ja"] == "じゃがいも")
-        self.assertIn("la papa / la patata", [c["label"] for c in papa["choices"]])
+        self.assertIn("la papa（南米） / la patata（スペイン）", [c["label"] for c in papa["choices"]])
 
     def test_food_categories_cover_each_list(self):
         expected = {
