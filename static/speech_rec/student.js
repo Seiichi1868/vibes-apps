@@ -136,7 +136,7 @@
     app.innerHTML = `
       <p class="topic">${esc(info.topic)}</p>
       ${idSelects(info)}
-      <p class="mine"><a href="/rec/my">自分の結果</a></p>
+      <p class="mine"><a href="/rec/my?from=${encodeURIComponent(location.pathname + location.search)}">自分の結果履歴</a></p>
       ${info.calibration_mode ? `<p class="err">この回は録音と文字起こしが24時間保存されます。</p>` : ""}
       <p class="note">下のボタンを押してスピーチを開始してください。終わると評価が表示されるので、スクリーンショットで保存してください。音声は採点後すぐに、文字起こしやコメントは30分後に、サーバーから自動的に削除されます。</p>
       <button id="start" class="primary">${Number(info.prep_sec) > 0 ? "準備スタート" : "スピーチ開始"}</button>
@@ -427,7 +427,7 @@
     const rubric = data.show_points && data.scores ? esc(Math.round((data.scores.total || 0) - (data.wpm_points || 0))) : "—";
     app.className = "app sheet";
     app.innerHTML = `
-      <p class="meta"><a href="/rec/my">自分の結果</a> ${when} ・ 試行 ${esc(data.attempt)}</p>
+      <p class="meta"><a href="/rec/my?from=${encodeURIComponent(location.pathname + location.search)}">自分の結果履歴</a> ${when} ・ 試行 ${esc(data.attempt)}</p>
       <p class="topic">${esc(data.topic)}</p>
       <p class="total">${total}</p>
       <p class="sub"><span>WPM点 ${wpm}</span><span>ルーブリック ${rubric}</span></p>
@@ -562,15 +562,19 @@
     window.addEventListener("pagehide", stopPlayer, { once: true });
   }
 
-  function rememberHistory(readToken) {
+  function rememberHistory(readToken, snapshot) {
     const key = "speechrec:history";
     const now = Date.now();
     const keep = 60 * 24 * 60 * 60 * 1000;
     let rows = [];
     try { rows = JSON.parse(localStorage.getItem(key) || "[]"); } catch (error) { rows = []; }
     if (!Array.isArray(rows)) rows = [];
+    const previous = rows.find((row) => row && row.read_token === readToken);
     rows = rows.filter((row) => row && row.read_token && now - Number(row.saved_at) < keep && row.read_token !== readToken);
-    rows.push({ read_token: readToken, saved_at: now });
+    const saved = { read_token: readToken, saved_at: now };
+    const kept = snapshot && snapshot.status === "done" ? snapshot : (previous && previous.snapshot);
+    if (kept) saved.snapshot = kept;
+    rows.push(saved);
     localStorage.setItem(key, JSON.stringify(rows.slice(-30)));
     sessionStorage.setItem("speechrec:current", JSON.stringify({
       path: location.pathname + location.search.replace(/([?&])resume=[^&]*/g, "").replace(/[?&]$/, ""),
@@ -596,7 +600,7 @@
 
   async function poll(readToken) {
     localStorage.setItem(readKey, readToken);
-    app.innerHTML = `<p class="status" id="phase">文字起こし中…</p>`;
+    app.innerHTML = `<p class="status" id="phase">採点中…</p>`;
     let data = {};
     const started = Date.now();
     let wait = 1500;
@@ -605,7 +609,7 @@
       data = await res.json().catch(() => ({}));
       if (data.status === "done" || data.status === "error") break;
       const phase = document.getElementById("phase");
-      if (phase) phase.textContent = data.status === "received" ? "送信しました。文字起こしを待っています。" : "文字起こし中…";
+      if (phase) phase.textContent = data.status === "received" ? "送信しました。採点を待っています。" : "採点中…";
       await new Promise((resolve) => setTimeout(resolve, wait));
       wait = Math.min(5000, wait + 500);
     }
@@ -617,6 +621,7 @@
       await window.SpeechRecAudio.deleteClip(token).catch(() => {});
       state.result = data;
       state.readToken = readToken;
+      rememberHistory(readToken, data);
       renderScore(data);
       return;
     }
