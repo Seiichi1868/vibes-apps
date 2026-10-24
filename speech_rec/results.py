@@ -65,13 +65,37 @@ def present(record: dict, *, speak_sec: float) -> dict:
         "levels": levels,
         "rubric": rubric,
         "total": scores.get("total"),
-        "oreo": {key: bool(oreo.get(key)) for key in ("opinion_open", "reason", "example", "opinion_close")},
+        "oreo": _oreo_flags(oreo),
         "pauses": pauses,
         "snr_db": metrics.get("snr_db"),
         "flags": record.get("flags") or [],
         "code": record.get("verify_code"),
         "yen": round(float(record.get("cost_usd") or 0) * JPY_PER_USD, 2),
         "delivery_cap": scores.get("delivery_cap"),
+    }
+
+
+def _oreo_flags(oreo: dict) -> dict:
+    def on(key: str, legacy: str | None = None) -> bool:
+        if key in oreo:
+            return bool(oreo.get(key))
+        if legacy:
+            return bool(oreo.get(legacy))
+        return False
+
+    reason_1 = on("reason_1", "reason")
+    example_1 = on("example_1", "example")
+    reason_2 = on("reason_2")
+    example_2 = on("example_2")
+    return {
+        "opinion_open": on("opinion_open"),
+        "reason_1": reason_1,
+        "reason_2": reason_2,
+        "example_1": example_1,
+        "example_2": example_2,
+        "opinion_close": on("opinion_close"),
+        "reason": reason_1 or reason_2 or on("reason"),
+        "example": example_1 or example_2 or on("example"),
     }
 
 
@@ -148,7 +172,10 @@ def csv_text(assignment_id: str) -> str:
             row["time"], row["student_id"], row["attempt"], row["status"], row["words"], row["wpm"], row["wpm_points"],
             points.get("general_description"), points.get("delivery"), points.get("language_use"), points.get("topic_development"),
             row["rubric"], row["total"],
-            "".join(letter if oreo.get(key) else "·" for letter, key in (("O", "opinion_open"), ("R", "reason"), ("E", "example"), ("O", "opinion_close"))),
+            "".join(letter if oreo.get(key) else "·" for letter, key in (
+                ("O", "opinion_open"), ("R", "reason_1"), ("R", "reason_2"),
+                ("E", "example_1"), ("E", "example_2"), ("O", "opinion_close"),
+            )),
             row["pauses"], row["snr_db"], " ".join(row["flags"]), row["code"], row["yen"],
         ])
     return buffer.getvalue()

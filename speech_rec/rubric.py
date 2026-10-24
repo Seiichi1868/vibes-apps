@@ -1,7 +1,7 @@
 """ルーブリック原文とレベル点数。評価の点数換算はサーバー側。"""
 from __future__ import annotations
 
-PROMPT_VERSION = "ms-eval-v1"
+PROMPT_VERSION = "ms-eval-v2"
 RUBRIC_VERSION = "s5-sem2-v1"
 LEVEL_POINTS = {1: 10, 2: 20, 3: 25, 4: 30, 5: 35, 6: 40}
 

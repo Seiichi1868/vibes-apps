@@ -177,7 +177,7 @@ class JobTests(unittest.TestCase):
                 "flags": ["no_example"],
                 "cost_usd": 0.001,
                 "model": "gpt-4o-mini",
-                "prompt_version": "ms-eval-v1",
+                "prompt_version": "ms-eval-v2",
                 "view": {"comments": {"general_description": "よい"}, "evidence": {"example": "secret quote"}, "sentences": [], "student_feedback": {"next_step": "例を足そう"}},
             }
 
