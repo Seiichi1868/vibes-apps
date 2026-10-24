@@ -551,11 +551,11 @@ def teacher_account_issue():
             "ok": True,
             "account": {
                 "id": account["id"],
-                "password": account["password"],
+                "password": account.get("password") or "",
                 "created_at": account["created_at"],
                 "disabled": False,
             },
-            "copy_text": copy_login_text(account["id"], account["password"], login_url),
+            "copy_text": copy_login_text(account["id"], account.get("password") or "", login_url),
             "accounts": public_accounts(),
             "login_url": login_url,
         }

@@ -14,6 +14,7 @@ import time
 from pathlib import Path
 
 from flask import jsonify, request, session
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from news_app.admin_auth import (
     SESSION_KEY,
@@ -38,7 +39,7 @@ SESSION_REV = "news_admin_rev"
 
 MIN_ID_LEN = 2
 MAX_ID_LEN = 40
-MIN_PASSWORD_LEN = 4
+MIN_PASSWORD_LEN = 8
 MAX_PASSWORD_LEN = 80
 _ID_RE = re.compile(r"^[^\s/\\]{2,40}$")
 
@@ -179,7 +180,7 @@ def validate_account_id(account_id: str) -> str | None:
 def validate_password(password: str) -> str | None:
     password = password if isinstance(password, str) else ""
     if len(password) < MIN_PASSWORD_LEN or len(password) > MAX_PASSWORD_LEN:
-        return "パスワードは4〜80文字にしてください。"
+        return "パスワードは8〜80文字にしてください。"
     if password.strip() != password or not password.strip():
         return "パスワードの前後に空白は使えません。"
     return None
@@ -196,13 +197,15 @@ def issue_account(account_id: str, password: str) -> tuple[dict | None, str | No
             return None, "同じIDのアカウントが既にあります。"
         account = {
             "id": account_id,
-            "password": password,
+            "password_hash": generate_password_hash(password),
             "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "disabled": False,
             "rev": 1,
         }
         data["accounts"].append(account)
-        return account, None
+        shown = dict(account)
+        shown["password"] = password
+        return shown, None
 
     return _with_store(add)
 
@@ -241,7 +244,7 @@ def delete_account(account_id: str) -> str | None:
 
 
 def public_accounts() -> list[dict]:
-    """所有者セッション向け。パスワードを含む。"""
+    """所有者向け一覧。保存済みパスワードは返さない。"""
     rows = []
     for account in load_access()["accounts"]:
         if not isinstance(account, dict):
@@ -249,10 +252,10 @@ def public_accounts() -> list[dict]:
         rows.append(
             {
                 "id": account.get("id") or "",
-                "password": account.get("password") or "",
                 "created_at": account.get("created_at") or "",
                 "disabled": bool(account.get("disabled")),
                 "rev": int(account.get("rev") or 1),
+                "has_password": bool(account.get("password_hash") or account.get("password")),
             }
         )
     return rows
@@ -322,6 +325,28 @@ def actor_id() -> str:
     return actor or ""
 
 
+def _password_matches(account: dict, provided: str) -> bool:
+    hashed = account.get("password_hash")
+    if isinstance(hashed, str) and hashed:
+        return check_password_hash(hashed, provided)
+    plain = account.get("password")
+    if isinstance(plain, str) and plain:
+        return hmac.compare_digest(provided, plain)
+    return False
+
+
+def _migrate_plaintext_password(account_id: str, password: str) -> None:
+    def apply(data):
+        account = _find_account(data, account_id)
+        if not account or account.get("password_hash"):
+            return None
+        account["password_hash"] = generate_password_hash(password)
+        account.pop("password", None)
+        return None
+
+    _with_store(apply)
+
+
 def attempt_login(payload: dict) -> tuple | None:
     """失敗時は (response, status)。成功時は None でセッション確立済み。"""
     payload = payload or {}
@@ -337,13 +362,10 @@ def attempt_login(payload: dict) -> tuple | None:
 
     if teacher_id:
         account = _account_by_id(teacher_id)
-        password = account.get("password") if account else None
-        matches = bool(
-            account
-            and not account.get("disabled")
-            and isinstance(password, str)
-            and hmac.compare_digest(provided, password)
-        )
+        matches = bool(account and not account.get("disabled") and _password_matches(account, provided))
+        if matches and account and not account.get("password_hash") and account.get("password"):
+            _migrate_plaintext_password(teacher_id, provided)
+            account = _account_by_id(teacher_id) or account
         if not matches:
             record_failure(ip)
             if is_locked(ip):

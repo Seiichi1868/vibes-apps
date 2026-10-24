@@ -33,7 +33,17 @@ def device_hash(raw: str) -> str:
     """署名鍵と専用 salt から HMAC を作る。記録にはこの値だけを残す。"""
     from flask import current_app
 
-    secret = str(current_app.config.get("SECRET_KEY") or "speech-rec-dev-secret")
+    import os
+
+    secret = str(current_app.config.get("SECRET_KEY") or os.environ.get("FLASK_SECRET_KEY") or "").strip()
+    render = (os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
+    env = (os.environ.get("FLASK_ENV") or os.environ.get("ENV") or "").strip().lower()
+    if (render or env == "production") and (
+        not secret or secret in {"local-dev-flask-secret", "speech-rec-dev-secret", "your-secret-key-here"}
+    ):
+        raise RuntimeError("FLASK_SECRET_KEY が未設定です。本番では起動できません。")
+    if not secret:
+        secret = "local-dev-flask-secret"
     return hmac.new(secret.encode(), f"{DEVICE_SALT}:{raw}".encode(), hashlib.sha256).hexdigest()
 
 

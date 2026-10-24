@@ -56,6 +56,8 @@ DEFAULT_SETTINGS = {
     "poi_protected_start_sec": POI_PROTECTED_SEC,
     "poi_protected_end_sec": POI_PROTECTED_SEC,
     "affiliations": [],
+    "paid_daily_limit_enabled": True,
+    "paid_daily_limit_disabled_at": None,
 }
 
 MAX_AFFILIATION_NAME_LEN = 40
@@ -219,6 +221,11 @@ def _normalize(raw: dict | None) -> dict:
     data["poi_protected_start_sec"] = start_sec
     data["poi_protected_end_sec"] = end_sec
     data["affiliations"] = _normalize_affiliations(raw.get("affiliations"))
+
+    if "paid_daily_limit_enabled" in raw:
+        data["paid_daily_limit_enabled"] = bool(raw.get("paid_daily_limit_enabled"))
+    disabled_at = raw.get("paid_daily_limit_disabled_at")
+    data["paid_daily_limit_disabled_at"] = disabled_at if isinstance(disabled_at, str) and disabled_at.strip() else None
 
     return data
 

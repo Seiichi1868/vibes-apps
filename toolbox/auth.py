@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hmac
 import logging
+import os
 import secrets
 from functools import wraps
 
@@ -30,11 +31,20 @@ from toolbox.storage import (
 logger = logging.getLogger(__name__)
 
 
-def _serializer() -> URLSafeTimedSerializer:
+def _runtime_secret() -> str:
     from flask import current_app
 
-    secret = current_app.config.get("SECRET_KEY") or "toolbox-dev-secret"
-    return URLSafeTimedSerializer(str(secret), salt=SESSION_SALT)
+    secret = str(current_app.config.get("SECRET_KEY") or os.environ.get("FLASK_SECRET_KEY") or "").strip()
+    render = (os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
+    env = (os.environ.get("FLASK_ENV") or os.environ.get("ENV") or "").strip().lower()
+    production = render or env == "production"
+    if production and (not secret or secret in {"local-dev-flask-secret", "toolbox-dev-secret", "your-secret-key-here"}):
+        raise RuntimeError("FLASK_SECRET_KEY が未設定です。本番では起動できません。")
+    return secret or "local-dev-flask-secret"
+
+
+def _serializer() -> URLSafeTimedSerializer:
+    return URLSafeTimedSerializer(_runtime_secret(), salt=SESSION_SALT)
 
 
 def cookie_secure() -> bool:

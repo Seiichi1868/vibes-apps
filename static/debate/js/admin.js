@@ -291,6 +291,11 @@ function applyScriptModelMode(mode, activeModel) {
   }
 }
 
+function applyPaidDailyLimit(enabled) {
+  const box = document.getElementById("paid-daily-limit");
+  if (box) box.checked = enabled !== false;
+}
+
 function applySpeechMode(mode) {
   currentSpeechMode = mode === "browser" ? "browser" : "openai";
   speechModePicker?.querySelectorAll('input[name="speech_mode"]').forEach((input) => {
@@ -361,6 +366,7 @@ async function loadSettingsIntoUI() {
   renderScriptModelOptions(data.judge_model_modes || [], data.script_model_mode || "5.6-terra");
   applyScriptModelMode(data.script_model_mode || "5.6-terra", data.script_model);
   applySpeechMode(data.speech_mode || "openai");
+  applyPaidDailyLimit(data.paid_daily_limit_enabled !== false);
 }
 
 function schedulePoiProtectedSave() {
@@ -398,6 +404,25 @@ function scheduleBackgroundSave() {
       const activeBtn = bgPicker?.querySelector(`.bg-pick-btn[data-bg-id="${saved.background_id}"]`);
       applyBackground(saved.background_id, activeBtn?.dataset.bgImage);
       applyBackgroundOpacity(saved.background_opacity ?? 0.32);
+      if (statusMessage) statusMessage.textContent = "保存しました";
+      hideLockMessage();
+    } catch (err) {
+      if (statusMessage) statusMessage.textContent = "";
+      showLockMessage(err.message);
+    }
+  }, 300);
+}
+
+function schedulePaidLimitSave() {
+  if (!unlocked) return;
+  const box = document.getElementById("paid-daily-limit");
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    try {
+      const saved = await saveSettings({
+        paid_daily_limit_enabled: !!(box && box.checked),
+      });
+      applyPaidDailyLimit(saved.paid_daily_limit_enabled !== false);
       if (statusMessage) statusMessage.textContent = "保存しました";
       hideLockMessage();
     } catch (err) {
@@ -1019,6 +1044,10 @@ poiProtectedStartSlider?.addEventListener("input", () => {
 });
 poiProtectedEndSlider?.addEventListener("input", () => {
   schedulePoiProtectedSave();
+});
+
+document.getElementById("paid-daily-limit")?.addEventListener("change", () => {
+  schedulePaidLimitSave();
 });
 
 transcriptionModePicker?.addEventListener("change", () => {
