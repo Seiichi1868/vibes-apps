@@ -76,7 +76,7 @@
         row.time, row.student_id, row.attempt, mark(row.status), row.words, row.wpm_points,
         points.general_description, points.delivery, points.language_use, points.topic_development,
         row.rubric, row.total,
-        ["opinion_open", "reason", "example", "opinion_close"].map((key) => (row.oreo || {})[key] ? "●" : "○").join(""),
+        ["opinion_open", "reason_1", "reason_2", "example_1", "example_2", "opinion_close"].map((key) => (row.oreo || {})[key] ? "●" : "○").join(""),
         row.pauses, row.snr_db, (row.flags || []).join(" "), row.code, row.yen,
       ];
       values.forEach((value, index) => {

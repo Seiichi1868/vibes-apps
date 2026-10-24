@@ -13,7 +13,7 @@ SYSTEM = """あなたは日本の高校の英語スピーキング評価の採�
 生徒が「準備1分→スピーチ1分」で話した英語を、音声認識（Whisper）の文字起こしをもとに、ルーブリックで評価します。
 
 【課題】
-お題について、OREO形式（Opinion → Reason → Example → Opinion）で、1分間、論理的に述べる。
+お題について、OREO形式（Opinion → Reason を2つ → Example を2つ → Opinion）で、1分間、論理的に述べる。理由と具体例は、それぞれ別の内容を2つ言うことを目指す。
 
 【前提（必ず守る）】
 - transcript は音声認識の結果。大文字小文字・句読点・綴りの揺れは生徒の誤りとして扱わない。
@@ -24,8 +24,10 @@ SYSTEM = """あなたは日本の高校の英語スピーキング評価の採�
 【手順】
 1. transcript を文に分け、各文に role を付ける。
    role = opinion | reason | example | elaboration | transition | filler_or_repair | off_topic | other
-2. OREOの4要素 opinion_open / reason / example / opinion_close について、
-   present(true/false) と evidence を出す。opinion_close は、終わりの部分で最初の主張に戻れているか。
+2. OREOについて present(true/false) と evidence を出す。
+   opinion_open は最初の主張。opinion_close は、終わりの部分で最初の主張に戻れているか。
+   reason_1 と reason_2 は、内容が違う理由をそれぞれ1つ。同じ理由の言い換えは2つ目に数えない。1つしかなければ reason_2 は present false。
+   example_1 と example_2 も同様に、内容が違う具体例をそれぞれ1つ。1つしかなければ example_2 は present false。
 3. on_topic：お題に答えているか(true/false)。
 4. 次の3項目を level 1〜6 の整数で採点する（1が最低、6が最高）。レベルと点数の対応は 1=10, 2=20, 3=25, 4=30, 5=35, 6=40。
    - general_description：理由・説明の十分さ、主張を支える文（reason/example/elaboration）の割合。OREOの Reason と Example を主に反映する。
@@ -44,8 +46,10 @@ SYSTEM = """あなたは日本の高校の英語スピーキング評価の採�
   "on_topic": true,
   "oreo": {
     "opinion_open":  {"present": true, "evidence": ""},
-    "reason":        {"present": true, "evidence": ""},
-    "example":       {"present": true, "evidence": ""},
+    "reason_1":      {"present": true, "evidence": ""},
+    "reason_2":      {"present": true, "evidence": ""},
+    "example_1":     {"present": true, "evidence": ""},
+    "example_2":     {"present": true, "evidence": ""},
     "opinion_close": {"present": true, "evidence": ""}
   },
   "sentences": [{"text": "", "role": "opinion"}],
@@ -61,6 +65,49 @@ SYSTEM = """あなたは日本の高校の英語スピーキング評価の採�
 
 def system_prompt() -> str:
     return SYSTEM.replace("{{RUBRIC_DESCRIPTORS}}", descriptor_text()).replace("{{ANCHOR_EXAMPLES}}", "")
+
+
+def _quote(row: dict) -> str:
+    return str(row.get("text") or row.get("evidence") or "")[:200]
+
+
+def _slot(item: object) -> tuple[bool, str]:
+    if not isinstance(item, dict):
+        return False, ""
+    return bool(item.get("present")), str(item.get("evidence") or "")[:200]
+
+
+def read_oreo(oreo_in: dict, sentences: list) -> tuple[dict, dict]:
+    """理由と具体例は2つずつ。古い1つずつのJSONも読む。"""
+    by_role: dict[str, list[str]] = {"reason": [], "example": []}
+    for row in sentences:
+        if not isinstance(row, dict):
+            continue
+        role = row.get("role")
+        if role in by_role:
+            by_role[role].append(_quote(row))
+
+    def pair(new_key: str, legacy_key: str, role: str, index: int) -> tuple[bool, str]:
+        if new_key in oreo_in:
+            return _slot(oreo_in.get(new_key))
+        if index == 0 and legacy_key in oreo_in:
+            return _slot(oreo_in.get(legacy_key))
+        quotes = by_role[role]
+        if index < len(quotes) and quotes[index]:
+            return True, quotes[index]
+        return False, ""
+
+    oreo = {}
+    evidence = {}
+    oreo["opinion_open"], evidence["opinion_open"] = _slot(oreo_in.get("opinion_open"))
+    oreo["opinion_close"], evidence["opinion_close"] = _slot(oreo_in.get("opinion_close"))
+    for index, key in ((0, "reason_1"), (1, "reason_2")):
+        oreo[key], evidence[key] = pair(key, "reason", "reason", index)
+    for index, key in ((0, "example_1"), (1, "example_2")):
+        oreo[key], evidence[key] = pair(key, "example", "example", index)
+    oreo["reason"] = oreo["reason_1"] or oreo["reason_2"]
+    oreo["example"] = oreo["example_1"] or oreo["example_2"]
+    return oreo, evidence
 
 
 def support_ratio(sentences: list) -> float:
@@ -85,13 +132,8 @@ def interpret(payload: dict, *, words_counted: int) -> dict:
             levels[key] = clamp_level(raw)
             comments[key] = ""
     oreo_in = payload.get("oreo") if isinstance(payload.get("oreo"), dict) else {}
-    oreo = {}
-    evidence = {}
-    for key in ("opinion_open", "reason", "example", "opinion_close"):
-        item = oreo_in.get(key) if isinstance(oreo_in.get(key), dict) else {}
-        oreo[key] = bool(item.get("present"))
-        evidence[key] = str(item.get("evidence") or "")[:200]
     sentences = payload.get("sentences") if isinstance(payload.get("sentences"), list) else []
+    oreo, evidence = read_oreo(oreo_in, sentences)
     ratio = support_ratio(sentences)
     feedback = payload.get("student_feedback") if isinstance(payload.get("student_feedback"), dict) else {}
     flags = []
@@ -100,7 +142,7 @@ def interpret(payload: dict, *, words_counted: int) -> dict:
         flags.append("check_general_description")
     if not oreo["opinion_open"]:
         flags.append("no_open")
-    if not oreo["example"]:
+    if not oreo["example_1"] and not oreo["example_2"]:
         flags.append("no_example")
     if not oreo["opinion_close"]:
         flags.append("no_close")

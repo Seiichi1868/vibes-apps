@@ -413,6 +413,14 @@
   function renderScore(data) {
     const oreo = data.oreo || {};
     const mark = (on) => `<span class="dot ${on ? "on" : ""}"></span>`;
+    const oreoSlots = [
+      ["Opinion", oreo.opinion_open],
+      ["R1", "reason_1" in oreo ? oreo.reason_1 : oreo.reason],
+      ["R2", oreo.reason_2],
+      ["E1", "example_1" in oreo ? oreo.example_1 : oreo.example],
+      ["E2", oreo.example_2],
+      ["結び", oreo.opinion_close],
+    ];
     const when = esc(String(data.created_at || "").replace("T", " ").slice(0, 16));
     const total = data.show_points && data.scores ? esc(data.scores.total) : "—";
     const wpm = data.show_points ? esc(data.wpm_points) : "—";
@@ -429,10 +437,7 @@
       <section class="oreo-box" aria-label="OREO">
         <h2>OREO</h2>
         <div class="oreo">
-          <span class="${oreo.opinion_open ? "hit" : ""}">${mark(oreo.opinion_open)} Opinion</span>
-          <span class="${oreo.reason ? "hit" : ""}">${mark(oreo.reason)} Reason</span>
-          <span class="${oreo.example ? "hit" : ""}">${mark(oreo.example)} Example</span>
-          <span class="${oreo.opinion_close ? "hit" : ""}">${mark(oreo.opinion_close)} 結び</span>
+          ${oreoSlots.map(([label, on]) => `<span class="${on ? "hit" : ""}">${mark(on)} ${label}</span>`).join("")}
         </div>
       </section>
       <div class="foot">
@@ -457,8 +462,10 @@
     const commentOf = (key) => (key === "delivery" ? data.delivery_text : comments[key]) || "";
     const ores = [
       ["Opinion", evidence.opinion_open],
-      ["Reason", evidence.reason],
-      ["Example", evidence.example],
+      ["R1", evidence.reason_1 || evidence.reason],
+      ["R2", evidence.reason_2],
+      ["E1", evidence.example_1 || evidence.example],
+      ["E2", evidence.example_2],
       ["結び", evidence.opinion_close],
     ];
     app.innerHTML = `

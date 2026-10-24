@@ -102,6 +102,9 @@ class InterpretTests(unittest.TestCase):
         self.assertIn("off_topic", parsed["flags"])
         self.assertIn("short_speech", parsed["flags"])
         self.assertNotIn("evidence", parsed["oreo"])
+        self.assertTrue(parsed["oreo"]["reason_1"])
+        self.assertFalse(parsed["oreo"]["reason_2"])
+        self.assertFalse(parsed["oreo"]["example_1"])
         self.assertIn("I think winter", parsed["view"]["evidence"]["opinion_open"])
 
 
