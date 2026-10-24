@@ -838,6 +838,12 @@
   margin-bottom: 12px;
 }
 
+.vsc-vocab-body-compact {
+  font-size: 0.68rem;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
 .vsc-noun-cat + .vsc-noun-cat {
   margin-top: 12px;
   padding-top: 12px;
@@ -932,6 +938,19 @@
 .vsc-vocab-btn-meta {
   font-size: 0.7rem;
   color: var(--text-secondary);
+}
+
+.vsc-vocab-btn-compact {
+  padding: 8px 8px;
+  gap: 1px;
+}
+.vsc-vocab-btn-compact .vsc-vocab-btn-label {
+  font-size: 0.72rem;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+.vsc-vocab-btn-compact .vsc-vocab-btn-meta {
+  font-size: 0.62rem;
 }
 
 .vsc-choice-list {
