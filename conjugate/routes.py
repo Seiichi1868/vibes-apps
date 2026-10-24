@@ -652,7 +652,7 @@ def vocab_screen(session_id):
         session_id=session_id,
         direction=session.get("direction", "ja_to_es"),
         direction_label=DIRECTION_LABELS.get(session.get("direction"), ""),
-        quiz_title="名詞クイズ" if session.get("kind") == "noun" else "意味クイズ",
+        quiz_title=(session.get("category_label") or "単語") + "クイズ" if session.get("kind") == "noun" else "意味クイズ",
     )
 
 

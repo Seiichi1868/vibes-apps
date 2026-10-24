@@ -16,6 +16,7 @@
 
   <p id="prompt-kicker" class="vsc-slide-subtitle text-center"></p>
   <h2 id="prompt-word" class="vsc-prompt-word"></h2>
+  <p id="prompt-en" class="vsc-prompt-en"></p>
 
   <div id="choice-list" class="vsc-choice-list"></div>
 
@@ -31,5 +32,5 @@
 <script>
   window.CONJUGATE_VOCAB_SESSION_ID = {{ session_id | tojson }};
 </script>
-<script src="{{ url_for('conjugate.static', filename='js/vocab.js', v='20261010a') }}"></script>
+<script src="{{ url_for('conjugate.static', filename='js/vocab.js', v='20261024a') }}"></script>
 {% endblock %}

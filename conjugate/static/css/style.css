@@ -981,6 +981,27 @@
   margin-top: 8px;
 }
 
+.vsc-prompt-en,
+.vsc-choice-en {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+}
+
+.vsc-prompt-en {
+  text-align: center;
+  margin-top: 4px;
+  min-height: 1em;
+}
+
+.vsc-choice-en {
+  display: block;
+  margin-top: 2px;
+  font-weight: 500;
+}
+
 .vsc-btn-stop {
   background: #C97858;
   color: #fff;
