@@ -95,7 +95,7 @@ class NounQuizTests(unittest.TestCase):
         for q in questions:
             labels = [c["label"] for c in q["choices"]]
             self.assertEqual(len(set(labels)), 4)
-            self.assertEqual(q["prompt_kicker"], "この日本語は？")
+            self.assertEqual(q["prompt_kicker"], "これはスペイン語で？")
             self.assertTrue(q["prompt_en"])
         papa = next(q for q in questions if q["meaning_ja"] == "じゃがいも")
         self.assertIn("la papa（南米） / la patata（スペイン）", [c["label"] for c in papa["choices"]])

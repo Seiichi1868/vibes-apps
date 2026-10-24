@@ -73,7 +73,7 @@ def build_noun_questions(category: str, direction: str, count: int | None = None
         chosen.append(random.choice(pool))
 
     key = "es" if direction == "ja_to_es" else "ja"
-    kicker = "この日本語は？" if direction == "ja_to_es" else "このスペイン語の意味は？"
+    kicker = "これはスペイン語で？" if direction == "ja_to_es" else "このスペイン語の意味は？"
     questions = []
     for noun in chosen:
         distractors = _pick_distractors(noun, pool, key, n=3)
