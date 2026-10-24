@@ -378,9 +378,30 @@
     return button;
   }
 
+  const AXES = [
+    { key: "general_description", en: "General Description", ja: "内容", tone: "gd" },
+    { key: "delivery", en: "Delivery", ja: "話し方", tone: "dv" },
+    { key: "language_use", en: "Language Use", ja: "英語", tone: "lu" },
+    { key: "topic_development", en: "Topic Development", ja: "構成", tone: "td" },
+  ];
+
   function bars(level) {
     const n = Math.max(0, Math.min(6, Number(level) || 0));
-    return `<span class="ticks">${[1, 2, 3, 4, 5, 6].map((i) => `<i class="${i <= n ? "on" : ""}"></i>`).join("")}</span>`;
+    return `<span class="ticks" aria-hidden="true">${[1, 2, 3, 4, 5, 6].map((i) => `<i class="${i <= n ? "on" : ""}"></i>`).join("")}</span>`;
+  }
+
+  function axisCard(data, axis) {
+    const level = (data.levels || {})[axis.key];
+    const shown = level ? `Lv ${esc(level)}` : "—";
+    return `<article class="axis axis-${axis.tone}">
+      <header>
+        <span class="axis-ja">${axis.ja}</span>
+        <span class="axis-en">${axis.en}</span>
+        <strong>${shown}</strong>
+        <em>${points(data, axis.key)}</em>
+      </header>
+      ${bars(level)}
+    </article>`;
   }
 
   function points(data, key) {
@@ -401,14 +422,19 @@
       <p class="meta"><a href="/rec/my">自分の結果</a> ${when} ・ 試行 ${esc(data.attempt)}</p>
       <p class="topic">${esc(data.topic)}</p>
       <p class="total">${total}</p>
-      <p class="sub">WPM点 ${wpm} ／ ルーブリック ${rubric}</p>
-      <div class="bars">
-        <div class="bar-row"><span>General Description</span>${bars((data.levels || {}).general_description)}<span>${points(data, "general_description")}</span></div>
-        <div class="bar-row"><span>Delivery（流暢さ）</span>${bars((data.levels || {}).delivery)}<span>${points(data, "delivery")}</span></div>
-        <div class="bar-row"><span>Language Use</span>${bars((data.levels || {}).language_use)}<span>${points(data, "language_use")}</span></div>
-        <div class="bar-row"><span>Topic Development</span>${bars((data.levels || {}).topic_development)}<span>${points(data, "topic_development")}</span></div>
-      </div>
-      <p class="oreo">OREO ${mark(oreo.opinion_open)} O ${mark(oreo.reason)} R ${mark(oreo.example)} E ${mark(oreo.opinion_close)} O</p>
+      <p class="sub"><span>WPM点 ${wpm}</span><span>ルーブリック ${rubric}</span></p>
+      <section class="axes" aria-label="評価項目">
+        ${AXES.map((axis) => axisCard(data, axis)).join("")}
+      </section>
+      <section class="oreo-box" aria-label="OREO">
+        <h2>OREO</h2>
+        <div class="oreo">
+          <span class="${oreo.opinion_open ? "hit" : ""}">${mark(oreo.opinion_open)} Opinion</span>
+          <span class="${oreo.reason ? "hit" : ""}">${mark(oreo.reason)} Reason</span>
+          <span class="${oreo.example ? "hit" : ""}">${mark(oreo.example)} Example</span>
+          <span class="${oreo.opinion_close ? "hit" : ""}">${mark(oreo.opinion_close)} 結び</span>
+        </div>
+      </section>
       <div class="foot">
         <button type="button" id="detail">詳細</button>
         <span class="code">${esc(data.verify_code || "")}</span>
@@ -428,20 +454,39 @@
     const comments = data.comments || {};
     const evidence = data.evidence || {};
     const levels = data.levels || {};
+    const commentOf = (key) => (key === "delivery" ? data.delivery_text : comments[key]) || "";
+    const ores = [
+      ["Opinion", evidence.opinion_open],
+      ["Reason", evidence.reason],
+      ["Example", evidence.example],
+      ["結び", evidence.opinion_close],
+    ];
     app.innerHTML = `
       <button type="button" id="back">結果に戻る</button>
       <h2>詳細</h2>
       <div id="player"><button type="button" id="play">再生</button><input id="seek" type="range" min="0" max="1000" value="0"></div>
-      <p>General Description ${esc(levels.general_description || "")}：${esc(comments.general_description || "")}</p>
-      <p>Delivery（流暢さ） ${esc(levels.delivery || "")}：${esc(data.delivery_text || "")}</p>
-      <p>Language Use ${esc(levels.language_use || "")}：${esc(comments.language_use || "")}</p>
-      <p>Topic Development ${esc(levels.topic_development || "")}：${esc(comments.topic_development || "")}</p>
-      <p>次の一歩：${esc(data.next_step || "")}</p>
-      <p>Opinion ${esc(evidence.opinion_open || "")}</p>
-      <p>Reason ${esc(evidence.reason || "")}</p>
-      <p>Example ${esc(evidence.example || "")}</p>
-      <p>結び ${esc(evidence.opinion_close || "")}</p>
-      <p>${esc(data.transcript)}</p>`;
+      <section class="detail-axes" aria-label="観点ごとのコメント">
+        ${AXES.map((axis) => `<article class="axis axis-${axis.tone}">
+          <header>
+            <span class="axis-ja">${axis.ja}</span>
+            <span class="axis-en">${axis.en}</span>
+            <strong>${levels[axis.key] ? `Lv ${esc(levels[axis.key])}` : "—"}</strong>
+          </header>
+          <p>${esc(commentOf(axis.key))}</p>
+        </article>`).join("")}
+      </section>
+      <section class="detail-block next-block">
+        <h3>次の一歩</h3>
+        <p>${esc(data.next_step || "")}</p>
+      </section>
+      <section class="detail-block oreo-detail">
+        <h3>OREO の根拠</h3>
+        ${ores.map(([label, text]) => `<p><b>${label}</b>${esc(text || "—")}</p>`).join("")}
+      </section>
+      <section class="detail-block transcript-block">
+        <h3>文字起こし</h3>
+        <p>${esc(data.transcript)}</p>
+      </section>`;
     document.getElementById("back").onclick = () => {
       stopPlayer();
       renderScore(state.result || data);

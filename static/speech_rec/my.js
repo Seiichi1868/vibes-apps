@@ -41,12 +41,21 @@
       <p class="meta">${when} ・ 試行 ${esc(data.attempt)}</p>
       <p class="topic">${esc(shortTopic(data.topic))}</p>
       <p class="total">${total}</p>
-      <div class="bars">
-        <div class="bar-row"><span>General Description</span><span>${esc(levels.general_description || "")}</span><span>${esc(points.general_description || "")}</span></div>
-        <div class="bar-row"><span>Delivery（流暢さ）</span><span>${esc(levels.delivery || "")}</span><span>${esc(points.delivery || "")}</span></div>
-        <div class="bar-row"><span>Language Use</span><span>${esc(levels.language_use || "")}</span><span>${esc(points.language_use || "")}</span></div>
-        <div class="bar-row"><span>Topic Development</span><span>${esc(levels.topic_development || "")}</span><span>${esc(points.topic_development || "")}</span></div>
-      </div>
+      <section class="axes" aria-label="評価項目">
+        ${[
+          ["general_description", "内容", "General Description", "gd"],
+          ["delivery", "話し方", "Delivery", "dv"],
+          ["language_use", "英語", "Language Use", "lu"],
+          ["topic_development", "構成", "Topic Development", "td"],
+        ].map(([key, ja, en, tone]) => `<article class="axis axis-${tone}">
+          <header>
+            <span class="axis-ja">${ja}</span>
+            <span class="axis-en">${en}</span>
+            <strong>${levels[key] ? `Lv ${esc(levels[key])}` : "—"}</strong>
+            <em>${esc(points[key] || "")}</em>
+          </header>
+        </article>`).join("")}
+      </section>
       <p class="code">${esc(data.verify_code || "")}</p>
       <button type="button" id="back">一覧</button>
       ${todayResult() ? `<p><a id="today" href="${esc(todayResult())}">今日の結果に戻る</a></p>` : ""}`;

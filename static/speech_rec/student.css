@@ -7,7 +7,7 @@ body {
   color: #1c1915;
 }
 html, body { height: 100%; }
-.app.sheet { min-height: 0; max-width: none; margin: 0; }
+.app.sheet { min-height: 0; max-width: 28rem; margin: 0 auto; }
 .app {
   min-height: 100dvh;
   display: flex;
@@ -38,14 +38,15 @@ button.primary { background: #1f4d3a; color: #fff; border-color: #1f4d3a; }
 .err { color: #8d1d1d; }
 .small { font-size: .85rem; color: #6b645b; }
 .sheet {
-  height: 100dvh;
-  max-height: 100dvh;
-  overflow: hidden;
+  min-height: 100dvh;
+  height: auto;
+  max-height: none;
+  overflow: auto;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: .35rem;
-  padding: .3rem .5rem .25rem;
+  justify-content: flex-start;
+  gap: .45rem;
+  padding: .45rem .55rem .7rem;
 }
 .sheet .meta { font-size: clamp(13px, 3.4vw, 17px); color: #6b645b; margin: 0; }
 .mine { margin: 0; text-align: right; font-size: .8rem; }
@@ -59,15 +60,66 @@ button.primary { background: #1f4d3a; color: #fff; border-color: #1f4d3a; }
   overflow: hidden;
 }
 .total { font-size: clamp(40px, 12vw, 58px); font-weight: 750; margin: 0; line-height: 1; }
-.sub { font-size: clamp(16px, 4.2vw, 20px); margin: 0; }
-.bars { display: flex; flex-direction: column; gap: .15rem; }
-.bar-row { display: grid; grid-template-columns: 1fr auto auto; gap: .35rem; align-items: center; font-size: clamp(15px, 4vw, 18px); }
-.ticks { display: flex; gap: 2px; }
-.ticks i { width: clamp(9px, 2.8vw, 14px); height: clamp(9px, 2.5vw, 12px); background: #d9d3c7; display: block; }
-.ticks i.on { background: #1f4d3a; }
-.oreo { display: flex; gap: .55rem; font-size: clamp(16px, 4.4vw, 20px); margin: 0; }
-.dot { width: .7em; height: .7em; border-radius: 50%; display: inline-block; border: 1px solid #1c1915; vertical-align: middle; }
-.dot.on { background: #1f4d3a; }
+.sub { font-size: clamp(15px, 4vw, 18px); margin: 0; display: flex; gap: .7rem; flex-wrap: wrap; }
+.axes, .detail-axes { display: flex; flex-direction: column; gap: .4rem; }
+.axis {
+  border-radius: 12px;
+  padding: .4rem .55rem .45rem;
+  border: 1px solid transparent;
+}
+.axis header {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: .35rem .45rem;
+  align-items: baseline;
+}
+.axis-ja {
+  font-size: .72rem;
+  font-weight: 750;
+  letter-spacing: .04em;
+  padding: .05rem .35rem;
+  border-radius: 999px;
+  background: #fff;
+}
+.axis-en { font-size: clamp(13px, 3.5vw, 15px); font-weight: 650; }
+.axis header strong { font-size: clamp(14px, 3.8vw, 16px); }
+.axis header em { font-style: normal; font-variant-numeric: tabular-nums; font-weight: 700; min-width: 1.6rem; text-align: right; }
+.axis-gd { background: #e7f3ee; border-color: #b7d7c8; color: #16382b; }
+.axis-dv { background: #f8efe0; border-color: #e4cfab; color: #5a3d12; }
+.axis-lu { background: #e7eef8; border-color: #c3d2ea; color: #1c3358; }
+.axis-td { background: #f3eaf6; border-color: #dcc6e4; color: #4a2758; }
+.axis-gd .ticks i.on { background: #1f4d3a; }
+.axis-dv .ticks i.on { background: #a86b16; }
+.axis-lu .ticks i.on { background: #2d5aa6; }
+.axis-td .ticks i.on { background: #7a3d92; }
+.ticks { display: flex; gap: 3px; margin-top: .28rem; }
+.ticks i { width: clamp(14px, 4.2vw, 22px); height: 7px; border-radius: 99px; background: rgba(28, 25, 21, .16); display: block; }
+.oreo-box, .detail-block {
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #e0d9cc;
+  padding: .4rem .55rem .5rem;
+}
+.oreo-box h2, .detail-block h3 { margin: 0 0 .3rem; font-size: .78rem; letter-spacing: .06em; color: #6b645b; }
+.oreo { display: grid; grid-template-columns: 1fr 1fr; gap: .3rem; margin: 0; }
+.oreo span {
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+  font-size: clamp(13px, 3.6vw, 15px);
+  padding: .28rem .4rem;
+  border-radius: 8px;
+  background: #f6f4ef;
+  color: #6b645b;
+}
+.oreo span.hit { background: #e7f3ee; color: #16382b; font-weight: 650; }
+.dot { width: .65em; height: .65em; border-radius: 50%; display: inline-block; border: 1px solid currentColor; flex: none; }
+.dot.on { background: currentColor; }
+.detail-axes .axis p, .detail-block p { margin: .15rem 0 0; line-height: 1.5; font-size: .95rem; }
+.oreo-detail p { display: grid; grid-template-columns: 4.5rem 1fr; gap: .35rem; margin: .25rem 0; }
+.oreo-detail b { font-size: .8rem; color: #6b645b; }
+.next-block { background: #fff8e8; border-color: #ead7a4; }
+.transcript-block p { white-space: pre-wrap; }
 .next { font-size: clamp(11px, 3vw, 14px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0; }
 .foot { display: flex; justify-content: space-between; align-items: flex-end; gap: .4rem; }
 .note-line { font-size: clamp(9px, 2.5vw, 11px); margin: 0; }
